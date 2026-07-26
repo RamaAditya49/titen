@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a concrete Titen capability or improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the real workflow or limitation, not only a preferred implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Product mode
+      options:
+        - Personal
+        - Company
+        - Enterprise
+        - All modes
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current workaround
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and scale
+      description: Include frequency, corpus size, latency, cost, or failure examples when available.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This belongs in a memory/collaboration layer rather than an agent runtime or general scheduler.
+          required: true

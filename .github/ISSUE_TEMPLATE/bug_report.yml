@@ -1,0 +1,51 @@
+name: Bug report
+description: Report reproducible incorrect behavior in Titen
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here. Follow SECURITY.md.
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - Cloudflare
+        - Bun/VPS
+        - Shared core
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Use synthetic data and remove credentials/private memory.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Titen version or commit
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials, private memory, prompts, and production payloads.
+          required: true

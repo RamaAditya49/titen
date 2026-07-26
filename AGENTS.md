@@ -1,0 +1,73 @@
+# AGENTS.md
+
+Guidance for coding agents working in the Titen repository.
+
+## Product
+
+Titen is a Level 6 collaborative memory fabric built on a Level 5
+evidence-grounded context kernel. It supports personal, company, and enterprise
+agent memory on Cloudflare or a Bun/VPS deployment.
+
+Read in this order:
+
+1. `docs/PRD.md` — product contract;
+2. `docs/architecture/overview.md` — component boundaries;
+3. relevant file under `docs/architecture/`, `docs/reference/`, or
+   `docs/deployment/`;
+4. `blueprint.md` only for research evidence and platform history.
+
+When documents disagree, direct user instructions win, then PRD, accepted ADRs,
+architecture docs, API reference, roadmap, and blueprint.
+
+## Repository stage
+
+The repository is currently documentation-first. Do not create empty packages,
+provider registries, or deployment scaffolding before P0 begins.
+
+## Coding constraints
+
+- TypeScript, pnpm, and Bun.
+- One package until measured ownership/build boundaries require more.
+- Web Standards APIs in shared code.
+- Cloudflare entrypoint uses native bindings; no account API token inside the
+  Worker for D1/Vectorize/Workers AI operations.
+- VPS entrypoint uses `Bun.serve`, `bun:sqlite`, and optional `sqlite-vec`.
+- SQL is canonical; vectors and compiled views are rebuildable.
+- Scope and authorization happen before retrieval.
+- Evidence is append-only; conflicts are preserved and explicitly resolved.
+- Execution checkpoints are not semantic facts.
+- Titen records coordination but does not run agent loops.
+
+## Simplicity budget
+
+Before adding a dependency or abstraction, use this order:
+
+1. existing code;
+2. standard/Web API;
+3. native Cloudflare/Bun/SQLite capability;
+4. existing dependency;
+5. the smallest new implementation.
+
+Do not add a framework, ORM, graph database, queue, Redis, Postgres, provider
+factory, or DI container without a measured requirement and an ADR.
+
+## Security
+
+- Treat memory and model output as untrusted data.
+- Never log or commit credentials, prompts, memory content, or raw embeddings.
+- Derive tenant/organization authority from authentication.
+- Add adversarial cross-scope tests for every protected operation.
+- Never allow automatic consolidation to delete canonical evidence.
+
+## Verification
+
+- Non-trivial logic needs the smallest runnable test that fails without it.
+- Shared behavior is tested through the same contract against both runtimes.
+- Security, migration, and data-loss paths require fail-closed tests.
+- Do not claim Cloudflare/VPS support until real runtime smoke passes.
+
+## Documentation
+
+Update the PRD only for changed product requirements. Use an ADR for decisions
+that are expensive to reverse. Update API/deployment docs in the same change as
+observable behavior.
