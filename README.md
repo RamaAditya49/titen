@@ -138,6 +138,11 @@ Neighborhood, and Conflict & Freshness. v0.3 adds Scope Preview and Knowledge
 Release for authorized governance work. SQL stays canonical; Atlas adds no
 graph database, grants no access, and is not required for headless REST/MCP.
 
+Atlas is also the first and only area in the initial dashboard slice. Later
+operator areas follow the progressive [DESIGN](./docs/DESIGN.md) map and appear
+only after their backend contract, authorization, and EARS UI work item pass.
+Titen does not render locked or promotional placeholders for unshipped areas.
+
 ## First useful slice
 
 The first implementation will prove the complete Level 5 loop with five
@@ -203,6 +208,7 @@ Docker.
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | [PRD](./docs/PRD.md)                                                                   | Product goals, users, scope, and success criteria     |
 | [FRD](./docs/FRD.md)                                                                   | Functional behavior and acceptance requirements       |
+| [DESIGN](./docs/DESIGN.md)                                                             | Progressive dashboard information architecture        |
 | [Requirements workflow](./docs/engineering/requirements-workflow.md)                   | EARS criteria and closed work lifecycle               |
 | [Architecture](./docs/architecture/overview.md)                                        | Components and dual-runtime boundaries                |
 | [Memory lifecycle](./docs/architecture/memory-lifecycle.md)                            | Complete Level 5/6 flow and embedding/vector decision |
@@ -215,7 +221,7 @@ Docker.
 | [Threat model](./docs/security/threat-model.md)                                        | Trust boundaries, attack paths, and controls          |
 | [Roadmap](./docs/ROADMAP.md)                                                           | Delivery sequence and release gates                   |
 | [Channel-release decision](./docs/decisions/0002-channel-release-not-public-memory.md) | Why CRM/public knowledge is an approved snapshot      |
-| [Memory Atlas decision](./docs/decisions/0003-memory-atlas-authorized-projection.md)    | Why visualization stays optional and derived          |
+| [Memory Atlas decision](./docs/decisions/0003-memory-atlas-authorized-projection.md)   | Why visualization stays optional and derived          |
 | [Research landscape](./docs/research/competitive-landscape.md)                         | Mem0, Honcho, Karpathy, and Titen's position          |
 | [Brand](./docs/BRAND.md)                                                               | Logo, palette, typography, and mascot rules           |
 | [Blueprint](./blueprint.md)                                                            | Research audit and design rationale                   |

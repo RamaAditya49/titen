@@ -9,6 +9,10 @@ together.
 The roadmap is ordered by risk. A phase starts only after the previous gate
 passes on both Cloudflare and VPS.
 
+Dashboard delivery follows the progressive area map in
+[DESIGN](./DESIGN.md). A backend feature may ship headlessly before its
+operator UI; no planned area appears as placeholder navigation.
+
 ## P0 — dual-runtime spike
 
 Prove the smallest vertical path:
@@ -54,6 +58,8 @@ Gate:
   and Conflict & Freshness lenses over authorized canonical records;
 - one bounded `POST /v1/memory-views/compile` contract shared by Cloudflare and
   VPS, with no graph database and no dependency from the headless core;
+- first optional dashboard slice at `/dashboard/`, rendering Atlas directly as
+  its only product area with no locked or speculative navigation;
 - single-deployment company mode.
 
 ## v0.3 — enterprise governance
@@ -70,6 +76,29 @@ Gate:
 - backup/restore and disaster-recovery drills;
 - Memory Atlas Scope Preview and Knowledge Release lenses; preview computes
   eligibility but never impersonates a principal or grants access.
+- Approvals & Releases appears in dashboard navigation only after its separate
+  governance UI work item and authorization journeys pass.
+
+## Dashboard expansion rule
+
+After the first Atlas slice, dashboard areas are selected one bounded operator
+journey at a time:
+
+1. Memory may add Memories and Context after authorized list/detail contracts
+   stabilize;
+2. Collaboration may add Work after checkpoint, lease, and handoff contracts
+   pass;
+3. Operations may add Audit & Events and System after their metadata and
+   recovery boundaries pass;
+4. Administration may add Access after key, identity, membership, and
+   visibility management behavior passes;
+5. Governance may add Approvals & Releases no earlier than v0.3.
+
+An area is absent until its backend capability, authorization, current-build
+availability, EARS UI work item, and failure/rollback evidence are complete.
+Categories and tags remain filters; webhooks remain inside Audit & Events;
+export/recovery remains inside System; Settings waits for an explicit browser
+account/session contract.
 
 ## v1 — federation when justified
 

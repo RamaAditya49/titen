@@ -6,16 +6,18 @@ remember this, and was it safe to use?”
 
 The accepted boundary is recorded in
 [ADR-0003](../decisions/0003-memory-atlas-authorized-projection.md).
+Its position inside the progressive operator interface is defined in
+[DESIGN](../DESIGN.md).
 
 ## Product lenses
 
 | Lens                       | Release | Operator question                                                              |
 | -------------------------- | ------- | ------------------------------------------------------------------------------ |
 | Evidence Trace             | v0.2    | Which observations support, contradict, or qualify this claim/context item?    |
-| Memory Neighborhood        | v0.2    | Which authorized claims, subjects, agents, and contexts are directly related? |
+| Memory Neighborhood        | v0.2    | Which authorized claims, subjects, agents, and contexts are directly related?  |
 | Conflict & Freshness       | v0.2    | Which claims are disputed, stale, superseded, expired, or recently changed?    |
 | Scope Preview              | v0.3    | What would an explicitly selected principal be eligible to inspect?            |
-| Knowledge Release         | v0.3    | Which reviewed snapshot reaches which channel/audience, and from what source?  |
+| Knowledge Release          | v0.3    | Which reviewed snapshot reaches which channel/audience, and from what source?  |
 | Constellation/Time Machine | later   | Does large-scale exploration or temporal playback improve measured operations? |
 
 Evidence Trace is the priority. A visually impressive constellation without
@@ -25,7 +27,7 @@ provenance, temporal state, or authorization is not sufficient.
 
 ```mermaid
 flowchart LR
-    O[Authorized operator] --> U[Optional Memory Atlas UI]
+    O[Authorized operator] --> U[Optional dashboard / Atlas area]
     U --> A[Authenticated REST]
     A --> P[Auth and policy]
     P --> V[Memory view compiler]
@@ -65,6 +67,18 @@ The compiler follows this order:
 
 Authorization happens before expansion. Response totals describe only the
 authorized candidate set; they cannot reveal that hidden nodes or edges exist.
+
+## Dashboard placement
+
+Atlas is the first and only area in the active v0.2 dashboard implementation
+slice. It renders directly at `/dashboard/` without an empty sidebar, locked
+future areas, or an administration shell.
+
+The long-term dashboard may later group Atlas with Memories and Context under
+Memory. That information architecture does not change Atlas authorization or
+make the later areas part of this release. Each area remains absent until its
+backend contract, authorization, current-build capability, and separate EARS UI
+work item are complete.
 
 ## Projection contract
 
@@ -118,14 +132,17 @@ A future UI should keep meaning stable across lenses:
 - selected detail appears beside a stable overview instead of relaying out the
   entire graph on every click.
 
-This is presentation guidance, not a renderer dependency. Renderer, layout
-algorithm, accessibility behavior, keyboard navigation, and exact node limits
-must be chosen in the implementation spec and verified on representative data.
+This is presentation guidance, not a core renderer dependency. The active v0.2
+implementation spec selects native SVG, deterministic bounded layouts, and a
+synchronized HTML representation; exact limits and accessibility behavior must
+still be verified on representative data. A later renderer dependency requires
+measured need and a revised work spec.
 
 ## Release and failure behavior
 
 - P0/v0.1 have no Memory Atlas release requirement.
 - v0.2 ships only after evidence, collaboration, and cross-scope fixtures pass.
+- the first v0.2 client renders only Atlas and no placeholder navigation;
 - v0.3 lenses ship only after policy, customer isolation, and channel-release
   fixtures pass.
 - A missing UI or renderer is not a readiness failure for the headless service.

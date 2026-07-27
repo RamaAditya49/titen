@@ -4,8 +4,9 @@
 - Product: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers/D1 and Bun/SQLite
-- Related documents: [PRD](./PRD.md), [roadmap](./ROADMAP.md),
-  [architecture](./architecture/overview.md), and [API](./reference/api.md)
+- Related documents: [PRD](./PRD.md), [DESIGN](./DESIGN.md),
+  [roadmap](./ROADMAP.md), [architecture](./architecture/overview.md), and
+  [API](./reference/api.md)
 
 ## 1. Purpose
 
@@ -47,20 +48,20 @@ Titen
     |-- identity, visibility, and policy
     |-- approved channel knowledge releases
     |-- checkpoints, leases, and handoffs
-    `-- optional read-only Memory Atlas projections
+    `-- optional progressive operator dashboard, beginning with Memory Atlas
 ```
 
 The minimum useful path must work without an LLM or vector database.
 
 ## 3. Release feature map
 
-| Release | Required feature set                                                                                                                                     | Gate                                                                               |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| P0      | dual-runtime contract, health, scoped authentication/project resolution, observations, direct claims, context compilation, feedback, FTS-only retrieval  | the same fixture passes on Worker/D1 and Bun/SQLite                                |
-| v0.1    | complete Level 5 kernel, optional consolidation, temporal/conflict lifecycle, evidence inspection, private checkpoints, API-key lifecycle, export/import | one agent can remember, verify, resume, and move its data safely                   |
-| v0.2    | identities and memberships, visibility, shared checkpoints, leases, handoffs, observer-specific claims, audit, stateless MCP, events/webhooks, read-only Memory Atlas | two agents collaborate and operators diagnose memory without private-data leakage |
-| v0.3    | roles and policy, approvals, channel knowledge releases, retention/legal hold, identity boundary, audit/recovery, governance Atlas lenses                    | company and enterprise policy, release, channel-isolation, and recovery tests pass |
-| v1      | governed federation                                                                                                                                      | authorized scopes exchange events without losing provenance or conflicts           |
+| Release | Required feature set                                                                                                                                                                                  | Gate                                                                               |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| P0      | dual-runtime contract, health, scoped authentication/project resolution, observations, direct claims, context compilation, feedback, FTS-only retrieval                                               | the same fixture passes on Worker/D1 and Bun/SQLite                                |
+| v0.1    | complete Level 5 kernel, optional consolidation, temporal/conflict lifecycle, evidence inspection, private checkpoints, API-key lifecycle, export/import                                              | one agent can remember, verify, resume, and move its data safely                   |
+| v0.2    | identities and memberships, visibility, shared checkpoints, leases, handoffs, observer-specific claims, audit, stateless MCP, events/webhooks, read-only Memory Atlas, progressive dashboard boundary | two agents collaborate and operators diagnose memory without private-data leakage  |
+| v0.3    | roles and policy, approvals, channel knowledge releases, retention/legal hold, identity boundary, audit/recovery, governance Atlas lenses                                                             | company and enterprise policy, release, channel-isolation, and recovery tests pass |
+| v1      | governed federation                                                                                                                                                                                   | authorized scopes exchange events without losing provenance or conflicts           |
 
 No feature in a later release is required to implement an earlier gate.
 
@@ -117,6 +118,8 @@ All features obey these rules:
   publish memory without an explicit authorized channel release.
 - no derived Memory Atlas view, layout, cluster, or summary may become
   canonical evidence, grant access, or publish a release.
+- no dashboard area may appear as shipped navigation before its backing
+  contract, authorization, and EARS UI work item are complete.
 - complex work may not enter implementation without an active EARS work spec
   and paired plan.
 
@@ -734,6 +737,53 @@ Acceptance (EARS):
 - **AC-ATLAS-007 — Unwanted behavior:** If a view exceeds configured traversal or response limits, then Titen shall truncate only after authorization, report bounded authorized-result metadata, and avoid unbounded traversal or layout work.
 - **AC-ATLAS-008 — Ubiquitous:** Titen shall keep Memory Atlas in the same repository behind a separate integration boundary, shall expose it through authenticated REST rather than ordinary-agent MCP, and shall require no dashboard dependency in the memory kernel.
 
+### UI-001 — Progressive dashboard information architecture
+
+**Release:** v0.2 establishes the boundary; later areas follow their backing
+feature release and a separate completed UI work item
+
+The canonical area map is defined in [DESIGN](./DESIGN.md). It groups operator
+jobs without claiming that every planned area is implemented:
+
+- Memory: Atlas, Memories, and Context;
+- Collaboration: Work;
+- Operations: Audit & Events and System;
+- Administration: Access;
+- Governance: Approvals & Releases.
+
+Required behavior:
+
+- keep the dashboard optional and consume only authenticated REST contracts;
+- render Memory Atlas directly as the only area in the first v0.2 dashboard
+  slice, without an empty sidebar or product switcher;
+- add a later area only after its backend behavior is implemented, the current
+  build reports it available, the principal may discover it, and its paired
+  EARS UI work item is complete;
+- omit unavailable areas and routes instead of rendering a placeholder, lock,
+  disabled control, upgrade badge, or speculative menu;
+- authorize every route and request independently from navigation state and
+  return a non-disclosing response for foreign resources;
+- keep categories and tags as Memory filters, webhooks inside Audit & Events,
+  export/import and recovery inside System, and runtime configuration read-only
+  until a mutation contract exists;
+- omit Settings until a browser account/session, profile, or password lifecycle
+  is explicitly specified;
+- keep read-only diagnosis visibly distinct from key, approval, release,
+  retention, or recovery mutations;
+- use the same built client and external behavior on Cloudflare and VPS, while
+  leaving headless REST/MCP complete when the client is disabled.
+
+Acceptance (EARS):
+
+- **AC-UI-001 — State-driven:** While a dashboard area lacks an implemented authorized backend contract or completed EARS UI work item, Titen shall omit the area from navigation and direct routes.
+- **AC-UI-002 — Optional feature:** Where only the first v0.2 dashboard slice is shipped, Titen shall render Memory Atlas directly as the sole product area without placeholder navigation.
+- **AC-UI-003 — Event-driven:** When more than one area passes its emergence gate, Titen shall group only discoverable shipped areas under Memory, Collaboration, Operations, Administration, and Governance as defined in DESIGN.
+- **AC-UI-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign dashboard route or resource, then Titen shall return a non-disclosing state and shall clear prior private content that could be mistaken for the requested result.
+- **AC-UI-005 — Ubiquitous:** Titen shall keep categories and tags as Memory filters, webhooks inside Audit & Events, portability and recovery inside System, and Settings absent until an account/session contract exists.
+- **AC-UI-006 — State-driven:** While runtime configuration lacks an authorized mutation contract, Titen shall expose configuration only as non-secret read-only capability and readiness state.
+- **AC-UI-007 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
+- **AC-UI-008 — Unwanted behavior:** If documentation lists a planned dashboard area whose emergence gate has not passed, then Titen shall not present that listing as a shipped route, control, screenshot, or implementation claim.
+
 ## 12. Enterprise governance features
 
 ### GOV-001 — Roles and policy enforcement
@@ -927,9 +977,10 @@ until measured concurrent/offline mutation cases prove they are necessary.
 | stale release claim version                   | `409`; require a new reviewed release snapshot                         |
 | invalid/expired/replayed customer assertion   | generic `403`; resolve/disclose no customer subject                    |
 | channel vector index unavailable              | use authorized release FTS and report degraded capability              |
-| unauthorized Atlas focus/scope                 | non-disclosing `404`; return no hidden node, edge, label, or count      |
-| Atlas limit reached                            | return a bounded authorized view with explicit `truncated=true`         |
-| stale Atlas cache/index                        | re-authorize canonical hydration; omit newly ineligible records         |
+| unauthorized Atlas focus/scope                | non-disclosing `404`; return no hidden node, edge, label, or count     |
+| Atlas limit reached                           | return a bounded authorized view with explicit `truncated=true`        |
+| stale Atlas cache/index                       | re-authorize canonical hydration; omit newly ineligible records        |
+| unavailable dashboard area or direct route    | omit navigation and return non-disclosing `404`; no placeholder        |
 | canonical SQL unavailable                     | fail; never claim a write succeeded                                    |
 | token budget too small for any item           | successful empty context with budget metadata                          |
 | unsupported export version                    | reject before mutation                                                 |
@@ -971,6 +1022,8 @@ Pass conditions:
 10. Reconstruct the flow from metadata-only audit events.
 11. Compile Evidence Trace, Memory Neighborhood, and Conflict & Freshness views
     for visible records, then probe each with a foreign/private record ID.
+12. Open the first v0.2 dashboard slice and confirm Atlas is the only product
+    area, with no locked, disabled, promotional, or speculative menu.
 
 Pass conditions:
 
@@ -982,6 +1035,7 @@ Pass conditions:
 - audit contains no memory content or credential.
 - Atlas returns useful authorized provenance without leaking hidden topology or
   aggregate counts; disabling it does not affect the journey.
+- dashboard navigation exposes no unshipped area or unauthorized scope.
 
 ### Journey C — Enterprise governance and recovery
 
@@ -996,6 +1050,8 @@ Pass conditions:
 9. Re-run authorization, provenance, channel, context, and recovery smoke tests.
 10. Use Scope Preview and Knowledge Release lenses to inspect eligibility and
     release state without granting the previewed principal any access.
+11. Expose Approvals & Releases only after its governance UI work item passes,
+    and confirm direct access remains independently authorized.
 
 Pass conditions:
 
@@ -1007,6 +1063,8 @@ Pass conditions:
 - restored canonical data and provenance match the source.
 - preview and release views expose only authorized policy results and never
   convert verification into publication.
+- governance navigation is absent before its emergence gate and grants no
+  authority after it appears.
 
 ## 16. Quality and success measures
 
@@ -1026,6 +1084,8 @@ Each tagged release publishes measurements appropriate to its features:
 - operator observability: authorized evidence-trace coverage, zero hidden
   topology/count leakage, view-compile p50/p95, truncation, and diagnosis
   success/time;
+- dashboard usability: task completion, navigation error, unauthorized route
+  leakage, and time to identify evidence, context, or work state;
 - portability: normalized round-trip success across Cloudflare and VPS;
 - footprint: compressed Worker target below 1 MiB and VPS idle RSS target below
   100 MiB, excluding model runtimes.
@@ -1049,6 +1109,7 @@ release claim.
 | FR-9 runtimes             | FND-001, FND-002, RET-001, OPS-001                                   |
 | FR-10 channel release     | GOV-001, GOV-002, REL-001, AUD-001, EVT-001                          |
 | FR-11 Memory Atlas        | OBS-001, MEM-005, AUD-001, GOV-001, REL-001                          |
+| FR-12 dashboard IA        | UI-001, FND-002, IAM-001, IAM-002, AUD-001, EVT-001, OBS-001         |
 
 ## 18. Explicit non-features
 
@@ -1057,6 +1118,10 @@ The following are not Titen features for the planned releases:
 - agent execution, scheduling, retries, or model-loop orchestration;
 - general chat UI or mandatory hosted control plane; the optional read-only
   Memory Atlas is explicitly in scope;
+- placeholder, locked, disabled, promotional, or paid-upgrade navigation for
+  unshipped dashboard areas;
+- top-level Categories, Webhooks, Export, Configuration, or Settings areas
+  without the grouping and emergence rules in DESIGN;
 - direct public/internet access to canonical memory or automatic publication of
   verified claims; approved channel releases are the supported external path;
 - mandatory LLM, vector database, graph database, Redis, Postgres, or Docker;

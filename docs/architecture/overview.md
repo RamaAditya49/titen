@@ -10,6 +10,8 @@ accepted in [ADR-0002](../decisions/0002-channel-release-not-public-memory.md).
 The optional operator projection boundary is defined in
 [Memory Atlas](./memory-atlas.md) and accepted in
 [ADR-0003](../decisions/0003-memory-atlas-authorized-projection.md).
+The progressive operator information architecture is defined in
+[DESIGN](../DESIGN.md).
 
 ## System shape
 
@@ -21,7 +23,7 @@ factories or runtime-specific modules dynamically.
 flowchart TB
     A[Agent / thin adapter] --> X[REST or MCP]
     G[CRM / chatbot gateway] --> X
-    O[Operator / optional Memory Atlas UI] --> X
+    O[Operator / optional dashboard] --> X
     X --> H[Fetch API]
     H --> P[Auth and policy]
     P --> C[Level 6 collaboration]
@@ -56,6 +58,7 @@ flowchart TB
 | Memory kernel      | observations, claims, context compilation, feedback    | agent loops       |
 | Collaboration      | checkpoints, leases, handoffs, audit                   | task scheduling   |
 | Channel release    | approved claim snapshots, channel/audience eligibility | public ingress    |
+| Dashboard client   | progressively shipped operator interface               | domain authority  |
 | Memory Atlas       | bounded authorized read-only projections               | canonical storage |
 | Event delivery     | post-commit events, retries, signed webhooks           | agent selection   |
 | SQL adapter        | canonical transactions, FTS, hydration, outbox         | semantic policy   |
@@ -90,6 +93,7 @@ vertical spike starts.
 ```text
 titen/
 ├── .github/
+├── dashboard/                 # added only when the v0.2 UI spec enters implementation
 ├── docs/
 ├── examples/                  # added after the external API stabilizes
 ├── migrations/
@@ -170,6 +174,21 @@ The compiler is a read-only REST integration in the same repository, not a
 seventh ordinary-agent MCP tool. Layout, clusters, summaries, and caches are
 rebuildable and cannot become canonical memory.
 
+## Dashboard path
+
+1. Serve one optional static client that consumes authenticated REST only.
+2. Render only areas implemented in the current build and discoverable by the
+   authenticated principal; navigation never replaces route authorization.
+3. In the first v0.2 slice, render Memory Atlas directly with no placeholder
+   navigation.
+4. Add later areas according to [DESIGN](../DESIGN.md), one completed EARS UI
+   work item at a time.
+5. Keep categories/tags as filters, webhooks within Audit & Events,
+   export/recovery within System, and Settings absent until its own contract.
+
+Disabling or rolling back the static client changes no canonical data, API
+contract, or ordinary-agent MCP behavior.
+
 ## Channel knowledge path
 
 1. An authorized publisher selects one exact active claim version.
@@ -196,6 +215,8 @@ remain source-tool calls instead of stale knowledge releases.
   vector failure degrades only to authorized release FTS.
 - Memory Atlas failure disables only operator visualization; stale projections
   are re-authorized at canonical hydration and cannot widen scope.
+- dashboard failure or omission leaves all headless REST/MCP behavior complete;
+  unavailable areas have no placeholder route or control.
 - Expired lease/checkpoint never becomes a durable fact.
 - Federation failure never changes the local canonical event history.
 
@@ -206,9 +227,10 @@ Expected P0 runtime dependencies:
 - `zod` for trust-boundary validation;
 - `sqlite-vec` only in the VPS adapter if the spike passes.
 
-Memory Atlas adds no graph database or renderer dependency to the core. A UI
-library may be selected only in its implementation spec after a representative
-fixture measures bundle size, accessibility, and node limits.
+Memory Atlas adds no graph database or renderer dependency to the core. The
+active v0.2 client spec uses browser-native HTML, CSS, TypeScript, and SVG; a UI
+library requires a revised work spec and representative bundle, accessibility,
+and node-limit evidence.
 
 Development dependencies:
 

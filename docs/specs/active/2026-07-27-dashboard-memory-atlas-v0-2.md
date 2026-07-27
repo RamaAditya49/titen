@@ -14,8 +14,11 @@ owner: titen-maintainers
 
 ## Related contracts
 
-- PRD: FR-11 Memory Atlas observability;
-- FRD: OBS-001 Memory Atlas authorized views;
+- PRD: FR-11 Memory Atlas observability and FR-12 progressive dashboard
+  information architecture;
+- FRD: OBS-001 Memory Atlas authorized views and UI-001 progressive dashboard
+  information architecture;
+- [Product interface design](../../DESIGN.md);
 - [ADR-0003](../../decisions/0003-memory-atlas-authorized-projection.md);
 - [Memory Atlas architecture](../../architecture/memory-atlas.md);
 - [REST view contract](../../reference/api.md#memory-atlas-operation);
@@ -35,6 +38,10 @@ Ship one optional, read-only `/dashboard/` workspace whose first and only
 product area is Memory Atlas. An operator connects to a Titen endpoint, supplies
 one exact focus record, selects one v0.2 lens, and inspects the authorized view
 through a stable visual overview plus an accessible evidence/detail list.
+
+This slice implements only **Memory > Atlas** from the progressive dashboard
+map. Because it is the sole shipped area, it renders directly without a sidebar,
+product switcher, locked menu, or placeholder route.
 
 The same static artifact must work with Cloudflare and VPS deployments. The
 dashboard is not required for headless REST/MCP and is not proof that the
@@ -62,6 +69,7 @@ Primary journey:
 
 - one same-repository static dashboard artifact with no separate package;
 - one `/dashboard/` route and one Memory Atlas workspace;
+- direct Atlas rendering with no navigation for future dashboard areas;
 - the three v0.2 lenses: `evidence_trace`, `memory_neighborhood`, and
   `conflict_freshness`;
 - exact focus input for the record types accepted by
@@ -79,6 +87,8 @@ Primary journey:
 
 - memory creation, editing, deletion, approval, release activation, key
   administration, membership, retention, or backup controls;
+- Memories, Context, Work, Audit & Events, System, Access, and Approvals &
+  Releases dashboard areas;
 - Scope Preview and Knowledge Release lenses before the v0.3 policy gate;
 - dashboard overview metrics, global search, recent-memory browsing, or a new
   list/search API;
@@ -123,20 +133,22 @@ endpoint passes the same contract.
 ```
 
 No placeholder navigation is rendered for features that do not exist.
+The future area map in [DESIGN](../../DESIGN.md) is documentation, not scope for
+this implementation pair.
 
 ## Interaction and state model
 
-| State          | Required presentation                                                        |
-| -------------- | ---------------------------------------------------------------------------- |
-| disconnected   | endpoint and password-style key fields; no remote request                    |
-| ready          | lens/focus form and an honest empty workspace                                |
-| loading        | layout-matched skeleton; duplicate compile disabled                          |
-| success        | stable overview, list, legend, details, and response metadata                |
-| empty          | explicit “no authorized records in this view”; no decorative fake nodes      |
-| unauthorized   | generic denial/not-found message with no target existence or prior-view leak |
-| degraded       | persistent capability notice while preserving safe authorized results        |
-| truncated      | persistent limit notice with authorized-only counts and effective limits      |
-| network/error  | inline error and explicit retry; never relabel stale data as current          |
+| State         | Required presentation                                                        |
+| ------------- | ---------------------------------------------------------------------------- |
+| disconnected  | endpoint and password-style key fields; no remote request                    |
+| ready         | lens/focus form and an honest empty workspace                                |
+| loading       | layout-matched skeleton; duplicate compile disabled                          |
+| success       | stable overview, list, legend, details, and response metadata                |
+| empty         | explicit “no authorized records in this view”; no decorative fake nodes      |
+| unauthorized  | generic denial/not-found message with no target existence or prior-view leak |
+| degraded      | persistent capability notice while preserving safe authorized results        |
+| truncated     | persistent limit notice with authorized-only counts and effective limits     |
+| network/error | inline error and explicit retry; never relabel stale data as current         |
 
 Changing selection is a client-side action and must not recompile the view.
 Changing lens, focus, scope, or limits requires an explicit compile action.
@@ -241,18 +253,19 @@ recorded before the work closes.
 - **AC-DASH-014 — Ubiquitous:** Titen shall keep initial dashboard JavaScript plus CSS at or below 150 KiB gzip and shall require no frontend framework, graph renderer, remote font, analytics SDK, or runtime provider SDK.
 - **AC-DASH-015 — Optional feature:** Where dashboard hosting is enabled on Cloudflare or VPS, Titen shall serve the same built static artifact behind the configured operator ingress while preserving identical authenticated REST behavior and complete headless operation when hosting is disabled.
 - **AC-DASH-016 — Event-driven:** When an operator disconnects, closes the page, or receives an authentication failure, Titen shall clear the in-memory credential and all rendered private view data without mutating canonical memory.
+- **AC-DASH-017 — Optional feature:** Where this first v0.2 dashboard slice is the only shipped area, Titen shall render Memory Atlas directly and shall expose no navigation, route, lock, disabled control, upgrade badge, or placeholder for a future dashboard area.
 
 ## Risks and mitigations
 
-| Risk                                | Mitigation                                                                    |
-| ----------------------------------- | ----------------------------------------------------------------------------- |
-| visual topology leaks hidden state  | render only the authorized response; generic auth errors; no client inference |
-| graph becomes visually noisy        | three task-specific deterministic layouts and an HTML list, not constellation |
-| credential leaks from browser       | memory-only token, no URL/storage/logs/third-party requests                    |
-| SVG stalls on a large response      | client cap, linear layouts, pre-layout validation, measured fixture            |
-| accessibility depends on SVG        | synchronized semantic HTML list and inspector                                 |
-| frontend expands into admin suite   | read-only scope and no placeholder navigation                                 |
-| Cloudflare/VPS behavior drifts      | one artifact and the same REST contract; hosting adapters only                 |
+| Risk                               | Mitigation                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| visual topology leaks hidden state | render only the authorized response; generic auth errors; no client inference |
+| graph becomes visually noisy       | three task-specific deterministic layouts and an HTML list, not constellation |
+| credential leaks from browser      | memory-only token, no URL/storage/logs/third-party requests                   |
+| SVG stalls on a large response     | client cap, linear layouts, pre-layout validation, measured fixture           |
+| accessibility depends on SVG       | synchronized semantic HTML list and inspector                                 |
+| frontend expands into admin suite  | DESIGN emergence gate, direct Atlas rendering, and no future-area navigation  |
+| Cloudflare/VPS behavior drifts     | one artifact and the same REST contract; hosting adapters only                |
 
 ## Done conditions
 

@@ -17,7 +17,8 @@ spec: docs/specs/active/2026-07-27-dashboard-memory-atlas-v0-2.md
 
 This plan prepares one read-only dashboard vertical slice. It does not authorize
 implementation before the spec's entry gate, and it does not include the v0.3
-governance lenses or a general administration console.
+governance lenses or a general administration console. It implements only
+Memory > Atlas from [DESIGN](../../DESIGN.md).
 
 ## Ordered steps
 
@@ -40,7 +41,8 @@ governance lenses or a general administration console.
       inspector, legend, focus management, keyboard behavior, mobile collapse,
       reduced motion, forced colors, and 200% zoom behavior.
 - [ ] Apply the canonical Titen brand tokens and existing Kawung asset with no
-      remote font, third-party asset, fake metric, or unimplemented navigation.
+      remote font, third-party asset, fake metric, or unimplemented navigation;
+      render Atlas directly with no sidebar or placeholder area.
 - [ ] Add the minimum pure-layout/state tests and one local browser suite for
       credential storage, auth denial, keyboard/mobile accessibility, response
       bounds, rendering, disconnect clearing, and performance measurements.
@@ -59,24 +61,25 @@ governance lenses or a general administration console.
 
 ## Acceptance evidence
 
-| Criterion   | Planned evidence                                                                          |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| AC-DASH-001 | dependency graph/build inspection; kernel import check; six-tool MCP assertion            |
-| AC-DASH-002 | browser network test proving zero authenticated request before explicit connect            |
-| AC-DASH-003 | browser storage/URL/console/request inspection with synthetic canary credential/data        |
-| AC-DASH-004 | invalid, revoked, private, and foreign-focus browser/contract cases                         |
-| AC-DASH-005 | request spy plus authorized fixture parity for all three v0.2 lenses                        |
-| AC-DASH-006 | delayed-response test for skeleton, duplicate-submit prevention, and stale-view clearing    |
-| AC-DASH-007 | authorized empty-response screenshot/DOM assertion with zero fabricated records             |
+| Criterion   | Planned evidence                                                                             |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| AC-DASH-001 | dependency graph/build inspection; kernel import check; six-tool MCP assertion               |
+| AC-DASH-002 | browser network test proving zero authenticated request before explicit connect              |
+| AC-DASH-003 | browser storage/URL/console/request inspection with synthetic canary credential/data         |
+| AC-DASH-004 | invalid, revoked, private, and foreign-focus browser/contract cases                          |
+| AC-DASH-005 | request spy plus authorized fixture parity for all three v0.2 lenses                         |
+| AC-DASH-006 | delayed-response test for skeleton, duplicate-submit prevention, and stale-view clearing     |
+| AC-DASH-007 | authorized empty-response screenshot/DOM assertion with zero fabricated records              |
 | AC-DASH-008 | degraded and truncated fixtures with persistent labeled notices and authorized-only metadata |
-| AC-DASH-009 | selection test proving stable coordinates, synchronized inspector/list, and zero fetch      |
-| AC-DASH-010 | narrow-viewport browser test at 320 and 767 CSS pixels with overflow assertion              |
-| AC-DASH-011 | reduced-motion and forced-colors browser snapshots plus keyboard/focus assertions           |
+| AC-DASH-009 | selection test proving stable coordinates, synchronized inspector/list, and zero fetch       |
+| AC-DASH-010 | narrow-viewport browser test at 320 and 767 CSS pixels with overflow assertion               |
+| AC-DASH-011 | reduced-motion and forced-colors browser snapshots plus keyboard/focus assertions            |
 | AC-DASH-012 | malformed and above-cap fixtures proving pre-layout rejection and bounded error output       |
 | AC-DASH-013 | raw local performance samples on the declared 200-node/400-edge reference fixture            |
 | AC-DASH-014 | production gzip report and dependency/import audit                                           |
-| AC-DASH-015 | identical artifact hash plus Cloudflare/VPS route and headless-disabled smoke                 |
-| AC-DASH-016 | disconnect, page-unload, and auth-failure data/credential clearing browser tests              |
+| AC-DASH-015 | identical artifact hash plus Cloudflare/VPS route and headless-disabled smoke                |
+| AC-DASH-016 | disconnect, page-unload, and auth-failure data/credential clearing browser tests             |
+| AC-DASH-017 | route/DOM/build assertion proving Atlas is direct and no future-area control or route exists |
 
 ## Planned local verification
 
@@ -108,6 +111,8 @@ forced-colors, and final asset gzip bytes. GitHub Actions remain disabled.
 - verify dashboard errors never include raw response content or credentials;
 - verify no dashboard operation mutates memory, feedback, checkpoint, lease,
   handoff, policy, or release state.
+- verify the built client contains no menu, label, route, lock, disabled control,
+  or upgrade prompt for any future DESIGN area.
 
 ## Deployment and smoke sequence
 

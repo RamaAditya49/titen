@@ -81,6 +81,9 @@ and confident reuse of untrusted memory.
 9. **Observability is not authority.** A visual projection may explain an
    authorized result, but it cannot grant access, publish knowledge, or become
    a new source of truth.
+10. **Navigation is a truth claim.** The dashboard exposes only shipped,
+    authorized product areas; planned work never appears as a locked,
+    disabled, or promotional menu.
 
 ## 6. Product modes
 
@@ -96,8 +99,9 @@ and confident reuse of untrusted memory.
 - organizations, workspaces, projects, members, and service agents;
 - private, team, and organization visibility;
 - shared checkpoints, leases, handoffs, and audit;
-- optional read-only Memory Atlas views for evidence, neighborhood, conflict,
-  and freshness inspection;
+- an optional progressively disclosed operator dashboard whose first slice is
+  read-only Memory Atlas evidence, neighborhood, conflict, and freshness
+  inspection;
 - optional governed knowledge serving through an authorized CRM/chatbot
   gateway;
 - one deployment is sufficient.
@@ -232,6 +236,27 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   Cloudflare and VPS, remain outside the six ordinary-agent MCP tools, and add
   no graph-database or renderer dependency to the core.
 
+### FR-12 — progressive dashboard information architecture
+
+- Titen MUST treat the dashboard as an optional authenticated REST client;
+  disabling it MUST leave complete headless REST/MCP behavior unchanged.
+- The initial v0.2 dashboard MUST expose Memory Atlas as its first and only
+  product area and MUST NOT imply that other operator or administration UI has
+  shipped.
+- Later dashboard areas MUST follow the canonical groups defined in
+  [DESIGN](./DESIGN.md): Memory, Collaboration, Operations, Administration, and
+  Governance.
+- An area MUST NOT appear in navigation until its backend contract is
+  implemented, the current build declares it available, its authorization and
+  failure behavior pass, and its paired EARS UI work item is complete.
+- Titen MUST omit unavailable areas instead of rendering placeholder, locked,
+  disabled, paid-upgrade, or speculative navigation.
+- Categories and tags MUST remain memory filters; webhooks MUST remain inside
+  Audit & Events; export and recovery MUST remain inside System; account
+  settings MUST remain absent until an account/session lifecycle exists.
+- Navigation and route discovery MUST NOT bypass authorization or reveal a
+  foreign resource, hidden capability, record count, or private scope.
+
 ## 8. Non-functional requirements
 
 ### Security
@@ -339,6 +364,12 @@ inferring hidden records; disabling the surface leaves headless REST/MCP
 behavior unchanged. Its v0.3 preview lenses must not impersonate another
 principal or convert verified memory into an active release.
 
+The dashboard information architecture is accepted when the v0.2 build renders
+only Atlas with no placeholder navigation, and each later area remains absent
+until its backing capability, authorization, EARS UI work item, and release
+evidence are complete. A planned area in documentation is not implementation
+evidence.
+
 ## 11. Success measures
 
 - retrieval: Recall@5, MRR, precision, and no-result quality;
@@ -353,6 +384,8 @@ principal or convert verified memory into an active release.
   activation/revocation lag, citation coverage, and useful-answer rate;
 - operator observability: authorized evidence-trace coverage, topology leakage
   rate, view-compile p95, truncation rate, and diagnosis success/time;
+- dashboard usability: task-completion rate, navigation error rate, unauthorized
+  route leakage count, and time to identify evidence or work state;
 - portability: successful Cloudflare-to-VPS and VPS-to-Cloudflare round trips.
 
 ## 12. Non-goals
@@ -361,6 +394,8 @@ principal or convert verified memory into an active release.
 - general workflow orchestration;
 - general chat UI or a mandatory hosted control plane; Memory Atlas is an
   optional read-only integration in this repository;
+- placeholder, locked, promotional, or paid-upgrade navigation for unshipped
+  dashboard areas;
 - an unauthenticated public canonical-memory/search endpoint or automatic
   publication of verified claims;
 - mandatory graph traversal or graph database;
@@ -377,5 +412,7 @@ principal or convert verified memory into an active release.
 - exact signed customer-assertion format and issuer/key-rotation contract at
   v0.3;
 - federation transport after a real multi-node requirement exists;
-- Memory Atlas renderer, layout algorithm, and measured server-side caps when
-  its implementation spec starts.
+- measured Memory Atlas server-side caps after the authorized reference fixture
+  exists;
+- the first post-Atlas dashboard area, selected only after its operator journey
+  and authorized list/detail API are stable.
