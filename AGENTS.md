@@ -24,6 +24,26 @@ architecture docs, API reference, roadmap, and blueprint.
 The repository is currently documentation-first. Do not create empty packages,
 provider registries, or deployment scaffolding before P0 begins.
 
+## Required work lifecycle
+
+Every change follows `spec -> plan -> implement -> done`. Read
+[`docs/engineering/requirements-workflow.md`](./docs/engineering/requirements-workflow.md)
+before substantial work.
+
+- Simple work may record its spec, plan, and evidence inline in the issue or
+  pull request.
+- Complex work must create paired files under `docs/specs/active/` and
+  `docs/plans/active/` before implementation.
+- Complex acceptance criteria must use identified EARS patterns and observable
+  outcomes.
+- When scope changes, update the spec first and the plan second before
+  continuing.
+- Completed, cancelled, or superseded work must move both artifacts to their
+  matching `done/` paths. Never report work as done while its spec or plan is
+  still active or contains unchecked work.
+
+Run `node scripts/check-workflow-docs.mjs` before handoff.
+
 ## Coding constraints
 
 - TypeScript, pnpm, and Bun.
@@ -70,4 +90,5 @@ factory, or DI container without a measured requirement and an ADR.
 
 Update the PRD only for changed product requirements. Use an ADR for decisions
 that are expensive to reverse. Update API/deployment docs in the same change as
-observable behavior.
+observable behavior. PRD/FRD entries are product baselines; they do not replace
+the EARS work spec and paired plan required for complex implementation.

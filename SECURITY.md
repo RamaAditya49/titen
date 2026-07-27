@@ -3,6 +3,9 @@
 Titen stores agent and user memory, so confidentiality, integrity, provenance,
 and scope isolation are core security properties.
 
+The design-level assets, trust boundaries, attack paths, required controls, and
+residual risks are maintained in the [threat model](./docs/security/threat-model.md).
+
 ## Reporting a vulnerability
 
 Do not disclose vulnerabilities through public issues, discussions, pull
@@ -28,10 +31,16 @@ Useful reports include:
 - Tenant/organization authority comes from authentication.
 - API keys are high entropy, hashed at rest, scoped, labeled, and revocable.
 - Claims do not become trusted without evidence and policy.
+- Verified trust does not permit external disclosure; customer-facing knowledge
+  requires an explicit approved release for one channel/audience.
 - Vector indexes do not authorize or serve canonical content.
+- Memory Atlas is a read-only derived projection; it authorizes before
+  traversal, cannot grant access, and must not reveal hidden topology or counts.
 - Another agent's private memory is not eligible for retrieval.
 - Checkpoints, leases, and handoffs do not become durable facts automatically.
 - Federation applies source policy before transmitting an event.
+- External customers use an authenticated application gateway and never receive
+  a Titen key or direct canonical-memory access.
 
 ## Prohibited data handling
 
@@ -48,8 +57,12 @@ Titen must not log or expose:
 - cross-tenant or cross-visibility retrieval;
 - memory poisoning or stored prompt injection;
 - unauthorized procedural/organization memory writes;
+- unauthorized channel publication, stale release serving, or cross-customer
+  CRM/chatbot context leakage;
 - evidence mutation or provenance forgery;
 - stale vector resurrection after revoke/delete;
+- Memory Atlas topology/count leakage, stale-projection disclosure, or Scope
+  Preview impersonation/authority escalation;
 - lease/checkpoint races causing duplicate destructive work;
 - export/import scope bypass;
 - federation policy or signature bypass;

@@ -1,5 +1,14 @@
 # Multi-agent collaboration
 
+The end-to-end Level 5/6 sequence is defined in the
+[memory lifecycle protocol](./memory-lifecycle.md). This document expands the
+collaboration-specific identity, visibility, coordination, and governance rules.
+Host adapters, hooks, project resolution, signed events, and orchestrator
+responsibilities are defined in the
+[agent integration flow](./agent-integration.md).
+Customer-facing distribution is governed by
+[ADR-0002](../decisions/0002-channel-release-not-public-memory.md).
+
 ## Goal
 
 Titen enables agents to share useful memory and coordinate bounded work while
@@ -41,6 +50,29 @@ Company-wide policy, approved procedures, and stable reference facts can be
 visible across workspaces. Organization visibility requires stronger write
 authority than personal or episodic memory.
 
+### Approved channel knowledge
+
+An organization may serve reviewed knowledge through CRM, website, support, or
+partner gateways. This is not a fourth visibility value and does not make the
+source claim or evidence public. An authorized publisher creates a versioned
+release snapshot for one channel/audience; an authorized gateway retrieves only
+active releases for that scope.
+
+`Verified` does not mean publishable. Release approval, redaction/localization,
+validity, and revocation are independent of claim trust. Customer-specific
+memory remains subject-scoped and cannot enter anonymous or other-customer
+context.
+
+### Authorized operator views
+
+Memory Atlas may explain evidence, relationships, conflicts, freshness, scope
+eligibility, and channel release state, but it is not a sharing mechanism. Its
+v0.2 views include only records the operator may inspect. v0.3 Scope Preview
+requires explicit preview authority and computes another principal's
+eligibility without impersonating it or granting it access; Knowledge Release
+inspection never exposes private source evidence to a release-only operator.
+All views follow the [Memory Atlas architecture](./memory-atlas.md).
+
 ## Parallel work primitives
 
 Titen provides only the state needed to prevent silent collisions:
@@ -52,6 +84,17 @@ Titen provides only the state needed to prevent silent collisions:
 - **idempotency key:** retry-safe mutation identity.
 
 The caller still decides agent selection, scheduling, retries, and model loops.
+
+## Orchestrator boundary
+
+An orchestrator may receive a post-commit event, select an authorized/capable
+agent, and start it with a handoff ID. The agent must still accept the handoff,
+acquire the lease, and compile context under its own credential. Titen never
+turns an event subscription into project membership.
+
+Without a long-running orchestrator, agents list pending handoffs or poll the
+metadata event cursor. Webhooks target explicit operator-managed gateways or
+dispatchers, not model-generated destinations or ephemeral CLI sessions.
 
 ## Conflict handling
 
@@ -86,6 +129,12 @@ The compiler receives actor, role, task, scope, and token budget. It may include
 It must not include another agent's private memory merely because it is
 semantically similar.
 
+Channel context is a separate policy mode. It includes active approved release
+snapshots plus, only for an authenticated customer, that server-resolved
+customer's eligible memory after signed assertion validation. It excludes
+unreleased internal claims, source evidence the audience cannot inspect, and
+every other customer's memory.
+
 ## Audit
 
 Audit events cover:
@@ -96,7 +145,9 @@ Audit events cover:
 - lease acquisition/release/expiry;
 - checkpoint versions and handoff lifecycle;
 - context compilation item IDs;
-- feedback and authorized conflict resolution.
+- feedback and authorized conflict resolution;
+- channel/release creation, approval, activation, replacement, expiry,
+  revocation, and context item IDs.
 
 Audit events should identify records and actors without copying sensitive
 content into logs.
@@ -108,6 +159,7 @@ Enterprise capabilities are layered onto the same model:
 - role and policy enforcement;
 - retention and legal hold;
 - approval requirements for procedural/organization memory;
+- channel/audience policy and release approval for external knowledge serving;
 - identity-provider mapping;
 - audit export and data-residency controls;
 - per-workspace or per-region storage placement.

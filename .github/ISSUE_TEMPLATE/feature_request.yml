@@ -36,6 +36,26 @@ body:
     attributes:
       label: Evidence and scale
       description: Include frequency, corpus size, latency, cost, or failure examples when available.
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Work classification
+      description: When unsure, select complex.
+      options:
+        - Complex — durable EARS spec and plan required
+        - Simple — inline spec and plan allowed
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: EARS acceptance criteria
+      description: Use one observable behavior per criterion. Complex work will move these into a durable work spec.
+      placeholder: |
+        AC-EXAMPLE-001 — When <event>, Titen shall <measurable response>.
+        AC-EXAMPLE-002 — If <failure>, then Titen shall <safe observable response>.
+    validations:
+      required: true
   - type: checkboxes
     id: scope
     attributes:

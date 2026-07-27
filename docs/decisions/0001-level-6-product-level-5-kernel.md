@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-07-26
+- Related: [ADR-0002](./0002-channel-release-not-public-memory.md) separates
+  internal memory visibility from customer-facing knowledge release.
 
 ## Context
 

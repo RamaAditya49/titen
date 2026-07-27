@@ -25,6 +25,9 @@ Keputusan 26 Juli 2026:
   menjadi task scheduler umum;
 - D1/SQLite tetap canonical; vector index dan compiled views dapat dibangun
   ulang.
+- knowledge untuk CRM/chatbot eksternal memakai snapshot release yang eksplisit,
+  versioned, dan approved; `verified` bukan izin publikasi dan raw canonical
+  memory tidak menjadi endpoint publik.
 
 Dokumen authoritative:
 
@@ -266,7 +269,8 @@ Kesimpulan: pertahankan `subject_id`, `agent_id`, `run_id`, dan source provenanc
 | Persona L0→L3 / consolidation              | tunda sampai ada bukti kebutuhan                        |
 | Reranker, MMR, time-decay                  | tunda sampai eval menunjukkan RRF kurang                |
 | OAuth browser flow / Durable Object        | tunda sampai ada kebutuhan multi-user interactive login |
-| Connectors dan dashboard                   | bukan core; integration terpisah                        |
+| Memory Atlas dashboard                     | v0.2 read-only integration; v0.3 governance lenses      |
+| Connectors dan general-purpose UI          | bukan core; integration terpisah                        |
 
 ## 4. Tujuan fondasi Level 5
 
@@ -488,6 +492,14 @@ Startup/readiness melakukan tiga pemeriksaan:
 Mismatch membuat `/readyz` gagal dan write semantic ditolak. Tidak boleh “memperbaiki” mismatch dengan padding/truncation vector.
 
 ## 8. Scope dan multi-tenancy
+
+Addendum 27 Juli 2026: kontrak produk authoritative memisahkan tiga axis:
+`trust` untuk otoritas bukti, `visibility` untuk akses internal
+`private`/`team`/`organization`, dan `knowledge_release` untuk snapshot yang
+boleh disajikan ke channel/audience eksternal. Detailnya ada di
+[ADR-0002](./docs/decisions/0002-channel-release-not-public-memory.md). Istilah
+tenant pada blueprint awal dipetakan ke organization boundary pada model produk
+terbaru.
 
 - `tenant_id` selalu berasal dari API key.
 - request tidak menerima `tenant_id` sebagai authority.
@@ -723,6 +735,12 @@ Error envelope stabil:
 - CORS off default;
 - server VPS bind ke `127.0.0.1` default;
 - public VPS harus berada di belakang TLS reverse proxy, Cloudflare Tunnel, atau private network;
+- untuk CRM/chatbot, traffic publik berhenti di application gateway; gateway
+  memakai service credential sempit dan Titen tetap authenticated;
+- `verified` tidak otomatis publishable; channel release memerlukan exact claim
+  version, approval terpisah, audience, validity, audit, dan revoke;
+- anonymous caller tidak boleh memilih customer subject dan private customer
+  memory tidak masuk release index;
 - log tidak memuat content, raw prompt, API key, atau full subject ID;
 - telemetry off default;
 - health endpoint tidak memuat nama database, model token, atau stack trace.
@@ -1017,6 +1035,35 @@ Tidak memuat memory content, prompt, embedding, secret, atau full identifiers.
 
 Metric exporter khusus tidak dibuat di v0.1. Log dan provider dashboard cukup sampai ada kebutuhan Prometheus/OpenTelemetry yang nyata.
 
+### 19.1 Memory Atlas
+
+Memory Atlas adalah permukaan observability operator yang opsional dan
+read-only, bukan graph database atau sumber kebenaran baru. SQL tetap canonical;
+node, edge, cluster, layout, summary, dan count selalu merupakan projection yang
+dapat dibangun ulang.
+
+Scope awal v0.2 sengaja kecil:
+
+1. **Evidence Trace** — claim ke versi dan observation sumber;
+2. **Memory Neighborhood** — lingkungan terotorisasi di sekitar satu record;
+3. **Conflict & Freshness** — konflik, supersession, status, dan validity.
+
+v0.3 menambah **Scope Preview** dan **Knowledge Release** untuk operator yang
+memiliki capability eksplisit. Preview hanya menghitung eligibility principal
+lain; ia tidak melakukan impersonation atau memberikan akses. Knowledge Release
+tetap mengikuti ADR-0002: `verified` bukan berarti boleh dipublikasikan.
+
+View dikompilasi melalui `POST /v1/memory-views/compile`. Policy dijalankan
+sebelum traversal; kedua endpoint setiap edge harus boleh dilihat; canonical
+hydration memeriksa ulang version, lifecycle, visibility, dan release status.
+Traversal, label, node, edge, waktu, dan response bytes selalu bounded. Hidden
+record tidak boleh bocor lewat topology, count, label, maupun cache. Bila Atlas
+dimatikan atau renderer gagal, REST/MCP headless tetap berfungsi penuh.
+
+Atlas berada di repository yang sama tetapi di integration boundary terpisah.
+Tidak ada Graphify runtime, graph DB, renderer, atau package tambahan sebelum
+spec implementasi memilih opsi terkecil berdasarkan fixture dan ukuran nyata.
+
 ## 20. Verifikasi dan acceptance criteria
 
 ### 20.1 Contract test yang sama di dua runtime
@@ -1131,6 +1178,8 @@ Gate: jangan lanjut jika BGE-M3 binding, `sqlite-vec` pada Bun, atau bounded ove
 - stateless MCP `remember/recall/forget`;
 - VPS stdio MCP;
 - Mem0 import adapter;
+- Memory Atlas read-only: Evidence Trace, Memory Neighborhood, serta Conflict &
+  Freshness;
 - TypeScript client tipis hanya jika raw fetch usage berulang nyata.
 
 ### P3 — quality and operations
@@ -1139,7 +1188,9 @@ Gate: jangan lanjut jika BGE-M3 binding, `sqlite-vec` pada Bun, atau bounded ove
 - LoCoMo/LongMemEval reproducible run;
 - rate limiting/deletion workflows jika deployment publik membutuhkannya;
 - backup/restore drill automation;
-- optional OCI image.
+- optional OCI image;
+- safety, usefulness, dan dual-runtime latency eval untuk Memory Atlas;
+- Scope Preview dan Knowledge Release lens setelah policy/release v0.3 lolos.
 
 ### P4 — hanya berdasarkan bukti
 
@@ -1155,6 +1206,7 @@ Tambahkan fitur ketika trigger terukur muncul:
 | temporal contradiction adalah error dominan             | validity windows/temporal edge layer              |
 | user berulang kali meminta profile                      | materialized persona, tetap traceable ke memories |
 | browser login dibutuhkan                                | OAuth/Cloudflare Access                           |
+| bounded Atlas views tidak cukup untuk corpus nyata      | ukur dulu; baru pilih stored layout/tile pipeline |
 
 ## 23. Risiko dan mitigasi
 
@@ -1178,7 +1230,8 @@ Tambahkan fitur ketika trigger terukur muncul:
 - Default extraction LLM: dipilih setelah P0 mini-eval.
 - Exact Bun/pnpm/Wrangler versions: dipin saat scaffold berdasarkan versi stabil yang diuji.
 - Hosted OAuth: bearer key dahulu.
-- Dashboard: API/CLI dahulu.
+- Full constellation, time playback, stored layout, dan repository dashboard
+  terpisah: bounded Memory Atlas dahulu.
 - SDK: native `fetch` examples dahulu.
 - Docker: systemd dahulu.
 - Graph/persona/consolidation: eval dahulu.

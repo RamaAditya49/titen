@@ -5,12 +5,25 @@ Thank you for helping build Titen.
 ## Before coding
 
 - Read the [PRD](./docs/PRD.md) and relevant architecture document.
+- Follow the
+  [requirements and delivery workflow](./docs/engineering/requirements-workflow.md):
+  `spec -> plan -> implement -> done`.
+- For memory, retrieval, authorization, or persistence changes, also read the
+  [evaluation specification](./docs/testing/EVALS.md) and
+  [threat model](./docs/security/threat-model.md).
 - Open an issue before a large feature, new dependency, provider, database, or
   architectural change.
 - Small documentation fixes, tests, and isolated bug fixes may go directly to a
   pull request.
 - Security vulnerabilities must follow [SECURITY.md](./SECURITY.md), never a
   public issue.
+
+Classify the change before implementation. Public contracts, persistence,
+migrations, authorization, privacy, dual-runtime behavior, external services,
+concurrency, recovery, dependencies, and measurable performance or reliability
+work are always complex. Complex work requires paired active spec/plan files
+with EARS acceptance criteria. Simple work may keep the same four stages inline
+in its issue or pull request.
 
 ## Repository stage
 
@@ -21,6 +34,8 @@ commands that cannot run yet.
 Documentation changes can be checked with:
 
 ```bash
+node scripts/check-workflow-docs.mjs
+node scripts/check-workflow-docs.mjs --self-test
 git diff --check
 ```
 
@@ -44,6 +59,7 @@ Use Conventional Commit prefixes such as `feat:`, `fix:`, `docs:`, `test:`,
 
 A pull request should state:
 
+- whether the work is simple or complex and, when complex, its spec/plan paths;
 - the problem and smallest chosen solution;
 - affected runtime(s);
 - security/data-migration impact;
@@ -51,12 +67,18 @@ A pull request should state:
 - documentation changed;
 - rollback or compatibility notes when relevant.
 
+Before marking a pull request complete, close its workflow: record evidence for
+every acceptance ID, resolve all plan checkboxes, and move a complex spec/plan
+pair to `done/` together. Cancelled or superseded work also moves to `done/`
+with a concrete closure reason.
+
 ## Architecture decisions
 
 Add an ADR under `docs/decisions/` when changing a durable boundary such as:
 
 - canonical storage semantics;
 - scope/visibility model;
+- channel/audience release and customer-identity boundary;
 - runtime support;
 - API compatibility;
 - federation/conflict strategy;

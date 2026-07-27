@@ -11,8 +11,11 @@
 
 Titen helps AI agents remember and work together. It stores immutable evidence,
 derives temporal claims, compiles task-specific context, and records whether
-that context helped. A collaboration layer adds private/shared visibility,
-checkpoints, leases, handoffs, policy, audit, and optional federation.
+that context helped. A collaboration layer adds private, team, and organization
+visibility plus checkpoints, leases, handoffs, policy, audit, and optional
+federation.
+An enterprise release layer lets authorized CRM/chatbot gateways serve reviewed
+knowledge snapshots without exposing canonical memory.
 
 Personal, company, and enterprise installations use one engine and one external
 contract. Titen is self-hostable and does not require a hosted Titen service.
@@ -34,13 +37,14 @@ and confident reuse of untrusted memory.
 
 ## 3. Users
 
-| User | Need | Default deployment |
-| --- | --- | --- |
-| Individual | Persistent private agent context across sessions | Bun/SQLite or Worker/D1 |
-| Small team | Shared project knowledge and parallel agent handoffs | One Titen deployment |
-| Company | Workspace isolation, roles, audit, and retention | Managed Worker or private VPS |
-| Enterprise | Governance, data boundaries, regional nodes, and federation | Multiple governed deployments |
-| Agent framework author | Stable HTTP/MCP memory and coordination primitives | Embedded client or remote service |
+| User                   | Need                                                        | Default deployment                |
+| ---------------------- | ----------------------------------------------------------- | --------------------------------- |
+| Individual             | Persistent private agent context across sessions            | Bun/SQLite or Worker/D1           |
+| Small team             | Shared project knowledge and parallel agent handoffs        | One Titen deployment              |
+| Company                | Workspace isolation, roles, audit, and retention            | Managed Worker or private VPS     |
+| CRM/chatbot operator   | Approved customer knowledge plus isolated customer context  | Authorized gateway + Titen        |
+| Enterprise             | Governance, data boundaries, regional nodes, and federation | Multiple governed deployments     |
+| Agent framework author | Stable HTTP/MCP memory and coordination primitives          | Embedded client or remote service |
 
 ## 4. Jobs to be done
 
@@ -48,8 +52,12 @@ and confident reuse of untrusted memory.
 - Retrieve the smallest context that is relevant to the current actor and task.
 - Explain where every recalled claim came from and when it was valid.
 - Let agents resume, claim, and hand off work without silently duplicating it.
+- Connect different agent hosts through one small REST/MCP contract and explicit
+  project identity.
 - Preserve disagreement between agents until evidence or authorized policy
   resolves it.
+- Release a reviewed claim version to a specific CRM/chatbot audience without
+  exposing internal evidence or another customer's memory.
 - Export canonical data and move between Cloudflare and VPS deployments.
 
 ## 5. Product principles
@@ -68,6 +76,11 @@ and confident reuse of untrusted memory.
    indexes are rebuildable.
 7. **Light by default.** No graph database, queue, Redis, Postgres, Docker, or
    LLM is mandatory for the first useful path.
+8. **Trust is not disclosure.** Evidence authority, internal visibility, and
+   external channel release remain independent decisions.
+9. **Observability is not authority.** A visual projection may explain an
+   authorized result, but it cannot grant access, publish knowledge, or become
+   a new source of truth.
 
 ## 6. Product modes
 
@@ -83,6 +96,10 @@ and confident reuse of untrusted memory.
 - organizations, workspaces, projects, members, and service agents;
 - private, team, and organization visibility;
 - shared checkpoints, leases, handoffs, and audit;
+- optional read-only Memory Atlas views for evidence, neighborhood, conflict,
+  and freshness inspection;
+- optional governed knowledge serving through an authorized CRM/chatbot
+  gateway;
 - one deployment is sufficient.
 
 ### Enterprise
@@ -90,10 +107,18 @@ and confident reuse of untrusted memory.
 - policy and role enforcement;
 - retention and legal-hold primitives;
 - identity-provider integration boundary;
+- channel, audience, approval, redaction, validity, and revocation policy for
+  customer-facing knowledge;
+- governed Scope Preview and Knowledge Release lenses for authorized operators;
 - governed federation between deployments when required by region or data
   ownership.
 
 ## 7. Functional requirements
+
+These are product-level requirements, not active-work status. Before any
+complex implementation begins, the selected slice MUST be expressed as
+identified EARS acceptance criteria in a paired work spec and plan following
+the [requirements workflow](./engineering/requirements-workflow.md).
 
 ### FR-1 — observations
 
@@ -142,6 +167,8 @@ and confident reuse of untrusted memory.
 - It MUST preserve observer-specific claims and disagreement.
 - It MUST record who wrote, read, shared, resolved, or revoked collaborative
   memory.
+- It MUST expose durable metadata events for explicit orchestrator
+  subscriptions without turning Titen into a scheduler.
 
 ### FR-7 — isolation and policy
 
@@ -164,6 +191,46 @@ and confident reuse of untrusted memory.
 - Cloudflare MUST use native bindings for D1, Vectorize, and Workers AI.
 - VPS MUST use Bun, `bun:sqlite`, and optional `sqlite-vec`.
 - An OpenAI-compatible HTTP model boundary MUST be sufficient on VPS.
+
+### FR-10 — channel knowledge release
+
+- `trust`, internal `visibility`, and external release eligibility MUST remain
+  separate.
+- A release MUST reference one exact claim version and carry an explicit
+  channel, audience, approved snapshot, status, validity window, and approver.
+- Release status MUST be one of `draft`, `approved`, `active`, `suspended`,
+  `replaced`, `expired`, or `revoked`; reactivating a suspended snapshot
+  requires approval again.
+- `verified` MUST NOT imply publishable, and model output, tags, similarity, or
+  feedback MUST NOT activate a release.
+- CRM/chatbot gateways MUST authenticate as service principals; public users
+  MUST NOT receive direct canonical-memory access.
+- Authenticated customer memory MUST be selected from a subject resolved from a
+  short-lived signed channel assertion and MUST NOT enter anonymous or
+  other-customer release context.
+- Revoked, expired, replaced, source-invalidated, or out-of-audience releases
+  MUST be ineligible before the next channel context compile, even when a
+  derived index or asynchronous status update is stale.
+
+### FR-11 — Memory Atlas observability
+
+- Titen MUST offer Memory Atlas as an optional, read-only operator surface;
+  REST/MCP memory operations MUST remain complete when it is disabled.
+- The v0.2 surface MUST support Evidence Trace, Memory Neighborhood, and
+  Conflict & Freshness lenses. Scope Preview and Knowledge Release lenses are
+  v0.3 governance features.
+- Every view MUST be derived from authorized canonical SQL records; layout,
+  clusters, summaries, counts, and caches MUST remain rebuildable projections.
+- Authorization MUST run before traversal and apply to both endpoints of every
+  returned edge. Hidden records MUST NOT leak through labels, topology, counts,
+  or timing-dependent expansion behavior.
+- Canonical hydration MUST recheck lifecycle version, visibility, and release
+  eligibility before returning a cached or indexed candidate.
+- Requests MUST have bounded depth, nodes, edges, labels, execution time, and
+  response bytes, with explicit truncation or degraded metadata.
+- The view compiler MUST use the same authenticated REST contract on
+  Cloudflare and VPS, remain outside the six ordinary-agent MCP tools, and add
+  no graph-database or renderer dependency to the core.
 
 ## 8. Non-functional requirements
 
@@ -201,7 +268,9 @@ and confident reuse of untrusted memory.
 Kernel:
 
 ```text
+POST /v1/projects/resolve
 POST /v1/observations
+POST /v1/observations/batch
 POST /v1/consolidations
 POST /v1/context/compile
 POST /v1/context/:id/feedback
@@ -214,7 +283,28 @@ Collaboration is added after the kernel gate:
 POST /v1/checkpoints
 POST /v1/leases
 POST /v1/handoffs
+GET  /v1/events
 GET  /v1/audit/events
+```
+
+Optional read-only operator views are added with v0.2:
+
+```text
+POST /v1/memory-views/compile
+```
+
+Governed channel knowledge is added with v0.3:
+
+```text
+POST /v1/channels
+GET  /v1/channels
+PATCH /v1/channels/:id
+POST /v1/knowledge-releases
+GET  /v1/knowledge-releases
+POST /v1/knowledge-releases/:id/approve
+POST /v1/knowledge-releases/:id/activate
+POST /v1/knowledge-releases/:id/revoke
+POST /v1/channels/:id/context/compile
 ```
 
 The exact schemas live in [API reference](./reference/api.md).
@@ -229,12 +319,25 @@ P0 is accepted when:
 4. FTS recall continues when vectors are disabled;
 5. context budget is enforced deterministically;
 6. incorrect feedback does not mutate evidence;
-7. restart preserves canonical data and resumable checkpoints;
+7. restart preserves canonical data; v0.1 additionally preserves resumable
+   checkpoints;
 8. measured resource usage is published.
 
 Company collaboration is accepted when two agents can claim separate work,
 observe shared checkpoints, hand off one task, preserve a disputed claim, and
-complete the flow without reading each other's private memories.
+complete the flow without reading each other's private memories. A signed event
+may wake an external orchestrator, but webhook failure cannot roll back memory.
+
+Channel knowledge is accepted when a service gateway can serve one approved
+claim snapshot to the intended audience, cannot retrieve internal or another
+customer's memory, rejects invalid/replayed customer assertions, and stops
+serving a revoked or source-invalidated release before the next context.
+
+Memory Atlas is accepted when an authorized operator can trace evidence,
+inspect a bounded neighborhood, and diagnose conflicts without reading or
+inferring hidden records; disabling the surface leaves headless REST/MCP
+behavior unchanged. Its v0.3 preview lenses must not impersonate another
+principal or convert verified memory into an active release.
 
 ## 11. Success measures
 
@@ -244,13 +347,22 @@ complete the flow without reading each other's private memories.
   rate, and unauthorized-access test pass rate;
 - operations: p50/p95 latency, degraded recall rate, outbox age, CPU, memory,
   storage, and model cost;
+- integration: hook overhead, calls/bytes per completed task, semantic-ready and
+  webhook lag, orchestration wake time, and dropped/duplicate mutation rate;
+- channel serving: unauthorized-release rate, cross-customer leakage,
+  activation/revocation lag, citation coverage, and useful-answer rate;
+- operator observability: authorized evidence-trace coverage, topology leakage
+  rate, view-compile p95, truncation rate, and diagnosis success/time;
 - portability: successful Cloudflare-to-VPS and VPS-to-Cloudflare round trips.
 
 ## 12. Non-goals
 
 - running an agent or model loop;
 - general workflow orchestration;
-- chat UI or hosted control plane in the core repository;
+- general chat UI or a mandatory hosted control plane; Memory Atlas is an
+  optional read-only integration in this repository;
+- an unauthenticated public canonical-memory/search endpoint or automatic
+  publication of verified claims;
 - mandatory graph traversal or graph database;
 - automatic deletion of canonical evidence;
 - arbitrary provider plugin marketplace;
@@ -260,6 +372,10 @@ complete the flow without reading each other's private memories.
 
 - exact stable Bun, pnpm, TypeScript, and Wrangler versions at P0;
 - first extraction model after a structured-output mini-eval;
-- whether MCP ships in v0.1 or v0.2;
+- exact v0.2 reference host plugin selected after the generic MCP contract;
 - identity-provider interface when enterprise work starts;
-- federation transport after a real multi-node requirement exists.
+- exact signed customer-assertion format and issuer/key-rotation contract at
+  v0.3;
+- federation transport after a real multi-node requirement exists;
+- Memory Atlas renderer, layout algorithm, and measured server-side caps when
+  its implementation spec starts.
