@@ -1,6 +1,7 @@
 import { createApp } from "../../core/app";
 import { migrate } from "../../core/migrations";
 import { createSqliteDb, openDatabase } from "./sqlite";
+import { tryCreateVectors } from "./vectors";
 
 export interface ServeOptions {
   dbPath: string;
@@ -9,6 +10,11 @@ export interface ServeOptions {
   revision?: string;
   autoMigrate?: boolean;
   quiet?: boolean;
+  vecDbPath?: string;
+  embedBaseUrl?: string;
+  embedModel?: string;
+  embedDims?: number;
+  embedApiKey?: string;
 }
 
 /**
@@ -19,10 +25,18 @@ export async function serve(options: ServeOptions) {
   const database = openDatabase(options.dbPath);
   const db = createSqliteDb(database);
   if (options.autoMigrate !== false) await migrate(db);
+  const vectors = tryCreateVectors({
+    vecDbPath: options.vecDbPath,
+    embedBaseUrl: options.embedBaseUrl,
+    embedModel: options.embedModel,
+    embedDims: options.embedDims,
+    embedApiKey: options.embedApiKey,
+  });
   const app = createApp({
     db,
     revision: options.revision ?? "dev",
     runtime: "bun-sqlite",
+    vectors,
   });
 
   // @ts-ignore - Bun global is provided by the runtime.

@@ -1339,9 +1339,10 @@ export const CASES: Case[] = [
     name: "memberships control who belongs to a workspace",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
+      const wsName = `collab-${Date.now()}`;
       const ws = await fx.call("POST", "/v1/workspaces", {
         key: owner.key,
-        body: { name: "collab-test" },
+        body: { name: wsName },
       });
       const wsId = ws.body.data.workspace_id;
 

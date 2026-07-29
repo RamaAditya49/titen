@@ -35,6 +35,8 @@ export const SCOPES = [
   "audit:export",
   "federation:read",
   "federation:write",
+  "webhooks:read",
+  "webhooks:write",
   "keys:manage",
   "export:read",
   "import:write",

@@ -1,0 +1,69 @@
+/**
+ * Dashboard API client. When configured with a real endpoint and key,
+ * fetches live data from POST /v1/memory-views/compile.
+ * Falls back to synthetic data when not configured.
+ */
+
+export interface DashboardConfig {
+  endpoint?: string; // e.g. "http://127.0.0.1:8787"
+  apiKey?: string;
+}
+
+export interface AtlasNode {
+  id: string;
+  type: "claim" | "observation";
+  label: string;
+  trust: string;
+  status?: string;
+  created_at: string;
+  freshness?: number;
+}
+
+export interface AtlasEdge {
+  from: string;
+  to: string;
+  relation: string;
+}
+
+export interface AtlasView {
+  lens: string;
+  nodes: AtlasNode[];
+  edges: AtlasEdge[];
+  metadata: Record<string, unknown>;
+}
+
+const config: DashboardConfig = {
+  endpoint: import.meta.env.PUBLIC_TITEN_ENDPOINT,
+  apiKey: import.meta.env.PUBLIC_TITEN_DASHBOARD_KEY,
+};
+
+export function isConnected(): boolean {
+  return Boolean(config.endpoint && config.apiKey);
+}
+
+export async function compileView(
+  lens: string,
+  options: { subject_id?: string; focus_id?: string; limit?: number } = {},
+): Promise<AtlasView | null> {
+  if (!config.endpoint || !config.apiKey) return null;
+  try {
+    const res = await fetch(`${config.endpoint}/v1/memory-views/compile`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({ lens, ...options }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { data: AtlasView };
+    return json.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function getScopePreview(subjectId?: string): Promise<Record<string, unknown> | null> {
+  const view = await compileView("scope_preview", { subject_id: subjectId ?? "_all" });
+  return view?.metadata ?? null;
+}

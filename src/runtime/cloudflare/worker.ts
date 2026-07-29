@@ -1,6 +1,7 @@
 import { createApp } from "../../core/app";
 import { migrate } from "../../core/migrations";
 import { createD1Db, type D1Database } from "./d1";
+import { tryCreateVectorize } from "./vectors";
 
 export interface Env {
   DB: D1Database;
@@ -8,6 +9,10 @@ export interface Env {
   TITEN_REVISION?: string;
   /** Set to "1" to apply pending migrations from the Worker itself. */
   TITEN_AUTO_MIGRATE?: string;
+  VECTORIZE?: unknown;
+  AI?: unknown;
+  TITEN_EMBED_MODEL?: string;
+  TITEN_EMBED_DIMS?: string;
 }
 
 let migration: Promise<unknown> | undefined;
@@ -27,10 +32,12 @@ export default {
       migration ??= migrate(db).catch(() => undefined);
       await migration;
     }
+    const vectors = tryCreateVectorize(env as any);
     const app = createApp({
       db,
       revision: env.TITEN_REVISION ?? "dev",
       runtime: "cloudflare-d1",
+      vectors,
     });
     return app(request);
   },

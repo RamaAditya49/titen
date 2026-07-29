@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Titen database backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

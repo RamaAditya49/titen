@@ -1,0 +1,18 @@
+titen.example.com {
+    reverse_proxy 127.0.0.1:8787 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/titen.log
+        format json
+    }
+}
