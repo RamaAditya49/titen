@@ -16,13 +16,18 @@ Read in this order:
    `docs/deployment/`;
 4. `blueprint.md` only for research evidence and platform history.
 
-When documents disagree, direct user instructions win, then PRD, accepted ADRs,
-architecture docs, API reference, roadmap, and blueprint.
+When documents disagree, direct user instructions and verified current behavior
+win, then PRD, accepted ADRs, architecture docs, API reference, roadmap, and
+blueprint. Files under `docs/specs/done/` and `docs/plans/done/` are terminal
+delivery evidence and may preserve superseded decisions.
 
 ## Repository stage
 
-The repository is currently documentation-first. Do not create empty packages,
-provider registries, or deployment scaffolding before P0 begins.
+The repository currently contains a tested static Astro dashboard backed by a
+synthetic fixture. The memory service, authenticated API, Cloudflare Worker,
+Bun/SQLite runtime, and dual-runtime contract suite remain planned P0 work. Do
+not present the dashboard as service evidence or create empty runtime scaffolding
+before its P0 work item begins.
 
 ## Required work lifecycle
 
@@ -46,7 +51,8 @@ Run `node scripts/check-workflow-docs.mjs` before handoff.
 
 ## Coding constraints
 
-- TypeScript, pnpm, and Bun.
+- Current dashboard: Astro, TypeScript, Node 22+, and pnpm.
+- Planned VPS memory runtime: Bun and SQLite.
 - One package until measured ownership/build boundaries require more.
 - Web Standards APIs in shared code.
 - Cloudflare entrypoint uses native bindings; no account API token inside the

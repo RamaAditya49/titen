@@ -7,7 +7,7 @@
 > audit teknis dan blueprint infrastruktur; keputusan lama yang bertentangan
 > dengan PRD dinyatakan superseded.
 
-Status: rancangan, belum diimplementasikan  
+Status: rancangan memory service; dashboard Astro sintetis telah diimplementasikan
 Tanggal audit: 26 Juli 2026  
 Target runtime: Cloudflare Workers dan VPS dengan Bun  
 Bahasa dan package manager: TypeScript, pnpm  

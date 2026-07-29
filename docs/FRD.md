@@ -1,6 +1,6 @@
 # Titen functional requirements document
 
-- Status: draft for implementation
+- Status: feature baseline; static synthetic dashboard implemented, memory service planned
 - Product: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers/D1 and Bun/SQLite
@@ -966,29 +966,29 @@ until measured concurrent/offline mutation cases prove they are necessary.
 
 ## 14. Common errors and edge behavior
 
-| Condition                                     | Required behavior                                                      |
-| --------------------------------------------- | ---------------------------------------------------------------------- |
-| invalid request                               | `400` with stable validation code and no sensitive echo                |
-| missing/invalid/revoked key                   | `401`                                                                  |
-| safe same-tenant denial                       | `403`                                                                  |
-| foreign tenant/resource                       | non-disclosing `404`                                                   |
-| stale checkpoint version                      | `409`                                                                  |
-| active competing lease                        | `409` with non-sensitive lease metadata                                |
-| duplicate idempotency key, same payload       | return original result                                                 |
-| duplicate idempotency key, different payload  | `409`                                                                  |
-| model/vector unavailable                      | canonical path succeeds where possible and reports degraded capability |
-| webhook destination unavailable               | canonical path succeeds; delivery retries or terminates visibly        |
-| release is pending/revoked/expired/ineligible | omit or return non-disclosing `404`; never fall back to source claim   |
-| stale release claim version                   | `409`; require a new reviewed release snapshot                         |
-| invalid/expired/replayed customer assertion   | generic `403`; resolve/disclose no customer subject                    |
-| channel vector index unavailable              | use authorized release FTS and report degraded capability              |
-| unauthorized Atlas focus/scope                | non-disclosing `404`; return no hidden node, edge, label, or count     |
-| Atlas limit reached                           | return a bounded authorized view with explicit `truncated=true`        |
-| stale Atlas cache/index                       | re-authorize canonical hydration; omit newly ineligible records        |
-| unavailable dashboard area or direct route    | omit navigation and return non-disclosing `404`; no placeholder        |
-| canonical SQL unavailable                     | fail; never claim a write succeeded                                    |
-| token budget too small for any item           | successful empty context with budget metadata                          |
-| unsupported export version                    | reject before mutation                                                 |
+| Condition                                     | Required behavior                                                                      |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| invalid request                               | `400` with stable validation code and no sensitive echo                                |
+| missing/invalid/revoked key                   | `401`                                                                                  |
+| safe same-tenant denial                       | `403`                                                                                  |
+| foreign tenant/resource                       | non-disclosing `404`                                                                   |
+| stale checkpoint version                      | `409`                                                                                  |
+| active competing lease                        | `409` with non-sensitive lease metadata                                                |
+| duplicate idempotency key, same payload       | return original result                                                                 |
+| duplicate idempotency key, different payload  | `409`                                                                                  |
+| model/vector unavailable                      | canonical path succeeds where possible and reports degraded capability                 |
+| webhook destination unavailable               | canonical path succeeds; delivery retries or terminates visibly                        |
+| release is pending/revoked/expired/ineligible | omit or return non-disclosing `404`; never fall back to source claim                   |
+| stale release claim version                   | `409`; require a new reviewed release snapshot                                         |
+| invalid/expired/replayed customer assertion   | generic `403`; resolve/disclose no customer subject                                    |
+| channel vector index unavailable              | use authorized release FTS and report degraded capability                              |
+| unauthorized Atlas focus/scope                | non-disclosing `404`; return no hidden node, edge, label, or count                     |
+| Atlas limit reached                           | return a bounded authorized view with explicit `truncated=true`                        |
+| stale Atlas cache/index                       | re-authorize canonical hydration; omit newly ineligible records                        |
+| unavailable dashboard area or direct route    | optional plain shell label; no control/route; direct request gets non-disclosing `404` |
+| canonical SQL unavailable                     | fail; never claim a write succeeded                                                    |
+| token budget too small for any item           | successful empty context with budget metadata                                          |
+| unsupported export version                    | reject before mutation                                                                 |
 
 ## 15. Acceptance journeys
 
@@ -1027,8 +1027,9 @@ Pass conditions:
 10. Reconstruct the flow from metadata-only audit events.
 11. Compile Evidence Trace, Memory Neighborhood, and Conflict & Freshness views
     for visible records, then probe each with a foreign/private record ID.
-12. Open the first v0.2 dashboard slice and confirm Atlas is the only product
-    area, with no locked, disabled, promotional, or speculative menu.
+12. Open the v0.3.1 static dashboard and confirm Atlas is the only active product
+    area; other approved shell labels are plain, non-interactive orientation with
+    no route, locked, disabled, promotional, or shipped-capability treatment.
 
 Pass conditions:
 
@@ -1040,7 +1041,7 @@ Pass conditions:
 - audit contains no memory content or credential.
 - Atlas returns useful authorized provenance without leaking hidden topology or
   aggregate counts; disabling it does not affect the journey.
-- dashboard navigation exposes no unshipped area or unauthorized scope.
+- dashboard navigation exposes no unshipped route or unauthorized scope.
 
 ### Journey C — Enterprise governance and recovery
 

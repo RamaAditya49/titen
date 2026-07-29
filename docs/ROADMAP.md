@@ -14,6 +14,10 @@ Dashboard delivery follows the progressive area map in
 operator UI; the static reference shell may show a planned area's plain label,
 but only completed capability-backed areas become controls or routes.
 
+The static Astro dashboard listed under v0.2 has landed early as an isolated
+synthetic preview. It does not satisfy the v0.2 memory-service, authorization,
+live Atlas, collaboration, or dual-runtime gates below.
+
 ## P0 — dual-runtime spike
 
 Prove the smallest vertical path:

@@ -85,44 +85,16 @@ only when measured scale, concurrency, or an existing enterprise Postgres
 topology outweighs the operational cost. Every vector backend still requires a
 compatible embedding model at write and query time.
 
-## Planned repository tree
+## Repository state and target runtime shape
 
-Only documentation exists before P0. Runtime directories are created when the
-vertical spike starts.
+The current checkout contains one static Astro dashboard, local assets,
+Playwright tests, workflow checks, and product/engineering documentation. The
+dashboard uses a frozen synthetic fixture and has no memory-service dependency.
 
-```text
-titen/
-├── .github/
-├── dashboard/                 # added only when the v0.2 UI spec enters implementation
-├── docs/
-├── examples/                  # added after the external API stabilizes
-├── migrations/
-│   └── 0001_init.sql
-├── src/
-│   ├── app.ts                 # fetch router, validation, envelopes
-│   ├── auth.ts                # identities, memberships, policy
-│   ├── memory.ts              # observations, claims, context, feedback
-│   ├── collaboration.ts       # checkpoints, leases, handoffs
-│   ├── atlas.ts               # v0.2 read-only view compiler
-│   ├── store.ts               # small SQL/vector/model contracts
-│   ├── cloudflare.ts          # Worker bindings and scheduled handler
-│   └── bun.ts                 # Bun server, SQLite, model HTTP
-├── test/
-│   └── contract.test.ts       # same behavior against both adapters
-├── AGENTS.md
-├── CONTRIBUTING.md
-├── SECURITY.md
-├── README.md
-├── blueprint.md
-├── package.json
-├── pnpm-lock.yaml
-├── tsconfig.json
-└── wrangler.jsonc
-```
-
-Split a source file only after size, ownership, or runtime boundaries make the
-split useful. Do not begin with packages, provider registries, repositories per
-table, or dependency injection containers.
+The memory kernel, authenticated REST/MCP app, SQL migrations, Cloudflare/Bun
+entrypoints, and dual-runtime contract tests do not exist yet. P0 creates only
+the files required by its accepted vertical-spike work item. Split files or add
+adapters only after a measured ownership, size, or runtime boundary requires it.
 
 ## Write path
 
@@ -179,8 +151,9 @@ rebuildable and cannot become canonical memory.
 1. Serve one optional static client that consumes authenticated REST only.
 2. Render only areas implemented in the current build and discoverable by the
    authenticated principal; navigation never replaces route authorization.
-3. In the first v0.2 slice, render Memory Atlas directly with no placeholder
-   navigation.
+3. In the v0.3.1 static preview, keep Atlas as the only active route; the
+   approved shell may show other area names only as plain non-interactive
+   orientation.
 4. Add later areas according to [DESIGN](../DESIGN.md), one completed EARS UI
    work item at a time.
 5. Keep categories/tags as filters, webhooks within Audit & Events,
@@ -216,26 +189,18 @@ remain source-tool calls instead of stale knowledge releases.
 - Memory Atlas failure disables only operator visualization; stale projections
   are re-authorized at canonical hydration and cannot widen scope.
 - dashboard failure or omission leaves all headless REST/MCP behavior complete;
-  unavailable areas have no placeholder route or control.
+  unavailable areas have no route or control, even when the approved shell shows
+  their non-interactive labels.
 - Expired lease/checkpoint never becomes a durable fact.
 - Federation failure never changes the local canonical event history.
 
 ## Dependency budget
 
-Expected P0 runtime dependencies:
+The current production dependency is Astro. Playwright and local font packages
+support browser verification and self-hosted typography. Memory Atlas uses
+native HTML, CSS, JavaScript, dialog, and SVG without a graph renderer.
 
-- `zod` for trust-boundary validation;
-- `sqlite-vec` only in the VPS adapter if the spike passes.
-
-Memory Atlas adds no graph database or renderer dependency to the core. The
-active v0.2 client spec uses browser-native HTML, CSS, TypeScript, and SVG; a UI
-library requires a revised work spec and representative bundle, accessibility,
-and node-limit evidence.
-
-Development dependencies:
-
-- TypeScript;
-- Wrangler.
-
-Use native `Request`, `Response`, Web Crypto, D1, `bun:sqlite`, `Bun.serve`, and
-`fetch` before adding frameworks or SDKs.
+P0 service dependencies are not approved until its vertical spike. Use native
+`Request`, `Response`, Web Crypto, D1, `bun:sqlite`, `Bun.serve`, and `fetch`
+before adding validation, vector, framework, or provider SDK dependencies.
+`sqlite-vec` remains optional and may be added only if its VPS spike passes.

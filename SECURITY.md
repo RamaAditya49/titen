@@ -11,11 +11,9 @@ residual risks are maintained in the [threat model](./docs/security/threat-model
 Do not disclose vulnerabilities through public issues, discussions, pull
 requests, or example payloads.
 
-Once the public GitHub repository exists, use GitHub Private Vulnerability
-Reporting from the repository Security tab. Before publication, contact the
-maintainer through an already established private channel. Do not include real
-credentials or private memory content unless explicitly requested through a
-secure channel.
+Use [GitHub Private Vulnerability Reporting](https://github.com/RamaAditya49/titen/security/advisories/new).
+Do not include real credentials or private memory content unless explicitly
+requested through a secure channel.
 
 Useful reports include:
 

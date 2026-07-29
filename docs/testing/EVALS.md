@@ -1,7 +1,7 @@
 # Evaluation specification
 
-Status: release-gate design. Commands and measured baselines are added with the
-P0 implementation.
+Status: memory-service release-gate design. The static Astro dashboard has a
+local browser gate; service commands and measured baselines begin with P0.
 
 ## Purpose
 
@@ -44,6 +44,9 @@ failure classes may not.
 
 When v0.2 ships, the same dual-runtime contract also covers the three read-only
 Memory Atlas lenses, canonical re-authorization, limits, and disabled behavior.
+The current v0.3.1 frontend exercises four lenses against a synthetic fixture;
+those browser checks are UX evidence, not live compiler, authorization, runtime,
+or roadmap-v0.3 service evidence.
 
 When v0.3 ships, the same dual-runtime contract also covers channel
 create/pause, release draft/approve/activate/suspend/replace/revoke, signed
@@ -206,9 +209,9 @@ evaluation corpus.
 | Unauthorized release rate  | unreleased/wrong-channel/wrong-audience items returned / adversarial channel queries             |
 | Cross-customer leakage     | other-customer records returned or existence-disclosed / adversarial customer queries            |
 | Released citation coverage | returned channel items with valid audience-safe released citations / returned channel items      |
-| Atlas evidence coverage    | required authorized evidence nodes/edges returned / expected authorized evidence links             |
-| Atlas topology leakage     | hidden nodes, edges, labels, or count influence / adversarial Atlas requests                        |
-| Atlas diagnosis success    | operator diagnosis cases answered correctly / attempted diagnosis cases                            |
+| Atlas evidence coverage    | required authorized evidence nodes/edges returned / expected authorized evidence links           |
+| Atlas topology leakage     | hidden nodes, edges, labels, or count influence / adversarial Atlas requests                     |
+| Atlas diagnosis success    | operator diagnosis cases answered correctly / attempted diagnosis cases                          |
 
 Latency, CPU, storage, model calls, and token cost are reported separately; they
 must not be blended into a quality score.
@@ -220,22 +223,22 @@ must not be blended into a quality score.
 Titen does not define speed as vector-query latency alone. The measured unit is
 the useful memory operation an agent experiences.
 
-| Operation               | Start                                 | Stop                                     | Required result                                    |
-| ----------------------- | ------------------------------------- | ---------------------------------------- | -------------------------------------------------- |
-| canonical remember      | request sent                          | durable canonical response received      | observation, history, FTS, and outbox committed    |
-| lexical visibility      | canonical commit                      | record is eligible through FTS context   | authorized canonical item returned                 |
-| semantic visibility     | canonical commit                      | current vector version is queryable      | authorized hydrated item returned                  |
-| context compile         | authorized request sent               | bounded structured context received      | citations, conflicts, and budget metadata valid    |
-| consolidation           | eligible batch accepted               | validated claims and sources committed   | no fabricated or cross-scope source                |
-| feedback                | feedback request sent                 | utility projection durably updated       | evidence unchanged                                 |
-| collaboration operation | checkpoint/lease/handoff request sent | versioned state committed                | ownership and visibility invariants hold           |
-| event delivery          | domain event committed                | subscribed destination returns valid 2xx | signed, retry-safe metadata delivered              |
-| adapter lifecycle       | host lifecycle event emitted          | adapter returns control to host          | required memory step completed or explicit degrade |
-| recovery                | dependency restored                   | readiness and backlog return to target   | no lost canonical record                           |
-| release activation      | activation commit                     | next channel compile begins              | exact approved snapshot is eligible                |
-| release revocation      | revocation commit                     | next channel compile begins              | release is absent despite stale projections        |
-| channel context         | gateway request sent                  | bounded released context received        | audience, subject, citation, and budget rules hold |
-| Memory Atlas compile    | authorized view request sent           | bounded read-only projection received    | no hidden topology/count; canonical state is current |
+| Operation               | Start                                 | Stop                                     | Required result                                      |
+| ----------------------- | ------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| canonical remember      | request sent                          | durable canonical response received      | observation, history, FTS, and outbox committed      |
+| lexical visibility      | canonical commit                      | record is eligible through FTS context   | authorized canonical item returned                   |
+| semantic visibility     | canonical commit                      | current vector version is queryable      | authorized hydrated item returned                    |
+| context compile         | authorized request sent               | bounded structured context received      | citations, conflicts, and budget metadata valid      |
+| consolidation           | eligible batch accepted               | validated claims and sources committed   | no fabricated or cross-scope source                  |
+| feedback                | feedback request sent                 | utility projection durably updated       | evidence unchanged                                   |
+| collaboration operation | checkpoint/lease/handoff request sent | versioned state committed                | ownership and visibility invariants hold             |
+| event delivery          | domain event committed                | subscribed destination returns valid 2xx | signed, retry-safe metadata delivered                |
+| adapter lifecycle       | host lifecycle event emitted          | adapter returns control to host          | required memory step completed or explicit degrade   |
+| recovery                | dependency restored                   | readiness and backlog return to target   | no lost canonical record                             |
+| release activation      | activation commit                     | next channel compile begins              | exact approved snapshot is eligible                  |
+| release revocation      | revocation commit                     | next channel compile begins              | release is absent despite stale projections          |
+| channel context         | gateway request sent                  | bounded released context received        | audience, subject, citation, and budget rules hold   |
+| Memory Atlas compile    | authorized view request sent          | bounded read-only projection received    | no hidden topology/count; canonical state is current |
 
 The primary user-facing latency is **time to useful context**: request start to
 a policy-valid, evidence-backed, token-bounded context response. It is reported
@@ -369,7 +372,7 @@ Asynchronous mutation acceptance is never reported as semantic readiness.
 | channel context latency  | authenticated gateway request to bounded audience-valid context                |
 | Atlas compile latency    | authenticated view request to bounded authorized projection                    |
 | Atlas truncation rate    | successful authorized views truncated by configured limits / view requests     |
-| Atlas diagnosis time     | task start to correct evidence/conflict/scope diagnosis                         |
+| Atlas diagnosis time     | task start to correct evidence/conflict/scope diagnosis                        |
 
 Vector-only benchmarks additionally report index build time, index size, exact
 or approximate search mode, Recall@k against exact ground truth, and the
@@ -530,8 +533,8 @@ Titen's isolation, evidence, conflict, and collaboration fixtures.
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | P0   | all deterministic dual-runtime cases pass; scope leakage, fabricated evidence, and budget violations are zero; quality baseline is published |
 | v0.1 | P0 remains green; lifecycle, portability, recovery, and multilingual suites pass; retrieval does not regress beyond an approved ADR          |
-| v0.2 | v0.1 remains green; collaboration, events, adapter parity, REST/MCP parity, and Memory Atlas safety/usefulness pass                           |
-| v0.3 | governance, channel/release/customer isolation, Atlas governance lenses, revocation, retention, audit, backup, and recovery journeys pass     |
+| v0.2 | v0.1 remains green; collaboration, events, adapter parity, REST/MCP parity, and Memory Atlas safety/usefulness pass                          |
+| v0.3 | governance, channel/release/customer isolation, Atlas governance lenses, revocation, retention, audit, backup, and recovery journeys pass    |
 | v1   | authorized federation preserves provenance, conflicts, policy filtering, and replay-safe cursors                                             |
 
 Flaky security or canonical-integrity tests fail the gate. They are not retried

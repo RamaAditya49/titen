@@ -123,7 +123,7 @@ principals or policy snapshots.
 
 ## Visual language
 
-A future UI should keep meaning stable across lenses:
+The operator UI keeps meaning stable across lenses:
 
 - observations are evidence points;
 - claims are the primary knowledge nodes;

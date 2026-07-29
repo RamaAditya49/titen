@@ -1,6 +1,6 @@
 # Titen product requirements document
 
-- Status: draft for implementation
+- Status: product baseline; static synthetic dashboard implemented, memory service planned
 - Product direction: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers and Bun on a VPS

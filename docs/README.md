@@ -14,7 +14,7 @@ context without a documentation-site dependency.
 | [Dashboard](./dashboard.md)                                        | Astro preview, fixture boundary, tests, screenshots, and static hosting       |
 | [Roadmap](./ROADMAP.md)                                            | Delivery order and release gates                                              |
 | [Requirements workflow](./engineering/requirements-workflow.md)    | EARS acceptance criteria and spec-plan-implement-done lifecycle               |
-| [Architecture](./architecture/overview.md)                         | Components, runtime boundaries, and planned repository tree                   |
+| [Architecture](./architecture/overview.md)                         | Current repository state, target components, and runtime boundaries           |
 | [Memory lifecycle](./architecture/memory-lifecycle.md)             | End-to-end Level 5/6 flow, adaptation loop, and embedding/vector architecture |
 | [Memory Atlas](./architecture/memory-atlas.md)                     | Authorized visual evidence, conflict, scope, and release projections          |
 | [Agent integration](./architecture/agent-integration.md)           | MCP/REST install, hooks, attribution, tags, events, and orchestration         |
@@ -31,6 +31,19 @@ context without a documentation-site dependency.
 | [ADR-0001](./decisions/0001-level-6-product-level-5-kernel.md)     | Why Level 6 is built on a Level 5 kernel                                      |
 | [ADR-0002](./decisions/0002-channel-release-not-public-memory.md)  | Why customer-facing knowledge uses approved channel releases                  |
 | [ADR-0003](./decisions/0003-memory-atlas-authorized-projection.md) | Why visual memory is a bounded derived projection in the same repository      |
+
+## Current implementation status
+
+| Surface                            | Current state                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------- |
+| Astro dashboard                    | Implemented and tested at `/dashboard/` against a frozen synthetic fixture      |
+| Memory service and live REST/MCP   | Planned; no authenticated memory API, canonical store, or model/index pipeline  |
+| Cloudflare and VPS memory runtimes | Target architecture; neither has passed the P0 dual-runtime service smoke       |
+| Product release gates              | P0 through v1 describe capability acceptance, not the dashboard package version |
+
+The `0.3.1` package version identifies the static dashboard implementation. It
+does not mean that the roadmap's v0.3 memory-service, governance, or live Atlas
+capabilities have shipped.
 
 ## Documentation rules
 
@@ -51,6 +64,11 @@ context without a documentation-site dependency.
 - `BRAND.md` defines the contributor-facing identity system.
 - `blueprint.md` at the repository root remains research evidence, not the
   current product contract.
+
+Files under `specs/done/` and `plans/done/` are historical terminal evidence.
+They may describe a design that a later completed work item explicitly
+superseded; use the current PRD, FRD, DESIGN, architecture, source, and tests for
+the active contract.
 
 Add a docs-site generator only when plain GitHub navigation becomes a measured
 problem.
