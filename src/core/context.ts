@@ -71,15 +71,12 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
           topK: 50,
           filter: { org_id: principal.orgId, subject_id: subjectId },
         });
-        // Boost FTS candidates that also appear in vector results
-        const vectorScores = new Map(vectorHits.map(h => [h.id, h.score]));
-        for (const c of candidates) {
-          const vs = vectorScores.get(c.id);
-          if (vs !== undefined) {
-            // ponytail: additive boost. Ceiling: may overweight dual-match vs
-            // FTS-only hits. Upgrade: learned weight via feedback.
-            (c as any).vector_boost = vs;
-          }
+        // A candidate that both matches lexically and is semantically near the
+        // task carries its similarity into ranking.
+        const vectorScores = new Map(vectorHits.map((h) => [h.id, h.score]));
+        for (const candidate of candidates) {
+          const score = vectorScores.get(candidate.id);
+          if (score !== undefined) candidate.vector_boost = score;
         }
         vectorUsed = true;
       }

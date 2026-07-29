@@ -25,6 +25,8 @@ export interface RankInput {
   feedback_positive: number;
   feedback_negative: number;
   feedback_total: number;
+  /** Semantic similarity from the optional vector store, 0..1. */
+  vector_boost?: number;
 }
 
 export interface ScoreComponents {
@@ -77,8 +79,20 @@ export function scoreCandidate(
   relevance: number,
   now: Date,
 ): { score: number; components: ScoreComponents } {
+  // A semantic hit is relevance evidence, so it competes with the lexical score
+  // rather than forming a sixth weighted term. Taking the stronger of the two is
+  // the point of hybrid retrieval: a vector match rescues a weak keyword match.
+  // With no vector capability the value is undefined and the result is
+  // arithmetically identical to lexical-only ranking.
+  //
+  // ponytail: max() of two differently-derived 0..1 scores. The ceiling is that
+  // bm25 is normalized within the candidate set while the vector score is
+  // absolute, so they are comparable but not calibrated. Upgrade path: learn the
+  // blend weight from context feedback.
+  const effectiveRelevance = Math.max(relevance, candidate.vector_boost ?? 0);
+
   const components: ScoreComponents = {
-    relevance: round(relevance),
+    relevance: round(effectiveRelevance),
     trust: round(TRUST_RANK[candidate.trust] / 3),
     recency: round(recencyScore(candidate.created_at, now)),
     utility: round(utilityScore(candidate)),

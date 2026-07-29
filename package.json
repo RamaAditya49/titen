@@ -17,7 +17,7 @@
     "preview": "astro preview",
     "test": "pnpm build && playwright test",
     "test:browser": "playwright test",
-    "test:api": "pnpm build:worker && bun test tests/contract",
+    "test:api": "pnpm build:worker && bun test tests/contract tests/sdk",
     "test:all": "pnpm test:api && pnpm test && pnpm check:workflow",
     "build:worker": "WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir dist/worker",
     "deploy:worker": "WRANGLER_SEND_METRICS=false wrangler deploy",

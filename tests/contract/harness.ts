@@ -2,6 +2,7 @@ import { createApiKey, organizationStatement } from "../../src/core/auth";
 import { newId } from "../../src/core/ids";
 import type { Db, Param } from "../../src/core/db";
 import type { Trust } from "../../src/core/validate";
+import type { VectorCapability } from "../../src/core/vectors";
 
 export interface Res {
   status: number;
@@ -93,8 +94,7 @@ export async function revokeWith(db: Db, keyId: string): Promise<void> {
 }
 
 /** Builds the client implementations from any raw request dispatcher. */
-export function clientVia(
-  dispatch: (request: Request) => Promise<Response>,
+export function clientVia(  dispatch: (request: Request) => Promise<Response>,
   origin: string,
 ): Pick<Fixture, "call" | "callRaw"> {
   const send = async (
@@ -132,6 +132,57 @@ export function clientVia(
       };
       if (options.key) headers.authorization = `Bearer ${options.key}`;
       return send(method, path, headers, options.body);
+    },
+  };
+}
+
+/**
+ * An in-memory vector capability for exercising the hybrid retrieval path.
+ *
+ * Real vector retrieval needs a native extension (sqlite-vec) or a Cloudflare
+ * binding (Vectorize) plus an embedding provider, none of which belong in a
+ * contract test. This stands in for all three so the shared core's hybrid
+ * branch actually executes and its effect on ranking is observable.
+ */
+export function fakeVectors(): VectorCapability & {
+  /** Pin a similarity score for a record id, as a real index would return. */
+  setScore(id: string, score: number): void;
+  /** Make the embedder throw, to prove retrieval degrades instead of failing. */
+  breakEmbedder(): void;
+  embedCalls: () => number;
+} {
+  const scores = new Map<string, number>();
+  let broken = false;
+  let calls = 0;
+
+  return {
+    setScore: (id, score) => scores.set(id, score),
+    breakEmbedder: () => {
+      broken = true;
+    },
+    embedCalls: () => calls,
+    embedder: {
+      dimensions: 4,
+      model: "contract-stub",
+      async embed(texts: string[]) {
+        calls += 1;
+        if (broken) throw new Error("embedding provider is unavailable");
+        return texts.map(() => new Float32Array([1, 0, 0, 0]));
+      },
+    },
+    store: {
+      async upsert() {
+        /* the fixture pins scores directly */
+      },
+      async query(_vector, options) {
+        return [...scores.entries()]
+          .map(([id, score]) => ({ id, score }))
+          .sort((left, right) => right.score - left.score)
+          .slice(0, options.topK);
+      },
+      async remove(ids: string[]) {
+        for (const id of ids) scores.delete(id);
+      },
     },
   };
 }
