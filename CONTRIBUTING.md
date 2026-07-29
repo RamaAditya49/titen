@@ -27,19 +27,22 @@ in its issue or pull request.
 
 ## Repository stage
 
-Titen is currently in product-definition/P0 preparation. Runtime setup commands
-will be added with the first package scaffold; this document does not invent
-commands that cannot run yet.
+The memory service remains in product-definition/P0 preparation. The repository
+does contain a runnable Astro dashboard preview; it uses synthetic data and has
+no memory-service write path.
 
-Documentation changes can be checked with:
+Install and verify the current repository with:
 
 ```bash
-node scripts/check-workflow-docs.mjs
-node scripts/check-workflow-docs.mjs --self-test
+pnpm install
+pnpm test
+pnpm check:workflow
 git diff --check
 ```
 
-Also verify that every relative Markdown link points to an existing file.
+Use `pnpm dev` for local dashboard work and `pnpm screenshots` after a production
+build when an approved visual change needs refreshed README images. Also verify
+that every relative Markdown link points to an existing file.
 
 ## Contribution principles
 

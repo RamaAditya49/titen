@@ -1,16 +1,22 @@
 ---
 work_id: titen-dashboard-memory-atlas-v0-2
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: superseded
 complexity: complex
 created: 2026-07-27
-updated: 2026-07-27
-review_after: 2026-08-10
+updated: 2026-07-29
 owner: titen-maintainers
 ---
 
 # Titen Dashboard v0.2: Memory Atlas operator workspace
+
+## Closure reason
+
+Superseded before implementation by Rama's approved 2026-07-29 final dashboard
+mockup and Astro-first delivery decision. No runtime or dashboard source was
+created under this work item; the replacement work is tracked by
+`titen-dashboard-final-astro-v0-3`.
 
 ## Related contracts
 

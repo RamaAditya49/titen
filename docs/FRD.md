@@ -118,8 +118,9 @@ All features obey these rules:
   publish memory without an explicit authorized channel release.
 - no derived Memory Atlas view, layout, cluster, or summary may become
   canonical evidence, grant access, or publish a release.
-- no dashboard area may appear as shipped navigation before its backing
-  contract, authorization, and EARS UI work item are complete.
+- no dashboard area may become an interactive control or route before its
+  backing contract, authorization, and EARS UI work item are complete;
+  non-interactive reference-shell labels are not shipped navigation.
 - complex work may not enter implementation without an active EARS work spec
   and paired plan.
 
@@ -739,8 +740,8 @@ Acceptance (EARS):
 
 ### UI-001 — Progressive dashboard information architecture
 
-**Release:** v0.2 establishes the boundary; later areas follow their backing
-feature release and a separate completed UI work item
+**Release:** v0.3.1 implements the static reference shell; live areas follow
+their backing feature release and a separate completed UI work item
 
 The canonical area map is defined in [DESIGN](./DESIGN.md). It groups operator
 jobs without claiming that every planned area is implemented:
@@ -754,13 +755,17 @@ jobs without claiming that every planned area is implemented:
 Required behavior:
 
 - keep the dashboard optional and consume only authenticated REST contracts;
-- render Memory Atlas directly as the only area in the first v0.2 dashboard
-  slice, without an empty sidebar or product switcher;
+- render Memory Atlas as the only active route in the final reference shell,
+  using synthetic fixture data until the separately specified authorized view
+  compiler integration ships;
+- allow the approved shell to show the canonical area map as non-interactive
+  orientation without implying those labels have routes or backend behavior;
 - add a later area only after its backend behavior is implemented, the current
   build reports it available, the principal may discover it, and its paired
   EARS UI work item is complete;
-- omit unavailable areas and routes instead of rendering a placeholder, lock,
-  disabled control, upgrade badge, or speculative menu;
+- expose no route or interactive control for unavailable areas and never render
+  their orientation labels as placeholders, locks, disabled controls, upgrade
+  badges, or shipped menus;
 - authorize every route and request independently from navigation state and
   return a non-disclosing response for foreign resources;
 - keep categories and tags as Memory filters, webhooks inside Audit & Events,
@@ -775,14 +780,14 @@ Required behavior:
 
 Acceptance (EARS):
 
-- **AC-UI-001 — State-driven:** While a dashboard area lacks an implemented authorized backend contract or completed EARS UI work item, Titen shall omit the area from navigation and direct routes.
-- **AC-UI-002 — Optional feature:** Where only the first v0.2 dashboard slice is shipped, Titen shall render Memory Atlas directly as the sole product area without placeholder navigation.
-- **AC-UI-003 — Event-driven:** When more than one area passes its emergence gate, Titen shall group only discoverable shipped areas under Memory, Collaboration, Operations, Administration, and Governance as defined in DESIGN.
+- **AC-UI-001 — State-driven:** While a dashboard area lacks an implemented authorized backend contract or completed EARS UI work item, Titen shall expose no route or interactive control for it and shall keep any approved reference-shell label non-interactive.
+- **AC-UI-002 — Optional feature:** Where the final reference shell is enabled, Titen shall render Memory Atlas as the sole active product area and may show the canonical area map only as non-interactive orientation.
+- **AC-UI-003 — Event-driven:** When an area passes its emergence gate, Titen shall convert only that authorized discoverable area into an interactive control and route under the canonical DESIGN group.
 - **AC-UI-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign dashboard route or resource, then Titen shall return a non-disclosing state and shall clear prior private content that could be mistaken for the requested result.
 - **AC-UI-005 — Ubiquitous:** Titen shall keep categories and tags as Memory filters, webhooks inside Audit & Events, portability and recovery inside System, and Settings absent until an account/session contract exists.
 - **AC-UI-006 — State-driven:** While runtime configuration lacks an authorized mutation contract, Titen shall expose configuration only as non-secret read-only capability and readiness state.
 - **AC-UI-007 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
-- **AC-UI-008 — Unwanted behavior:** If documentation lists a planned dashboard area whose emergence gate has not passed, then Titen shall not present that listing as a shipped route, control, screenshot, or implementation claim.
+- **AC-UI-008 — Unwanted behavior:** If documentation or a reference-shell label names a dashboard area whose emergence gate has not passed, then Titen shall not present that area as a shipped route, control, or implementation claim.
 
 ## 12. Enterprise governance features
 

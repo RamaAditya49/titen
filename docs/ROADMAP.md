@@ -11,7 +11,8 @@ passes on both Cloudflare and VPS.
 
 Dashboard delivery follows the progressive area map in
 [DESIGN](./DESIGN.md). A backend feature may ship headlessly before its
-operator UI; no planned area appears as placeholder navigation.
+operator UI; the static reference shell may show a planned area's plain label,
+but only completed capability-backed areas become controls or routes.
 
 ## P0 — dual-runtime spike
 
@@ -58,8 +59,9 @@ Gate:
   and Conflict & Freshness lenses over authorized canonical records;
 - one bounded `POST /v1/memory-views/compile` contract shared by Cloudflare and
   VPS, with no graph database and no dependency from the headless core;
-- first optional dashboard slice at `/dashboard/`, rendering Atlas directly as
-  its only product area with no locked or speculative navigation;
+- an Astro dashboard preview at `/dashboard/`, with Atlas as the only active
+  route and the remaining canonical area labels shown only as non-interactive
+  orientation against a synthetic fixture;
 - single-deployment company mode.
 
 ## v0.3 — enterprise governance
@@ -94,8 +96,10 @@ journey at a time:
    visibility management behavior passes;
 5. Governance may add Approvals & Releases no earlier than v0.3.
 
-An area is absent until its backend capability, authorization, current-build
-availability, EARS UI work item, and failure/rollback evidence are complete.
+An area has no interactive control or route until its backend capability,
+authorization, current-build availability, EARS UI work item, and
+failure/rollback evidence are complete. The approved static reference shell may
+show its non-interactive label without claiming the capability has shipped.
 Categories and tags remain filters; webhooks remain inside Audit & Events;
 export/recovery remains inside System; Settings waits for an explicit browser
 account/session contract.

@@ -1,8 +1,8 @@
 # Titen product interface design
 
-- Status: planned product contract; not implementation evidence
+- Status: final Astro frontend implemented; live memory-service integration planned
 - Scope: optional operator dashboard and progressive information architecture
-- First implementation slice: v0.2 Memory Atlas
+- First implementation slice: v0.3.1 Memory Atlas frontend preview
 - Target runtimes: Cloudflare Workers and Bun on a VPS
 
 ## 1. Design intent
@@ -21,11 +21,13 @@ authority. A headless installation remains a complete Titen installation.
 
 1. **Evidence before decoration.** Provenance, lifecycle, trust, validity, and
    conflict are more important than decorative graphs or aggregate counters.
-2. **Truthful navigation.** The interface exposes only areas that exist and are
-   authorized. It does not advertise unavailable features with locks, disabled
-   controls, upgrade badges, or empty routes.
+2. **Truthful navigation.** Only implemented areas become links, controls, or
+   routes. The approved reference shell may show the canonical area map as
+   non-interactive orientation, but it cannot style those labels as locked,
+   disabled, paid, or shipped capability.
 3. **Progressive capability.** Backend release, authorization, and a completed
-   EARS UI work item precede the appearance of an area in navigation.
+   EARS UI work item precede an area's conversion from orientation label into a
+   discoverable control or route.
 4. **Scope before content.** Organization, workspace, project, subject, agent,
    and run authority are resolved before private labels, counts, or records are
    rendered.
@@ -34,8 +36,9 @@ authority. A headless installation remains a complete Titen installation.
    approval.
 6. **Stable across runtimes.** The same static artifact and REST behavior work
    on Cloudflare and VPS; the browser never imports runtime bindings.
-7. **Light by default.** Native HTML, CSS, TypeScript, and SVG are preferred.
-   Dependencies require a measured accessibility, bundle, or maintenance need.
+7. **Light by default.** Astro generates static HTML; native CSS, browser
+   JavaScript, dialog, and SVG provide the interface. Dependencies require a
+   measured accessibility, bundle, typography, test, or maintenance need.
 8. **Accessible evidence.** Every visual relationship has a synchronized text
    representation, keyboard path, visible focus, and non-color meaning.
 
@@ -89,27 +92,37 @@ A dashboard area or nested view may render only when:
 5. empty, unauthorized, degraded, and rollback behavior is verified;
 6. documentation describes the area as shipped.
 
-Until then, the area is absent. Documentation may describe its planned position
-and earliest backend release, but the product must not render a placeholder.
+Until then, the area has no route or interactive control. The final reference
+shell may render its plain label solely to preserve the accepted information
+map, provided Atlas remains the only active area and public documentation calls
+the label non-interactive rather than shipped.
 
 ## 5. Release shape
 
-### v0.2 first dashboard slice
+### v0.3.1 final frontend preview
 
-The active dashboard implementation exposes only **Memory > Atlas** at
-`/dashboard/`. Because only one area exists, it renders directly without a
-sidebar, product switcher, or empty navigation group.
+The implemented Astro dashboard exposes only **Memory > Atlas** at
+`/dashboard/`. It reproduces Rama's approved final mockup and includes the full
+canonical area map as non-interactive orientation. It does not add routes for
+the other labels or claim that their backend behavior exists.
 
 Atlas provides:
 
 - Evidence Trace;
 - Memory Neighborhood;
 - Conflict & Freshness;
+- Scope Preview as a synthetic policy-eligibility demonstration;
 - one exact authorized focus;
-- a bounded SVG overview synchronized with an accessible evidence/detail list.
+- a bounded SVG overview synchronized with an accessible evidence/detail list;
+- search dialog, disconnect/reconnect, responsive graph/table scroll regions,
+  and selected-record inspectors.
 
 The exact implementation contract lives in the
-[active Memory Atlas dashboard spec](./specs/active/2026-07-27-dashboard-memory-atlas-v0-2.md).
+[Astro dashboard spec](./specs/done/2026-07-29-dashboard-final-astro-v0-3.md),
+and the operational boundary lives in the [dashboard guide](./dashboard.md).
+
+Every visible value is a synthetic fixture. The live authorized view compiler,
+credential flow, and runtime deployment remain separate work.
 
 ### Later capability-backed slices
 
@@ -139,13 +152,13 @@ No release is required to add all eligible areas at once.
 
 ## 7. Application shell
 
-When more than one area passes the emergence gate, the smallest useful shell
-contains:
+The final reference shell contains:
 
 - Titen mark and current product area;
 - non-secret endpoint/runtime identity and connection state;
 - authorized organization/workspace/project scope when the area requires it;
-- grouped navigation containing only discoverable shipped areas;
+- grouped information architecture where only discoverable shipped areas are
+  interactive;
 - a disconnect action that clears in-memory credentials and private data;
 - persistent degraded or truncated state where applicable.
 
@@ -153,9 +166,9 @@ Navigation does not determine authorization. Every route and request performs
 server-side authorization again, and a foreign resource returns a
 non-disclosing response.
 
-On small screens, area navigation may collapse behind one native disclosure
-control. Content order, focus order, and labels remain available without
-horizontal page scrolling.
+On small screens, navigation contracts to the active Atlas item. Content order,
+focus order, and labels remain available without horizontal page scrolling;
+wide graphs and tables scroll only inside their labelled regions.
 
 ## 8. Visual system
 
@@ -197,12 +210,14 @@ channels. Color alone never carries meaning.
   SQLite, vector indexes, models, or provider bindings directly.
 - Disabling the dashboard changes no canonical data and leaves headless
   REST/MCP behavior complete.
+- The current frontend preview makes no API request, persists no state, and
+  labels its data as synthetic in public documentation.
 
 ## 11. Design acceptance
 
-- **AC-DESIGN-001 — State-driven:** While an area lacks an implemented authorized contract or completed UI work item, Titen shall omit it from dashboard navigation and direct routes.
-- **AC-DESIGN-002 — Optional feature:** Where only Memory Atlas is shipped, Titen shall render Atlas directly as the sole dashboard area without placeholder navigation.
-- **AC-DESIGN-003 — Event-driven:** When more than one area passes its emergence gate, Titen shall group only discoverable shipped areas under Memory, Collaboration, Operations, Administration, and Governance.
+- **AC-DESIGN-001 — State-driven:** While an area lacks an implemented authorized contract or completed UI work item, Titen shall expose no route or interactive control for it and shall present any reference-shell label only as non-interactive orientation.
+- **AC-DESIGN-002 — Optional feature:** Where the approved final reference shell is enabled, Titen shall render the canonical Memory, Collaboration, Operations, Administration, and Governance map while keeping Memory Atlas as the sole active area.
+- **AC-DESIGN-003 — Event-driven:** When an area passes its emergence gate, Titen shall convert only that authorized discoverable area from an orientation label into an interactive control and route.
 - **AC-DESIGN-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign area or resource, then Titen shall return a non-disclosing state and shall clear any prior private content that could be mistaken for the current result.
 - **AC-DESIGN-005 — Ubiquitous:** Titen shall keep categories and tags as filters, webhooks inside Audit & Events, portability and recovery inside System, and account settings absent until their own contracts exist.
 - **AC-DESIGN-006 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.

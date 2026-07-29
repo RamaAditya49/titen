@@ -1,17 +1,23 @@
 ---
 work_id: titen-dashboard-memory-atlas-v0-2
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: superseded
 complexity: complex
 created: 2026-07-27
-updated: 2026-07-27
-review_after: 2026-08-10
+updated: 2026-07-29
 owner: titen-maintainers
-spec: docs/specs/active/2026-07-27-dashboard-memory-atlas-v0-2.md
+spec: docs/specs/done/2026-07-27-dashboard-memory-atlas-v0-2.md
 ---
 
 # Plan: Titen Dashboard v0.2 Memory Atlas workspace
+
+## Closure reason
+
+Superseded before implementation by Rama's approved 2026-07-29 final dashboard
+mockup and Astro-first delivery decision. The replacement work item is
+`titen-dashboard-final-astro-v0-3`; unchecked steps below are historical plan
+content and were never started.
 
 ## Delivery boundary
 

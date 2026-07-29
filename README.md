@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Status: product definition" src="https://img.shields.io/badge/status-product%20definition-A9552A?style=flat&amp;labelColor=3E3630">
+  <img alt="Status: dashboard preview" src="https://img.shields.io/badge/status-dashboard%20preview-A9552A?style=flat&amp;labelColor=3E3630">
   <img alt="Cloudflare target" src="https://img.shields.io/badge/target-Cloudflare%20Workers-223A57?style=flat&amp;labelColor=3E3630">
   <img alt="VPS target" src="https://img.shields.io/badge/target-Bun%20%2B%20SQLite-223A57?style=flat&amp;labelColor=3E3630">
   <a href="./LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="#why-titen">Why Titen</a> ·
+  <a href="#dashboard-preview">Dashboard</a> ·
   <a href="#memory-levels">Memory levels</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#first-useful-slice">API slice</a> ·
@@ -18,8 +19,10 @@
 </p>
 
 > [!IMPORTANT]
-> Titen is currently a product definition, not an installable release. The next
-> gate is a dual-runtime vertical spike—not a broad framework scaffold.
+> Titen's memory service is still a product definition awaiting its dual-runtime
+> vertical spike. This repository now includes an installable Astro dashboard
+> preview driven by a synthetic fixture; it is not evidence of a deployed memory
+> API or production data.
 
 Titen is a lightweight, open-source **Level 6 collaborative memory fabric**
 built on a **Level 5 evidence-grounded memory kernel**. It helps personal,
@@ -40,6 +43,43 @@ as the complete memory system.
 
 Vectors are an index, never the source of truth. Retrieved memory is reference
 data, never an instruction.
+
+## Dashboard preview
+
+The checked-in Astro dashboard reproduces the approved Memory Atlas design at
+`/dashboard/`. Its Evidence Trace, Neighborhood, Conflict & Freshness, Scope
+Preview, inspector, search dialog, and disconnect flow run entirely in the
+browser against synthetic data. The other area names are non-interactive
+information-architecture labels, not shipped routes.
+
+<p align="center">
+  <img src="./docs/assets/screenshots/dashboard-atlas-evidence.png" alt="Titen Memory Atlas Evidence Trace dashboard" width="100%">
+</p>
+
+<p align="center">
+  <img src="./docs/assets/screenshots/dashboard-conflict-freshness.png" alt="Titen Conflict and Freshness dashboard with preserved perspectives" width="100%">
+</p>
+
+<details>
+<summary><strong>Mobile inspection flow</strong></summary>
+
+<p align="center">
+  <img src="./docs/assets/screenshots/dashboard-mobile.png" alt="Titen Memory Atlas mobile inspection flow" width="390">
+</p>
+
+</details>
+
+Run it locally:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Then open `http://localhost:4321/dashboard/`. Use `pnpm test` for the production
+build and browser suite, or `pnpm screenshots` after a build to refresh the
+README images. See the [dashboard guide](./docs/dashboard.md) for the fixture,
+security, hosting, and rollback boundaries.
 
 For customer-facing CRM or chatbot use, approved knowledge is released through
 an explicit channel snapshot. `Verified` describes evidence authority; it does
@@ -132,16 +172,17 @@ proves SQL plus hybrid retrieval cannot answer a real workload.
 
 ### Operator observability
 
-**Memory Atlas** is an optional, read-only projection over the same authorized
-records. v0.2 starts with three bounded lenses: Evidence Trace, Memory
-Neighborhood, and Conflict & Freshness. v0.3 adds Scope Preview and Knowledge
-Release for authorized governance work. SQL stays canonical; Atlas adds no
-graph database, grants no access, and is not required for headless REST/MCP.
+**Memory Atlas** is an optional, read-only projection over authorized records.
+The implemented frontend preview demonstrates Evidence Trace, Memory
+Neighborhood, Conflict & Freshness, and Scope Preview with a frozen synthetic
+fixture. The real view compiler remains planned; SQL will stay canonical, Atlas
+will add no graph database or authority, and headless REST/MCP will not depend
+on the dashboard.
 
-Atlas is also the first and only area in the initial dashboard slice. Later
-operator areas follow the progressive [DESIGN](./docs/DESIGN.md) map and appear
-only after their backend contract, authorization, and EARS UI work item pass.
-Titen does not render locked or promotional placeholders for unshipped areas.
+Atlas is the only active dashboard route. The final visual shell also shows the
+canonical [DESIGN](./docs/DESIGN.md) map as non-interactive orientation. Those
+labels do not become routes or controls until their backend contract,
+authorization, and EARS UI work item pass.
 
 ## First useful slice
 
@@ -197,10 +238,10 @@ Enterprise governance adds versioned channel knowledge releases. Public-facing
 chatbots remain external gateways: they retrieve only active releases for their
 configured audience, while customer-private and internal memory stay isolated.
 
-Deliberately outside v0.1: an agent framework, general chat UI, Memory Atlas,
-mandatory knowledge graph, broad provider matrix, autonomous evidence deletion,
-default Redis / Postgres / Qdrant / Neo4j / queue dependencies, and required
-Docker.
+Deliberately outside v0.1: an agent framework, general chat UI, live Memory
+Atlas API integration, mandatory knowledge graph, broad provider matrix,
+autonomous evidence deletion, default Redis / Postgres / Qdrant / Neo4j / queue
+dependencies, and required Docker.
 
 ## Documentation
 
@@ -209,6 +250,7 @@ Docker.
 | [PRD](./docs/PRD.md)                                                                   | Product goals, users, scope, and success criteria     |
 | [FRD](./docs/FRD.md)                                                                   | Functional behavior and acceptance requirements       |
 | [DESIGN](./docs/DESIGN.md)                                                             | Progressive dashboard information architecture        |
+| [Dashboard guide](./docs/dashboard.md)                                                 | Run, test, screenshot, and host the Astro preview     |
 | [Requirements workflow](./docs/engineering/requirements-workflow.md)                   | EARS criteria and closed work lifecycle               |
 | [Architecture](./docs/architecture/overview.md)                                        | Components and dual-runtime boundaries                |
 | [Memory lifecycle](./docs/architecture/memory-lifecycle.md)                            | Complete Level 5/6 flow and embedding/vector decision |

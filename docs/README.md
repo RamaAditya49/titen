@@ -11,6 +11,7 @@ context without a documentation-site dependency.
 | [PRD](./PRD.md)                                                    | Product scope, users, requirements, and acceptance criteria                   |
 | [FRD](./FRD.md)                                                    | Feature behavior, release scope, failure rules, and acceptance journeys       |
 | [DESIGN](./DESIGN.md)                                              | Progressive dashboard areas, emergence gates, interaction, and visual rules   |
+| [Dashboard](./dashboard.md)                                        | Astro preview, fixture boundary, tests, screenshots, and static hosting       |
 | [Roadmap](./ROADMAP.md)                                            | Delivery order and release gates                                              |
 | [Requirements workflow](./engineering/requirements-workflow.md)    | EARS acceptance criteria and spec-plan-implement-done lifecycle               |
 | [Architecture](./architecture/overview.md)                         | Components, runtime boundaries, and planned repository tree                   |

@@ -1,0 +1,29 @@
+{
+  "name": "titen",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && node scripts/check-dashboard-bundle.mjs",
+    "preview": "astro preview",
+    "test": "pnpm build && playwright test",
+    "test:browser": "playwright test",
+    "screenshots": "playwright test tests/dashboard-screenshots.spec.ts",
+    "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test"
+  },
+  "dependencies": {
+    "astro": "7.1.4"
+  },
+  "devDependencies": {
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource-variable/instrument-sans": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@playwright/test": "1.62.0"
+  }
+}

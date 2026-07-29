@@ -70,15 +70,16 @@ authorized candidate set; they cannot reveal that hidden nodes or edges exist.
 
 ## Dashboard placement
 
-Atlas is the first and only area in the active v0.2 dashboard implementation
-slice. It renders directly at `/dashboard/` without an empty sidebar, locked
-future areas, or an administration shell.
+Atlas is the first and only active area in the implemented Astro dashboard at
+`/dashboard/`. The final reference shell shows the canonical area map, but every
+label besides Atlas is non-interactive and has no route. Its displayed records
+and runtime state are a frozen synthetic fixture, not an authorized API result.
 
-The long-term dashboard may later group Atlas with Memories and Context under
-Memory. That information architecture does not change Atlas authorization or
-make the later areas part of this release. Each area remains absent until its
-backend contract, authorization, current-build capability, and separate EARS UI
-work item are complete.
+The later dashboard may activate Memories and Context under Memory and the
+other groups defined in DESIGN. The information map does not change Atlas
+authorization or make its labels part of this release. Each label becomes a
+control only after its backend contract, authorization, current-build
+capability, and separate EARS UI work item are complete.
 
 ## Projection contract
 
@@ -132,17 +133,18 @@ A future UI should keep meaning stable across lenses:
 - selected detail appears beside a stable overview instead of relaying out the
   entire graph on every click.
 
-This is presentation guidance, not a core renderer dependency. The active v0.2
-implementation spec selects native SVG, deterministic bounded layouts, and a
-synchronized HTML representation; exact limits and accessibility behavior must
-still be verified on representative data. A later renderer dependency requires
-measured need and a revised work spec.
+This is presentation guidance, not a core renderer dependency. The v0.3.1
+frontend uses Astro static HTML, native SVG, deterministic bounded layouts, and
+a synchronized inspector against a synthetic fixture. Live response limits and
+authorized-data accessibility remain future integration evidence. A later
+renderer dependency requires measured need and a revised work spec.
 
 ## Release and failure behavior
 
 - P0/v0.1 have no Memory Atlas release requirement.
 - v0.2 ships only after evidence, collaboration, and cross-scope fixtures pass.
-- the first v0.2 client renders only Atlas and no placeholder navigation;
+- the v0.3.1 static client keeps only Atlas active and treats the remaining
+  canonical area labels as non-interactive orientation;
 - v0.3 lenses ship only after policy, customer isolation, and channel-release
   fixtures pass.
 - A missing UI or renderer is not a readiness failure for the headless service.
