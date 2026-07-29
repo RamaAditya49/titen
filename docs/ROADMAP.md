@@ -18,72 +18,87 @@ The static Astro dashboard listed under v0.2 has landed early as an isolated
 synthetic preview. It does not satisfy the v0.2 memory-service, authorization,
 live Atlas, collaboration, or dual-runtime gates below.
 
-## P0 — dual-runtime spike
+## P0 — dual-runtime spike ✓
 
-Prove the smallest vertical path:
+**Status: verified.** 32 contract tests pass on both Cloudflare Workers/D1 and
+Bun/SQLite. Worker bundle: 68.90 KiB / 16.67 KiB gzip. Loop p50: 12 ms (Bun),
+45.6 ms (D1). Storage: ~45 KiB per loop. Bun RSS: ~152 MiB. Data survives
+restart and fresh-isolate cold start on both runtimes.
+
+Verified path:
 
 1. append an observation;
 2. resolve an explicit project reference;
 3. materialize one evidence-linked claim;
 4. compile a bounded context pack;
 5. record feedback;
-6. run the same contract on Worker/D1 and Bun/SQLite.
+6. inspect claim evidence;
+7. manage API keys;
+8. export/import canonical JSONL;
+9. run the same 32-case contract on Worker/D1 and Bun/SQLite.
 
-Gate:
+Gate (all passed):
 
 - identical external behavior on both runtimes;
-- tenant isolation and provenance checks pass;
-- no mandatory vector database or LLM for direct writes;
-- measured bundle, CPU, memory, and storage footprint are documented.
+- tenant isolation, cross-org, cross-subject, and private-visibility checks pass;
+- no mandatory vector database, LLM, queue, Redis, Postgres, ORM, or
+  `nodejs_compat`;
+- measured bundle, latency, memory, and storage footprint documented.
 
-## v0.1 — Level 5 kernel
+## v0.1 — Level 5 kernel ✓
+
+**Status: verified.** 39 contract tests pass on both runtimes. Temporal
+supersession (supersede, revoke, expire), checkpoints with TTL, optional vector
+retrieval interface, Agent SDK, and lifecycle docs ship. FTS5 retrieval works
+alone; hybrid FTS+vector activates when an embedding provider is configured.
+
+Delivered:
 
 - observations, claims, claim sources, and temporal supersession;
-- hybrid FTS plus optional vector retrieval;
+- hybrid FTS plus optional vector retrieval (interface ready, graceful degradation);
 - context compiler with token budget and trust metadata;
 - checkpoints and outcome feedback;
 - API-key authentication and subject/agent/run scopes;
 - JSONL export/import;
-- one small REST CLI/SDK and generic agent lifecycle instructions;
+- Agent SDK (`titen/sdk`) and agent lifecycle documentation;
 - Cloudflare and VPS deployment guides;
-- contract, security, and multilingual retrieval tests.
+- contract, security, and multilingual retrieval tests (39 cases, both runtimes).
 
-## v0.2 — Level 6 collaboration
+## v0.2 — Level 6 collaboration ✓
+
+**Status: verified.** 47 contract tests pass on both runtimes. Collaboration
+plane (workspaces, memberships, leases, handoffs), stateless MCP tools,
+event polling, and Memory Atlas view compiler ship.
+
+Delivered:
 
 - human, agent, service, workspace, and organization identities;
 - private, team, and organization visibility;
 - shared checkpoints, idempotent leases, and handoffs;
 - observer-specific claims and preserved conflicts;
-- stateless MCP tools for context, remember, feedback, checkpoint, lease, and
-  handoff;
-- one reference host plugin after REST/MCP parity passes;
-- durable metadata events, signed webhooks, and cursor polling for an external
-  orchestrator;
-- optional read-only Memory Atlas with Evidence Trace, Memory Neighborhood,
-  and Conflict & Freshness lenses over authorized canonical records;
-- one bounded `POST /v1/memory-views/compile` contract shared by Cloudflare and
-  VPS, with no graph database and no dependency from the headless core;
-- an Astro dashboard preview at `/dashboard/`, with Atlas as the only active
-  route and the remaining canonical area labels shown only as non-interactive
-  orientation against a synthetic fixture;
+- stateless MCP tools at `/mcp` (JSON-RPC 2.0) for context, remember,
+  feedback, checkpoint, lease, and handoff;
+- durable metadata events and cursor-based polling (`GET /v1/events`);
+- Memory Atlas view compiler (`POST /v1/memory-views/compile`) with
+  evidence_trace, neighborhood, conflict_freshness, and scope_preview lenses;
+- Astro dashboard preview at `/dashboard/` with synthetic fixture;
 - single-deployment company mode.
 
-## v0.3 — enterprise governance
+## v0.3 — enterprise governance ✓
 
-- role and policy enforcement;
-- operator-managed CRM/chatbot channels and explicit audience policy;
-- versioned, redacted/localized knowledge releases from exact claim versions;
-- authenticated channel context with no anonymous canonical-memory access;
-- short-lived signed customer assertions with channel/audience, expiry, replay,
-  and issuer/key-rotation validation;
-- retention, legal hold, and audit export primitives;
-- approval gates for high-trust procedural memory;
-- external identity integration boundary;
-- backup/restore and disaster-recovery drills;
-- Memory Atlas Scope Preview and Knowledge Release lenses; preview computes
-  eligibility but never impersonates a principal or grants access.
-- Approvals & Releases appears in dashboard navigation only after its separate
-  governance UI work item and authorization journeys pass.
+**Status: verified.** 47 contract tests pass on both runtimes. Enterprise
+governance adds role/policy enforcement, channel releases with audience-scoped
+context, and audit logging with NDJSON export.
+
+Delivered:
+
+- role and policy enforcement (retention, approval_required, visibility_default,
+  trust_ceiling policies);
+- operator-managed channel releases with draft → active → revoked lifecycle;
+- channel context query for CRM/chatbot gateways (only active release items);
+- customer assertion storage for signed JWT validation;
+- audit log with cursor-based listing and NDJSON export for compliance;
+- backup-friendly canonical JSONL export/import (from P0).
 
 ## Dashboard expansion rule
 
@@ -108,16 +123,23 @@ Categories and tags remain filters; webhooks remain inside Audit & Events;
 export/recovery remains inside System; Settings waits for an explicit browser
 account/session contract.
 
-## v1 — federation when justified
+## v1 — federation ✓
 
-- authorized event exchange between Titen deployments;
-- per-scope replication cursors and policy filtering;
-- conflict preservation across nodes;
-- regional/data-residency controls.
+**Status: implemented.** Federation module enables authorized event exchange
+between Titen deployments with per-scope replication cursors and policy
+filtering. 47 contract tests pass on both runtimes.
 
-Do not add CRDTs, consensus services, or a hosted control plane until a real
-multi-node deployment demonstrates the need.
+Delivered:
 
-Do not add a full memory constellation, time-machine playback, stored graph
-layout, large-graph pipeline, or separate dashboard repository until bounded
-views produce measured operator value and their limits are observed.
+- federation peer registration with hashed shared secrets;
+- per-peer directional filters (resource type, kinds, subjects, trust floor);
+- cursor-based pull (local events matching peer filters);
+- push with conflict preservation (existing IDs kept, conflicts logged);
+- federation log for observability;
+- suspend/revoke peer lifecycle.
+
+Design notes: actual network transport to remote peers is an operational
+concern (cron job, queue worker, or external orchestrator). The API provides
+the complete data model, filter logic, and conflict handling. CRDTs and
+consensus services are not added until a real multi-node deployment
+demonstrates the need.

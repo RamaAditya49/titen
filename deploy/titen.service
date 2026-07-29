@@ -1,0 +1,31 @@
+[Unit]
+Description=Titen memory service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=titen
+Group=titen
+StateDirectory=titen
+WorkingDirectory=/opt/titen
+ExecStart=/usr/local/bin/bun /opt/titen/src/runtime/bun/cli.ts serve --db /var/lib/titen/titen.db --port 8787 --host 127.0.0.1
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/titen
+UMask=0077
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

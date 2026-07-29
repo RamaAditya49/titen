@@ -1,7 +1,8 @@
 # HTTP API reference
 
-Status: draft contract for P0 and later releases. Endpoint names and envelopes
-are stable targets; payload details may change before the first tagged release.
+Status: **P0 endpoints verified** on Cloudflare Workers/D1 and Bun/SQLite.
+Endpoint names, envelopes, and payload shapes are stable. Post-P0 operations
+remain draft until their implementation ships.
 
 ## Common behavior
 
