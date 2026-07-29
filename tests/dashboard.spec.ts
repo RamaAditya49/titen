@@ -132,8 +132,11 @@ test("keeps unavailable product areas as non-interactive orientation", async ({
   await expect(page.locator(".nav-item:not(.active)")).toHaveCount(8);
 });
 
-test("has no horizontal page overflow below 900px", async ({ page }) => {
+test("uses a readable mobile trail and bounded tablet graph", async ({
+  page,
+}) => {
   for (const viewport of [
+    { width: 320, height: 700 },
     { width: 390, height: 844 },
     { width: 768, height: 1024 },
   ]) {
@@ -147,12 +150,34 @@ test("has no horizontal page overflow below 900px", async ({ page }) => {
       graphClient: document.querySelector(".graph-scroll")?.clientWidth,
     }));
     expect(overflow.body).toBeLessThanOrEqual(overflow.viewport);
-    expect(overflow.graph).toBeGreaterThan(overflow.graphClient ?? 0);
+    if (viewport.width < 640)
+      expect(overflow.graph).toBeLessThanOrEqual(overflow.graphClient ?? 0);
+    else expect(overflow.graph).toBeGreaterThan(overflow.graphClient ?? 0);
   }
   await expect(
     page.getByRole("heading", { level: 1, name: "Memory Atlas" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("region", { name: /Evidence Trace graph/ }),
+    page.getByRole("region", { name: /Evidence Trace relationship/ }),
   ).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await page.locator(".focus-node").first().click();
+  await expect(page.locator('[data-inspector="focus"]')).toBeVisible();
+  expect(
+    await page
+      .locator(".inspector-column")
+      .evaluate((element) => Math.abs(element.getBoundingClientRect().top)),
+  ).toBeLessThan(160);
+
+  for (const lens of ["Conflict & Freshness", "Scope Preview"]) {
+    await page.getByRole("button", { name: lens, exact: true }).click();
+    const table = page.locator("[data-lens-panel]:visible .table-scroll");
+    const widths = await table.evaluate((element) => ({
+      scroll: element.scrollWidth,
+      client: element.clientWidth,
+    }));
+    expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+  }
 });

@@ -31,10 +31,12 @@ these are local maintainer gates.
 - exact desktop composition from the approved 1600 x 1080 final mockup;
 - Evidence Trace, Neighborhood, Conflict & Freshness, and Scope Preview lenses;
 - focus claim, disputed claim, and observation inspectors;
+- tap-to-inspect phone flow that brings the selected detail card into view;
 - native search dialog from the header or <kbd>Ctrl/Command</kbd>+<kbd>K</kbd>;
 - disconnect/reconnect that removes the private fixture from view and persists
   nothing;
-- responsive page composition with internally scrollable graph/table regions;
+- responsive page composition with a vertical evidence trail and labelled table
+  cards on phones, plus bounded graph/table scrolling on wider screens;
 - reduced-motion, forced-colors, visible-focus, and semantic landmark support;
 - locally built fonts, logo, SVG graphs, and icons with no third-party runtime
   request.

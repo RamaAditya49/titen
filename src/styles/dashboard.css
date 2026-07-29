@@ -37,7 +37,7 @@ body {
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 button,
@@ -74,7 +74,7 @@ button:hover:not(:disabled) {
 .app-shell {
   display: flex;
   width: 100%;
-  min-height: max(100vh, 1080px);
+  min-height: max(100dvh, 1080px);
   background: var(--canvas);
 }
 
@@ -1791,7 +1791,7 @@ button.table-row {
 @media (max-width: 899px) {
   .app-shell {
     display: block;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .sidebar {
@@ -1995,6 +1995,200 @@ button.table-row {
   .panel-header {
     flex-wrap: wrap;
     padding: 12px 14px;
+  }
+
+  .graph-scroll,
+  .table-scroll {
+    overflow-x: clip;
+  }
+
+  .graph-canvas {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 10px 8px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 14px;
+  }
+
+  .graph-canvas > svg,
+  .edge-label {
+    display: none;
+  }
+
+  .graph-card {
+    position: static;
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 0;
+    padding: 11px 12px;
+    border-left-width: 3px;
+  }
+
+  .focus-node,
+  .neighborhood-canvas .focus-node {
+    position: static;
+    order: -2;
+    width: 22px;
+    height: 22px;
+    margin-top: 3px;
+    box-shadow: 0 0 0 4px rgb(169 85 42 / 16%);
+  }
+
+  .focus-node span {
+    width: 7px;
+    height: 7px;
+  }
+
+  .focus-caption,
+  .neighborhood-canvas .focus-caption {
+    position: static;
+    order: -1;
+    align-items: flex-start;
+    width: auto;
+    padding-bottom: 5px;
+  }
+
+  .focus-caption strong {
+    text-align: left;
+  }
+
+  .evidence-canvas .graph-card::before {
+    font-family: "JetBrains Mono Variable", monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .evidence-one,
+  .evidence-two {
+    border-left-color: #a8be96;
+  }
+
+  .evidence-one::before,
+  .evidence-two::before {
+    color: var(--success);
+    content: "supports focus";
+  }
+
+  .evidence-three {
+    border-left-color: #d8be87;
+  }
+
+  .evidence-three::before {
+    color: var(--warning);
+    content: "qualifies focus";
+  }
+
+  .evidence-four::before {
+    color: var(--danger);
+    content: "contradicts focus";
+  }
+
+  .disputed-card::before {
+    color: var(--danger);
+    content: "conflicting claim";
+  }
+
+  .context-card::before {
+    color: var(--wedel);
+    content: "selected in context";
+  }
+
+  .release-card::before {
+    color: var(--success);
+    content: "released from focus";
+  }
+
+  .data-table {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    background: var(--gading);
+  }
+
+  .table-head {
+    display: none;
+  }
+
+  .conflict-table .table-row,
+  .scope-table .table-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    min-height: 0;
+    padding: 13px 14px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-left-width: 3px;
+    border-radius: 3px;
+  }
+
+  .conflict-table .table-row.danger {
+    background: var(--warning-bg);
+    border-left-color: var(--danger);
+  }
+
+  .conflict-table .table-row.warning {
+    border-left-color: #d8be87;
+  }
+
+  .table-row > svg {
+    display: none;
+  }
+
+  .table-row > span:nth-child(2) {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .table-row > span:nth-child(n + 3)::before {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .conflict-table .table-row > span:nth-child(3)::before {
+    content: "status";
+  }
+
+  .conflict-table .table-row > span:nth-child(4)::before {
+    content: "trust";
+  }
+
+  .conflict-table .table-row > span:nth-child(5)::before {
+    content: "scope";
+  }
+
+  .conflict-table .table-row > span:nth-child(6)::before {
+    content: "evidence";
+  }
+
+  .conflict-table .table-row > span:nth-child(7),
+  .scope-table .table-row > span:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .conflict-table .table-row > span:nth-child(7)::before {
+    content: "changed";
+  }
+
+  .scope-table .table-row > span:nth-child(3)::before {
+    content: "visibility";
+  }
+
+  .scope-table .table-row > span:nth-child(4)::before {
+    content: "agent-11 eligible";
+  }
+
+  .scope-table .table-row > span:nth-child(5)::before {
+    content: "reason";
   }
 
   .legend-row {

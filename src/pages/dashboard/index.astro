@@ -515,7 +515,7 @@ const compileSteps = [
                   <div
                     class="graph-scroll"
                     role="region"
-                    aria-label="Evidence Trace graph; scroll horizontally on narrow screens"
+                    aria-label="Evidence Trace relationship view"
                     tabindex="0"
                   >
                     <div class="graph-canvas evidence-canvas">
@@ -664,7 +664,7 @@ const compileSteps = [
                   <div
                     class="graph-scroll"
                     role="region"
-                    aria-label="Memory Neighborhood graph; scroll horizontally on narrow screens"
+                    aria-label="Memory Neighborhood relationship view"
                     tabindex="0"
                   >
                     <div class="graph-canvas neighborhood-canvas">
@@ -1086,6 +1086,10 @@ const compileSteps = [
         document.querySelectorAll("[data-inspector]").forEach((panel) => {
           panel.hidden = panel.dataset.inspector !== selection;
         });
+        if (matchMedia("(max-width: 639px)").matches)
+          document
+            .querySelector(".inspector-column")
+            .scrollIntoView({ block: "start" });
       }
 
       function openSearch() {

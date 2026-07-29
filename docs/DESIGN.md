@@ -114,7 +114,7 @@ Atlas provides:
 - Scope Preview as a synthetic policy-eligibility demonstration;
 - one exact authorized focus;
 - a bounded SVG overview synchronized with an accessible evidence/detail list;
-- search dialog, disconnect/reconnect, responsive graph/table scroll regions,
+- search dialog, disconnect/reconnect, responsive phone trails/table cards,
   and selected-record inspectors.
 
 The exact implementation contract lives in the
@@ -168,7 +168,8 @@ non-disclosing response.
 
 On small screens, navigation contracts to the active Atlas item. Content order,
 focus order, and labels remain available without horizontal page scrolling;
-wide graphs and tables scroll only inside their labelled regions.
+phone layouts linearize graphs and tables, while wider bounded views may scroll
+inside their labelled regions.
 
 ## 8. Visual system
 

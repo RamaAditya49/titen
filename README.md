@@ -64,7 +64,7 @@ information-architecture labels, not shipped routes.
 <summary><strong>Mobile inspection flow</strong></summary>
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-mobile.png" alt="Titen Memory Atlas mobile inspection flow" width="390">
+  <img src="./docs/assets/screenshots/dashboard-mobile.png" alt="Titen Memory Atlas mobile inspection flow" width="354">
 </p>
 
 </details>

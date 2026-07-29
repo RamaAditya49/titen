@@ -34,8 +34,9 @@ test("capture mobile inspection flow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/dashboard/");
   await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({
+  await page.locator(".focus-node").first().click();
+  await expect(page.locator('[data-inspector="focus"]')).toBeVisible();
+  await page.locator('[data-inspector="focus"]').screenshot({
     path: resolve(output, "dashboard-mobile.png"),
-    fullPage: true,
   });
 });
