@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "titen",
+  "main": "src/runtime/cloudflare/worker.ts",
+  "compatibility_date": "2026-07-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "TITEN_REVISION": "dev",
+    "TITEN_AUTO_MIGRATE": "0"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "titen",
+      "database_id": "replace-with-your-d1-database-id"
+    }
+  ]
+}

@@ -1,5 +1,14 @@
 packages:
   - "."
 
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - miniflare@4.20260722.1
+  - wrangler@4.115.0
+
 onlyBuiltDependencies:
   - esbuild
+  - workerd

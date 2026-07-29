@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
+  // Browser specs only; tests/contract runs on Bun and workerd instead.
+  testMatch: "*.spec.ts",
   fullyParallel: false,
   reporter: "line",
   use: {

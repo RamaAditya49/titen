@@ -23,11 +23,12 @@ delivery evidence and may preserve superseded decisions.
 
 ## Repository stage
 
-The repository currently contains a tested static Astro dashboard backed by a
-synthetic fixture. The memory service, authenticated API, Cloudflare Worker,
-Bun/SQLite runtime, and dual-runtime contract suite remain planned P0 work. Do
-not present the dashboard as service evidence or create empty runtime scaffolding
-before its P0 work item begins.
+The repository contains a verified P0 memory service with a shared TypeScript
+core, a Cloudflare Worker/D1 adapter, and a Bun/SQLite adapter. The
+dual-runtime contract suite (32 cases) passes on both runtimes. The Astro
+dashboard preview continues to use a synthetic fixture independently of the
+memory API. Do not present the dashboard as live service evidence; it uses a
+synthetic fixture, not the memory API.
 
 ## Required work lifecycle
 

@@ -1,116 +1,97 @@
 # Cloudflare deployment
 
-Status: target design; P0 must verify every binding and runtime assumption.
+Status: **verified** — P0 memory service operational on Cloudflare Workers with D1.
 
-## Components
+## Quick start
 
-- one Cloudflare Worker;
-- D1 as canonical SQL and FTS store;
-- optional Vectorize as a rebuildable semantic index;
-- optional Workers AI for embeddings and structured extraction;
-- Cron Trigger for bounded enrichment, vector, event-delivery, and
-  consolidation work.
-- optional external CRM/chatbot gateway using a distinct scoped service
-  credential; it is not a public Titen route.
-- optional Memory Atlas static client, served by the same Worker/site or a
-  separate static host, calling only authenticated REST.
+Prerequisites: Node 22+, pnpm 10+, Cloudflare account with D1.
 
-No KV, R2, Queue, Durable Object, or `nodejs_compat` is required for P0.
+```bash
+# 1. Install
+pnpm install
 
-## Planned bindings
+# 2. Create D1 database
+wrangler d1 create titen
+# Copy the database_id from output into wrangler.jsonc
+
+# 3. Apply schema
+pnpm titen schema | wrangler d1 execute titen --file=-
+
+# 4. Bootstrap first org credential (save the printed key)
+pnpm titen bootstrap --org 'My Org' --print-sql | wrangler d1 execute titen --file=-
+
+# 5. Deploy
+pnpm deploy:worker
+
+# 6. (Optional) Enable auto-migrate on deploy
+# Set TITEN_AUTO_MIGRATE to "1" in wrangler.jsonc vars
+# or: wrangler secret put TITEN_AUTO_MIGRATE
+
+# 7. Verify
+curl https://titen.<your-subdomain>.workers.dev/healthz
+```
+
+## Verified P0 behavior
+
+- Worker bundle: 68.90 KiB / 16.67 KiB gzip.
+- 32 contract tests pass through Miniflare with real D1.
+- Loop latency p50: 45.6 ms (local D1, not production).
+- Data survives isolate disposal and fresh cold start.
+- No Vectorize, Workers AI, Cron, KV, R2, Queue, DO, or `nodejs_compat` required.
+
+## Bindings
+
+Actual `wrangler.jsonc`:
 
 ```jsonc
 {
-  "main": "src/cloudflare.ts",
-  "compatibility_date": "<pin during P0>",
-  "d1_databases": [{ "binding": "DB", "database_name": "titen" }],
-  "vectorize": [{ "binding": "VECTORIZE", "index_name": "titen-memory" }],
-  "ai": { "binding": "AI" },
-  "triggers": { "crons": ["*/5 * * * *"] },
+  "name": "titen",
+  "main": "src/runtime/cloudflare/worker.ts",
+  "compatibility_date": "2026-07-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "TITEN_REVISION": "dev",
+    "TITEN_AUTO_MIGRATE": "0"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "titen",
+      "database_id": "replace-with-your-d1-database-id"
+    }
+  ]
 }
 ```
 
-Vectorize and AI are optional capabilities. Readiness and responses must report
-when semantic retrieval or consolidation is unavailable.
+`TITEN_REVISION` is stamped at build/deploy; `TITEN_AUTO_MIGRATE` controls
+whether the Worker applies pending migrations on cold start.
 
-Vectorize does not create embeddings. When semantic retrieval is enabled,
-Workers AI or another compatible embedding provider must generate vectors for
-both indexed claim versions and incoming context queries. The configured model,
-dimensions, metric, normalization, and text-template version form one
-fingerprint; a mismatch fails semantic readiness without disabling canonical
-SQL/FTS operation.
+## Planned (not yet active)
 
-## Provisioning order
+These bindings will be added when their P0 work items begin:
 
-1. Create D1 and apply migrations.
-2. Create the vector index with the tested dimensions/metric if enabled.
-3. Create required vector metadata indexes before inserting vectors.
-4. Deploy the Worker.
-5. Bootstrap the first organization/admin credential through a local CLI.
-6. Run protected remember/context/delete and cross-scope smoke tests.
-7. Verify scheduled repair and outbox age.
-8. When MCP is enabled, verify `/mcp` initialization and the ordinary-agent
-   tool allowlist.
-9. When webhooks are enabled, verify signature, destination policy, retry, and
-   failure isolation with a non-production receiver.
-10. When v0.3 channel serving is enabled, provision publisher, approver, and
-    gateway principals separately; activate/revoke a synthetic release and run
-    anonymous plus cross-customer isolation probes.
-11. When Memory Atlas is enabled, compile each enabled lens, probe foreign and
-    private focus IDs, inject a stale candidate, and verify bounded truncation.
+- **Vectorize** — rebuildable semantic index for vector retrieval.
+- **Workers AI** — embeddings and structured extraction.
+- **Cron Trigger** — bounded consolidation, enrichment, event delivery.
+- **Channel serving** — CRM/chatbot gateway via scoped service credential.
+- **Memory Atlas** — read-only browser client against authenticated REST.
 
-## Runtime rules
-
-- Authority is derived from the authenticated credential.
-- D1 commits canonical records, history, FTS, and outbox atomically.
-- Vector mutations may be asynchronous; canonical hydration rejects stale
-  versions and tombstones.
-- Recent pending writes use a bounded overlay only if P0 CPU measurements allow
-  it.
-- Long consolidation work remains bounded; add Queue/Workflow only after a
-  measured need.
-- The same Worker may expose `/v1` and `/mcp`; neither route waits for model,
-  vector visibility, or webhook delivery after canonical commit.
-- Outbound webhook destinations are explicit, HTTPS, allowlisted, and checked
-  against private/link-local metadata targets before every delivery.
-- A public hostname may front the CRM/chatbot application, but `/v1` and `/mcp`
-  remain authenticated. The gateway calls protected channel-context operations;
-  it never forwards arbitrary Titen paths, keys, `subject_id`, or audience.
-- Channel release FTS is committed with the canonical release. Optional release
-  vectors are derived and every result is hydrated against channel, audience,
-  version, validity, and status.
-- Memory Atlas uses the same authenticated
-  `POST /v1/memory-views/compile` contract as VPS. The optional browser client
-  receives no D1, Vectorize, or Workers AI binding; same-origin hosting is
-  preferred and its CSP permits only required static assets and API calls.
-- Atlas layout and cache are derived. Disabling the client/compiler or losing a
-  renderer cannot fail headless REST/MCP readiness.
+Readiness and `/healthz` will report when optional capabilities are unavailable.
 
 ## Secrets
 
-- Store bootstrap/model secrets with Worker secrets, never `wrangler.jsonc`.
-- Never place API keys in Vectorize metadata or logs.
+- Store bootstrap/model secrets with `wrangler secret put`, never in `wrangler.jsonc`.
 - Use a distinct, revocable key per agent/service integration.
-- Pin each gateway key to its allowed channel/audience and keep publisher and
-  approver capabilities off that key.
+- Never place API keys in Vectorize metadata or logs.
 
 ## Verification gate
 
-- unauthenticated protected request returns JSON `401`;
-- cross-tenant access returns non-disclosing not-found;
-- observation and context compile work without Vectorize;
-- embedding dimension mismatch fails readiness;
-- invalid/missing configured customer-assertion verifier fails channel-serving
-  readiness without exposing issuer/key details;
-- cache-busted production response reports the deployed revision;
-- rollback artifact and migration compatibility are known before release.
-- channel smoke confirms verified-but-unreleased content is absent, anonymous
-  requests cannot select a customer subject, Customer A cannot retrieve
-  Customer B memory, expired/replayed customer assertions fail, and revoke takes
-  effect on the next context compile.
-- when Atlas is enabled, all lenses return only authorized nodes/edges/counts,
-  stale projections cannot revive ineligible records, limits truncate
-  boundedly, and disabled mode leaves kernel/MCP smoke green.
+- Unauthenticated protected request → JSON `401`.
+- Cross-tenant access → non-disclosing not-found.
+- Observation and context compile work without Vectorize.
+- Cache-busted production response reports the deployed revision.
+- Rollback artifact and migration compatibility known before release.
 
 Current Cloudflare limits and pricing remain research evidence in the root
 [blueprint](../../blueprint.md) and must be refreshed before production.

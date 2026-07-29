@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Status: dashboard preview" src="https://img.shields.io/badge/status-dashboard%20preview-A9552A?style=flat&amp;labelColor=3E3630">
+  <img alt="Status: P0 memory service" src="https://img.shields.io/badge/status-P0%20memory%20service-A9552A?style=flat&amp;labelColor=3E3630">
   <img alt="Cloudflare target" src="https://img.shields.io/badge/target-Cloudflare%20Workers-223A57?style=flat&amp;labelColor=3E3630">
   <img alt="VPS target" src="https://img.shields.io/badge/target-Bun%20%2B%20SQLite-223A57?style=flat&amp;labelColor=3E3630">
   <a href="./LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
@@ -18,11 +18,11 @@
   <a href="#documentation">Docs</a>
 </p>
 
-> [!IMPORTANT]
-> Titen's memory service is still a product definition awaiting its dual-runtime
-> vertical spike. This repository now includes an installable Astro dashboard
-> preview driven by a synthetic fixture; it is not evidence of a deployed memory
-> API or production data.
+> [!NOTE]
+> Titen's P0 memory service is operational on both Cloudflare Workers/D1 and
+> Bun/SQLite. The Level 5 evidence loop (observe → claim → compile → feedback)
+> is verified by 32 contract tests on each runtime. Vector retrieval and model
+> consolidation remain planned; lexical FTS5 serves all retrieval today.
 
 Titen is a lightweight, open-source **Level 6 collaborative memory fabric**
 built on a **Level 5 evidence-grounded memory kernel**. It helps personal,
@@ -80,6 +80,33 @@ Then open `http://localhost:4321/dashboard/`. Use `pnpm test` for the production
 build and browser suite, or `pnpm screenshots` after a build to refresh the
 README images. See the [dashboard guide](./docs/dashboard.md) for the fixture,
 security, hosting, and rollback boundaries.
+
+## Quick start
+
+### Local / VPS (Bun)
+
+```bash
+pnpm install
+pnpm titen bootstrap --org 'My Org'
+# Save the printed api_key — it cannot be shown again
+pnpm titen serve
+# Memory service at http://127.0.0.1:8787
+curl http://127.0.0.1:8787/healthz
+```
+
+### Cloudflare Workers
+
+```bash
+pnpm install
+wrangler d1 create titen
+# Update wrangler.jsonc with the database_id
+pnpm titen schema | wrangler d1 execute titen --remote --file=-
+pnpm titen bootstrap --org 'My Org' --print-sql | wrangler d1 execute titen --remote --file=-
+pnpm deploy:worker
+curl https://titen.<subdomain>.workers.dev/healthz
+```
+
+See [VPS guide](./docs/deployment/vps.md) and [Cloudflare guide](./docs/deployment/cloudflare.md) for production hardening, key management, and backup.
 
 For customer-facing CRM or chatbot use, approved knowledge is released through
 an explicit channel snapshot. `Verified` describes evidence authority; it does
@@ -186,7 +213,7 @@ authorization, and EARS UI work item pass.
 
 ## First useful slice
 
-The first implementation will prove the complete Level 5 loop with five
+The P0 implementation proves the complete Level 5 loop with five
 operations:
 
 ```http
