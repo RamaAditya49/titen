@@ -1,5 +1,6 @@
 import { assertTrustCeiling } from "./auth";
 import type { Stmt } from "./db";
+import { eventStatement } from "./events";
 import { validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
@@ -170,6 +171,15 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             ingestedAt,
           ),
           outboxStatement(principal.orgId, "observation", id, "upsert", ingestedAt),
+          eventStatement(
+            principal.orgId,
+            "observation.appended",
+            principal.principalId,
+            "observation",
+            id,
+            { subject_id: subjectId, kind, trust, visibility },
+            ingestedAt,
+          ),
         ],
       };
     },

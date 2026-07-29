@@ -1,5 +1,6 @@
 import { first } from "./db";
 import { notFound, validationError, conflict } from "./errors";
+import { eventStatement } from "./events";
 import { newId } from "./ids";
 import type { RequestContext, Result } from "./http";
 import {
@@ -133,11 +134,15 @@ export async function acquireLease(ctx: RequestContext): Promise<Result> {
   const id = newId("lease");
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
 
-  await ctx.app.db.batch([{
-    sql: `INSERT INTO leases (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds, expires_at, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [id, orgId, resourceType, resourceId, principalId, purpose, ttlSeconds, expiresAt, nowIso],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `INSERT INTO leases (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds, expires_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [id, orgId, resourceType, resourceId, principalId, purpose, ttlSeconds, expiresAt, nowIso],
+    },
+    eventStatement(orgId, "lease.acquired", principalId, "lease", id,
+      { resource_type: resourceType, resource_id: resourceId, purpose, expires_at: expiresAt }, nowIso),
+  ]);
 
   return { status: 201, data: { lease_id: id, expires_at: expiresAt } };
 }
@@ -173,11 +178,15 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
   const id = newId("hoff");
   const now = ctx.app.now().toISOString();
 
-  await ctx.app.db.batch([{
-    sql: `INSERT INTO handoffs (id, org_id, from_principal, to_principal, subject_id, context_id, checkpoint_id, message, status, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-    params: [id, orgId, principalId, toPrincipal, subjectId, contextId, checkpointId, message, now],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `INSERT INTO handoffs (id, org_id, from_principal, to_principal, subject_id, context_id, checkpoint_id, message, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      params: [id, orgId, principalId, toPrincipal, subjectId, contextId, checkpointId, message, now],
+    },
+    eventStatement(orgId, "handoff.created", principalId, "handoff", id,
+      { to_principal: toPrincipal, subject_id: subjectId }, now),
+  ]);
 
   return { status: 201, data: { handoff_id: id, status: "pending" } };
 }
@@ -198,10 +207,13 @@ export async function resolveHandoff(ctx: RequestContext): Promise<Result> {
     throw validationError("Only the target principal can resolve a handoff.");
 
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([{
-    sql: `UPDATE handoffs SET status = ?, resolved_at = ? WHERE id = ?`,
-    params: [status, now, id],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE handoffs SET status = ?, resolved_at = ? WHERE id = ?`,
+      params: [status, now, id],
+    },
+    eventStatement(orgId, `handoff.${status}`, principalId, "handoff", id, { status }, now),
+  ]);
 
   return { data: { handoff_id: id, status, resolved_at: now } };
 }

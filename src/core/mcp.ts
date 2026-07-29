@@ -33,105 +33,49 @@ const INTERNAL_ERROR = -32603;
 
 // --- Tool schemas ---
 
-const TOOLS = [
-  {
-    name: "titen_remember",
-    description: "Append an observation to memory.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        subject_id: { type: "string" },
-        kind: { type: "string" },
-        content: { type: "string" },
-        source_type: { type: "string" },
-        source_ref: { type: "string" },
-        trust: { type: "string" },
-        visibility: { type: "string" },
-      },
-      required: ["subject_id", "kind", "content", "source_type", "source_ref"],
-    },
-  },
-  {
-    name: "titen_compile",
-    description: "Compile context for a task.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        subject_id: { type: "string" },
-        task: { type: "string" },
-        max_tokens: { type: "integer" },
-      },
-      required: ["subject_id", "task", "max_tokens"],
-    },
-  },
-  {
-    name: "titen_feedback",
-    description: "Record feedback on a context run.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        context_id: { type: "string" },
-        outcome: { type: "string", enum: ["used", "useful", "irrelevant", "incorrect", "harmful"] },
-        claim_id: { type: "string" },
-        reason_code: { type: "string" },
-      },
-      required: ["context_id", "outcome"],
-    },
-  },
-  {
-    name: "titen_checkpoint_save",
-    description: "Save or update a checkpoint.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        subject_id: { type: "string" },
-        kind: { type: "string", enum: ["task_state", "conversation", "workflow", "cursor"] },
-        state: {},
-        ttl_seconds: { type: "integer" },
-      },
-      required: ["subject_id", "kind", "state", "ttl_seconds"],
-    },
-  },
-  {
-    name: "titen_checkpoint_get",
-    description: "Get the current checkpoint for a subject and kind.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        subject_id: { type: "string" },
-        kind: { type: "string", enum: ["task_state", "conversation", "workflow", "cursor"] },
-      },
-      required: ["subject_id", "kind"],
-    },
-  },
-  {
-    name: "titen_lease_acquire",
-    description: "Acquire a coordination lease on a resource.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        resource_type: { type: "string" },
-        resource_id: { type: "string" },
-        purpose: { type: "string" },
-        ttl_seconds: { type: "integer" },
-      },
-      required: ["resource_type", "resource_id", "purpose", "ttl_seconds"],
-    },
-  },
-  {
-    name: "titen_handoff",
-    description: "Create a handoff to another principal.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        to_principal: { type: "string" },
-        subject_id: { type: "string" },
-        message: { type: "string" },
-      },
-      required: ["to_principal", "subject_id"],
-    },
-  },
-] as const;
+const CHECKPOINT_KINDS = ["task_state", "conversation", "workflow", "cursor"];
+const OUTCOMES = ["used", "useful", "irrelevant", "incorrect", "harmful"];
+
+/**
+ * Tool specs as data: `name!` marks a required argument, `name:i` an integer,
+ * `name:?` a free-form value, and `name=a|b` an enum. One builder expands them
+ * into JSON Schema so adding a tool is one line, not a nested literal.
+ */
+const TOOL_SPECS: [name: string, description: string, args: string][] = [
+  ["titen_remember", "Append an observation to memory.",
+    "subject_id! kind! content! source_type! source_ref! trust visibility"],
+  ["titen_compile", "Compile context for a task.",
+    "subject_id! task! max_tokens!:i"],
+  ["titen_feedback", "Record feedback on a context run.",
+    `context_id! outcome!=${OUTCOMES.join("|")} claim_id reason_code`],
+  ["titen_checkpoint_save", "Save or update a checkpoint.",
+    `subject_id! kind!=${CHECKPOINT_KINDS.join("|")} state!:? ttl_seconds!:i`],
+  ["titen_checkpoint_get", "Get the current checkpoint for a subject and kind.",
+    `subject_id! kind!=${CHECKPOINT_KINDS.join("|")}`],
+  ["titen_lease_acquire", "Acquire a coordination lease on a resource.",
+    "resource_type! resource_id! purpose! ttl_seconds!:i"],
+  ["titen_handoff", "Create a handoff to another principal.",
+    "to_principal! subject_id! message"],
+];
+
+const TOOLS = TOOL_SPECS.map(([name, description, args]) => {
+  const properties: Record<string, unknown> = {};
+  const required: string[] = [];
+  for (const token of args.split(" ")) {
+    const [head, values] = token.split("=");
+    const isRequired = head!.includes("!");
+    const [field, type] = head!.replace("!", "").split(":");
+    if (isRequired) required.push(field!);
+    properties[field!] = values
+      ? { type: "string", enum: values.split("|") }
+      : type === "i"
+        ? { type: "integer" }
+        : type === "?"
+          ? {}
+          : { type: "string" };
+  }
+  return { name, description, inputSchema: { type: "object", properties, required } };
+});
 
 // --- Helpers ---
 

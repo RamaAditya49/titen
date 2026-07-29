@@ -32,7 +32,7 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
     },
   ]);
 
-  return { status: 201, data: { id, name, endpoint, direction, status: "active", created_at: now } };
+  return { status: 201, data: { peer_id: id, name, endpoint, direction, status: "active", created_at: now } };
 }
 
 /** GET /v1/federation/peers */
@@ -52,7 +52,7 @@ export async function listPeers(ctx: RequestContext): Promise<Result> {
        FROM federation_peers WHERE org_id = ? ORDER BY created_at DESC`,
     [principal.orgId],
   );
-  return { data: { peers: rows } };
+  return { data: { peers: rows.map((r) => ({ peer_id: r.id, ...r, id: undefined })) } };
 }
 
 /** POST /v1/federation/peers/:id/suspend */
@@ -109,7 +109,7 @@ export async function addFilter(ctx: RequestContext): Promise<Result> {
     },
   ]);
 
-  return { status: 201, data: { id, peer_id: peerId, resource_type: resourceType, include_kinds: includeKinds, exclude_subjects: excludeSubjects, min_trust: minTrust, created_at: now } };
+  return { status: 201, data: { filter_id: id, peer_id: peerId, resource_type: resourceType, include_kinds: includeKinds, exclude_subjects: excludeSubjects, min_trust: minTrust, created_at: now } };
 }
 
 /** GET /v1/federation/peers/:id/filters */
@@ -137,7 +137,7 @@ export async function listFilters(ctx: RequestContext): Promise<Result> {
     [peerId],
   );
 
-  return { data: { filters: rows } };
+  return { data: { filters: rows.map((r) => ({ filter_id: r.id, ...r, id: undefined })) } };
 }
 
 // --- Pull / Push ---

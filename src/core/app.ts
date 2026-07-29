@@ -13,7 +13,7 @@ import { compileView } from "./atlas";
 import { createPolicy, listPolicies, createRelease, publishRelease, revokeRelease, queryRelease, channelContext } from "./governance";
 import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
-import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries } from "./webhooks";
+import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation } from "./observations";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
@@ -177,6 +177,7 @@ const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/webhooks/:id/pause", scope: "webhooks:write", handler: pauseWebhook },
   { method: "POST", path: "/v1/webhooks/:id/resume", scope: "webhooks:write", handler: resumeWebhook },
   { method: "GET", path: "/v1/webhooks/:id/deliveries", scope: "webhooks:read", handler: listDeliveries },
+  { method: "POST", path: "/v1/webhooks/deliver", scope: "webhooks:write", handler: drainWebhooks },
 ];
 
 async function readiness(ctx: RequestContext): Promise<Result> {

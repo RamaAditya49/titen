@@ -41,6 +41,20 @@ export function isConnected(): boolean {
   return Boolean(config.endpoint && config.apiKey);
 }
 
+/**
+ * Label for the shell's connection row. Reports the configured host, never a
+ * key, and says plainly when nothing is configured so the preview cannot imply
+ * a live service it does not have.
+ */
+export function endpointLabel(): string {
+  if (!config.endpoint) return "synthetic fixture · no endpoint";
+  try {
+    return `${new URL(config.endpoint).host} · live`;
+  } catch {
+    return "invalid endpoint";
+  }
+}
+
 export async function compileView(
   lens: string,
   options: { subject_id?: string; focus_id?: string; limit?: number } = {},

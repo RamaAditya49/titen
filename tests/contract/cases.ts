@@ -1517,6 +1517,524 @@ export const CASES: Case[] = [
       assert.equal(listed.body.data.workspaces.length, 0);
     },
   },
+  // --- Audit + events are now written by the paths they describe ---
+  {
+    name: "a canonical write records its event in the same transaction",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const seeded = await seedClaim(fx, agent.key);
+
+      const listed = await fx.call("GET", "/v1/events", { key: agent.key });
+      expectOk(listed);
+      const kinds = listed.body.data.events.map((e: any) => e.kind);
+      assert.ok(kinds.includes("observation.appended"), "observation must emit an event");
+      assert.ok(kinds.includes("claim.materialized"), "claim must emit an event");
+
+      const claimEvent = listed.body.data.events.find(
+        (e: any) => e.resource_id === seeded.claimId,
+      );
+      assert.ok(claimEvent, "the event must point at the claim it describes");
+      assert.equal(claimEvent.resource_type, "claim");
+
+      // A rejected write leaves no event behind: same batch, same rollback.
+      const before = listed.body.data.events.length;
+      expectError(
+        await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({ kind: "gossip" }),
+        }),
+        400,
+      );
+      const after = await fx.call("GET", "/v1/events", { key: agent.key });
+      assert.equal(after.body.data.events.length, before, "a failed write emits no event");
+    },
+  },
+  {
+    name: "events stay inside their organization and page by cursor",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      await seedClaim(fx, owner.key);
+      const intruder = await fx.provision({ scopes: ["*"] });
+
+      const foreign = await fx.call("GET", "/v1/events", { key: intruder.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.events.length, 0, "events must not cross organizations");
+
+      const page = await fx.call("GET", "/v1/events?limit=1", { key: owner.key });
+      expectOk(page);
+      assert.equal(page.body.data.events.length, 1);
+      const cursor = page.body.data.cursor;
+      assert.ok(cursor);
+      const next = await fx.call("GET", `/v1/events?after=${cursor}&limit=1`, { key: owner.key });
+      expectOk(next);
+      assert.notEqual(next.body.data.events[0]?.id, page.body.data.events[0].id);
+
+      const single = await fx.call("GET", `/v1/events/${cursor}`, { key: owner.key });
+      expectOk(single);
+      assert.equal(single.body.data.id, cursor);
+      expectError(await fx.call("GET", `/v1/events/${cursor}`, { key: intruder.key }), 404);
+    },
+  },
+  {
+    name: "a lifecycle transition writes both an event and an audit entry",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const seeded = await seedClaim(fx, agent.key);
+      expectOk(
+        await fx.call("POST", `/v1/claims/${seeded.claimId}/revoke`, {
+          key: agent.key,
+          body: { reason: "superseded by policy" },
+        }),
+      );
+
+      const events = await fx.call("GET", "/v1/events?kind=claim.revoked", { key: agent.key });
+      expectOk(events);
+      assert.equal(events.body.data.events.length, 1);
+      assert.equal(events.body.data.events[0].resource_id, seeded.claimId);
+
+      const audit = await fx.call("GET", "/v1/audit?action=claim.revoke", { key: agent.key });
+      expectOk(audit);
+      assert.equal(audit.body.data.entries.length, 1);
+      assert.equal(audit.body.data.entries[0].resource_id, seeded.claimId);
+      assert.equal(audit.body.data.entries[0].detail, "superseded by policy");
+    },
+  },
+  {
+    name: "the audit trail exports as NDJSON and stays scoped",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const seeded = await seedClaim(fx, owner.key);
+      expectOk(
+        await fx.call("POST", `/v1/claims/${seeded.claimId}/expire`, {
+          key: owner.key,
+          body: {},
+        }),
+      );
+
+      const exported = await fx.call("GET", "/v1/audit/export", { key: owner.key });
+      assert.equal(exported.status, 200);
+      assert.match(exported.headers.get("content-type") ?? "", /ndjson/);
+      const lines = String(exported.body).trim().split("\n");
+      const header = JSON.parse(lines[0]!);
+      assert.equal(header.type, "titen.audit.header");
+      assert.equal(header.format_version, 1);
+      assert.ok(lines.length >= 2, "the expire action must be exported");
+      assert.ok(!String(exported.body).includes("titen_sk_"), "export must carry no key");
+
+      const intruder = await fx.provision({ scopes: ["*"] });
+      const foreign = await fx.call("GET", "/v1/audit", { key: intruder.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.entries.length, 0);
+    },
+  },
+  // --- v0.3: Governance ---
+  {
+    name: "a policy is created and listed within its organization",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const created = await fx.call("POST", "/v1/policies", {
+        key: owner.key,
+        body: {
+          kind: "retention",
+          target_type: "org",
+          config: JSON.stringify({ keep_days: 365 }),
+        },
+      });
+      expectOk(created, 201);
+      assert.match(created.body.data.policy_id, /^pol_/);
+
+      expectError(
+        await fx.call("POST", "/v1/policies", {
+          key: owner.key,
+          body: { kind: "invented", target_type: "org", config: "{}" },
+        }),
+        400,
+      );
+      expectError(
+        await fx.call("POST", "/v1/policies", {
+          key: owner.key,
+          body: { kind: "retention", target_type: "org", config: "not json" },
+        }),
+        400,
+      );
+
+      const listed = await fx.call("GET", "/v1/policies", { key: owner.key });
+      expectOk(listed);
+      assert.equal(listed.body.data.policies.length, 1);
+
+      const intruder = await fx.provision({ scopes: ["*"] });
+      const foreign = await fx.call("GET", "/v1/policies", { key: intruder.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.policies.length, 0);
+    },
+  },
+  {
+    name: "only verified claims reach a channel release, and only when published",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"], maxTrust: "policy_approved" });
+      const verified = await seedClaim(fx, owner.key);
+
+      // An asserted claim is not publishable knowledge.
+      const weak = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({ trust: "asserted", content: "Draft note about the rollback gate." }),
+      });
+      const weakClaim = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "user_rama",
+          claims: [claim(weak.body.data.observation_id, { statement: "Draft rollback rule." })],
+        },
+      });
+      expectOk(weakClaim, 201);
+
+      expectError(
+        await fx.call("POST", "/v1/channel-releases", {
+          key: owner.key,
+          body: {
+            channel: "crm",
+            audience: "public",
+            claim_ids: [weakClaim.body.data.claims[0].claim_id],
+          },
+        }),
+        400,
+      );
+
+      const release = await fx.call("POST", "/v1/channel-releases", {
+        key: owner.key,
+        body: {
+          channel: "crm",
+          audience: "public",
+          claim_ids: [verified.claimId, weakClaim.body.data.claims[0].claim_id],
+        },
+      });
+      expectOk(release, 201);
+      assert.equal(release.body.data.status, "draft");
+      assert.equal(release.body.data.claims_included, 1, "only the verified claim is eligible");
+      assert.equal(release.body.data.version, 1);
+      const releaseId = release.body.data.release_id;
+
+      // A draft discloses nothing: trust is not publication.
+      const beforePublish = await fx.call("POST", "/v1/channel-context", {
+        key: owner.key,
+        body: { channel: "crm", audience: "public", task: "rollback smoke", max_tokens: 900 },
+      });
+      expectOk(beforePublish);
+      assert.equal(beforePublish.body.data.items.length, 0, "a draft must not serve content");
+
+      expectOk(await fx.call("POST", `/v1/channel-releases/${releaseId}/publish`, {
+        key: owner.key,
+        body: {},
+      }));
+
+      const afterPublish = await fx.call("POST", "/v1/channel-context", {
+        key: owner.key,
+        body: { channel: "crm", audience: "public", task: "rollback smoke", max_tokens: 900 },
+      });
+      expectOk(afterPublish);
+      assert.equal(afterPublish.body.data.items.length, 1);
+      assert.match(afterPublish.body.data.instructions, /untrusted reference data/i);
+      assert.ok(afterPublish.body.data.budget.used_tokens <= 900);
+
+      // A different audience shares nothing with this release.
+      const otherAudience = await fx.call("POST", "/v1/channel-context", {
+        key: owner.key,
+        body: { channel: "crm", audience: "partner", task: "rollback smoke", max_tokens: 900 },
+      });
+      expectOk(otherAudience);
+      assert.equal(otherAudience.body.data.items.length, 0);
+
+      // Publishing twice is refused; revoking withdraws access immediately.
+      expectError(
+        await fx.call("POST", `/v1/channel-releases/${releaseId}/publish`, {
+          key: owner.key,
+          body: {},
+        }),
+        409,
+      );
+      expectOk(await fx.call("POST", `/v1/channel-releases/${releaseId}/revoke`, {
+        key: owner.key,
+        body: {},
+      }));
+      const afterRevoke = await fx.call("POST", "/v1/channel-context", {
+        key: owner.key,
+        body: { channel: "crm", audience: "public", task: "rollback smoke", max_tokens: 900 },
+      });
+      expectOk(afterRevoke);
+      assert.equal(afterRevoke.body.data.items.length, 0, "revoke takes effect on the next read");
+
+      // Publication and disclosure are both audited.
+      const audit = await fx.call("GET", "/v1/audit", { key: owner.key });
+      expectOk(audit);
+      const actions = audit.body.data.entries.map((e: any) => e.action);
+      assert.ok(actions.includes("release.publish"));
+      assert.ok(actions.includes("release.revoke"));
+      assert.ok(actions.includes("channel.context"), "a channel read is itself evidence");
+    },
+  },
+  {
+    name: "a release from another organization is not found",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const seeded = await seedClaim(fx, owner.key);
+      const release = await fx.call("POST", "/v1/channel-releases", {
+        key: owner.key,
+        body: { channel: "crm", audience: "public", claim_ids: [seeded.claimId] },
+      });
+      expectOk(release, 201);
+      const releaseId = release.body.data.release_id;
+
+      const intruder = await fx.provision({ scopes: ["*"] });
+      expectError(await fx.call("GET", `/v1/channel-releases/${releaseId}`, { key: intruder.key }), 404);
+      expectError(
+        await fx.call("POST", `/v1/channel-releases/${releaseId}/publish`, {
+          key: intruder.key,
+          body: {},
+        }),
+        404,
+      );
+
+      const own = await fx.call("GET", `/v1/channel-releases/${releaseId}`, { key: owner.key });
+      expectOk(own);
+      assert.equal(own.body.data.items.length, 1);
+    },
+  },
+  // --- v0.2: Memory Atlas view compiler ---
+  {
+    name: "atlas compiles each lens over authorized records only",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const seeded = await seedClaim(fx, owner.key);
+
+      const trace = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: { lens: "evidence_trace", focus_id: seeded.claimId, subject_id: "user_rama" },
+      });
+      expectOk(trace);
+      assert.equal(trace.body.data.lens, "evidence_trace");
+      assert.ok(
+        trace.body.data.nodes.some((n: any) => n.id === seeded.claimId),
+        "the focus claim must be a node",
+      );
+      assert.ok(
+        trace.body.data.nodes.some((n: any) => n.id === seeded.observationId),
+        "its evidence must be a node",
+      );
+      assert.ok(trace.body.data.edges.length >= 1, "the supports edge must be present");
+
+      for (const lens of ["neighborhood", "conflict_freshness", "scope_preview"]) {
+        const res = await fx.call("POST", "/v1/memory-views/compile", {
+          key: owner.key,
+          body: { lens, subject_id: "user_rama", focus_id: seeded.claimId },
+        });
+        expectOk(res);
+        assert.equal(res.body.data.lens, lens);
+        assert.ok(Array.isArray(res.body.data.nodes), `${lens} must return nodes`);
+      }
+
+      expectError(
+        await fx.call("POST", "/v1/memory-views/compile", {
+          key: owner.key,
+          body: { lens: "invented", subject_id: "user_rama" },
+        }),
+        400,
+      );
+
+      // Atlas is a projection, never an authorization bypass.
+      const intruder = await fx.provision({ scopes: ["*"] });
+      const foreign = await fx.call("POST", "/v1/memory-views/compile", {
+        key: intruder.key,
+        body: { lens: "evidence_trace", focus_id: seeded.claimId, subject_id: "user_rama" },
+      });
+      assert.ok(
+        foreign.status === 404 || foreign.body?.data?.nodes?.length === 0,
+        "a foreign focus must disclose nothing",
+      );
+    },
+  },
+  // --- Post-v1: webhooks ---
+  {
+    name: "a webhook registers, validates its destination, and hides its secret",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const created = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          url: "https://example.test/titen",
+          secret: "a-shared-secret-value",
+          events: ["claim.materialized"],
+        },
+      });
+      expectOk(created, 201);
+      assert.match(created.body.data.webhook_id, /^whk_/);
+
+      // A destination that could reach internal metadata is refused.
+      for (const url of [
+        "http://169.254.169.254/latest/meta-data",
+        "http://10.0.0.5/hook",
+        "ftp://example.test/hook",
+      ])
+        expectError(
+          await fx.call("POST", "/v1/webhooks", {
+            key: owner.key,
+            body: { url, secret: "s3cret-value-here", events: ["*"] },
+          }),
+          400,
+        );
+
+      const listed = await fx.call("GET", "/v1/webhooks", { key: owner.key });
+      expectOk(listed);
+      const serialized = JSON.stringify(listed.body);
+      assert.ok(!serialized.includes("a-shared-secret-value"), "listing must not expose the secret");
+      assert.ok(!serialized.includes("secret_hash"), "listing must not expose the hash");
+
+      const intruder = await fx.provision({ scopes: ["*"] });
+      const foreign = await fx.call("GET", "/v1/webhooks", { key: intruder.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.webhooks.length, 0);
+    },
+  },
+  {
+    name: "draining events queues a delivery for each subscribed webhook",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const hook = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          // Unroutable by design: the drain must record the attempt, not succeed.
+          url: "https://127.0.0.1:9/titen-sink",
+          secret: "drain-secret-value",
+          events: ["*"],
+        },
+      });
+      expectOk(hook, 201);
+      const hookId = hook.body.data.webhook_id;
+
+      await seedClaim(fx, owner.key);
+      const drained = await fx.call("POST", "/v1/webhooks/deliver", { key: owner.key, body: {} });
+      expectOk(drained);
+      assert.ok(drained.body.data.events_drained >= 2, "queued events must be drained");
+
+      const deliveries = await fx.call("GET", `/v1/webhooks/${hookId}/deliveries`, {
+        key: owner.key,
+      });
+      expectOk(deliveries);
+      assert.ok(deliveries.body.data.deliveries.length >= 2, "each event records a delivery");
+
+      // A paused webhook receives nothing further.
+      expectOk(await fx.call("POST", `/v1/webhooks/${hookId}/pause`, { key: owner.key, body: {} }));
+      const before = deliveries.body.data.deliveries.length;
+      await seedClaim(fx, owner.key, {
+        observation: { content: "Second batch of rollback evidence." },
+        claim: { statement: "Second rollback rule applies." },
+      });
+      expectOk(await fx.call("POST", "/v1/webhooks/deliver", { key: owner.key, body: {} }));
+      const after = await fx.call("GET", `/v1/webhooks/${hookId}/deliveries`, { key: owner.key });
+      expectOk(after);
+      assert.equal(
+        after.body.data.deliveries.length,
+        before,
+        "a paused webhook must receive no delivery",
+      );
+
+      expectOk(await fx.call("POST", `/v1/webhooks/${hookId}/resume`, { key: owner.key, body: {} }));
+      expectOk(await fx.call("DELETE", `/v1/webhooks/${hookId}`, { key: owner.key }));
+      expectError(
+        await fx.call("GET", `/v1/webhooks/${hookId}/deliveries`, { key: owner.key }),
+        404,
+      );
+    },
+  },
+  // --- v1: Federation ---
+  {
+    name: "a federation peer registers with a hashed secret and filters its scope",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: "eu-west",
+          endpoint: "https://titen-eu.example.test",
+          shared_secret: "peer-shared-secret-value",
+          direction: "bidirectional",
+        },
+      });
+      expectOk(peer, 201);
+      const peerId = peer.body.data.peer_id;
+
+      const listed = await fx.call("GET", "/v1/federation/peers", { key: owner.key });
+      expectOk(listed);
+      const serialized = JSON.stringify(listed.body);
+      assert.ok(!serialized.includes("peer-shared-secret-value"), "the secret must not be listed");
+      assert.ok(!serialized.includes("shared_secret_hash"), "the hash must not be listed");
+
+      const filter = await fx.call("POST", `/v1/federation/peers/${peerId}/filters`, {
+        key: owner.key,
+        body: { resource_type: "event", min_trust: "verified" },
+      });
+      expectOk(filter, 201);
+      const filters = await fx.call("GET", `/v1/federation/peers/${peerId}/filters`, {
+        key: owner.key,
+      });
+      expectOk(filters);
+      assert.equal(filters.body.data.filters.length, 1);
+
+      const intruder = await fx.provision({ scopes: ["*"] });
+      const foreign = await fx.call("GET", "/v1/federation/peers", { key: intruder.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.peers.length, 0);
+      expectError(
+        await fx.call("GET", `/v1/federation/peers/${peerId}/filters`, { key: intruder.key }),
+        404,
+      );
+    },
+  },
+  {
+    name: "federation pull advances a cursor and suspension stops exchange",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: "ap-south",
+          endpoint: "https://titen-ap.example.test",
+          shared_secret: "another-peer-secret",
+          direction: "pull",
+        },
+      });
+      expectOk(peer, 201);
+      const peerId = peer.body.data.peer_id;
+
+      await seedClaim(fx, owner.key);
+      const pulled = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peerId },
+      });
+      expectOk(pulled);
+      assert.ok(pulled.body.data.events.length >= 1, "eligible events must be offered");
+
+      const again = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peerId },
+      });
+      expectOk(again);
+      assert.equal(again.body.data.events.length, 0, "the cursor must not replay events");
+
+      expectOk(await fx.call("POST", `/v1/federation/peers/${peerId}/suspend`, {
+        key: owner.key,
+        body: {},
+      }));
+      // A suspended peer is an authorization state, not a write conflict.
+      expectError(
+        await fx.call("POST", "/v1/federation/pull", { key: owner.key, body: { peer_id: peerId } }),
+        403,
+      );
+
+      const log = await fx.call("GET", `/v1/federation/log?peer_id=${peerId}`, { key: owner.key });
+      expectOk(log);
+      assert.ok(Array.isArray(log.body.data.entries ?? log.body.data.log));
+    },
+  },
 ];
 
 /**

@@ -284,6 +284,9 @@ async function assertNoForeignIds(
   orgId: string,
   byType: Record<string, Record<string, unknown>[]>,
 ): Promise<void> {
+  // Kept as one statement per table: folding them into a UNION would bind each
+  // id three times, forcing chunks three times smaller for the same number of
+  // round trips, and would risk D1's 100-parameter cap.
   const tables: [string, string][] = [
     ["project", "projects"],
     ["observation", "observations"],

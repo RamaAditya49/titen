@@ -4,6 +4,12 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
+import { isConnected, endpointLabel } from "./api";
+
+// Resolved at build time. With no endpoint configured the shell must say so
+// rather than imply a live service; the fixture below is synthetic either way.
+const live = isConnected();
+const runtimeLabel = endpointLabel();
 
 const navigation = [
   {
@@ -451,8 +457,8 @@ const compileSteps = [
             </button>
             <span class="top-divider" aria-hidden="true"></span>
             <div class="connection-state" role="status" aria-live="polite">
-              <span class="connected-label"><i></i>connected</span>
-              <span class="runtime-label">workers · sg-01 · d1</span>
+              <span class="connected-label"><i></i>{live ? "connected" : "preview"}</span>
+              <span class="runtime-label">{runtimeLabel}</span>
             </div>
           </div>
         </header>

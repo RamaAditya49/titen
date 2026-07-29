@@ -1,10 +1,34 @@
 import { first } from "./db";
-import type { Db } from "./db";
+import type { Db, Stmt } from "./db";
 import { newId } from "./ids";
 import { notFound, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
 
-/** Internal helper — writes one audit row. Fire-and-forget safe. */
+/**
+ * Returns the statement that records one audit entry, so a caller folds it into
+ * the same atomic batch as the action it describes. The audit trail cannot
+ * disagree with what actually committed.
+ */
+export function auditStatement(
+  orgId: string,
+  actorId: string,
+  action: string,
+  resourceType: string,
+  at: string,
+  resourceId?: string | null,
+  detail?: string | null,
+): Stmt {
+  return {
+    sql: `INSERT INTO audit_log (id, org_id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
+    params: [
+      newId("aud"), orgId, actorId, action, resourceType,
+      resourceId ?? null, detail ?? null, at,
+    ],
+  };
+}
+
+/** Standalone write for callers that have no batch of their own. */
 export async function recordAudit(
   db: Db,
   orgId: string,
@@ -13,15 +37,13 @@ export async function recordAudit(
   resourceType: string,
   resourceId?: string | null,
   detail?: string | null,
-  ipHint?: string | null,
 ): Promise<void> {
-  const id = newId("aud");
-  const now = new Date().toISOString();
-  await db.batch([{
-    sql: `INSERT INTO audit_log (id, org_id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [id, orgId, actorId, action, resourceType, resourceId ?? null, detail ?? null, ipHint ?? null, now],
-  }]);
+  await db.batch([
+    auditStatement(
+      orgId, actorId, action, resourceType,
+      new Date().toISOString(), resourceId, detail,
+    ),
+  ]);
 }
 
 export async function listAudit(ctx: RequestContext): Promise<Result> {

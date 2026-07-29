@@ -1,6 +1,8 @@
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
 import { sha256Hex } from "./ids";
+import { auditStatement } from "./audit";
+import { eventStatement } from "./events";
 import { historyStatement } from "./observations";
 import type { RequestContext, Result } from "./http";
 import {
@@ -53,6 +55,13 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
       principal.principalId,
       await sha256Hex(`superseded_by:${newClaimId}`), at,
     ),
+    eventStatement(
+      principal.orgId, "claim.superseded", principal.principalId, "claim", claimId,
+      { superseded_by: newClaimId, version }, at,
+    ),
+    auditStatement(
+      principal.orgId, principal.principalId, "claim.supersede", "claim", at, claimId, reason,
+    ),
   ]);
 
   return {
@@ -97,6 +106,13 @@ export async function revokeClaim(ctx: RequestContext): Promise<Result> {
       principal.principalId,
       await sha256Hex(`revoked:${reason ?? "no reason"}`), at,
     ),
+    eventStatement(
+      principal.orgId, "claim.revoked", principal.principalId, "claim", claimId,
+      { version }, at,
+    ),
+    auditStatement(
+      principal.orgId, principal.principalId, "claim.revoke", "claim", at, claimId, reason,
+    ),
   ]);
 
   return {
@@ -138,6 +154,13 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
       principal.orgId, "claim", claimId, version, "expire",
       principal.principalId,
       await sha256Hex(`expired:${at}`), at,
+    ),
+    eventStatement(
+      principal.orgId, "claim.expired", principal.principalId, "claim", claimId,
+      { version, valid_to: at }, at,
+    ),
+    auditStatement(
+      principal.orgId, principal.principalId, "claim.expire", "claim", at, claimId, reason,
     ),
   ]);
 

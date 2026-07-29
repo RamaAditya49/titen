@@ -1,5 +1,7 @@
 import { first, chunk } from "./db";
 import { notFound, validationError, conflict, forbidden } from "./errors";
+import { auditStatement } from "./audit";
+import { eventStatement } from "./events";
 import { newId } from "./ids";
 import type { RequestContext, Result } from "./http";
 import {
@@ -119,16 +121,22 @@ export async function publishRelease(ctx: RequestContext): Promise<Result> {
   if (row.status !== "draft") throw conflict(`Release is "${row.status}", expected "draft".`);
 
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([{
-    sql: `UPDATE channel_releases SET status = 'active', published_at = ?, approved_by = ? WHERE id = ?`,
-    params: [now, principalId, id],
-  }]);
+  // Publishing releases knowledge outside canonical memory: the audit row is
+  // committed with the transition, never after it.
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE channel_releases SET status = 'active', published_at = ?, approved_by = ? WHERE id = ?`,
+      params: [now, principalId, id],
+    },
+    eventStatement(orgId, "release.published", principalId, "channel_release", id, { status: "active" }, now),
+    auditStatement(orgId, principalId, "release.publish", "channel_release", now, id, null),
+  ]);
 
   return { data: { release_id: id, status: "active", published_at: now } };
 }
 
 export async function revokeRelease(ctx: RequestContext): Promise<Result> {
-  const { orgId } = ctx.principal!;
+  const { orgId, principalId } = ctx.principal!;
   const id = ctx.params.id!;
 
   const row = await first<{ id: string; status: string }>(
@@ -140,10 +148,14 @@ export async function revokeRelease(ctx: RequestContext): Promise<Result> {
   if (row.status !== "active") throw conflict(`Release is "${row.status}", expected "active".`);
 
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([{
-    sql: `UPDATE channel_releases SET status = 'revoked', revoked_at = ? WHERE id = ?`,
-    params: [now, id],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE channel_releases SET status = 'revoked', revoked_at = ? WHERE id = ?`,
+      params: [now, id],
+    },
+    eventStatement(orgId, "release.revoked", principalId, "channel_release", id, { status: "revoked" }, now),
+    auditStatement(orgId, principalId, "release.revoke", "channel_release", now, id, null),
+  ]);
 
   return { data: { release_id: id, status: "revoked", revoked_at: now } };
 }
@@ -215,6 +227,16 @@ export async function channelContext(ctx: RequestContext): Promise<Result> {
     items.push(item);
     usedTokens += tokens;
   }
+
+  // A channel read discloses approved knowledge to an outside audience, so the
+  // access itself is evidence and must be recorded.
+  await ctx.app.db.batch([
+    auditStatement(
+      orgId, ctx.principal!.principalId, "channel.context", "channel_release",
+      ctx.app.now().toISOString(), null,
+      `${channel}/${audience} · ${items.length} items`,
+    ),
+  ]);
 
   return {
     data: {

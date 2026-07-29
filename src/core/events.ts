@@ -1,5 +1,5 @@
 import { first } from "./db";
-import type { Db } from "./db";
+import type { Db, Stmt } from "./db";
 import { notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import type { RequestContext, Result } from "./http";
@@ -8,9 +8,30 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 /**
- * Write an event row. Called from other modules when observable things happen.
- * Returns the generated event id.
+ * Returns the statement that records one event, so a caller folds it into the
+ * same atomic batch as the canonical write it describes. An event can never
+ * exist for a write that rolled back, and never be missing for one that
+ * committed.
  */
+export function eventStatement(
+  orgId: string,
+  kind: string,
+  actorId: string,
+  resourceType: string,
+  resourceId: string,
+  payload: Record<string, unknown>,
+  at: string,
+): Stmt & { id: string } {
+  const id = newId("evt");
+  return {
+    id,
+    sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    params: [id, orgId, kind, actorId, resourceType, resourceId, JSON.stringify(payload), at],
+  };
+}
+
+/** Standalone write for callers that have no batch of their own. */
 export async function recordEvent(
   db: Db,
   orgId: string,
@@ -20,16 +41,12 @@ export async function recordEvent(
   resourceId: string,
   payload: Record<string, unknown>,
 ): Promise<string> {
-  const id = newId("evt");
-  const now = new Date().toISOString();
-  await db.batch([
-    {
-      sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      params: [id, orgId, kind, actorId, resourceType, resourceId, JSON.stringify(payload), now],
-    },
-  ]);
-  return id;
+  const stmt = eventStatement(
+    orgId, kind, actorId, resourceType, resourceId, payload,
+    new Date().toISOString(),
+  );
+  await db.batch([{ sql: stmt.sql, params: stmt.params }]);
+  return stmt.id;
 }
 
 /**

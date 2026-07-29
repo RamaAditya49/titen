@@ -47,11 +47,29 @@ const client = () =>
     return response as unknown as Response;
   }, origin);
 
+/**
+ * Miniflare's D1 shim occasionally answers a batch with a non-JSON error
+ * string, which its own response parser then throws on. It is a harness fault,
+ * not a service fault, so provisioning retries once.
+ *
+ * ponytail: single retry, no backoff. The ceiling is a second consecutive shim
+ * fault failing the case; upgrade path is dropping this once Miniflare's D1
+ * parser handles its own error payloads.
+ */
+async function provisionRetrying(options?: Parameters<typeof provisionWith>[1]) {
+  try {
+    return await provisionWith(db, options);
+  } catch (error) {
+    if (!/Unexpected identifier|JSON Parse error/.test(String(error))) throw error;
+    return provisionWith(db, options);
+  }
+}
+
 const fixture: Fixture = {
   runtime: "cloudflare-d1",
   call: (method, path, options) => client().call(method, path, options),
   callRaw: (method, path, options) => client().callRaw(method, path, options),
-  provision: (options) => provisionWith(db, options),
+  provision: (options) => provisionRetrying(options),
   revoke: (keyId) => revokeWith(db, keyId),
   query: (sql, params) => db.all(sql, params),
   async restart() {

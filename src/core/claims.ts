@@ -1,6 +1,7 @@
 import { assertTrustCeiling, type Principal } from "./auth";
 import type { Db, Stmt } from "./db";
 import { notFound, validationError } from "./errors";
+import { eventStatement } from "./events";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { historyStatement, outboxStatement } from "./observations";
@@ -221,6 +222,17 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
           ),
         );
         statements.push(outboxStatement(principal.orgId, "claim", claim.id, "upsert", at));
+        statements.push(
+          eventStatement(
+            principal.orgId,
+            "claim.materialized",
+            principal.principalId,
+            "claim",
+            claim.id,
+            { subject_id: subjectId, kind: claim.kind, status: claim.status, trust: claim.trust },
+            at,
+          ),
+        );
       }
       return {
         status: 201,

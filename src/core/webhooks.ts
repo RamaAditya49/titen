@@ -90,7 +90,7 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
   return {
     status: 201,
     data: {
-      id,
+      webhook_id: id,
       url,
       events: rawEvents,
       status: "active",
@@ -125,7 +125,9 @@ export async function listWebhooks(ctx: RequestContext): Promise<Result> {
   return {
     data: {
       webhooks: rows.map((r) => ({
+        webhook_id: r.id,
         ...r,
+        id: undefined,
         events: r.events.split(","),
       })),
     },
@@ -347,4 +349,55 @@ export async function deliverEvent(
 
     await db.batch(stmts);
   }
+}
+
+/**
+ * POST /v1/webhooks/deliver — drains recorded events to subscribed webhooks.
+ *
+ * Delivery is pull-driven because a canonical write must not wait on an
+ * outbound request, and neither runtime has a background worker in this
+ * release. An operator calls this from a cron trigger or systemd timer.
+ *
+ * ponytail: no background worker. The ceiling is delivery latency equal to the
+ * caller's schedule. Upgrade path: a Cloudflare Cron Trigger or a Bun timer
+ * calling this same function, which needs no schema change.
+ */
+export async function drainWebhooks(ctx: RequestContext): Promise<Result> {
+  const { orgId } = ctx.principal!;
+  const after = ctx.url.searchParams.get("after") ?? "";
+  const limitParam = Number(ctx.url.searchParams.get("limit") ?? "50");
+  if (!Number.isInteger(limitParam) || limitParam < 1 || limitParam > 200)
+    throw validationError('Query "limit" must be an integer between 1 and 200.');
+
+  const events = await ctx.app.db.all<{ id: string; kind: string; payload: string }>(
+    `SELECT id, kind, payload FROM events
+      WHERE org_id = ? AND id > ? ORDER BY created_at, id LIMIT ?`,
+    [orgId, after, limitParam],
+  );
+
+  for (const event of events)
+    await deliverEvent(
+      ctx.app.db,
+      orgId,
+      event.kind,
+      JSON.parse(event.payload),
+      ctx.app.now(),
+      globalThis.fetch,
+    );
+
+  const queued = await first<{ count: number }>(
+    ctx.app.db,
+    `SELECT COUNT(*) AS count FROM webhook_deliveries d
+       JOIN webhooks w ON w.id = d.webhook_id
+      WHERE w.org_id = ? AND d.status = 'pending'`,
+    [orgId],
+  );
+
+  return {
+    data: {
+      events_drained: events.length,
+      cursor: events.length ? events[events.length - 1]!.id : null,
+      pending_deliveries: Number(queued?.count ?? 0),
+    },
+  };
 }
