@@ -1,6 +1,6 @@
 {
   "name": "titen-memory",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Collaborative memory fabric for AI agents \u2014 evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
   "license": "Apache-2.0",
   "type": "module",
