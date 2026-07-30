@@ -1,9 +1,11 @@
-import { createApp } from "../../core/app";
-import { migrate } from "../../core/migrations";
+import { createApp, parseMcpOrigin } from "../../core/app";
+import { migrate, schemaState } from "../../core/migrations";
 import { runMaintenance } from "../../core/maintenance";
 import type { VectorCapability } from "../../core/vectors";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { tryCreateVectors } from "./vectors";
+import type { WebhookSecurity } from "../../core/webhook-security";
+import { prepareSigningSecrets, type SecretCipher } from "../../core/secrets";
 
 export interface ServeOptions {
   dbPath: string;
@@ -24,6 +26,10 @@ export interface ServeOptions {
   embedModel?: string;
   embedDims?: number;
   embedApiKey?: string;
+  webhookSecurity?: WebhookSecurity;
+  secretCipher?: SecretCipher;
+  /** Exact public MCP origin when TLS terminates at a trusted reverse proxy. */
+  mcpOrigin?: string;
 }
 
 /**
@@ -31,9 +37,25 @@ export interface ServeOptions {
  * comes from the shared core.
  */
 export async function serve(options: ServeOptions) {
+  const mcpOrigin = parseMcpOrigin(options.mcpOrigin);
   const database = openDatabase(options.dbPath);
   const db = createSqliteDb(database);
-  if (options.autoMigrate !== false) await migrate(db);
+  let migrationsReady = true;
+  try {
+    if (options.autoMigrate !== false) await migrate(db);
+    const schema = await schemaState(db);
+    migrationsReady = schema.applied === schema.expected && schema.verified;
+  } catch {
+    migrationsReady = false;
+  }
+  let secretStorageReady = false;
+  if (migrationsReady) {
+    try {
+      secretStorageReady = await prepareSigningSecrets(db, options.secretCipher);
+    } catch {
+      secretStorageReady = false;
+    }
+  }
   const vectors =
     options.vectors ??
     tryCreateVectors({
@@ -44,14 +66,21 @@ export async function serve(options: ServeOptions) {
     embedApiKey: options.embedApiKey,
   });
   const intervalMs = options.maintenanceIntervalMs ?? 15_000;
-  const backgroundRepair =
-    intervalMs > 0 && (vectors !== undefined || options.maintenanceIntervalMs !== undefined);
+  const backgroundRepair = intervalMs > 0 && migrationsReady && secretStorageReady;
   const app = createApp({
     db,
     revision: options.revision ?? "dev",
     runtime: "bun-sqlite",
     vectors,
-    backgroundRepair: backgroundRepair ? "enabled" : "disabled",
+    backgroundRepair: {
+      configured: backgroundRepair,
+      staleAfterMs: Math.max(1_000, intervalMs * 3),
+    },
+    migrationsReady,
+    secretStorageReady,
+    webhookSecurity: options.webhookSecurity,
+    secretCipher: options.secretCipher,
+    mcpOrigin,
   });
 
   // @ts-ignore - Bun global is provided by the runtime.
@@ -88,7 +117,13 @@ export async function serve(options: ServeOptions) {
     if (ticking || stopped) return;
     ticking = true;
     try {
-      const result = await runMaintenance({ db, vectors });
+      const result = await runMaintenance({
+        db,
+        vectors,
+        webhookSecurity: options.webhookSecurity,
+        secretCipher: options.secretCipher,
+        expectedIntervalMs: intervalMs,
+      });
       if (!options.quiet && (result.indexed > 0 || result.delivered > 0 || result.errors.length))
         console.log(
           `maintenance indexed=${result.indexed} delivered=${result.delivered}${
@@ -105,6 +140,7 @@ export async function serve(options: ServeOptions) {
   const timer = backgroundRepair ? setInterval(tick, intervalMs) : undefined;
   // Never hold the process open on account of maintenance.
   timer?.unref?.();
+  if (backgroundRepair) void tick();
 
   const stop = async () => {
     if (stopped) return;

@@ -1,11 +1,47 @@
 import { first } from "./db";
 import type { Db, Stmt } from "./db";
+import { recordAccessSql } from "./authorization";
 import { notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import type { RequestContext, Result } from "./http";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+
+/** Visibility for event projections follows the canonical resource, not org alone. */
+export function eventAccessSql(alias = "e", principalSql = "?"): string {
+  return `(
+    (${alias}.resource_type = 'observation' AND EXISTS (
+      SELECT 1 FROM observations o WHERE o.id = ${alias}.resource_id
+        AND o.org_id = ${alias}.org_id AND ${recordAccessSql("o", principalSql)}
+    ))
+    OR (${alias}.resource_type = 'claim' AND EXISTS (
+      SELECT 1 FROM claims c WHERE c.id = ${alias}.resource_id
+        AND c.org_id = ${alias}.org_id AND ${recordAccessSql("c", principalSql)}
+    ))
+    OR (${alias}.resource_type = 'handoff' AND EXISTS (
+      SELECT 1 FROM handoffs h WHERE h.id = ${alias}.resource_id
+        AND h.org_id = ${alias}.org_id AND (h.from_principal = ${principalSql} OR h.to_principal = ${principalSql})
+    ))
+    OR (${alias}.resource_type = 'lease' AND EXISTS (
+      SELECT 1 FROM leases l WHERE l.id = ${alias}.resource_id
+        AND l.org_id = ${alias}.org_id AND l.holder_id = ${principalSql}
+    ))
+    OR (${alias}.resource_type NOT IN ('observation', 'claim', 'handoff', 'lease') AND ${alias}.actor_id = ${principalSql})
+  )`;
+}
+
+export function eventAccessParams(principalId: string): string[] {
+  return [principalId, principalId, principalId, principalId, principalId, principalId, principalId, principalId];
+}
+
+export async function canPrincipalReadEvent(db: Db, orgId: string, principalId: string, eventId: string): Promise<boolean> {
+  return Boolean(await first<{ id: string }>(
+    db,
+    `SELECT e.id FROM events e WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
+    [eventId, orgId, ...eventAccessParams(principalId)],
+  ));
+}
 
 /**
  * Returns the statement that records one event, so a caller folds it into the
@@ -73,16 +109,17 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
   if (after) {
     const cursor = await first<{ created_at: string; id: string }>(
       ctx.app.db,
-      `SELECT created_at, id FROM events WHERE id = ? AND org_id = ?`,
-      [after, principal.orgId],
+      `SELECT e.created_at, e.id FROM events e
+        WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
+      [after, principal.orgId, ...eventAccessParams(principal.principalId)],
     );
     if (!cursor) throw validationError('Query "after" references an unknown event.');
     afterCreatedAt = cursor.created_at;
     afterId = cursor.id;
   }
 
-  const conditions: string[] = ["org_id = ?"];
-  const params: (string | number)[] = [principal.orgId];
+  const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
+  const params: (string | number)[] = [principal.orgId, ...eventAccessParams(principal.principalId)];
 
   if (afterCreatedAt && afterId) {
     conditions.push("(created_at > ? OR (created_at = ? AND id > ?))");
@@ -97,7 +134,7 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
   params.push(limit);
 
   const sql = `SELECT id, kind, actor_id, resource_type, resource_id, payload, created_at
-    FROM events
+    FROM events e
     WHERE ${conditions.join(" AND ")}
     ORDER BY created_at ASC, id ASC
     LIMIT ?`;
@@ -145,9 +182,9 @@ export async function getEvent(ctx: RequestContext): Promise<Result> {
   }>(
     ctx.app.db,
     `SELECT id, kind, actor_id, resource_type, resource_id, payload, created_at
-       FROM events
-      WHERE id = ? AND org_id = ?`,
-    [eventId, principal.orgId],
+       FROM events e
+      WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
+    [eventId, principal.orgId, ...eventAccessParams(principal.principalId)],
   );
   if (!row) throw notFound();
 

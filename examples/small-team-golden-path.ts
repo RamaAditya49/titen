@@ -23,17 +23,19 @@ const writer = client(keys.writer);
 const operator = client(keys.operator);
 const reviewer = client(keys.reviewer);
 const subject = process.env.TITEN_SUBJECT_ID ?? `brief-${Date.now()}`;
+const workspaceId = process.env.TITEN_WORKSPACE_ID;
+if (!workspaceId) fail("TITEN_WORKSPACE_ID is required for team-visible memory.");
 
 try {
   await researcher.health();
   const project = await researcher.resolveProject(process.env.TITEN_PROJECT ?? "github.com/example/research-brief", true);
   const projectId = project.project_id;
-  const sourceA = await researcher.observe({ subject_id: subject, project_id: projectId, kind: "imported_source", content: "Measured onboarding completion was 62% in the sampled cohort.", source: { type: "report", ref: "study-a" }, trust: "verified", visibility: "team" });
-  const sourceB = await researcher.observe({ subject_id: subject, project_id: projectId, kind: "imported_source", content: "A later sample measured onboarding completion at 71%.", source: { type: "report", ref: "study-b" }, trust: "asserted", visibility: "team" });
+  const sourceA = await researcher.observe({ subject_id: subject, workspace_id: workspaceId, project_id: projectId, kind: "imported_source", content: "Measured onboarding completion was 62% in the sampled cohort.", source: { type: "report", ref: "study-a" }, trust: "verified", visibility: "team" });
+  const sourceB = await researcher.observe({ subject_id: subject, workspace_id: workspaceId, project_id: projectId, kind: "imported_source", content: "A later sample measured onboarding completion at 71%.", source: { type: "report", ref: "study-b" }, trust: "asserted", visibility: "team" });
   const consolidation = await researcher.consolidate(subject, [
     { kind: "semantic_fact", statement: "Onboarding completion is 62%.", confidence: 0.9, visibility: "team", sources: [{ observation_id: sourceA.observation_id, relation: "supports" }, { observation_id: sourceB.observation_id, relation: "contradicts" }] },
     { kind: "semantic_fact", statement: "Onboarding completion may be 71% in the later sample.", confidence: 0.7, visibility: "team", sources: [{ observation_id: sourceB.observation_id, relation: "supports" }, { observation_id: sourceA.observation_id, relation: "contradicts" }] },
-  ], projectId);
+  ], projectId, { workspaceId });
   const context = await writer.compile({ subject_id: subject, project_id: projectId, task: "Draft a brief that states the measured outcome and unresolved disagreement.", max_tokens: 500 });
   const checkpoint = await operator.saveCheckpoint({ subject_id: subject, kind: "workflow", state: { stage: "review", project_id: projectId }, ttl_seconds: 3600, agent_id: "operator" });
   const lease = await operator.acquireLease({ resource_type: "brief", resource_id: subject, purpose: "review handoff", ttl_seconds: 300 });

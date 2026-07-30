@@ -5,6 +5,8 @@ import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { serve } from "./server";
+import { parseSecretCipher } from "../../core/secrets";
+import { createBunWebhookSecurity } from "./webhooks";
 
 const USAGE = `titen — self-hosted memory service
 
@@ -25,32 +27,70 @@ Notes:
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
 
+function fail(message: string): never {
+  console.error(`error: ${message}`);
+  process.exit(1);
+}
+
+const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> = {
+  serve: { values: ["db", "port", "host", "revision"] },
+  migrate: { values: ["db"] },
+  bootstrap: { values: ["db", "org", "label"], booleans: ["print-sql"] },
+  "key create": {
+    values: ["db", "org-id", "principal", "kind", "scopes", "trust", "label"],
+    booleans: ["print-sql"],
+  },
+  "key list": { values: ["db"] },
+  "key revoke": { values: ["db", "id"] },
+  backup: { values: ["db", "out"] },
+  schema: { values: [] },
+};
+
 function parseArgs(argv: string[]) {
+  // Help is conventionally read-only. Handle it before command validation so
+  // no malformed companion flag can open a database or create a credential.
+  if (argv.includes("--help")) {
+    console.log(USAGE);
+    process.exit(0);
+  }
+  if (argv.length === 0) return { command: undefined, action: undefined, flags: {} };
+
+  const command = argv[0]!;
+  const action = command === "key" ? argv[1] : undefined;
+  const name = action ? `${command} ${action}` : command;
+  const schema = COMMAND_FLAGS[name];
+  if (!schema) fail(command === "key" ? "key needs create, list, or revoke" : `unknown command "${command}"`);
+
   const flags: Record<string, string | boolean> = {};
-  const positional: string[] = [];
-  for (let index = 0; index < argv.length; index += 1) {
+  const values = new Set(schema.values);
+  const booleans = new Set(schema.booleans ?? []);
+  for (let index = action ? 2 : 1; index < argv.length; index += 1) {
     const token = argv[index]!;
-    if (!token.startsWith("--")) {
-      positional.push(token);
+    if (!token.startsWith("--") || token === "--") fail(`unexpected argument "${token}"`);
+    const key = token.slice(2);
+    if (booleans.has(key)) {
+      flags[key] = true;
       continue;
     }
-    const key = token.slice(2);
-    const next = argv[index + 1];
-    if (next === undefined || next.startsWith("--")) flags[key] = true;
-    else {
-      flags[key] = next;
-      index += 1;
-    }
+    if (!values.has(key)) fail(`unknown flag "--${key}" for ${name}`);
+    const value = argv[index + 1];
+    if (value === undefined || value === "" || value.startsWith("--"))
+      fail(`--${key} requires a value`);
+    flags[key] = value;
+    index += 1;
   }
-  return { flags, positional };
+  return { command, action, flags };
 }
 
 const text = (value: string | boolean | undefined, fallback: string) =>
   typeof value === "string" ? value : fallback;
 
-function fail(message: string): never {
-  console.error(`error: ${message}`);
-  process.exit(1);
+function port(value: string | boolean | undefined): number {
+  const raw = text(value, "8787");
+  const parsed = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
+    fail("--port must be an integer between 1 and 65535");
+  return parsed;
 }
 
 function sqlLiteral(value: string | number | null): string {
@@ -81,8 +121,7 @@ async function withDb<T>(path: string, run: (db: ReturnType<typeof createSqliteD
   }
 }
 
-const { flags, positional } = parseArgs(process.argv.slice(2));
-const command = positional[0];
+const { flags, command, action } = parseArgs(process.argv.slice(2));
 const dbPath = text(flags.db, "titen.db");
 
 switch (command) {
@@ -94,7 +133,7 @@ switch (command) {
     const embedDims = Number(process.env.TITEN_EMBED_DIMS ?? "0");
     const started = await serve({
       dbPath,
-      port: Number(text(flags.port, "8787")),
+      port: port(flags.port),
       hostname: text(flags.host, "127.0.0.1"),
       revision: text(flags.revision, "dev"),
       vecDbPath: process.env.TITEN_VEC_DB_PATH ?? `${dbPath}.vec`,
@@ -106,6 +145,9 @@ switch (command) {
         process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
           ? undefined
           : Number(process.env.TITEN_MAINTENANCE_INTERVAL_MS),
+      secretCipher: parseSecretCipher(process.env.TITEN_SECRET_KEYS),
+      webhookSecurity: createBunWebhookSecurity(process.env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES),
+      mcpOrigin: process.env.TITEN_MCP_ORIGIN,
     });
     console.log(`titen listening on ${started.url} (database ${dbPath})`);
     break;
@@ -149,7 +191,6 @@ switch (command) {
   }
 
   case "key": {
-    const action = positional[1];
     if (action === "create") {
       const orgId = text(flags["org-id"], "");
       if (!orgId) fail("--org-id is required");

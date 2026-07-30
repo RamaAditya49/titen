@@ -3,6 +3,23 @@ import { newId } from "../../src/core/ids";
 import type { Db, Param } from "../../src/core/db";
 import type { Trust } from "../../src/core/validate";
 import type { VectorCapability } from "../../src/core/vectors";
+import { createSecretCipher } from "../../src/core/secrets";
+import type { WebhookSecurity } from "../../src/core/webhook-security";
+
+export const TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+export const TEST_SECRET_CIPHER = createSecretCipher({
+  active: "test-v1",
+  keys: { "test-v1": TEST_SECRET_KEY },
+});
+export const TEST_WEBHOOK_HOST = "hooks.example.com";
+export const TEST_WEBHOOK_SECURITY: WebhookSecurity = {
+  allowedHostnames: [TEST_WEBHOOK_HOST],
+  resolve: async () => ["93.184.216.34"],
+  dispatch: async ({ addresses }) => ({
+    response: new Response("test transport refusal", { status: 503 }),
+    connectedAddress: addresses[0]!,
+  }),
+};
 
 export interface Res {
   status: number;
@@ -146,21 +163,28 @@ export function clientVia(  dispatch: (request: Request) => Promise<Response>,
  */
 export function fakeVectors(): VectorCapability & {
   /** Pin a similarity score for a record id, as a real index would return. */
-  setScore(id: string, score: number): void;
+  setScore(id: string, score: number, metadata?: Record<string, string>): void;
   /** Make the embedder throw, to prove retrieval degrades instead of failing. */
   breakEmbedder(): void;
   restoreEmbedder(): void;
   breakStore(): void;
   restoreStore(): void;
   embedCalls: () => number;
+  metadataFor(id: string): Record<string, string> | undefined;
+  lastFilter: () => Record<string, string> | undefined;
 } {
   const scores = new Map<string, number>();
+  const metadata = new Map<string, Record<string, string>>();
   let broken = false;
   let storeBroken = false;
   let calls = 0;
+  let filter: Record<string, string> | undefined;
 
   return {
-    setScore: (id, score) => scores.set(id, score),
+    setScore: (id, score, scope) => {
+      scores.set(id, score);
+      if (scope) metadata.set(id, scope);
+    },
     breakEmbedder: () => {
       broken = true;
     },
@@ -174,6 +198,8 @@ export function fakeVectors(): VectorCapability & {
       storeBroken = false;
     },
     embedCalls: () => calls,
+    metadataFor: (id) => metadata.get(id),
+    lastFilter: () => filter,
     embedder: {
       dimensions: 4,
       model: "contract-stub",
@@ -191,16 +217,28 @@ export function fakeVectors(): VectorCapability & {
        */
       async upsert(records) {
         if (storeBroken) throw new Error("vector store is unavailable");
-        for (const record of records) if (!scores.has(record.id)) scores.set(record.id, 0.5);
+        for (const record of records) {
+          metadata.set(record.id, record.metadata);
+          if (!scores.has(record.id)) scores.set(record.id, 0.5);
+        }
       },
       async query(_vector, options) {
+        filter = options.filter;
         return [...scores.entries()]
+          .filter(([id]) =>
+            Object.entries(options.filter ?? {}).every(
+              ([key, value]) => metadata.get(id)?.[key] === value,
+            ),
+          )
           .map(([id, score]) => ({ id, score }))
           .sort((left, right) => right.score - left.score)
           .slice(0, options.topK);
       },
       async remove(ids: string[]) {
-        for (const id of ids) scores.delete(id);
+        for (const id of ids) {
+          scores.delete(id);
+          metadata.delete(id);
+        }
       },
     },
   };

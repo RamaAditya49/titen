@@ -102,10 +102,10 @@ reaches `latest`.
 Not shipped: the Astro dashboard (`src/pages`, `src/styles`), the Cloudflare
 adapter (deploy that from a clone with `wrangler`), tests, and docs.
 
-Consumers install **three** packages — `titen`, `sqlite-vec`, and its platform
-binary. `astro`, `wrangler`, `playwright`, and `miniflare` are devDependencies
-and must stay there; moving one into `dependencies` puts a build toolchain on
-every user's disk.
+Consumers install **three** packages — `titen-memory`, `sqlite-vec`, and its
+platform binary. `astro`, `wrangler`, `playwright`, and `miniflare` are
+devDependencies and must stay there; moving one into `dependencies` puts a build
+toolchain on every user's disk.
 
 ## Publishing
 
@@ -173,19 +173,20 @@ release never contained.
 ## Verifying a candidate
 
 `scripts/verify-pack.sh` packs the current tree, installs the tarball into a
-throwaway directory, and asserts the five things a broken publish breaks:
+throwaway directory, and asserts the six things a broken publish breaks:
 
-1. npm's publish-time normalization still ships a `titen` bin;
+1. the packaged README contains no repository-relative references to omitted files;
 2. the dependency tree contains no build toolchain;
 3. `titen bootstrap` creates a database and an API key;
 4. `titen serve` answers `/readyz` with every migration applied;
 5. plain `node` can `import { TitenClient } from "titen-memory"` and `"titen-memory/sdk"`.
+6. a global install under a custom npm prefix exposes an executable `titen` bin.
 
-Check 1 exists because `npm publish` rewrites `package.json` and `npm pack` does
-not — a `bin` entry can vanish at publish time and in no earlier step. npm's own
-warning for this is misleading: `"bin[titen]" script name … was invalid and
-removed` also fires when npm merely strips a leading `./` and keeps the entry.
-The check reports what the field actually becomes instead of what npm calls it.
+The bootstrap and serve checks execute the installed `node_modules/.bin/titen`
+shim, so a missing or invalid bin fails without importing npm's private package
+normalizer or assuming where npm itself is installed. The gate therefore works
+with a system npm and a custom user global prefix as well as an npm installed
+under that prefix.
 
 Run it before every publish. It exits non-zero on the first failure.
 
@@ -196,6 +197,6 @@ bunx titen-memory@latest --help
 npm view titen-memory version
 ```
 
-The npmjs.com page renders `README.md` and resolves its relative image paths
-against the GitHub repo, so push the tag before or with the publish or the
-banner will 404.
+The npmjs.com page renders `README.md`; its repository-only documentation and
+image references use stable absolute GitHub URLs because those files are not in
+the package allowlist.

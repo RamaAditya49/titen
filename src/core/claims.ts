@@ -6,6 +6,11 @@ import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { historyStatement, outboxStatement } from "./observations";
 import { requireProject } from "./projects";
+import {
+  authorizeRecordWorkspace,
+  recordAccessParams,
+  recordAccessSql,
+} from "./authorization";
 import type { RequestContext, Result } from "./http";
 import {
   CLAIM_KINDS,
@@ -36,6 +41,9 @@ interface SourceInput {
 
 interface SourceRow {
   id: string;
+  subject_id: string;
+  project_id: string | null;
+  workspace_id: string | null;
   trust: Trust;
   visibility: Visibility;
   actor_id: string;
@@ -67,15 +75,16 @@ async function loadSources(
 ): Promise<Map<string, SourceRow>> {
   const ids = [...new Set(sources.map((source) => source.observationId))];
   const rows = await db.all<SourceRow>(
-    `SELECT id, trust, visibility, actor_id FROM observations
-       WHERE org_id = ? AND id IN (${ids.map(() => "?").join(", ")})`,
-    [principal.orgId, ...ids],
+    `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.trust, o.visibility, o.actor_id
+       FROM observations o
+      WHERE o.org_id = ? AND o.id IN (${ids.map(() => "?").join(", ")})
+        AND ${recordAccessSql("o")}`,
+    [principal.orgId, ...ids, ...recordAccessParams(principal.principalId)],
   );
   const byId = new Map(rows.map((row) => [row.id, row]));
   for (const id of ids) {
     const row = byId.get(id);
     if (!row) throw notFound();
-    if (row.visibility === "private" && row.actor_id !== principal.principalId) throw notFound();
   }
   return byId;
 }
@@ -90,6 +99,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     principal.orgId,
     optionalString(body, "project_id", LIMITS.identifier),
   );
+  const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   const claims = body.claims;
   if (!Array.isArray(claims) || claims.length === 0)
     throw validationError('Field "claims" must be a non-empty array.');
@@ -119,6 +129,14 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       throw validationError('Field "confidence" must be greater than 0 and at most 1.');
     const sources = parseSources(claim.sources);
     const rows = await loadSources(ctx.app.db, principal, sources);
+    for (const source of sources) {
+      const row = rows.get(source.observationId)!;
+      if (
+        row.subject_id !== subjectId
+        || row.project_id !== projectId
+        || row.workspace_id !== workspaceId
+      ) throw validationError("Claim evidence must match the claim workspace, subject, and project.");
+    }
 
     const supporting = sources.filter((source) => source.relation === "supports");
     if (supporting.length === 0)
@@ -142,6 +160,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     const visibility = optionalEnum(claim, "visibility", VISIBILITIES, narrowest);
     if (VISIBILITY_RANK[visibility] > VISIBILITY_RANK[narrowest])
       throw validationError("Claim visibility may not exceed the visibility of its evidence.");
+    await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
 
     const seen = new Set<string>();
     for (const source of sources) {
@@ -169,23 +188,25 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
   const result = await commitIdempotent(
     ctx.app.db,
     principal,
-    ENDPOINT,
+    ctx.request,
     idempotencyKey(ctx.request),
     raw,
+    ctx.app.now(),
     async () => {
       const at = ctx.app.now().toISOString();
       const statements: Stmt[] = [];
       for (const claim of prepared) {
         statements.push({
           sql: `INSERT INTO claims
-                  (id, org_id, subject_id, project_id, observer_id, actor_id, kind, statement,
+                  (id, org_id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement,
                    confidence, trust, visibility, status, version, valid_from, valid_to, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
           params: [
             claim.id,
             principal.orgId,
             subjectId,
             projectId,
+            workspaceId,
             claim.observerId,
             principal.principalId,
             claim.kind,
@@ -229,7 +250,14 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
             principal.principalId,
             "claim",
             claim.id,
-            { subject_id: subjectId, kind: claim.kind, status: claim.status, trust: claim.trust },
+            {
+              subject_id: subjectId,
+              workspace_id: workspaceId,
+              kind: claim.kind,
+              status: claim.status,
+              trust: claim.trust,
+              visibility: claim.visibility,
+            },
             at,
           ),
         );
@@ -239,6 +267,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
         data: {
           subject_id: subjectId,
           project_id: projectId,
+          workspace_id: workspaceId,
           model_used: false,
           claims: prepared.map((claim) => ({
             claim_id: claim.id,

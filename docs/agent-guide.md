@@ -11,6 +11,41 @@ const titen = new TitenClient({
 });
 ```
 
+The constructor rejects a missing key, a non-HTTP(S) URL, or a non-function
+`fetch` before any network call. It never includes key material in an error.
+
+## SDK capability boundary
+
+The SDK is a thin typed client for the common agent path, not a generated copy
+of every administrative route. The exported `TITEN_SDK_TYPED_ROUTES` matrix is
+checked against the client prototype.
+
+| Typed family | Convenience methods |
+| --- | --- |
+| Status/project | `health`, `ready`, `resolveProject` |
+| Memory/context | `observe`, `consolidate`, `compile`, `feedback`, `evidence` |
+| Claim lifecycle | `supersede`, `revoke`, `expire` |
+| Checkpoints | `saveCheckpoint`, `getCheckpoint`, `deleteCheckpoint` |
+| Coordination | `acquireLease`, `releaseLease`, `createHandoff`, `listHandoffs`, `resolveHandoff` |
+| Operator view | `compileView` |
+| API keys | `createKey`, `listKeys`, `revokeKey` |
+
+Use `request()` for another JSON-envelope route and `requestRaw()` for a raw or
+streaming response such as JSONL export. Both attach the configured credential;
+passing an `Authorization` header is rejected rather than overriding it.
+
+```typescript
+const page = await titen.request<{ events: unknown[]; cursor: string | null }>(
+  "GET",
+  "/v1/events?limit=50",
+);
+const exported = await titen.requestRaw(
+  "GET",
+  "/v1/export?type=observations&limit=500",
+);
+const jsonl = await exported.text();
+```
+
 ## Canonical team scenario
 
 For the beachhead team of 2–10 agents, use one shared project and distinct
@@ -51,6 +86,24 @@ const obs = await titen.observe({
 });
 // obs.observation_id → "obs_..."
 ```
+
+For a retry-safe write, keep one key for one logical mutation and reuse it only
+with the same body:
+
+```typescript
+const obs = await titen.observe(
+  {
+    subject_id: "user_rama",
+    kind: "tool_result",
+    content: "Deploy smoke returned 200.",
+    source: { type: "tool", ref: "deploy_789#smoke" },
+  },
+  { idempotencyKey: "deploy-789-smoke-observation" },
+);
+```
+
+Typed idempotency options are available on `observe`, `consolidate`, and
+`feedback`, the mutations whose current server handlers implement replay.
 
 ### 2. Consolidate
 
@@ -122,13 +175,13 @@ Claims evolve over time:
 
 ```typescript
 // Supersede: new knowledge replaces old
-await titen.supersede(oldClaimId, newClaimId, "Updated procedure");
+await titen.supersede(oldClaimId, newClaimId, 1, "Updated procedure");
 
 // Revoke: withdrawn claim
-await titen.revoke(claimId, "No longer valid");
+await titen.revoke(claimId, 1, "No longer valid");
 
 // Expire: stale information
-await titen.expire(claimId, "Outdated");
+await titen.expire(claimId, 1, "Outdated");
 ```
 
 Superseded, revoked, and expired claims stop appearing in compilation but their
@@ -171,10 +224,15 @@ try {
   await titen.observe({ ... });
 } catch (err) {
   if (err instanceof TitenError) {
-    console.error(err.code, err.message); // "VALIDATION_ERROR", "Field ..."
+    console.error(err.status, err.code, err.message);
   }
 }
 ```
+
+Empty, HTML, text, or malformed error responses are normalized to
+status-preserving `TitenError` values without echoing a gateway body. A valid
+empty success resolves to `undefined`; malformed JSON on a successful JSON
+endpoint uses the stable `INVALID_RESPONSE` code.
 
 ## Security rules
 

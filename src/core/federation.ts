@@ -1,6 +1,7 @@
 import { first } from "./db";
 import type { Db } from "./db";
-import { notFound, validationError, conflict, forbidden } from "./errors";
+import { notFound, validationError, conflict, forbidden, unavailable } from "./errors";
+import { eventAccessParams, eventAccessSql } from "./events";
 import { newId, sha256Hex } from "./ids";
 import { signPayload } from "./webhooks";
 import type { RequestContext, Result } from "./http";
@@ -24,14 +25,16 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
   const direction = requireEnum(body, "direction", DIRECTIONS);
 
   const id = newId("fpeer");
+  if (!ctx.app.secretCipher) throw unavailable("Signing-secret encryption is not configured.");
   const now = ctx.app.now().toISOString();
   const hash = await sha256Hex(sharedSecret);
+  const encrypted = await ctx.app.secretCipher.encrypt(sharedSecret, `federation:${id}`);
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
-      params: [id, principal.orgId, name, endpoint, hash, sharedSecret, direction, now],
+      sql: `INSERT INTO federation_peers (id, org_id, principal_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      params: [id, principal.orgId, principal.principalId, name, endpoint, hash, encrypted, direction, now],
     },
   ]);
 
@@ -52,8 +55,8 @@ export async function listPeers(ctx: RequestContext): Promise<Result> {
     created_at: string;
   }>(
     `SELECT id, name, endpoint, direction, status, last_cursor, last_sync_at, created_at
-       FROM federation_peers WHERE org_id = ? ORDER BY created_at DESC`,
-    [principal.orgId],
+       FROM federation_peers WHERE org_id = ? AND principal_id = ? ORDER BY created_at DESC`,
+    [principal.orgId, principal.principalId],
   );
   return { data: { peers: rows.map((r) => ({ peer_id: r.id, ...r, id: undefined })) } };
 }
@@ -65,16 +68,16 @@ export async function suspendPeer(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string; status: string }>(
     ctx.app.db,
-    `SELECT id, status FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id, status FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
   if (peer.status === "revoked") throw forbidden("Cannot suspend a revoked peer.");
 
   await ctx.app.db.batch([
     {
-      sql: `UPDATE federation_peers SET status = 'suspended' WHERE id = ?`,
-      params: [peerId],
+      sql: `UPDATE federation_peers SET status = 'suspended' WHERE id = ? AND org_id = ? AND principal_id = ?`,
+      params: [peerId, principal.orgId, principal.principalId],
     },
   ]);
 
@@ -90,8 +93,8 @@ export async function addFilter(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
 
@@ -122,8 +125,8 @@ export async function listFilters(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
 
@@ -186,8 +189,8 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string; direction: string; status: string; last_cursor: string | null }>(
     ctx.app.db,
-    `SELECT id, direction, status, last_cursor FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id, direction, status, last_cursor FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
   if (peer.status !== "active") throw forbidden("Peer is not active.");
@@ -199,8 +202,11 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
   );
 
   // Fetch events after cursor
-  const conditions: string[] = ["org_id = ?"];
-  const params: (string | number)[] = [principal.orgId];
+  const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
+  const params: (string | number)[] = [
+    principal.orgId,
+    ...eventAccessParams(principal.principalId),
+  ];
 
   if (peer.last_cursor) {
     const cursor = await first<{ created_at: string; id: string }>(
@@ -209,7 +215,7 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
       [peer.last_cursor, principal.orgId],
     );
     if (cursor) {
-      conditions.push("(created_at > ? OR (created_at = ? AND id > ?))");
+      conditions.push("(e.created_at > ? OR (e.created_at = ? AND e.id > ?))");
       params.push(cursor.created_at, cursor.created_at, cursor.id);
     }
   }
@@ -224,9 +230,9 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
     payload: string;
     created_at: string;
   }>(
-    `SELECT id, kind, actor_id, resource_type, resource_id, payload, created_at
-       FROM events WHERE ${conditions.join(" AND ")}
-       ORDER BY created_at ASC, id ASC LIMIT ?`,
+    `SELECT e.id, e.kind, e.actor_id, e.resource_type, e.resource_id, e.payload, e.created_at
+       FROM events e WHERE ${conditions.join(" AND ")}
+       ORDER BY e.created_at ASC, e.id ASC LIMIT ?`,
     params,
   );
 
@@ -248,8 +254,9 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
     const now = ctx.app.now().toISOString();
     await ctx.app.db.batch([
       {
-        sql: `UPDATE federation_peers SET last_cursor = ?, last_sync_at = ? WHERE id = ?`,
-        params: [lastRow.id, now, peerId],
+        sql: `UPDATE federation_peers SET last_cursor = ?, last_sync_at = ?
+              WHERE id = ? AND org_id = ? AND principal_id = ?`,
+        params: [lastRow.id, now, peerId, principal.orgId, principal.principalId],
       },
     ]);
 
@@ -279,8 +286,8 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
     shared_secret: string | null;
   }>(
     ctx.app.db,
-    `SELECT id, direction, status, shared_secret FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id, direction, status, shared_secret FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
   if (peer.status !== "active") throw forbidden("Peer is not active.");
@@ -290,16 +297,22 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
   // proves the batch came from the peer that was registered. Without it the
   // shared secret would be decorative and any authorized caller could inject
   // records attributed to a remote deployment.
-  if (peer.shared_secret) {
-    const offered = ctx.request.headers.get("x-titen-peer-signature");
-    if (!offered) throw forbidden("Peer signature header is required.");
-    const expected = `sha256=${await signPayload(peer.shared_secret, await ctx.rawBody())}`;
-    if (offered.length !== expected.length) throw forbidden("Peer signature is invalid.");
-    let mismatch = 0;
-    for (let index = 0; index < expected.length; index += 1)
-      mismatch |= offered.charCodeAt(index) ^ expected.charCodeAt(index);
-    if (mismatch !== 0) throw forbidden("Peer signature is invalid.");
+  if (!peer.shared_secret || !ctx.app.secretCipher)
+    throw unavailable("Federation signing key is unavailable.");
+  let sharedSecret: string;
+  try {
+    sharedSecret = await ctx.app.secretCipher.decrypt(peer.shared_secret, `federation:${peer.id}`);
+  } catch {
+    throw unavailable("Federation signing key is unavailable.");
   }
+  const offered = ctx.request.headers.get("x-titen-peer-signature");
+  if (!offered) throw forbidden("Peer signature header is required.");
+  const expected = `sha256=${await signPayload(sharedSecret, await ctx.rawBody())}`;
+  if (offered.length !== expected.length) throw forbidden("Peer signature is invalid.");
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1)
+    mismatch |= offered.charCodeAt(index) ^ expected.charCodeAt(index);
+  if (mismatch !== 0) throw forbidden("Peer signature is invalid.");
 
   const filters = await ctx.app.db.all<FilterRow>(
     `SELECT resource_type, include_kinds, exclude_subjects, min_trust FROM federation_filters WHERE peer_id = ?`,
@@ -351,11 +364,32 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
       continue;
     }
 
-    // Insert event
-    const actorId = typeof evt.actor_id === "string" ? evt.actor_id : principal.principalId;
+    // A signed peer proves transport origin, not local identity or canonical
+    // record authority. Store the remote event as an explicitly untrusted
+    // wrapper owned by the authenticated peer principal.
+    const wrappedPayload = {
+      untrusted_remote_event: {
+        id: evtId,
+        kind,
+        actor_id: typeof evt.actor_id === "string" ? evt.actor_id : null,
+        resource_type: resourceType,
+        resource_id: resourceId,
+        payload,
+        created_at: typeof evt.created_at === "string" ? evt.created_at : null,
+      },
+    };
     stmts.push({
       sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      params: [evtId, principal.orgId, kind, actorId, resourceType, resourceId, JSON.stringify(payload), now],
+      params: [
+        evtId,
+        principal.orgId,
+        "federation.received",
+        principal.principalId,
+        "federated_event",
+        evtId,
+        JSON.stringify(wrappedPayload),
+        now,
+      ],
     });
     stmts.push({
       sql: `INSERT INTO federation_log (id, peer_id, direction, resource_type, resource_id, status, created_at) VALUES (?, ?, 'received', ?, ?, 'success', ?)`,
@@ -385,11 +419,11 @@ export async function federationLog(ctx: RequestContext): Promise<Result> {
 
   if (!peerId) throw validationError('Query "peer_id" is required.');
 
-  // Verify peer belongs to org
+  // Verify peer belongs to the caller without disclosing same-org peers.
   const peer = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
 

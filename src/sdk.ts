@@ -18,6 +18,27 @@ export interface TitenConfig {
   fetch?: typeof fetch;
 }
 
+export type TitenHttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+export interface TitenRequestOptions {
+  /** JSON request body. Mutually exclusive with `body`. */
+  json?: unknown;
+  /** Raw request body for contracts such as JSONL import. */
+  body?: BodyInit;
+  /** Additional headers. Authorization always comes from TitenConfig. */
+  headers?: HeadersInit;
+  /** Retry-safe mutation identity. */
+  idempotencyKey?: string;
+}
+
+export interface MutationOptions {
+  idempotencyKey?: string;
+}
+
+export interface ConsolidateOptions extends MutationOptions {
+  workspaceId?: string;
+}
+
 export interface Observation {
   subject_id: string;
   kind: "user_statement" | "tool_result" | "imported_source" | "decision" | "system_event";
@@ -25,6 +46,7 @@ export interface Observation {
   source: { type: string; ref?: string };
   trust?: "unverified" | "asserted" | "verified" | "policy_approved";
   visibility?: "private" | "team" | "organization";
+  workspace_id?: string;
   project_id?: string;
   agent_id?: string;
   run_id?: string;
@@ -81,6 +103,33 @@ export interface HandoffOptions {
   message?: string;
 }
 
+/** Typed convenience methods intentionally kept to the common agent path. */
+export const TITEN_SDK_TYPED_ROUTES = [
+  ["health", "GET /healthz"],
+  ["ready", "GET /readyz"],
+  ["resolveProject", "POST /v1/projects/resolve"],
+  ["observe", "POST /v1/observations"],
+  ["consolidate", "POST /v1/consolidations"],
+  ["compile", "POST /v1/context/compile"],
+  ["feedback", "POST /v1/context/:id/feedback"],
+  ["evidence", "GET /v1/claims/:id/evidence"],
+  ["supersede", "POST /v1/claims/:id/supersede"],
+  ["revoke", "POST /v1/claims/:id/revoke"],
+  ["expire", "POST /v1/claims/:id/expire"],
+  ["saveCheckpoint", "POST /v1/checkpoints"],
+  ["getCheckpoint", "GET /v1/checkpoints"],
+  ["deleteCheckpoint", "DELETE /v1/checkpoints/:id"],
+  ["acquireLease", "POST /v1/leases"],
+  ["releaseLease", "DELETE /v1/leases/:id"],
+  ["createHandoff", "POST /v1/handoffs"],
+  ["listHandoffs", "GET /v1/handoffs"],
+  ["resolveHandoff", "POST /v1/handoffs/:id/resolve"],
+  ["compileView", "POST /v1/memory-views/compile"],
+  ["createKey", "POST /v1/keys"],
+  ["listKeys", "GET /v1/keys"],
+  ["revokeKey", "DELETE /v1/keys/:id"],
+] as const;
+
 export class TitenError extends Error {
   status: number;
   code: string;
@@ -98,22 +147,88 @@ export class TitenClient {
   private f: typeof fetch;
 
   constructor(config: TitenConfig) {
-    this.url = config.url.replace(/\/+$/, "");
+    if (!config || typeof config !== "object") throw new TypeError("config is required");
+    if (typeof config.url !== "string" || config.url.trim() === "")
+      throw new TypeError("url is required and must be an absolute http(s) URL");
+    let parsed: URL;
+    try {
+      parsed = new URL(config.url);
+    } catch {
+      throw new TypeError("url is required and must be an absolute http(s) URL");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+      throw new TypeError("url is required and must be an absolute http(s) URL");
+    if (typeof config.key !== "string" || config.key.trim() === "")
+      throw new TypeError("key is required");
+    const configuredFetch = config.fetch === undefined ? globalThis.fetch : config.fetch;
+    if (typeof configuredFetch !== "function") throw new TypeError("fetch must be a function");
+
+    this.url = parsed.href.replace(/\/+$/, "");
     this.key = config.key;
-    this.f = config.fetch ?? globalThis.fetch;
+    this.f = configuredFetch;
   }
 
-  private async request(method: string, path: string, body?: unknown): Promise<any> {
-    const headers: Record<string, string> = { authorization: `Bearer ${this.key}` };
-    if (body !== undefined) headers["content-type"] = "application/json";
-    const res = await this.f(`${this.url}${path}`, {
+  /**
+   * Generic authenticated JSON access for stable routes without a convenience
+   * method. Authorization cannot be overridden by callers.
+   */
+  async request<T = any>(
+    method: TitenHttpMethod,
+    path: string,
+    options: TitenRequestOptions = {},
+  ): Promise<T> {
+    const res = await this.requestRaw(method, path, options);
+    if (res.status === 204 || res.status === 205) return undefined as T;
+    const text = await res.text();
+    if (text === "") return undefined as T;
+    if (!isJson(res))
+      throw new TitenError(res.status, "INVALID_RESPONSE", "Response was not valid JSON.");
+    try {
+      const json = JSON.parse(text) as { data?: T };
+      return json.data as T;
+    } catch {
+      throw new TitenError(res.status, "INVALID_RESPONSE", "Response was not valid JSON.");
+    }
+  }
+
+  /** Raw authenticated access for streaming/JSONL responses. */
+  async requestRaw(
+    method: TitenHttpMethod,
+    path: string,
+    options: TitenRequestOptions = {},
+  ): Promise<Response> {
+    const allowed = new Set<TitenHttpMethod>(["GET", "POST", "PATCH", "PUT", "DELETE"]);
+    if (!allowed.has(method)) throw new TypeError("method is not supported");
+    if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//"))
+      throw new TypeError("path must be an absolute API path");
+    if (options.json !== undefined && options.body !== undefined)
+      throw new TypeError("json and body are mutually exclusive");
+
+    const headers = new Headers(options.headers);
+    if (headers.has("authorization")) throw new TypeError("authorization cannot be overridden");
+    if (options.idempotencyKey !== undefined) {
+      if (
+        typeof options.idempotencyKey !== "string" ||
+        options.idempotencyKey.trim() === "" ||
+        options.idempotencyKey.length > 200
+      ) throw new TypeError("idempotencyKey must contain 1 to 200 characters");
+      if (headers.has("idempotency-key"))
+        throw new TypeError("idempotencyKey must be provided only once");
+      headers.set("idempotency-key", options.idempotencyKey.trim());
+    }
+    headers.set("authorization", `Bearer ${this.key}`);
+    if (options.json !== undefined) headers.set("content-type", "application/json");
+
+    const target = new URL(`${this.url}${path}`);
+    if (target.origin !== new URL(this.url).origin)
+      throw new TypeError("path must remain on the configured origin");
+    const res = await this.f(target, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
     });
-    const json = await res.json() as any;
-    if (!res.ok) throw new TitenError(res.status, json?.error?.code ?? "UNKNOWN", json?.error?.message ?? "Request failed");
-    return json.data;
+    if (!res.ok) await throwResponseError(res);
+    return res;
   }
 
   // --- Core operations ---
@@ -122,23 +237,41 @@ export class TitenClient {
   async ready() { return this.request("GET", "/readyz"); }
 
   async resolveProject(reference: string, create = false) {
-    return this.request("POST", "/v1/projects/resolve", { reference, create });
+    return this.request("POST", "/v1/projects/resolve", { json: { reference, create } });
   }
 
-  async observe(observation: Observation) {
-    return this.request("POST", "/v1/observations", observation);
+  async observe(observation: Observation, options: MutationOptions = {}) {
+    return this.request("POST", "/v1/observations", {
+      json: observation,
+      idempotencyKey: options.idempotencyKey,
+    });
   }
 
-  async consolidate(subject_id: string, claims: Claim[], project_id?: string) {
-    return this.request("POST", "/v1/consolidations", { subject_id, claims, project_id });
+  async consolidate(
+    subject_id: string,
+    claims: Claim[],
+    project_id?: string,
+    options: ConsolidateOptions = {},
+  ) {
+    return this.request("POST", "/v1/consolidations", {
+      json: { subject_id, claims, project_id, workspace_id: options.workspaceId },
+      idempotencyKey: options.idempotencyKey,
+    });
   }
 
   async compile(options: CompileOptions) {
-    return this.request("POST", "/v1/context/compile", options);
+    return this.request("POST", "/v1/context/compile", { json: options });
   }
 
-  async feedback(contextId: string, options: FeedbackOptions) {
-    return this.request("POST", `/v1/context/${contextId}/feedback`, options);
+  async feedback(
+    contextId: string,
+    feedback: FeedbackOptions,
+    options: MutationOptions = {},
+  ) {
+    return this.request("POST", `/v1/context/${contextId}/feedback`, {
+      json: feedback,
+      idempotencyKey: options.idempotencyKey,
+    });
   }
 
   async evidence(claimId: string) {
@@ -147,22 +280,28 @@ export class TitenClient {
 
   // --- Lifecycle ---
 
-  async supersede(claimId: string, supersededBy: string, reason?: string) {
-    return this.request("POST", `/v1/claims/${claimId}/supersede`, { superseded_by: supersededBy, reason });
+  async supersede(claimId: string, supersededBy: string, expectedVersion: number, reason?: string) {
+    return this.request("POST", `/v1/claims/${claimId}/supersede`, {
+      json: { superseded_by: supersededBy, expected_version: expectedVersion, reason },
+    });
   }
 
-  async revoke(claimId: string, reason?: string) {
-    return this.request("POST", `/v1/claims/${claimId}/revoke`, { reason });
+  async revoke(claimId: string, expectedVersion: number, reason?: string) {
+    return this.request("POST", `/v1/claims/${claimId}/revoke`, {
+      json: { expected_version: expectedVersion, reason },
+    });
   }
 
-  async expire(claimId: string, reason?: string) {
-    return this.request("POST", `/v1/claims/${claimId}/expire`, { reason });
+  async expire(claimId: string, expectedVersion: number, reason?: string) {
+    return this.request("POST", `/v1/claims/${claimId}/expire`, {
+      json: { expected_version: expectedVersion, reason },
+    });
   }
 
   // --- Checkpoints ---
 
   async saveCheckpoint(options: CheckpointOptions) {
-    return this.request("POST", "/v1/checkpoints", options);
+    return this.request("POST", "/v1/checkpoints", { json: options });
   }
 
   async getCheckpoint(subject_id: string, kind: string, agent_id?: string) {
@@ -178,7 +317,7 @@ export class TitenClient {
   // --- Coordination (records work; does not schedule it) ---
 
   async acquireLease(options: LeaseOptions) {
-    return this.request("POST", "/v1/leases", options);
+    return this.request("POST", "/v1/leases", { json: options });
   }
 
   async releaseLease(leaseId: string) {
@@ -186,7 +325,7 @@ export class TitenClient {
   }
 
   async createHandoff(options: HandoffOptions) {
-    return this.request("POST", "/v1/handoffs", options);
+    return this.request("POST", "/v1/handoffs", { json: options });
   }
 
   async listHandoffs(status?: "pending" | "accepted" | "rejected") {
@@ -195,17 +334,27 @@ export class TitenClient {
   }
 
   async resolveHandoff(handoffId: string, status: "accepted" | "rejected") {
-    return this.request("POST", `/v1/handoffs/${handoffId}/resolve`, { status });
+    return this.request("POST", `/v1/handoffs/${handoffId}/resolve`, { json: { status } });
   }
 
-  async compileView(lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "scope_preview", options: { subject_id?: string; focus_id?: string; limit?: number } = {}) {
-    return this.request("POST", "/v1/memory-views/compile", { lens, ...options });
+  async compileView(
+    lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue",
+    options: {
+      subject_id?: string;
+      focus_id?: string;
+      owner_id?: string;
+      review_reason?: "all" | "disputed" | "contradiction" | "low_confidence" | "negative_feedback";
+      cursor?: string;
+      limit?: number;
+    } = {},
+  ) {
+    return this.request("POST", "/v1/memory-views/compile", { json: { lens, ...options } });
   }
 
   // --- Keys ---
 
   async createKey(options: { label: string; scopes: string[]; max_trust?: string }) {
-    return this.request("POST", "/v1/keys", options);
+    return this.request("POST", "/v1/keys", { json: options });
   }
 
   async listKeys() {
@@ -215,4 +364,30 @@ export class TitenClient {
   async revokeKey(keyId: string) {
     return this.request("DELETE", `/v1/keys/${keyId}`);
   }
+}
+
+function isJson(response: Response): boolean {
+  return /(^|[+/])json\b/i.test(response.headers.get("content-type") ?? "");
+}
+
+async function throwResponseError(response: Response): Promise<never> {
+  if (isJson(response)) {
+    try {
+      const json = JSON.parse(await response.text()) as {
+        error?: { code?: string; message?: string };
+      };
+      throw new TitenError(
+        response.status,
+        json.error?.code ?? "HTTP_ERROR",
+        json.error?.message ?? `Request failed with status ${response.status}.`,
+      );
+    } catch (error) {
+      if (error instanceof TitenError) throw error;
+    }
+  }
+  throw new TitenError(
+    response.status,
+    "HTTP_ERROR",
+    `Request failed with status ${response.status}.`,
+  );
 }

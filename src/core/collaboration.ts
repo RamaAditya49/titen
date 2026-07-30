@@ -1,4 +1,6 @@
 import { first } from "./db";
+import type { Principal } from "./auth";
+import type { Db } from "./db";
 import { notFound, validationError, conflict } from "./errors";
 import { eventStatement } from "./events";
 import { newId } from "./ids";
@@ -103,38 +105,55 @@ export async function removeMember(ctx: RequestContext): Promise<Result> {
 
 // --- Leases ---
 
-export async function acquireLease(ctx: RequestContext): Promise<Result> {
-  const { orgId, principalId } = ctx.principal!;
-  const body = requireObject(await ctx.json());
-  const resourceType = requireString(body, "resource_type", LIMITS.label);
-  const resourceId = requireString(body, "resource_id", LIMITS.identifier);
-  const purpose = requireString(body, "purpose", LIMITS.label);
-  const ttlSeconds = requireInteger(body, "ttl_seconds", 10, 86400);
+interface LeaseInput {
+  resourceType: string;
+  resourceId: string;
+  purpose: string;
+  ttlSeconds: number;
+}
 
-  const now = ctx.app.now();
+export async function acquireLeaseForPrincipal(
+  db: Db,
+  principal: Principal,
+  input: LeaseInput,
+  now: Date,
+): Promise<{ lease_id: string; expires_at: string; renewed: boolean }> {
+  const { orgId, principalId } = principal;
+  const { resourceType, resourceId, purpose, ttlSeconds } = input;
   const nowIso = now.toISOString();
-
+  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
   const existing = await first<{ id: string; holder_id: string; expires_at: string }>(
-    ctx.app.db,
+    db,
     `SELECT id, holder_id, expires_at FROM leases
      WHERE org_id = ? AND resource_type = ? AND resource_id = ? AND released_at IS NULL`,
     [orgId, resourceType, resourceId],
   );
 
-  if (existing) {
-    if (existing.holder_id !== principalId && new Date(existing.expires_at) > now)
-      throw conflict(`Resource is leased by another principal until ${existing.expires_at}.`);
-    // Expired or same holder — release old
-    await ctx.app.db.batch([{
-      sql: `UPDATE leases SET released_at = ? WHERE id = ?`,
-      params: [nowIso, existing.id],
-    }]);
+  if (existing?.holder_id === principalId) {
+    await db.batch([
+      {
+        sql: `UPDATE leases SET purpose = ?, ttl_seconds = ?, expires_at = ?
+              WHERE id = ? AND org_id = ? AND holder_id = ? AND released_at IS NULL`,
+        params: [purpose, ttlSeconds, expiresAt, existing.id, orgId, principalId],
+      },
+      eventStatement(orgId, "lease.renewed", principalId, "lease", existing.id,
+        { resource_type: resourceType, resource_id: resourceId, purpose, expires_at: expiresAt }, nowIso),
+    ]);
+    return { lease_id: existing.id, expires_at: expiresAt, renewed: true };
   }
 
-  const id = newId("lease");
-  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
+  if (existing && new Date(existing.expires_at) > now)
+    throw conflict(`Resource is leased by another principal until ${existing.expires_at}.`);
 
-  await ctx.app.db.batch([
+  const id = newId("lease");
+  const statements = existing
+    ? [{
+        sql: `UPDATE leases SET released_at = ?
+              WHERE id = ? AND org_id = ? AND released_at IS NULL AND expires_at <= ?`,
+        params: [nowIso, existing.id, orgId, nowIso],
+      }]
+    : [];
+  statements.push(
     {
       sql: `INSERT INTO leases (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds, expires_at, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -142,25 +161,53 @@ export async function acquireLease(ctx: RequestContext): Promise<Result> {
     },
     eventStatement(orgId, "lease.acquired", principalId, "lease", id,
       { resource_type: resourceType, resource_id: resourceId, purpose, expires_at: expiresAt }, nowIso),
-  ]);
+  );
 
-  return { status: 201, data: { lease_id: id, expires_at: expiresAt } };
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE|constraint/i.test(error.message))
+      throw conflict("Resource was leased by another principal.");
+    throw error;
+  }
+  return { lease_id: id, expires_at: expiresAt, renewed: false };
+}
+
+export async function acquireLease(ctx: RequestContext): Promise<Result> {
+  const principal = ctx.principal!;
+  const body = requireObject(await ctx.json());
+  const resourceType = requireString(body, "resource_type", LIMITS.label);
+  const resourceId = requireString(body, "resource_id", LIMITS.identifier);
+  const purpose = requireString(body, "purpose", LIMITS.label);
+  const ttlSeconds = requireInteger(body, "ttl_seconds", 10, 86400);
+
+  const lease = await acquireLeaseForPrincipal(
+    ctx.app.db,
+    principal,
+    { resourceType, resourceId, purpose, ttlSeconds },
+    ctx.app.now(),
+  );
+  return { status: lease.renewed ? 200 : 201, data: lease };
 }
 
 export async function releaseLease(ctx: RequestContext): Promise<Result> {
-  const { orgId } = ctx.principal!;
+  const { orgId, principalId } = ctx.principal!;
   const id = ctx.params.id!;
   const row = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM leases WHERE id = ? AND org_id = ? AND released_at IS NULL`,
-    [id, orgId],
+    `SELECT id FROM leases WHERE id = ? AND org_id = ? AND holder_id = ? AND released_at IS NULL`,
+    [id, orgId, principalId],
   );
   if (!row) throw notFound();
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([{
-    sql: `UPDATE leases SET released_at = ? WHERE id = ?`,
-    params: [now, id],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE leases SET released_at = ?
+            WHERE id = ? AND org_id = ? AND holder_id = ? AND released_at IS NULL`,
+      params: [now, id, orgId, principalId],
+    },
+    eventStatement(orgId, "lease.released", principalId, "lease", id, {}, now),
+  ]);
   return { data: { lease_id: id, released_at: now } };
 }
 

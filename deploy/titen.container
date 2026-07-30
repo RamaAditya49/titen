@@ -1,0 +1,21 @@
+[Unit]
+Description=Titen rootless memory service
+After=network-online.target
+
+[Container]
+Image=localhost/titen:latest
+ContainerName=titen
+PublishPort=127.0.0.1:8787:8787
+Volume=%h/.local/share/titen:/var/lib/titen:Z
+EnvironmentFile=%h/.config/titen/titen.env
+Exec=serve --db /var/lib/titen/titen.db --host 0.0.0.0 --port 8787
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=all
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

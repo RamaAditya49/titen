@@ -738,6 +738,77 @@ Acceptance (EARS):
 - **AC-ATLAS-007 — Unwanted behavior:** If a view exceeds configured traversal or response limits, then Titen shall truncate only after authorization, report bounded authorized-result metadata, and avoid unbounded traversal or layout work.
 - **AC-ATLAS-008 — Ubiquitous:** Titen shall keep Memory Atlas in the same repository behind a separate integration boundary, shall expose it through authenticated REST rather than ordinary-agent MCP, and shall require no dashboard dependency in the memory kernel.
 
+### OPS-002 — Opinionated operator queues
+
+**Release:** the read-only reviewer queue ships as a Memory Atlas lens in v0.2;
+operations and publication queues remain specified but unimplemented.
+
+Queues are authorized projections over canonical records, not new canonical
+workflow state. No queue may create a generic task row, infer an owner, or make
+a lifecycle/publication decision. The dashboard and headless clients consume
+the same bounded projection.
+
+Every queue item uses this common schema:
+
+| Field | Contract |
+| --- | --- |
+| `id` / `type` | Canonical resource identifier and type. |
+| `status` | Current canonical lifecycle state; never a parallel queue status. |
+| `priority` / `reasons` | Deterministic server-computed rank and explicit eligibility reasons. |
+| `owner_id` | Canonical actor/assignee/holder/approver field; never model-inferred. |
+| `next_action` | One informational action from a bounded enum; it grants no authority. |
+| `deadline` | Existing expiry/validity/retry timestamp or `null`. |
+| `terminal_state` | Existing terminal lifecycle state or `null`; no queue-only terminal state. |
+| `evidence_refs` / `audit_refs` | Opaque references authorized for this caller; never hidden IDs or counts. |
+
+The implemented `review_queue` lens selects an authorized claim when its
+canonical status is `disputed`, it has an authorized contradicting source, its
+confidence is below `0.7`, or it has `incorrect`/`harmful` context feedback.
+Priority is stable and testable: harmful feedback (`4`), disputed or authorized
+contradiction (`3`), incorrect feedback (`2`), then low confidence (`1`), with
+ties ordered by confidence ascending, creation time ascending, and claim ID
+ascending. It supports the stable `review_reason`, `subject_id`, and `owner_id`
+filters plus an opaque keyset cursor. Authorization and filters execute before
+window counts and `LIMIT`.
+
+Reviewer state transitions reuse claim lifecycle only:
+
+```text
+active/disputed and eligible -> review_queue projection
+review_queue projection --supersede--> superseded (terminal, omitted)
+review_queue projection --expire-----> expired (terminal, omitted)
+review_queue projection --revoke-----> revoked (terminal, omitted)
+active no longer eligible ------------> omitted on next compile
+```
+
+The planned operations queue is a union of typed projections, not one generic
+table: handoff (`pending -> accepted|rejected|expired`), lease
+(`active -> released|expired`), checkpoint (`active -> expired|deleted`), and
+webhook delivery (`pending -> success|failed`). Owners come respectively from
+`to_principal`, `holder_id`, `agent_id`, and the subscription principal;
+deadlines come from existing expiry or retry columns. Each subtype retains its
+own transition endpoint and authorization policy.
+
+The planned publication queue projects a future governed release snapshot with
+channel, audience, source version, approver, disclosure-risk reasons, validity,
+and authorized evidence/audit references. Its specified transition is
+`draft -> approved -> active -> suspended|replaced|expired|revoked`; activation
+requires the separately specified approval and signed channel/audience gates.
+No publication queue route ships until those gates and their adversarial tests
+exist.
+
+Acceptance (EARS):
+
+- **AC-OPS-009 — Ubiquitous:** Titen shall compute queue eligibility, filters,
+  counts, and limits only from records authorized for the caller.
+- **AC-OPS-010 — Event-driven:** When a caller advances a keyset cursor, Titen
+  shall preserve deterministic ordering without duplicating or skipping an
+  unchanged eligible item.
+- **AC-OPS-011 — Unwanted behavior:** If evidence or audit provenance is not
+  authorized, then a queue item shall omit its identifiers and any hidden count.
+- **AC-OPS-012 — State-driven:** While a canonical item is terminal or no longer
+  eligible, it shall be absent on the next projection without a queue mutation.
+
 ### UI-001 — Progressive dashboard information architecture
 
 **Release:** v0.3.1 implements the static reference shell; live areas follow

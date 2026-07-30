@@ -50,7 +50,7 @@ pnpm titen key create --org-id <org_id> --label 'my agent'
 - All P0 endpoints operational: `healthz`, `readyz`, `observations`,
   `consolidations`, `context/compile`, `feedback`, `claims/:id/evidence`,
   `keys`, `export`, `import`.
-- 32 contract tests pass.
+- 60 shared contract cases pass independently on Bun/SQLite and Cloudflare/D1.
 - Data survives restart without rebuild.
 - FTS5 lexical retrieval works without a model.
 - Loop latency p50: 12 ms.
@@ -77,7 +77,9 @@ Docker is not required.
 
 - Bind: `127.0.0.1`.
 - Database: `/var/lib/titen/titen.db`.
-- WAL mode, foreign keys enabled, bounded busy timeout.
+- WAL mode, foreign keys enabled, bounded busy timeout, and an explicit
+  1,000-page auto-checkpoint. With 4 KiB pages, the tested steady-state WAL
+  stays below 5 MiB; the audited live WAL was about 4.0 MiB.
 - Service user: non-root `titen`.
 - Configuration/credential files: mode `0600`.
 - TLS/public ingress: Caddy, Nginx, Cloudflare Tunnel, or private network.
@@ -88,12 +90,21 @@ Docker is not required.
 TITEN_HOST=127.0.0.1
 TITEN_PORT=8787
 TITEN_DB_PATH=/var/lib/titen/titen.db
+TITEN_MCP_ORIGIN=https://titen.example.com
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
+TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
+TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
 ```
 
 Model variables are optional. Observations and lexical context work without them.
+
+Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
+is the exact external origin (scheme, host, and optional port), with no trailing
+slash. Titen deliberately ignores forwarded-protocol headers, so an untrusted
+client cannot choose the accepted origin. Leave it unset for direct loopback or
+private-network access; the request URL origin remains the default.
 
 Local agents connect to `http://127.0.0.1:8787`. Remote agents use a TLS
 reverse proxy or private network with distinct revocable credentials.
@@ -138,7 +149,8 @@ Two things that will bite otherwise:
 - **The base image must use glibc.** `sqlite-vec` ships a glibc-linked prebuilt
   binary; on Alpine it fails to load with `__memcpy_chk: symbol not found`. An
   Alpine image still starts and serves, it just loses vector retrieval silently.
-  That is why the image is Debian-based and 623 MB rather than ~100 MB.
+  The current audited Debian image is about 239 MB. Treat this as measured
+  evidence, not a fixed resource limit.
 - **Podman builds OCI images, which ignore `HEALTHCHECK`.** Use
   `podman build --format docker` if you want it honoured, or rely on an external
   probe against `/healthz`.
@@ -180,6 +192,51 @@ and preserved all memory across a container restart. Measured: index drain
 134.9 ms, context compile p50 104.8 ms, embedding 106.4 ms. Graceful shutdown
 completes in about 130 ms.
 
+## Rootless Quadlet
+
+The checked-in [`deploy/titen.container`](../../deploy/titen.container) is the
+rootless Podman path. It mounts the canonical state directory, reads a mode-0600
+environment file, drops capabilities, and publishes only to loopback.
+
+```bash
+mkdir -p ~/.config/containers/systemd ~/.config/titen ~/.local/share/titen
+chmod 700 ~/.config/titen ~/.local/share/titen
+install -m 600 /dev/null ~/.config/titen/titen.env
+cp deploy/titen.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user enable --now titen.service
+curl http://127.0.0.1:8787/readyz
+```
+
+Use `ssh -N -L 8787:127.0.0.1:8787 <host>` for private remote access. A public
+firewall rule and reverse proxy are explicit operator decisions, not defaults.
+
+## Signing-key migration and rotation
+
+Webhook and federation HMAC secrets are AES-256-GCM ciphertext in canonical SQL;
+the keyring remains external. Generate a 32-byte key, place the JSON keyring in
+the service's mode-0600 environment file, then restart. Startup wraps legacy
+plaintext rows in bounded batches while readiness keeps authenticated traffic
+blocked until rewrapping completes. Startup fail-closes an active legacy row
+whose recoverable secret is `NULL` by disabling the webhook or suspending the
+federation peer. Migration suspends an unattributed legacy peer and replaces its
+stored endpoint with a deterministic tombstone, so the operator can register an
+owned replacement at the original endpoint while the legacy log and filters
+remain preserved. Readiness can then recover; the legacy peer stays suspended
+and fail-closed. A missing or wrong keyring for any non-`NULL`
+persisted secret keeps readiness failed until the correct key is restored.
+
+To rotate, add `v2` while retaining `v1`, make `v2` active, restart and verify
+readiness, then remove `v1` and restart again. Never put either key in SQL,
+exports, logs, or command history.
+
+The Bun runtime enables webhooks only when
+`TITEN_WEBHOOK_ALLOWED_HOSTNAMES` is configured. It re-resolves each attempt,
+rejects private/link-local and special-use IPv4/IPv6, pins TLS to one approved
+address, disables redirects, and bounds each attempt to 10 seconds. Cloudflare
+webhook registration/delivery remains deliberately unavailable: Worker `fetch`
+does not expose a verifiable address-pinning primitive.
+
 ## Service hardening
 
 The production unit should use:
@@ -214,9 +271,7 @@ The production unit should use:
 
 - `sqlite-vec` semantic vector retrieval when configured.
 - Streamable HTTP MCP at `/mcp`.
-- Signed webhook delivery with retry/replay.
-- Channel-release publish/revoke for governed gateways.
+- Signed, allowlisted Bun webhook delivery with durable at-least-once retries.
 
-The provisioned systemd/Caddy deployment and deploy-script cleanup remain tracked
-in issue #14 and are owned by Shinta; this documentation batch does not modify
-that deployment scope.
+The `rama-tuf` reboot validation remains unverified until the operator approves
+a reboot window. Do not close that gate from a service restart alone.

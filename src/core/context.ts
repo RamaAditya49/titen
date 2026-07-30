@@ -1,11 +1,12 @@
-import { chunk, first } from "./db";
+import { first } from "./db";
 import type { Stmt } from "./db";
 import { notFound } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
 import { packUnderBudget, rankCandidates } from "./rank";
-import { ftsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./retrieval";
+import { planFtsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./retrieval";
+import { loadAuthorizedEvidenceIds } from "./evidence";
 import { estimateJsonTokens } from "./tokens";
 import type { RequestContext, Result } from "./http";
 import {
@@ -53,9 +54,9 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   const now = ctx.app.now();
   const at = now.toISOString();
   const scope = { subjectId, projectId, at };
-  const match = ftsQuery(task);
-  const candidates = match
-    ? await retrieveClaimCandidates(ctx.app.db, principal, match, scope)
+  const lexical = planFtsQuery(task);
+  const candidates = lexical.match
+    ? await retrieveClaimCandidates(ctx.app.db, principal, lexical.match, scope)
     : [];
 
   /**
@@ -72,7 +73,11 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       if (queryVec) {
         const hits = await ctx.app.vectors.store.query(queryVec, {
           topK: LIMITS.candidates,
-          filter: { org_id: principal.orgId, subject_id: subjectId },
+          filter: {
+            org_id: principal.orgId,
+            subject_id: subjectId,
+            ...(projectId ? { project_id: projectId } : {}),
+          },
         });
         const similarity = new Map(hits.map((hit) => [hit.id, hit.score]));
 
@@ -95,8 +100,9 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   }
 
   const ranked = rankCandidates(candidates, now);
-  const evidence = await loadEvidenceIds(
-    ctx,
+  const evidence = await loadAuthorizedEvidenceIds(
+    ctx.app.db,
+    principal,
     ranked.map((entry) => entry.candidate.id),
   );
 
@@ -184,30 +190,13 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       policy_snapshot: POLICY_SNAPSHOT,
       instructions: CONTEXT_INSTRUCTIONS,
     },
-    meta: { degraded, candidates: candidates.length },
+    meta: {
+      degraded,
+      candidates: candidates.length,
+      query_terms_used: lexical.termsUsed,
+      dropped_query_terms: lexical.termsDropped,
+    },
   };
-}
-
-async function loadEvidenceIds(
-  ctx: RequestContext,
-  claimIds: string[],
-): Promise<Map<string, string[]>> {
-  const grouped = new Map<string, string[]>();
-  if (claimIds.length === 0) return grouped;
-  for (const group of chunk(claimIds)) {
-    const rows = await ctx.app.db.all<{ claim_id: string; observation_id: string }>(
-      `SELECT claim_id, observation_id FROM claim_sources
-        WHERE claim_id IN (${group.map(() => "?").join(", ")})
-        ORDER BY claim_id, observation_id`,
-      group,
-    );
-    for (const row of rows) {
-      const list = grouped.get(row.claim_id) ?? [];
-      list.push(row.observation_id);
-      grouped.set(row.claim_id, list);
-    }
-  }
-  return grouped;
 }
 
 export async function recordFeedback(ctx: RequestContext): Promise<Result> {
@@ -240,8 +229,8 @@ export async function recordFeedback(ctx: RequestContext): Promise<Result> {
     const existing = await first<{ id: string; outcome: string; created_at: string }>(
       ctx.app.db,
       `SELECT id, outcome, created_at FROM context_feedback
-         WHERE org_id = ? AND client_mutation_id = ?`,
-      [principal.orgId, mutationId],
+         WHERE org_id = ? AND actor_id = ? AND client_mutation_id = ?`,
+      [principal.orgId, principal.principalId, mutationId],
     );
     if (existing)
       return {
@@ -259,9 +248,10 @@ export async function recordFeedback(ctx: RequestContext): Promise<Result> {
   const result = await commitIdempotent(
     ctx.app.db,
     principal,
-    FEEDBACK_ENDPOINT,
+    ctx.request,
     idempotencyKey(ctx.request),
     raw,
+    ctx.app.now(),
     async () => {
       const id = newId("fb");
       const at = ctx.app.now().toISOString();

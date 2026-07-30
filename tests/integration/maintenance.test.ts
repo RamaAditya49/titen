@@ -132,6 +132,7 @@ test("a claim that stopped being retrievable is retired, not embedded forever", 
   });
   await api("POST", `/v1/claims/${consolidated.claims[0].claim_id}/revoke`, {
     reason: "no longer applicable",
+    expected_version: 1,
   });
 
   const deadline = Date.now() + 5_000;

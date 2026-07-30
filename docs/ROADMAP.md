@@ -28,7 +28,8 @@ locally verified but has no live deployment evidence.
 | Evidence kernel: observe, claim, compile, feedback | Implemented; Verified locally | [P0 done spec](./specs/done/2026-07-29-p0-dual-runtime-vertical-spike.md), [contract tests](../tests/contract/) | Shared suite covers Bun/SQLite and local workerd/D1; this is not a live Cloudflare claim. |
 | Temporal claims, checkpoints, SDK, optional hybrid retrieval | Implemented; Verified locally | [agent guide](./agent-guide.md), [contract tests](../tests/contract/), [integration tests](../tests/integration/) | FTS works without vectors; live Vectorize/Workers AI is not verified. |
 | Identities, visibility, leases, handoffs, MCP, events, Atlas compiler | Implemented; Verified locally | [collaboration architecture](./architecture/collaboration.md), [API reference](./reference/api.md), [contract tests](../tests/contract/) | Local/emulated runtime evidence only. |
-| Enterprise policy, releases, and audit | Implemented; Verified locally | [FRD governance requirements](./FRD.md), [contract tests](../tests/contract/) | No claim of a provisioned enterprise deployment. |
+| Enterprise policy and governed releases | Planned | [FRD governance requirements](./FRD.md), [ADR-0002](./decisions/0002-channel-release-not-public-memory.md) | Withdrawn from the current route inventory until authorization and lifecycle gates are complete. |
+| Enterprise audit | Implemented; Verified locally | [FRD governance requirements](./FRD.md), [contract tests](../tests/contract/) | No claim of a provisioned enterprise deployment. |
 | Memory Atlas dashboard | Interactive prototype | [dashboard guide](./dashboard.md), [browser tests](../tests/) | Checked-in UI uses a synthetic fixture; it is not evidence of live API integration. |
 | Containerized Bun service with `embeddinggemma` | Verified live | [evaluation record](./testing/EVALS.md), [end-to-end script](../scripts/verify-live.ts) | Evidence covers the recorded container run, not systemd/VPS packaging or Cloudflare. |
 | Signed federation event exchange | Implemented; Verified locally | [collaboration federation boundary](./architecture/collaboration.md#signed-federation-event-exchange), [contract tests](../tests/contract/) | Exchanges filtered signed events and cursors. It does not make remote memory canonically recallable. |
@@ -56,9 +57,9 @@ Adds identities and memberships, scoped visibility, leases, handoffs,
 observer-specific conflicts, MCP, durable metadata events, and Memory Atlas
 view compilation. The dashboard remains a separate synthetic-data prototype.
 
-### v0.3 — governance
+### v0.3 — governance (planned)
 
-Adds role/policy enforcement, approved channel releases, audience-scoped
+Will add role/policy enforcement, approved channel releases, audience-scoped
 context, and audit export.
 
 ### v1 transport — signed federation event exchange

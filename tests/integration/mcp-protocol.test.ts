@@ -80,6 +80,14 @@ test("initialize negotiates a protocol revision and names the server", async () 
   assert.equal(current.body.result.serverInfo.name, "titen");
   assert.ok(current.body.result.capabilities.tools, "tools capability must be declared");
 
+  const latest = await rpc({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "initialize",
+    params: { protocolVersion: "2025-11-25" },
+  });
+  assert.equal(latest.body.result.protocolVersion, "2025-11-25");
+
   // An older client must not be forced onto a newer revision.
   const older = await rpc({
     jsonrpc: "2.0",
@@ -97,7 +105,7 @@ test("initialize negotiates a protocol revision and names the server", async () 
     params: { protocolVersion: "1999-01-01" },
   });
   assert.ok(
-    ["2025-06-18", "2025-03-26", "2024-11-05"].includes(
+    ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"].includes(
       unknown.body.result.protocolVersion,
     ),
     "the fallback must be a revision this server implements",
@@ -128,6 +136,108 @@ test("ping answers, and the full handshake completes in order", async () => {
     assert.ok(typeof tool.description === "string" && tool.description.length > 0);
     assert.equal(tool.inputSchema.type, "object", "each tool needs an object schema");
     assert.ok(Array.isArray(tool.inputSchema.required));
+    assert.equal(typeof tool.annotations.readOnlyHint, "boolean");
+    assert.equal(typeof tool.annotations.destructiveHint, "boolean");
+    assert.equal(typeof tool.annotations.idempotentHint, "boolean");
+    assert.equal(tool.annotations.openWorldHint, false);
+  }
+  const compile = tools.body.result.tools.find((tool: any) => tool.name === "titen_compile");
+  assert.equal(compile.annotations.readOnlyHint, false, "compile records a context run");
+  assert.equal(compile.annotations.idempotentHint, false, "compile creates a new context run");
+});
+
+test("the HTTP transport rejects unsafe origins and unsupported revisions", async () => {
+  const crossOrigin = await rpc(
+    { jsonrpc: "2.0", id: 1, method: "ping" },
+    { origin: "https://attacker.example" },
+  );
+  assert.equal(crossOrigin.status, 403);
+
+  const sameOrigin = await rpc(
+    { jsonrpc: "2.0", id: 2, method: "ping" },
+    { origin: running.url },
+  );
+  assert.equal(sameOrigin.status, 200);
+
+  const unsupported = await rpc(
+    { jsonrpc: "2.0", id: 3, method: "ping" },
+    { "mcp-protocol-version": "1999-01-01" },
+  );
+  assert.equal(unsupported.status, 400);
+  assert.equal(unsupported.body.error.code, -32600);
+
+  const noStream = await fetch(`${running.url}/mcp`, {
+    headers: {
+      accept: "text/event-stream",
+      authorization: `Bearer ${key}`,
+    },
+  });
+  assert.equal(noStream.status, 405);
+});
+
+test("a TLS proxy origin is trusted only through explicit configuration", async () => {
+  const dbPath = join(directory, "external-origin.db");
+  const externalOrigin = "https://titen.example.com";
+  const proxied = await serve({
+    dbPath,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    revision: "mcp-proxy",
+    mcpOrigin: externalOrigin,
+  });
+  const database = openDatabase(dbPath);
+  const provisioned = await provisionWith(createSqliteDb(database), { scopes: ["*"] });
+  database.close();
+
+  const call = (origin: string) =>
+    fetch(`${proxied.url}/mcp`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${provisioned.key}`,
+        origin,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+
+  try {
+    assert.equal((await call(externalOrigin)).status, 200);
+    assert.equal((await call(proxied.url)).status, 403, "the internal HTTP origin is no longer trusted");
+    assert.equal((await call("https://attacker.example")).status, 403);
+  } finally {
+    await proxied.stop();
+  }
+
+  assert.equal(
+    (
+      await rpc(
+        { jsonrpc: "2.0", id: 11, method: "ping" },
+        { origin: externalOrigin, "x-forwarded-proto": "https" },
+      )
+    ).status,
+    403,
+    "forwarded protocol does not make an unconfigured external origin trusted",
+  );
+});
+
+test("invalid configured MCP origins fail before the server starts", async () => {
+  for (const [index, mcpOrigin] of [
+    "ftp://titen.example.com",
+    "https://user@titen.example.com",
+    "https://titen.example.com/path",
+    "https://titen.example.com/",
+  ].entries()) {
+    await assert.rejects(
+      serve({
+        dbPath: join(directory, `invalid-origin-${index}.db`),
+        port: 0,
+        hostname: "127.0.0.1",
+        quiet: true,
+        mcpOrigin,
+      }),
+      /TITEN_MCP_ORIGIN must be an exact HTTP\(S\) origin/,
+    );
   }
 });
 
@@ -190,6 +300,20 @@ test("protocol-level errors use JSON-RPC error codes", async () => {
   });
   const parseError = (await malformed.json()) as any;
   assert.equal(parseError.error.code, -32700, "unparseable input is -32700");
+
+  const emptyBatch = await rpc([]);
+  assert.equal(emptyBatch.body.error.code, -32600, "an empty batch is one invalid request");
+});
+
+test("null ids are answered and missing ids are notifications", async () => {
+  const nullId = await rpc({ jsonrpc: "2.0", id: null, method: "ping" });
+  assert.equal(nullId.status, 200);
+  assert.equal(nullId.body.id, null, "an explicit null id is echoed in the response");
+  assert.deepEqual(nullId.body.result, {});
+
+  const notification = await rpc({ jsonrpc: "2.0", method: "tools/list" });
+  assert.equal(notification.status, 202);
+  assert.equal(notification.text, "", "tools/list without an id must not be answered");
 });
 
 test("a batch answers only the requests in it", async () => {

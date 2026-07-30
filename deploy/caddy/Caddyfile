@@ -1,3 +1,4 @@
+# Also set TITEN_MCP_ORIGIN=https://titen.example.com in Titen's environment.
 titen.example.com {
     reverse_proxy 127.0.0.1:8787 {
         header_up X-Real-IP {remote_host}

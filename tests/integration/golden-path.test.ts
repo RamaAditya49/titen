@@ -32,6 +32,25 @@ test("the documented golden path runs against scoped principals", async () => {
     principalId: "reviewer",
     scopes: ["handoffs:write", "feedback:write", "evidence:read", "views:compile"],
   });
+  const workspaceId = "ws_golden_path";
+  const at = new Date().toISOString();
+  await db.batch([
+    {
+      sql: `INSERT INTO workspaces (id, org_id, name, created_at) VALUES (?, ?, ?, ?)`,
+      params: [workspaceId, researcher.orgId, "Golden path", at],
+    },
+    ...[
+      ["researcher", "member"],
+      ["writer", "reader"],
+      ["operator", "admin"],
+      ["reviewer", "reader"],
+    ].map(([principalId, role], index) => ({
+      sql: `INSERT INTO memberships
+              (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+            VALUES (?, ?, ?, ?, 'agent', ?, ?)`,
+      params: [`mbr_golden_${index}`, researcher.orgId, workspaceId, principalId!, role!, at],
+    })),
+  ]);
   database.close();
 
   const api = await serve({ dbPath, port: 0, hostname: "127.0.0.1", quiet: true });
@@ -45,6 +64,7 @@ test("the documented golden path runs against scoped principals", async () => {
         TITEN_WRITER_KEY: writer.key,
         TITEN_OPERATOR_KEY: operator.key,
         TITEN_REVIEWER_KEY: reviewer.key,
+        TITEN_WORKSPACE_ID: workspaceId,
         TITEN_SUBJECT_ID: "golden-path-smoke",
       },
       stdout: "pipe",

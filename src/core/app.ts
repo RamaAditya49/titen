@@ -11,14 +11,13 @@ import { listEvents, getEvent } from "./events";
 import { drainIndex } from "./indexing";
 import { handleMcp } from "./mcp";
 import { compileView } from "./atlas";
-import { createPolicy, listPolicies, createRelease, publishRelease, revokeRelease, queryRelease, channelContext } from "./governance";
 import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation } from "./observations";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
-import { ApiError, unavailable, validationError } from "./errors";
+import { ApiError, forbidden, unavailable, validationError } from "./errors";
 import {
   MAX_BODY_BYTES,
   compileRoutes,
@@ -32,6 +31,9 @@ import {
 } from "./http";
 import type { Db } from "./db";
 import type { VectorCapability } from "./vectors";
+import { backgroundRepairState } from "./maintenance";
+import type { WebhookSecurity } from "./webhook-security";
+import type { SecretCipher } from "./secrets";
 
 export interface AppContext {
   db: Db;
@@ -42,17 +44,28 @@ export interface AppContext {
   runtime: string;
   /** Optional vector capability. Absent means FTS-only retrieval. */
   vectors?: VectorCapability;
-  /** Ownership of background indexing and webhook repair for this runtime. */
-  backgroundRepair: "enabled" | "disabled" | "external";
+  /** Scheduler intent; readiness still derives state from canonical evidence. */
+  backgroundRepair: { configured: boolean; staleAfterMs: number };
+  /** False only after a required startup migration failed. */
+  migrationsReady: boolean;
+  /** False when persisted signing secrets cannot be decrypted safely. */
+  secretStorageReady: boolean;
+  webhookSecurity?: WebhookSecurity;
+  secretCipher?: SecretCipher;
 }
 
 /** Capabilities are reported honestly based on what's configured. */
-export function capabilities(app: AppContext) {
+export async function capabilities(app: AppContext) {
   return {
     fts: "enabled",
     vector: app.vectors ? "enabled" : "disabled",
     model: app.vectors?.embedder ? "enabled" : "disabled",
-    background_repair: app.backgroundRepair,
+    background_repair: await backgroundRepairState({
+      db: app.db,
+      configured: app.backgroundRepair.configured,
+      now: app.now(),
+      staleAfterMs: app.backgroundRepair.staleAfterMs,
+    }),
     export_import: "enabled",
   } as const;
 }
@@ -159,13 +172,6 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/events", scope: "events:read", handler: listEvents },
   { method: "GET", path: "/v1/events/:id", scope: "events:read", handler: getEvent },
   { method: "POST", path: "/v1/memory-views/compile", scope: "views:compile", handler: compileView },
-  { method: "POST", path: "/v1/policies", scope: "policies:write", handler: createPolicy },
-  { method: "GET", path: "/v1/policies", scope: "policies:read", handler: listPolicies },
-  { method: "POST", path: "/v1/channel-releases", scope: "releases:write", handler: createRelease },
-  { method: "POST", path: "/v1/channel-releases/:id/publish", scope: "releases:write", handler: publishRelease },
-  { method: "POST", path: "/v1/channel-releases/:id/revoke", scope: "releases:write", handler: revokeRelease },
-  { method: "GET", path: "/v1/channel-releases/:id", scope: "releases:read", handler: queryRelease },
-  { method: "POST", path: "/v1/channel-context", scope: "channel:read", handler: channelContext },
   { method: "GET", path: "/v1/audit", scope: "audit:read", handler: listAudit },
   { method: "GET", path: "/v1/audit/export", scope: "audit:export", handler: exportAudit },
   { method: "POST", path: "/v1/federation/peers", scope: "federation:write", handler: registerPeer },
@@ -200,12 +206,18 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   }
   const schema = await schemaState(ctx.app.db);
   checks.migrations =
-    schema.applied === schema.expected
+    schema.applied === schema.expected && schema.verified
       ? "ok"
-      : `pending (applied ${schema.applied}, expected ${schema.expected})`;
-  if (schema.applied !== schema.expected) ready = false;
+      : `invalid or pending (applied ${schema.applied}, expected ${schema.expected})`;
+  if (schema.applied !== schema.expected || !schema.verified) ready = false;
+  if (!ctx.app.migrationsReady) {
+    checks.migrations = "failed";
+    ready = false;
+  }
+  checks.signing_secrets = ctx.app.secretStorageReady ? "ok" : "failed";
+  if (!ctx.app.secretStorageReady) ready = false;
 
-  const caps = capabilities(ctx.app);
+  const caps = await capabilities(ctx.app);
   const body = {
     ready,
     runtime: ctx.app.runtime,
@@ -220,31 +232,75 @@ async function readiness(ctx: RequestContext): Promise<Result> {
 
 const compiled = compileRoutes(ROUTES);
 
+/** Canonical origin trusted for browser-originated MCP requests. */
+export function parseMcpOrigin(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const url = new URL(value);
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || value !== url.origin)
+      throw new Error();
+    return url.origin;
+  } catch {
+    throw new Error(
+      "TITEN_MCP_ORIGIN must be an exact HTTP(S) origin without credentials, path, query, hash, or trailing slash.",
+    );
+  }
+}
+
 export function createApp(context: {
   db: Db;
   now?: () => Date;
   revision?: string;
   runtime: string;
   vectors?: VectorCapability;
-  backgroundRepair?: "enabled" | "disabled" | "external";
+  backgroundRepair?: { configured: boolean; staleAfterMs: number };
+  migrationsReady?: boolean;
+  secretStorageReady?: boolean;
+  webhookSecurity?: WebhookSecurity;
+  secretCipher?: SecretCipher;
+  mcpOrigin?: string;
 }): (request: Request) => Promise<Response> {
+  const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
   const app: AppContext = {
     db: context.db,
     now: context.now ?? (() => new Date()),
     revision: context.revision ?? "dev",
     runtime: context.runtime,
     vectors: context.vectors,
-    backgroundRepair: context.backgroundRepair ?? "disabled",
+    backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
+    migrationsReady: context.migrationsReady ?? true,
+    secretStorageReady: context.secretStorageReady ?? true,
+    webhookSecurity: context.webhookSecurity,
+    secretCipher: context.secretCipher,
   };
 
   return async function handle(request: Request): Promise<Response> {
     const requestId = newRequestId();
     try {
       const url = new URL(request.url);
+      if (url.pathname === "/mcp") {
+        const rawOrigin = request.headers.get("origin");
+        if (rawOrigin) {
+          let origin: string;
+          try {
+            origin = parseMcpOrigin(rawOrigin)!;
+          } catch {
+            throw forbidden("Invalid MCP Origin header.");
+          }
+          if (origin !== (mcpOrigin ?? url.origin))
+            throw forbidden("Cross-origin MCP requests are not allowed.");
+        }
+      }
       const matched = matchRoute(compiled, request.method, url.pathname);
       if (!matched) throw new ApiError(404, "NOT_FOUND", "Unknown endpoint.");
       if ("allowed" in matched)
         throw new ApiError(405, "METHOD_NOT_ALLOWED", `Allowed methods: ${matched.allowed.join(", ")}.`);
+      if (
+        (!app.migrationsReady || !app.secretStorageReady) &&
+        matched.route.path !== "/healthz" &&
+        matched.route.path !== "/readyz"
+      )
+        throw unavailable("Required database migration has not completed.");
 
       let cachedBody: string | undefined;
       const rawBody = async () => {

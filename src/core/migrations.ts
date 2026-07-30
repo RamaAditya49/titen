@@ -389,9 +389,8 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // fingerprint, which stays useful for confirming which secret is
       // configured without revealing it.
       //
-      // ponytail: the shared secret is stored recoverably, as every HMAC webhook
-      // implementation must. The ceiling is that a database read discloses it;
-      // the upgrade path is envelope encryption with a KMS-held key.
+      // This historical column is rewrapped into an AES-GCM envelope during
+      // startup before protected traffic is accepted.
       `ALTER TABLE webhooks ADD COLUMN secret TEXT`,
     ],
   },
@@ -402,8 +401,7 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // it registered. That needs the shared key itself, for the same reason a
       // webhook signature does: HMAC is symmetric.
       //
-      // ponytail: stored recoverably, ceiling and upgrade path identical to the
-      // webhook secret in migration 7.
+      // This historical column is rewrapped like the webhook secret above.
       `ALTER TABLE federation_peers ADD COLUMN shared_secret TEXT`,
     ],
   },
@@ -422,9 +420,104 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON webhook_deliveries (webhook_id, event_id)`,
     ],
   },
+  {
+    version: 10,
+    statements: [
+      // Team visibility is a real workspace boundary. Legacy team rows remain
+      // fail-closed until an explicit future rebinding migration can prove scope.
+      `ALTER TABLE observations ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)`,
+      `ALTER TABLE claims ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)`,
+      `CREATE INDEX observations_workspace_scope
+         ON observations (org_id, workspace_id, subject_id, ingested_at)`,
+      `CREATE INDEX claims_workspace_scope
+         ON claims (org_id, workspace_id, subject_id, status)`,
+      // Preserve every lease row while deterministically retiring duplicate
+      // unreleased losers before the database starts enforcing one winner.
+      `UPDATE leases AS losing
+          SET released_at = losing.expires_at
+        WHERE losing.released_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM leases winning
+             WHERE winning.org_id = losing.org_id
+               AND winning.resource_type = losing.resource_type
+               AND winning.resource_id = losing.resource_id
+               AND winning.released_at IS NULL
+               AND (
+                 winning.expires_at > losing.expires_at
+                 OR (winning.expires_at = losing.expires_at AND winning.created_at > losing.created_at)
+                 OR (winning.expires_at = losing.expires_at AND winning.created_at = losing.created_at AND winning.id > losing.id)
+               )
+          )`,
+      `CREATE UNIQUE INDEX leases_one_unreleased_resource
+         ON leases (org_id, resource_type, resource_id) WHERE released_at IS NULL`,
+      // A claim/version fence makes concurrent lifecycle batches choose one
+      // winner without requiring an interactive transaction unavailable in D1.
+      `CREATE TABLE lifecycle_fences (
+         claim_id TEXT NOT NULL REFERENCES claims(id),
+         expected_version INTEGER NOT NULL,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (claim_id, expected_version)
+       )`,
+      `CREATE TABLE idempotency_v2 (
+         org_id TEXT NOT NULL,
+         key_id TEXT NOT NULL,
+         request_identity TEXT NOT NULL,
+         key_hash TEXT NOT NULL,
+         request_hash TEXT NOT NULL,
+         status INTEGER NOT NULL,
+         response TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         expires_at TEXT NOT NULL,
+         PRIMARY KEY (org_id, key_id, key_hash)
+       )`,
+      `CREATE INDEX idempotency_v2_expiry ON idempotency_v2 (expires_at)`,
+      `DROP INDEX context_feedback_mutation`,
+      `CREATE UNIQUE INDEX context_feedback_mutation
+         ON context_feedback (org_id, actor_id, client_mutation_id)
+         WHERE client_mutation_id IS NOT NULL`,
+      // Existing subscriptions have no attributable principal and therefore
+      // receive no private/team events until re-registered.
+      `ALTER TABLE webhooks ADD COLUMN principal_id TEXT`,
+      // Federation cursors are mutable authorization state. Legacy peers have
+      // no attributable owner and therefore stay fail-closed until re-created.
+      `ALTER TABLE federation_peers ADD COLUMN principal_id TEXT`,
+      // Keep legacy logs and filters, but retire the unusable peer and release
+      // its public endpoint so an attributable replacement can be registered.
+      `UPDATE federation_peers
+          SET endpoint = endpoint || '#titen-legacy-peer=' || id,
+              status = 'suspended'
+        WHERE principal_id IS NULL`,
+      `CREATE TABLE maintenance_state (
+         id TEXT PRIMARY KEY CHECK (id = 'background'),
+         last_attempt_at TEXT NOT NULL,
+         last_success_at TEXT,
+         last_error_at TEXT,
+         indexed INTEGER NOT NULL DEFAULT 0,
+         delivered INTEGER NOT NULL DEFAULT 0,
+         expected_interval_ms INTEGER NOT NULL
+       )`,
+      `ALTER TABLE webhook_deliveries ADD COLUMN lease_token TEXT`,
+      `ALTER TABLE webhook_deliveries ADD COLUMN lease_expires_at TEXT`,
+      `ALTER TABLE webhook_deliveries ADD COLUMN attempt_id TEXT`,
+      `CREATE INDEX webhook_deliveries_due
+         ON webhook_deliveries (status, next_retry_at, lease_expires_at)`,
+      // Vector schemas now enforce subject/project metadata before top-k. The
+      // projection is rebuildable, so every canonical claim is safely requeued.
+      `UPDATE index_outbox SET state = 'pending', attempts = 0 WHERE record_type = 'claim'`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
+
+const REQUIRED_OBJECTS = MIGRATIONS.flatMap(({ statements }) => statements).flatMap((sql) => {
+  const match = sql.match(/^CREATE\s+(?:VIRTUAL\s+)?(?:UNIQUE\s+)?(TABLE|INDEX)\s+([a-z0-9_]+)/i);
+  return match ? [{ type: match[1]!.toLowerCase(), name: match[2]! }] : [];
+});
+const REQUIRED_COLUMNS = MIGRATIONS.flatMap(({ statements }) => statements).flatMap((sql) => {
+  const match = sql.match(/^ALTER\s+TABLE\s+([a-z0-9_]+)\s+ADD\s+COLUMN\s+([a-z0-9_]+)/i);
+  return match ? [{ table: match[1]!, column: match[2]! }] : [];
+});
 
 async function appliedVersion(db: Db): Promise<number> {
   await db.exec(
@@ -439,32 +532,58 @@ async function appliedVersion(db: Db): Promise<number> {
   return rows[0]?.version ?? 0;
 }
 
-/** Apply pending migrations. Safe to call repeatedly and concurrently-ish. */
+/** Apply pending migrations as one cross-runtime atomic batch per version. */
 export async function migrate(db: Db): Promise<number> {
-  const current = await appliedVersion(db);
+  let current = await appliedVersion(db);
   for (const migration of MIGRATIONS) {
     if (migration.version <= current) continue;
-    for (const statement of migration.statements) await db.exec(statement);
-    await db.batch([
-      {
-        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
-        params: [migration.version, new Date().toISOString()],
-      },
-    ]);
+    try {
+      await db.batch([
+        ...migration.statements.map((sql) => ({ sql })),
+        {
+          sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+          params: [migration.version, new Date().toISOString()],
+        },
+      ]);
+      current = migration.version;
+    } catch (error) {
+      // Another isolate may have committed the same atomic migration first.
+      // Accept only a durable winner; every other failure remains fail-closed.
+      current = await appliedVersion(db);
+      if (current < migration.version) throw error;
+    }
   }
+  const state = await schemaState(db);
+  if (state.applied !== state.expected || !state.verified)
+    throw new Error("Database schema verification failed after migration.");
   return SCHEMA_VERSION;
 }
 
 /** Readiness needs the applied version without creating anything. */
 export async function schemaState(
   db: Db,
-): Promise<{ applied: number; expected: number }> {
+): Promise<{ applied: number; expected: number; verified: boolean }> {
   try {
     const rows = await db.all<{ version: number | null }>(
       `SELECT MAX(version) AS version FROM titen_migrations`,
     );
-    return { applied: rows[0]?.version ?? 0, expected: SCHEMA_VERSION };
+    const applied = rows[0]?.version ?? 0;
+    if (applied !== SCHEMA_VERSION)
+      return { applied, expected: SCHEMA_VERSION, verified: false };
+    for (const object of REQUIRED_OBJECTS) {
+      const found = await db.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+        [object.type, object.name],
+      );
+      if (!found.length) return { applied, expected: SCHEMA_VERSION, verified: false };
+    }
+    for (const required of REQUIRED_COLUMNS) {
+      const columns = await db.all<{ name: string }>(`PRAGMA table_info(${required.table})`);
+      if (!columns.some(({ name }) => name === required.column))
+        return { applied, expected: SCHEMA_VERSION, verified: false };
+    }
+    return { applied, expected: SCHEMA_VERSION, verified: true };
   } catch {
-    return { applied: 0, expected: SCHEMA_VERSION };
+    return { applied: 0, expected: SCHEMA_VERSION, verified: false };
   }
 }

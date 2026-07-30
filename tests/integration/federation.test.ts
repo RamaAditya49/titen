@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { signPayload } from "../../src/core/webhooks";
-import { provisionWith } from "../contract/harness";
+import { provisionWith, TEST_SECRET_CIPHER } from "../contract/harness";
 
 /**
  * Federation between two independent deployments, over real HTTP.
@@ -40,6 +40,8 @@ async function boot(name: string): Promise<Node> {
     hostname: "127.0.0.1",
     quiet: true,
     revision: name,
+    maintenanceIntervalMs: 0,
+    secretCipher: TEST_SECRET_CIPHER,
   });
   const provisioned = await provisionWith(createSqliteDb(openDatabase(dbPath)), {
     scopes: ["*"],
@@ -149,24 +151,27 @@ test("events cross the network from one deployment into the other", async () => 
     `expected accepted events, got ${JSON.stringify(pushed.body.data.results)}`,
   );
 
-  // The records now exist on the east side, having crossed a real socket.
+  // Remote identity and canonical pointers remain untrusted. The receiving
+  // principal sees local wrappers, never remote rows with local authority.
   const after = await call(east, "GET", "/v1/events");
-  assert.ok(after.body.data.events.length >= 1, "the east side received the events");
-  const arrived = after.body.data.events.find(
-    (e: any) => e.kind === "observation.appended",
-  );
-  assert.ok(arrived, "the observation event must have arrived");
-  assert.equal(
-    arrived.resource_id,
-    observation.body.data.observation_id,
-    "identity is preserved across the boundary",
-  );
+  assert.equal(after.body.data.events.length, applied.length);
+  const remoteById = new Map(pulled.body.data.events.map((event: any) => [event.id, event]));
+  for (const wrapper of after.body.data.events) {
+    assert.equal(wrapper.kind, "federation.received");
+    assert.equal(wrapper.resource_type, "federated_event");
+    assert.equal(wrapper.resource_id, wrapper.id);
+    assert.deepEqual(wrapper.payload.untrusted_remote_event, remoteById.get(wrapper.id));
+  }
 
   // Both sides recorded the exchange.
   const sent = await call(west, "GET", `/v1/federation/log?peer_id=${outbound}`);
   assert.ok((sent.body.data.entries ?? []).length >= 1, "the sender logged the exchange");
   const got = await call(east, "GET", `/v1/federation/log?peer_id=${inbound}`);
   assert.ok((got.body.data.entries ?? []).length >= 1, "the receiver logged the exchange");
+  assert.ok(
+    got.body.data.entries.some((entry: any) => entry.status === "success"),
+    "the receiver must durably record a successful signed exchange",
+  );
 });
 
 test("a replayed batch is preserved as a conflict rather than duplicated", async () => {

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/assets/brand/titen-readme-hero.svg" alt="Titen — collaborative memory for AI agents" width="100%">
+  <img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/brand/titen-readme-hero.svg" alt="Titen — collaborative memory for AI agents" width="100%">
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
   <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm downloads" src="https://img.shields.io/npm/dm/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
   <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm unpacked size" src="https://img.shields.io/npm/unpacked-size/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
   <a href="https://github.com/RamaAditya49/titen/graphs/contributors"><img alt="GitHub contributors" src="https://img.shields.io/github/contributors/RamaAditya49/titen?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
-  <a href="./LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
+  <a href="https://github.com/RamaAditya49/titen/blob/main/LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 > [!NOTE]
 > The service and collaboration contracts are implemented and verified locally
 > on Bun/SQLite and workerd/D1. The dashboard is an interactive synthetic-data
-> prototype. See the [evidence-based maturity matrix](./docs/ROADMAP.md#maturity-matrix)
+> prototype. See the [evidence-based maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
 > for the exact boundary of each claim.
 
 When 2–10 agents share a project, they often repeat research, act on stale
@@ -65,18 +65,18 @@ browser against synthetic data. The other area names are non-interactive
 information-architecture labels, not shipped routes.
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-atlas-evidence.png" alt="Synthetic prototype of the Titen Memory Atlas Evidence Trace dashboard" width="100%">
+  <img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/screenshots/dashboard-atlas-evidence.png" alt="Synthetic prototype of the Titen Memory Atlas Evidence Trace dashboard" width="100%">
 </p>
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-conflict-freshness.png" alt="Synthetic prototype of the Titen Conflict and Freshness dashboard with preserved perspectives" width="100%">
+  <img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/screenshots/dashboard-conflict-freshness.png" alt="Synthetic prototype of the Titen Conflict and Freshness dashboard with preserved perspectives" width="100%">
 </p>
 
 <details>
 <summary><strong>Mobile inspection flow</strong></summary>
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-mobile.png" alt="Synthetic prototype of the Titen Memory Atlas mobile inspection flow" width="354">
+  <img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/screenshots/dashboard-mobile.png" alt="Synthetic prototype of the Titen Memory Atlas mobile inspection flow" width="354">
 </p>
 
 </details>
@@ -90,7 +90,7 @@ pnpm dev
 
 Then open `http://localhost:4321/dashboard/`. Use `pnpm test` for the production
 build and browser suite, or `pnpm screenshots` after a build to refresh the
-README images. See the [dashboard guide](./docs/dashboard.md) for the fixture,
+README images. See the [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md) for the fixture,
 security, hosting, and rollback boundaries.
 
 ## Dashboard implementation truth
@@ -103,7 +103,7 @@ security, hosting, and rollback boundaries.
 
 ## Quick start
 
-Follow the copy-pasteable [small-team golden path](./docs/guides/golden-path.md) to create scoped researcher, writer, operator, and reviewer principals and verify evidence, citations, handoff, feedback, conflict, and freshness end to end.
+Follow the copy-pasteable [small-team golden path](https://github.com/RamaAditya49/titen/blob/main/docs/guides/golden-path.md) to create scoped researcher, writer, operator, and reviewer principals and verify evidence, citations, handoff, feedback, conflict, and freshness end to end.
 
 ### Local / VPS (Bun)
 
@@ -136,6 +136,11 @@ const titen = new TitenClient({ url: "http://127.0.0.1:8787", key: process.env.T
 const ctx = await titen.compile({ subject_id: "user_x", task: "…", max_tokens: 900 });
 ```
 
+Common agent operations have typed methods; `request()` and `requestRaw()`
+cover the remaining authenticated JSON and streaming routes. See the
+[agent integration guide](https://github.com/RamaAditya49/titen/blob/main/docs/agent-guide.md)
+for the capability matrix and retry-safe `idempotencyKey` mutation pattern.
+
 ### Cloudflare Workers
 
 ```bash
@@ -148,7 +153,7 @@ pnpm deploy:worker
 curl https://titen.<subdomain>.workers.dev/healthz
 ```
 
-See [VPS guide](./docs/deployment/vps.md) and [Cloudflare guide](./docs/deployment/cloudflare.md) for production hardening, key management, and backup.
+See [VPS guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md) and [Cloudflare guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/cloudflare.md) for production hardening, key management, and backup.
 
 For customer-facing CRM or chatbot use, approved knowledge is released through
 an explicit channel snapshot. `Verified` describes evidence authority; it does
@@ -250,7 +255,7 @@ will add no graph database or authority, and headless REST/MCP will not depend
 on the dashboard.
 
 Atlas is the only active dashboard route. The final visual shell also shows the
-canonical [DESIGN](./docs/DESIGN.md) map as non-interactive orientation. Those
+canonical [DESIGN](https://github.com/RamaAditya49/titen/blob/main/docs/DESIGN.md) map as non-interactive orientation. Those
 labels do not become routes or controls until their backend contract,
 authorization, and EARS UI work item pass.
 
@@ -319,27 +324,27 @@ dependencies, and required Docker.
 
 | Document                                                                               | Purpose                                               |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| [PRD](./docs/PRD.md)                                                                   | Product goals, users, scope, and success criteria     |
-| [FRD](./docs/FRD.md)                                                                   | Functional behavior and acceptance requirements       |
-| [DESIGN](./docs/DESIGN.md)                                                             | Progressive dashboard information architecture        |
-| [Dashboard guide](./docs/dashboard.md)                                                 | Run, test, screenshot, and host the Astro preview     |
-| [Requirements workflow](./docs/engineering/requirements-workflow.md)                   | EARS criteria and closed work lifecycle               |
-| [Architecture](./docs/architecture/overview.md)                                        | Components and dual-runtime boundaries                |
-| [Memory lifecycle](./docs/architecture/memory-lifecycle.md)                            | Complete Level 5/6 flow and embedding/vector decision |
-| [Agent integration](./docs/architecture/agent-integration.md)                          | MCP/REST, hooks, ownership, events, and orchestration |
-| [Memory model](./docs/architecture/memory-model.md)                                    | Evidence, claims, context, and lifecycle              |
-| [Collaboration](./docs/architecture/collaboration.md)                                  | Multi-agent coordination and governance               |
-| [Memory Atlas](./docs/architecture/memory-atlas.md)                                    | Authorized visual projections and rollout boundary    |
-| [Data model](./docs/reference/data-model.md)                                           | Logical SQL entities and transaction boundaries       |
-| [Evaluation](./docs/testing/EVALS.md)                                                  | Quality, performance, safety, and release gates       |
-| [Threat model](./docs/security/threat-model.md)                                        | Trust boundaries, attack paths, and controls          |
-| [Roadmap](./docs/ROADMAP.md)                                                           | Delivery sequence and release gates                   |
-| [Channel-release decision](./docs/decisions/0002-channel-release-not-public-memory.md) | Why CRM/public knowledge is an approved snapshot      |
-| [Memory Atlas decision](./docs/decisions/0003-memory-atlas-authorized-projection.md)   | Why visualization stays optional and derived          |
-| [Research landscape](./docs/research/competitive-landscape.md)                         | Mem0, Honcho, Karpathy, and Titen's position          |
-| [Brand](./docs/BRAND.md)                                                               | Logo, palette, typography, and mascot rules           |
-| [Blueprint](./blueprint.md)                                                            | Research audit and design rationale                   |
-| [Documentation map](./docs/README.md)                                                  | Full documentation index                              |
+| [PRD](https://github.com/RamaAditya49/titen/blob/main/docs/PRD.md)                                                                   | Product goals, users, scope, and success criteria     |
+| [FRD](https://github.com/RamaAditya49/titen/blob/main/docs/FRD.md)                                                                   | Functional behavior and acceptance requirements       |
+| [DESIGN](https://github.com/RamaAditya49/titen/blob/main/docs/DESIGN.md)                                                             | Progressive dashboard information architecture        |
+| [Dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)                                                 | Run, test, screenshot, and host the Astro preview     |
+| [Requirements workflow](https://github.com/RamaAditya49/titen/blob/main/docs/engineering/requirements-workflow.md)                   | EARS criteria and closed work lifecycle               |
+| [Architecture](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/overview.md)                                        | Components and dual-runtime boundaries                |
+| [Memory lifecycle](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/memory-lifecycle.md)                            | Complete Level 5/6 flow and embedding/vector decision |
+| [Agent integration](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/agent-integration.md)                          | MCP/REST, hooks, ownership, events, and orchestration |
+| [Memory model](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/memory-model.md)                                    | Evidence, claims, context, and lifecycle              |
+| [Collaboration](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/collaboration.md)                                  | Multi-agent coordination and governance               |
+| [Memory Atlas](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/memory-atlas.md)                                    | Authorized visual projections and rollout boundary    |
+| [Data model](https://github.com/RamaAditya49/titen/blob/main/docs/reference/data-model.md)                                           | Logical SQL entities and transaction boundaries       |
+| [Evaluation](https://github.com/RamaAditya49/titen/blob/main/docs/testing/EVALS.md)                                                  | Quality, performance, safety, and release gates       |
+| [Threat model](https://github.com/RamaAditya49/titen/blob/main/docs/security/threat-model.md)                                        | Trust boundaries, attack paths, and controls          |
+| [Roadmap](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md)                                                           | Delivery sequence and release gates                   |
+| [Channel-release decision](https://github.com/RamaAditya49/titen/blob/main/docs/decisions/0002-channel-release-not-public-memory.md) | Why CRM/public knowledge is an approved snapshot      |
+| [Memory Atlas decision](https://github.com/RamaAditya49/titen/blob/main/docs/decisions/0003-memory-atlas-authorized-projection.md)   | Why visualization stays optional and derived          |
+| [Research landscape](https://github.com/RamaAditya49/titen/blob/main/docs/research/competitive-landscape.md)                         | Mem0, Honcho, Karpathy, and Titen's position          |
+| [Brand](https://github.com/RamaAditya49/titen/blob/main/docs/BRAND.md)                                                               | Logo, palette, typography, and mascot rules           |
+| [Blueprint](https://github.com/RamaAditya49/titen/blob/main/blueprint.md)                                                            | Research audit and design rationale                   |
+| [Documentation map](https://github.com/RamaAditya49/titen/blob/main/docs/README.md)                                                  | Full documentation index                              |
 
 ## The mark
 
@@ -347,7 +352,7 @@ Titen's Kawung mark comes from the supplied brand system. Its four petals—
 `tenant · subject · agent · run`—touch at one evidence core without overlapping.
 That is also the product model: separate scopes, shared context, traceable origin.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) to help shape the first vertical slice
-and [SECURITY.md](./SECURITY.md) for vulnerability reporting.
+See [CONTRIBUTING.md](https://github.com/RamaAditya49/titen/blob/main/CONTRIBUTING.md) to help shape the first vertical slice
+and [SECURITY.md](https://github.com/RamaAditya49/titen/blob/main/SECURITY.md) for vulnerability reporting.
 
-Apache-2.0. See [LICENSE](./LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/RamaAditya49/titen/blob/main/LICENSE).

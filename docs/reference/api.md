@@ -16,7 +16,6 @@ features explicitly listed as proposed are not routes.
 - `GET /readyz`
 - `GET /v1/audit`
 - `GET /v1/audit/export`
-- `GET /v1/channel-releases/:id`
 - `GET /v1/checkpoints`
 - `GET /v1/claims/:id/evidence`
 - `GET /v1/events`
@@ -28,15 +27,10 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/handoffs`
 - `GET /v1/keys`
 - `GET /v1/memberships`
-- `GET /v1/policies`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
 - `GET /v1/workspaces`
 - `POST /mcp`
-- `POST /v1/channel-context`
-- `POST /v1/channel-releases`
-- `POST /v1/channel-releases/:id/publish`
-- `POST /v1/channel-releases/:id/revoke`
 - `POST /v1/checkpoints`
 - `POST /v1/claims/:id/expire`
 - `POST /v1/claims/:id/revoke`
@@ -58,7 +52,6 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
-- `POST /v1/policies`
 - `POST /v1/projects/resolve`
 - `POST /v1/webhooks`
 - `POST /v1/webhooks/:id/pause`
@@ -75,6 +68,22 @@ features explicitly listed as proposed are not routes.
   `audit/events`, and channel-scoped context paths are not aliases. Use the
   implemented inventory above.
 
+## Webhook delivery
+
+`POST /v1/webhooks` accepts only a configured allowlisted HTTPS hostname. The
+Bun runtime resolves and rejects private, link-local, special-use, mapped IPv4,
+and unsafe IPv6 addresses, re-resolves before every attempt, pins TLS to one
+approved address, and never follows redirects. Cloudflare returns `503` for
+webhook registration/delivery because Worker `fetch` cannot prove this pinning.
+
+Canonical writes enqueue durable delivery rows before outbound I/O. Claims are
+atomic leases that recover after expiry. `X-Titen-Delivery` is stable across
+retries; `X-Titen-Attempt` changes per network attempt. Delivery is
+at-least-once, times out after at most 10 seconds, and reaches `success` or
+terminal `failed` after five attempts. The drain response includes
+`delivery_attempts`, `delivered`, `pending_deliveries`, `failed_deliveries`,
+`oldest_retry_at`, `oldest_pending_at`, and `semantics: "at_least_once"`.
+
 ## Common behavior
 
 - Base path: `/v1`.
@@ -83,6 +92,8 @@ features explicitly listed as proposed are not routes.
 - JSON requests use `application/json`.
 - External field names use `snake_case`.
 - Requests may include `Idempotency-Key` on mutations.
+- An idempotency key is bound to its credential plus canonical method, concrete
+  path, normalized query, and JSON body; reuse for a different request is `409`.
 - Tenant/organization authority never comes from a request body.
 
 Success envelope:
@@ -133,6 +144,7 @@ Append evidence.
   "subject_id": "user_123",
   "agent_id": "agent_research",
   "run_id": "run_456",
+  "workspace_id": "ws_deploy",
   "kind": "tool_result",
   "content": "Production smoke returned 200 application/json.",
   "source": {
@@ -145,6 +157,9 @@ Append evidence.
 ```
 
 Only authorized service/agent identities may assert `verified` trust.
+Visibility defaults to `private`. `team` requires `workspace_id` and an active
+non-reader membership; this predicate is applied before retrieval, export,
+events, Atlas limits/counts, and webhook delivery.
 
 ### Proposed: `POST /v1/observations/batch`
 
@@ -158,6 +173,14 @@ invalid candidate does not force an adapter to resend accepted items.
 
 Materialize or reconcile claims for an authorized scope. Direct deterministic
 claims do not require a model. Automatic extraction is optional and bounded.
+Every claim needs supporting evidence from the same subject, project, and
+workspace, with no trust or visibility widening.
+
+### Claim lifecycle routes
+
+`supersede`, `revoke`, and `expire` require `expected_version`. A superseding
+claim must match the original subject, project, workspace, kind, and visibility;
+stale or concurrent transitions return `409` without partial history or events.
 
 ### `POST /v1/context/compile`
 
@@ -228,10 +251,21 @@ Compile one authorized visual projection around a focus record.
 }
 ```
 
-The implemented lenses are `evidence_trace`, `neighborhood`, and
-`conflict_freshness`. v0.3 adds `scope_preview` and `knowledge_release` after
-their policy gates pass. The example limits are caller requests, not normative
-server maxima; the server clamps them to measured deployment limits.
+The implemented lenses are `evidence_trace`, `neighborhood`,
+`conflict_freshness`, and the read-only `review_queue`. Additional operations
+and governance queues remain planned until their policy gates pass. The example
+limits are caller requests, not normative server maxima; the server clamps them
+to measured deployment limits.
+
+`review_queue` accepts optional `subject_id`, canonical `owner_id`,
+`review_reason` (`all`, `disputed`, `contradiction`, `low_confidence`, or
+`negative_feedback`), `cursor`, and `limit`. It returns claim nodes with
+deterministic `priority`, explicit `reasons`, canonical `owner_id`, bounded
+`next_action`, canonical-validity `deadline`, `terminal_state`, and only
+authorized `evidence_refs` and `audit_refs`. Metadata contains authorized
+page/remaining counts and an opaque
+stable keyset `next_cursor`. The lens is not an action route or canonical queue;
+supersede, expire, and revoke remain claim lifecycle operations.
 
 ```json
 {
@@ -261,11 +295,8 @@ version, lifecycle, visibility, and release eligibility. Hidden candidates do
 not contribute edges, labels, or counts. Limit metadata describes only the
 authorized result.
 
-`scope_preview` additionally accepts a preview principal/scope only for callers
-with explicit preview capability. It reports that principal's eligibility but
-does not impersonate it, mint authority, or return source content the operator
-cannot inspect. `knowledge_release` follows the same distinction between
-verified evidence and active external release.
+Governance previews remain proposed and are not present in the current route
+inventory.
 
 ## Collaboration operations
 
@@ -295,6 +326,16 @@ Return authorized metadata-only domain events after an opaque cursor. It lets an
 orchestrator poll when inbound webhooks are unavailable; it is not a transcript
 or raw memory feed.
 
+### Federation routes
+
+Each federation peer and cursor belongs to the principal that registered it.
+Signed push input proves the configured transport peer, not a local actor or
+canonical record. Accepted input is stored as an owner-visible
+`federation.received` event with resource type `federated_event`; the complete
+remote event remains untrusted under `payload.untrusted_remote_event`. Remote
+actor, resource type, and resource ID therefore never grant local feed or
+webhook visibility and never create canonical observations or claims.
+
 ### Proposed legacy webhook-subscription shape (not implemented)
 
 The implemented API uses `/v1/webhooks`, pause/resume action routes, and
@@ -322,9 +363,8 @@ List authorized metadata-only audit events with cursor pagination.
 
 ## Governed channel knowledge operations
 
-The channel CRUD and `knowledge-releases` names below are **proposed and not
-implemented**. Current governed release routes are `/v1/channel-releases` and
-`/v1/channel-context` in the inventory; their action is `publish`, not `activate`.
+All channel and `knowledge-releases` names below are **proposed and not
+implemented**. No governed release route is present in the current inventory.
 
 
 These v0.3 operations implement
@@ -448,12 +488,14 @@ derived cache/vector or release-status maintenance job is stale.
   vector capability when enabled, outbox health, and release FTS plus
   customer-assertion verifier readiness when channel serving is enabled.
 
-`capabilities.background_repair` is configuration-derived: `enabled` means the
-Bun process created its in-process maintenance timer, `disabled` means Bun did
-not create one, and `external` means Cloudflare expects an external Cron Trigger
-that the request isolate cannot observe. It does not claim a recent successful
-pass; issue #11 tracks evidence-based scheduler freshness. Readiness performs no
-model or scheduler network probe.
+`capabilities.background_repair` is canonical scheduler evidence. `enabled`
+means a configured scheduler recorded a successful pass within its bounded
+freshness window, `stale` means the pass is absent, failed, malformed, or old,
+and `disabled` means this process has no configured scheduler. Readiness makes no
+model, webhook, or scheduler network call. It also reports verified migration
+objects and whether persisted signing secrets can be decrypted with the external
+keyring; either failure blocks protected API traffic while health diagnostics
+remain available.
 
 When Memory Atlas is disabled, it does not affect liveness/readiness. When
 enabled, readiness checks only the server-side compiler's canonical
@@ -461,21 +503,37 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes the smallest ordinary-agent tool set:
+The implemented `/mcp` endpoint exposes seven wire tools in six ordinary-agent
+families:
 
-- `titen_context`;
 - `titen_remember`;
+- `titen_compile`;
 - `titen_feedback`;
-- `titen_checkpoint`;
-- `titen_lease`;
+- `titen_checkpoint_save`;
+- `titen_checkpoint_get`;
+- `titen_lease_acquire`;
 - `titen_handoff`.
 
 Administrative key, membership, retention, and webhook-subscription operations
 are not enabled for ordinary agent profiles by default. MCP tools are stateless
-adapters over the same domain operations as REST; restarting or disconnecting
-the MCP client loses no canonical state. `titen_context` is declared read-only;
-the other default tools are declared write-capable so hosts can apply their
-native approval policy correctly.
+adapters over the same validated handlers as REST; restarting or disconnecting
+the MCP client loses no canonical state. Only `titen_checkpoint_get` is
+read-only. `titen_compile` persists a context run, and every other tool is also
+write-capable, so hosts can apply their native approval policy correctly. Server
+metadata uses the running build revision rather than a separately maintained MCP
+version.
+
+The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
+`GET /mcp` therefore returns `405`. A present `Origin` must match the request URL
+origin, or the exact external origin configured by the Bun runtime's
+`TITEN_MCP_ORIGIN`, or the request returns `403`; non-browser clients may omit
+it. The configured value must be an HTTP(S) origin without credentials, path,
+query, hash, or trailing slash. Titen does not trust forwarded-protocol headers
+to derive it. The server negotiates protocol versions through `2025-11-25`,
+assumes the compatible `2025-03-26` behavior when the HTTP version header is
+absent, and returns `400` for an unsupported `MCP-Protocol-Version`. Tool
+discovery includes read-only, destructive, idempotent, and open-world hints;
+these are client hints only and never replace server-side scopes.
 
 Channel creation, release approval/activation/revocation, and channel context
 are not part of the ordinary agent MCP profile. Publisher, approver, and gateway
