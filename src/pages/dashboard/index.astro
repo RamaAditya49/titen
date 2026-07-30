@@ -4,7 +4,7 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
-import { isConnected, endpointLabel } from "./api";
+import { isConnected, endpointLabel, compileView, atlasSubject } from "./api";
 
 // Resolved at build time. With no endpoint configured the shell must say so
 // rather than imply a live service; the fixture below is synthetic either way.
@@ -51,7 +51,7 @@ const lenses = [
   { id: "scope", label: "Scope Preview" },
 ];
 
-const conflictRows = [
+const FIXTURE_CONFLICT_ROWS = [
   {
     claim: "Budget is 250 ms vs 400 ms",
     status: "disputed",
@@ -99,6 +99,35 @@ const conflictRows = [
     tone: "muted",
   },
 ];
+
+// Build-time fetch. With an endpoint configured the Conflict & Freshness lens
+// shows the deployment's real claims; with none it shows the frozen fixture. The
+// shell states which of the two it is rather than leaving the reader to guess.
+const liveConflict = live
+  ? await compileView("conflict_freshness", { subject_id: atlasSubject(), limit: 5 })
+  : null;
+
+const conflictRows =
+  liveConflict && liveConflict.nodes.length > 0
+    ? liveConflict.nodes.slice(0, 5).map((node) => ({
+        claim: node.label,
+        status: node.status ?? "active",
+        trust: node.trust,
+        scope: "org",
+        evidence: "—",
+        changed: node.freshness === undefined ? "—" : `${node.freshness}d`,
+        tone:
+          node.status === "disputed"
+            ? "danger"
+            : node.status === "expired" || node.status === "superseded"
+              ? "muted"
+              : "warning",
+        selectable: node.status === "disputed",
+      }))
+    : FIXTURE_CONFLICT_ROWS;
+
+const dataSource = conflictRows === FIXTURE_CONFLICT_ROWS ? "fixture" : "live";
+
 
 const scopeRows = [
   {

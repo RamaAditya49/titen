@@ -16,6 +16,7 @@ Usage:
                    [--scopes "a,b"] [--trust asserted] [--label name] [--print-sql]
   titen key list   [--db titen.db]
   titen key revoke [--db titen.db] --id <key id>
+  titen backup     [--db titen.db] --out <file>   verified online copy
   titen schema     print every migration statement (for "wrangler d1 execute --file")
 
 Notes:
@@ -203,6 +204,32 @@ switch (command) {
       break;
     }
     fail("key needs create, list, or revoke");
+    break;
+  }
+
+  case "backup": {
+    const out = text(flags.out, "");
+    if (!out) fail("--out <file> is required");
+    // VACUUM INTO writes a compacted, self-contained copy and is safe against a
+    // live WAL database, so the service does not need to stop. The copy is then
+    // verified here rather than by the caller: a backup that cannot pass its own
+    // integrity check must not be left behind looking usable.
+    const database = openDatabase(dbPath);
+    try {
+      database.run(`VACUUM INTO ?`, out);
+    } finally {
+      database.close();
+    }
+    const copy = openDatabase(out);
+    let result = "unknown";
+    try {
+      const rows = copy.query(`PRAGMA integrity_check`).all() as { integrity_check: string }[];
+      result = rows[0]?.integrity_check ?? "unknown";
+    } finally {
+      copy.close();
+    }
+    if (result !== "ok") fail(`backup failed integrity check: ${result}`);
+    console.log(`backup verified: ${out}`);
     break;
   }
 

@@ -123,6 +123,41 @@ Categories and tags remain filters; webhooks remain inside Audit & Events;
 export/recovery remains inside System; Settings waits for an explicit browser
 account/session contract.
 
+## Verification status
+
+Every phase above is marked complete against automated tests. This section
+records what those tests do and do not cover, so a reader can tell proven
+behavior from written behavior.
+
+Proven by execution:
+
+- the dual-runtime contract suite on Bun/SQLite and Cloudflare/D1 via workerd;
+- signed webhook delivery to a real HTTP receiver, including independent
+  signature verification, a rejecting receiver, and an unreachable destination;
+- federation between two independent deployments over real HTTP, including
+  peer-signature enforcement, replay conflict, and policy filtering;
+- `sqlite-vec` nearest-neighbour search with the real prebuilt extension;
+- the published SDK against a running service;
+- `deploy/backup.sh` executed end to end, with the restored copy verified and
+  accepted by the service;
+- the dashboard reading `POST /v1/memory-views/compile` from a live deployment
+  (`pnpm verify:dashboard-live`).
+
+Not proven, and not claimed:
+
+- **A real Cloudflare deployment.** `wrangler.jsonc` still carries a placeholder
+  `database_id`. Everything Cloudflare-side is verified against workerd and local
+  D1 through Miniflare, plus `wrangler deploy --dry-run`. A first real deploy
+  needs an account, a D1 database, and one smoke run against the deployed URL.
+- **A real VPS install.** The systemd units, Caddyfile, and monitor script are
+  written but have never run on a provisioned host. `backup.sh` has been executed
+  directly; it has not been executed by its timer under the `titen` user.
+- **Vectorize and Workers AI.** The Cloudflare vector adapter has no test,
+  because it needs live bindings. Its Bun counterpart is covered.
+- **Retry escalation over time.** Webhook backoff schedules the next attempt and
+  that is asserted; no test advances a clock through all five attempts to a
+  `failed` terminal state.
+
 ## v1 — federation ✓
 
 **Status: implemented.** Federation module enables authorized event exchange

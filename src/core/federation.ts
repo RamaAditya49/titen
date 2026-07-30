@@ -2,6 +2,7 @@ import { first } from "./db";
 import type { Db } from "./db";
 import { notFound, validationError, conflict, forbidden } from "./errors";
 import { newId, sha256Hex } from "./ids";
+import { signPayload } from "./webhooks";
 import type { RequestContext, Result } from "./http";
 import { LIMITS, requireObject, requireString, optionalString, requireEnum } from "./validate";
 
@@ -18,6 +19,8 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
   const name = requireString(body, "name", LIMITS.label);
   const endpoint = requireString(body, "endpoint", 2000);
   const sharedSecret = requireString(body, "shared_secret", 512);
+  if (sharedSecret.length < 16)
+    throw validationError('Field "shared_secret" must be at least 16 characters.');
   const direction = requireEnum(body, "direction", DIRECTIONS);
 
   const id = newId("fpeer");
@@ -26,9 +29,9 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, direction, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`,
-      params: [id, principal.orgId, name, endpoint, hash, direction, now],
+      sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      params: [id, principal.orgId, name, endpoint, hash, sharedSecret, direction, now],
     },
   ]);
 
@@ -269,14 +272,34 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
   const body = requireObject(await ctx.json());
   const peerId = requireString(body, "peer_id", LIMITS.identifier);
 
-  const peer = await first<{ id: string; direction: string; status: string }>(
+  const peer = await first<{
+    id: string;
+    direction: string;
+    status: string;
+    shared_secret: string | null;
+  }>(
     ctx.app.db,
-    `SELECT id, direction, status FROM federation_peers WHERE id = ? AND org_id = ?`,
+    `SELECT id, direction, status, shared_secret FROM federation_peers WHERE id = ? AND org_id = ?`,
     [peerId, principal.orgId],
   );
   if (!peer) throw notFound();
   if (peer.status !== "active") throw forbidden("Peer is not active.");
   if (peer.direction === "pull") throw forbidden("Peer is configured for pull only.");
+
+  // An API key proves the caller may use this endpoint; the peer signature
+  // proves the batch came from the peer that was registered. Without it the
+  // shared secret would be decorative and any authorized caller could inject
+  // records attributed to a remote deployment.
+  if (peer.shared_secret) {
+    const offered = ctx.request.headers.get("x-titen-peer-signature");
+    if (!offered) throw forbidden("Peer signature header is required.");
+    const expected = `sha256=${await signPayload(peer.shared_secret, await ctx.rawBody())}`;
+    if (offered.length !== expected.length) throw forbidden("Peer signature is invalid.");
+    let mismatch = 0;
+    for (let index = 0; index < expected.length; index += 1)
+      mismatch |= offered.charCodeAt(index) ^ expected.charCodeAt(index);
+    if (mismatch !== 0) throw forbidden("Peer signature is invalid.");
+  }
 
   const filters = await ctx.app.db.all<FilterRow>(
     `SELECT resource_type, include_kinds, exclude_subjects, min_trust FROM federation_filters WHERE peer_id = ?`,

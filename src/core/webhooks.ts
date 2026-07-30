@@ -61,6 +61,8 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
   const body = requireObject(await ctx.json());
   const url = requireString(body, "url", 2000);
   const secret = requireString(body, "secret", 512);
+  if (secret.length < 16)
+    throw validationError('Field "secret" must be at least 16 characters.');
 
   const rawEvents = body.events;
   if (!Array.isArray(rawEvents) || rawEvents.length === 0)
@@ -81,9 +83,9 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO webhooks (id, org_id, url, secret_hash, events, status, failure_count, created_at)
-            VALUES (?, ?, ?, ?, ?, 'active', 0, ?)`,
-      params: [id, principal.orgId, url, secretHash, eventsStr, now],
+      sql: `INSERT INTO webhooks (id, org_id, url, secret_hash, secret, events, status, failure_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'active', 0, ?)`,
+      params: [id, principal.orgId, url, secretHash, secret, eventsStr, now],
     },
   ]);
 
@@ -255,11 +257,12 @@ export async function deliverEvent(
   const hooks = await db.all<{
     id: string;
     url: string;
+    secret: string | null;
     secret_hash: string;
     events: string;
     failure_count: number;
   }>(
-    `SELECT id, url, secret_hash, events, failure_count FROM webhooks
+    `SELECT id, url, secret, secret_hash, events, failure_count FROM webhooks
        WHERE org_id = ? AND status = 'active'`,
     [orgId],
   );
@@ -286,7 +289,9 @@ export async function deliverEvent(
 
     if (fetcher) {
       // Attempt actual delivery
-      const signature = await signPayload(hook.secret_hash, payloadStr);
+      // Signed with the shared secret so the receiver can verify without
+      // holding anything Titen stores about it.
+      const signature = await signPayload(hook.secret ?? hook.secret_hash, payloadStr);
       let success = false;
       let responseStatus: number | null = null;
 

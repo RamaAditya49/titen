@@ -18,12 +18,14 @@
     "test": "pnpm build && playwright test",
     "test:browser": "playwright test",
     "test:api": "pnpm build:worker && bun test tests/contract tests/sdk",
-    "test:all": "pnpm test:api && pnpm test && pnpm check:workflow",
+    "test:all": "pnpm test:api && pnpm test:integration && pnpm test && pnpm check:workflow",
     "build:worker": "WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir dist/worker",
     "deploy:worker": "WRANGLER_SEND_METRICS=false wrangler deploy",
     "titen": "bun src/runtime/bun/cli.ts",
     "screenshots": "playwright test tests/dashboard-screenshots.spec.ts",
-    "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test"
+    "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test",
+    "verify:dashboard-live": "bun scripts/verify-dashboard-live.ts",
+    "test:integration": "bun test tests/integration"
   },
   "dependencies": {
     "astro": "7.1.4"
@@ -35,5 +37,8 @@
     "@playwright/test": "1.62.0",
     "miniflare": "4.20260722.1",
     "wrangler": "4.115.0"
+  },
+  "optionalDependencies": {
+    "sqlite-vec": "0.1.9"
   }
 }

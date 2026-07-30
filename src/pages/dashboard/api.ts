@@ -37,6 +37,15 @@ const config: DashboardConfig = {
   apiKey: import.meta.env.PUBLIC_TITEN_DASHBOARD_KEY,
 };
 
+/**
+ * Which subject the Atlas lenses describe. Atlas scopes every projection to one
+ * subject, so an operator pointing the shell at a real deployment has to say
+ * whose memory it is showing.
+ */
+export function atlasSubject(): string {
+  return import.meta.env.PUBLIC_TITEN_SUBJECT ?? "default";
+}
+
 export function isConnected(): boolean {
   return Boolean(config.endpoint && config.apiKey);
 }

@@ -381,6 +381,32 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `CREATE INDEX webhook_deliveries_pending ON webhook_deliveries (webhook_id, status, next_retry_at)`,
     ],
   },
+  {
+    version: 7,
+    statements: [
+      // HMAC is symmetric: the receiver verifies with the same shared secret it
+      // was given, so the signing key cannot be a hash. Stored alongside the
+      // fingerprint, which stays useful for confirming which secret is
+      // configured without revealing it.
+      //
+      // ponytail: the shared secret is stored recoverably, as every HMAC webhook
+      // implementation must. The ceiling is that a database read discloses it;
+      // the upgrade path is envelope encryption with a KMS-held key.
+      `ALTER TABLE webhooks ADD COLUMN secret TEXT`,
+    ],
+  },
+  {
+    version: 8,
+    statements: [
+      // A receiving deployment must be able to prove a push came from the peer
+      // it registered. That needs the shared key itself, for the same reason a
+      // webhook signature does: HMAC is symmetric.
+      //
+      // ponytail: stored recoverably, ceiling and upgrade path identical to the
+      // webhook secret in migration 7.
+      `ALTER TABLE federation_peers ADD COLUMN shared_secret TEXT`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
