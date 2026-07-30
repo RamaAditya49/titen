@@ -47,21 +47,43 @@ npm login
 git status --short          # must be empty
 pnpm test:all
 
-# 2. Bump. This also creates the vN.N.N tag.
+# 2. Write the entry FIRST, while the reasons are still in your head.
+#    Move CHANGELOG.md's [Unreleased] items under the new version heading,
+#    date it, and update the compare links at the bottom.
+$EDITOR CHANGELOG.md
+
+# 3. Bump. This commits package.json and creates the vN.N.N tag.
 npm version <patch|minor|major>
 
-# 3. Prove the tarball works before it becomes permanent (see below).
+# 4. Prove the tarball works before it becomes permanent (see below).
 #    npm publish is irreversible after 72 hours.
 bash scripts/verify-pack.sh
 
-# 4. Ship.
+# 5. Ship.
 npm publish                 # prepack rebuilds dist/npm/sdk.js
 git push && git push --tags
+
+# 6. Publish the GitHub release from the entry you already wrote.
+gh release create "v$(node -p 'require("./package.json").version')" \
+  --title "…" --notes-file <(scripts/changelog-section.sh)
 ```
 
 `npm publish` is the right command even though the repo uses pnpm: `pnpm
 publish` refuses a dirty tree and re-runs the workspace lifecycle, which buys
 nothing here. Either works.
+
+## Changelog and GitHub releases
+
+[`CHANGELOG.md`](../../CHANGELOG.md) is the single source for release notes;
+the GitHub release body is generated from it by
+[`scripts/changelog-section.sh`](../../scripts/changelog-section.sh) so the two
+can never drift. Do not hand-write a release body.
+
+Every published version needs a `vN.N.N` tag and a GitHub release. The one
+exception on record is **0.1.0**, published from a staging tree before the
+packaging work was committed — no commit represents it, so it has no tag.
+Do not retrofit one onto a later commit; that would point the tag at code the
+release never contained.
 
 ## Verifying a candidate
 
