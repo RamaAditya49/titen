@@ -19,6 +19,48 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 Nothing yet.
 
+## [0.1.2] — 2026-07-30
+
+### Added
+
+- **A five-minute small-team golden path.** The documented researcher, writer,
+  operator, and reviewer flow uses four scoped keys and the public SDK to prove
+  evidence, conflicting claims, context, checkpoint, lease, handoff, feedback,
+  citations, and freshness against a real Bun/SQLite service.
+- **Optional loopback live dashboard data.** Conflict & Freshness can read one
+  subject-scoped Atlas view through a same-origin adapter that keeps the Titen
+  key server-side. Static serving rejects traversal, encoded/backslash/NUL, and
+  symlink escapes; every other dashboard lens stays visibly synthetic.
+- **More SDK coverage.** The published client now exposes the shipped
+  checkpoint, lease, handoff, evidence, and Atlas-view operations used by the
+  golden path.
+- **One canonical live verifier.** `pnpm verify:live` replaces the duplicate
+  script name and remains explicit about requiring a provisioned deployment.
+
+### Fixed
+
+- **Semantic ranking now works with real narrow-band cosine scores.** Vector
+  similarity is normalized inside the authorized candidate set and confidence
+  is an explicit weighted component, so a semantically correct lower-confidence
+  claim no longer ranks last behind lexical decoys.
+- **Index dependency outages are retryable.** Embedder and vector-store failures
+  return bounded `503 UNAVAILABLE` metadata while leaving pending outbox work
+  intact.
+- **Canonical imports are order-independent within a request.** Imports preflight
+  missing parents before mutation, accept child-before-parent lines atomically,
+  and return `UNRESOLVED_REFERENCE` instead of mislabeling a missing dependency
+  as a conflict.
+- **Readiness reports background repair honestly.** Bun reports whether its
+  maintenance timer was actually created; Cloudflare reports external scheduler
+  ownership without pretending the request isolate can observe Cron state.
+
+### Changed
+
+- The API reference is verified against the router's 58 implemented routes and
+  clearly separates proposed endpoints from callable ones.
+- Dashboard screenshots, mobile disclosure, and the capability matrix identify
+  synthetic, locally verified, and planned regions consistently.
+
 ## [0.1.1] — 2026-07-30
 
 ### Fixed
@@ -95,6 +137,7 @@ Releases are cut by hand from a maintainer's machine and deliberately have no
 GitHub Action, so an npm token never lives in repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.1.2
 [0.1.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.1.1
 [0.1.0]: https://www.npmjs.com/package/titen-memory/v/0.1.0
