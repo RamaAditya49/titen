@@ -464,21 +464,24 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes the smallest ordinary-agent tool set:
+The implemented `/mcp` endpoint exposes seven wire tools in six ordinary-agent
+families:
 
-- `titen_context`;
 - `titen_remember`;
+- `titen_compile`;
 - `titen_feedback`;
-- `titen_checkpoint`;
-- `titen_lease`;
+- `titen_checkpoint_save`;
+- `titen_checkpoint_get`;
+- `titen_lease_acquire`;
 - `titen_handoff`.
 
 Administrative key, membership, retention, and webhook-subscription operations
 are not enabled for ordinary agent profiles by default. MCP tools are stateless
-adapters over the same domain operations as REST; restarting or disconnecting
-the MCP client loses no canonical state. `titen_context` is declared read-only;
-the other default tools are declared write-capable so hosts can apply their
-native approval policy correctly.
+adapters over the same validated handlers as REST; restarting or disconnecting
+the MCP client loses no canonical state. `titen_compile` and
+`titen_checkpoint_get` are read-only; the other tools are write-capable so hosts
+can apply their native approval policy correctly. Server metadata uses the
+running build revision rather than a separately maintained MCP version.
 
 Channel creation, release approval/activation/revocation, and channel context
 are not part of the ordinary agent MCP profile. Publisher, approver, and gateway

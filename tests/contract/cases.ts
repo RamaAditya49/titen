@@ -1575,6 +1575,139 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "MCP delegates to the REST domain contract",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const mcp = (name: string, args: Record<string, unknown>, id = 1) =>
+        fx.call("POST", "/mcp", {
+          key: agent.key,
+          body: {
+            jsonrpc: "2.0", id, method: "tools/call",
+            params: { name, arguments: args },
+          },
+        });
+
+      const init = await fx.call("POST", "/mcp", {
+        key: agent.key,
+        body: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+      });
+      assert.equal(init.body.result.serverInfo.version, "test");
+
+      const rememberBody = {
+        subject_id: "user_mcp_parity",
+        kind: "tool_result",
+        content: "MCP and REST share one canonical observation command.",
+        source: { type: "test", ref: "parity#1" },
+        trust: "verified",
+        visibility: "private",
+      };
+      const remembered = await mcp("titen_remember", {
+        ...rememberBody,
+        source_type: rememberBody.source.type,
+        source_ref: rememberBody.source.ref,
+        source: undefined,
+        idempotency_key: "mcp-rest-parity",
+      });
+      assert.equal(remembered.body.result.isError, undefined);
+      const rememberedPayload = JSON.parse(remembered.body.result.content[0].text);
+      const observationId = rememberedPayload.data.observation_id as string;
+
+      const replayed = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        headers: { "idempotency-key": "mcp-rest-parity" },
+        body: rememberBody,
+      });
+      expectOk(replayed);
+      assert.equal(replayed.body.data.observation_id, observationId);
+      assert.equal(replayed.body.meta.replayed, true);
+
+      const sideEffects = await fx.query<{ histories: number; outbox: number; events: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM record_history WHERE record_type = 'observation' AND record_id = ?) AS histories,
+           (SELECT COUNT(*) FROM index_outbox WHERE record_type = 'observation' AND record_id = ?) AS outbox,
+           (SELECT COUNT(*) FROM events WHERE resource_type = 'observation' AND resource_id = ?) AS events`,
+        [observationId, observationId, observationId],
+      );
+      assert.deepEqual(sideEffects[0], { histories: 1, outbox: 1, events: 1 });
+
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: rememberBody.subject_id,
+          claims: [{
+            kind: "procedural",
+            statement: "MCP and REST use the same authorized context compiler.",
+            confidence: 0.9,
+            visibility: "private",
+            sources: [{ observation_id: observationId, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(consolidated, 201);
+      const claimId = consolidated.body.data.claims[0].claim_id as string;
+      const task = "same authorized context compiler";
+      const restCompile = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: rememberBody.subject_id, task, max_tokens: 900 },
+      });
+      expectOk(restCompile);
+      const mcpCompile = await mcp("titen_compile", {
+        subject_id: rememberBody.subject_id, task, max_tokens: 900,
+      }, 2);
+      const mcpCompilePayload = JSON.parse(mcpCompile.body.result.content[0].text);
+      assert.deepEqual(
+        mcpCompilePayload.data.items.map((item: any) => item.claim_id),
+        restCompile.body.data.items.map((item: any) => item.claim_id),
+      );
+      assert.equal(mcpCompilePayload.data.items[0].claim_id, claimId);
+      assert.equal(mcpCompilePayload.data.policy_snapshot, restCompile.body.data.policy_snapshot);
+      assert.deepEqual(mcpCompilePayload.meta.degraded, restCompile.body.meta.degraded);
+
+      const lowTrust = await fx.provision({ scopes: ["*"], maxTrust: "asserted" });
+      const deniedRest = await fx.call("POST", "/v1/observations", {
+        key: lowTrust.key, body: { ...rememberBody, subject_id: "denied_rest" },
+      });
+      expectError(deniedRest, 403, "FORBIDDEN");
+      const deniedMcp = await fx.call("POST", "/mcp", {
+        key: lowTrust.key,
+        body: {
+          jsonrpc: "2.0", id: 3, method: "tools/call",
+          params: {
+            name: "titen_remember",
+            arguments: {
+              ...rememberBody,
+              subject_id: "denied_mcp",
+              source_type: rememberBody.source.type,
+              source_ref: rememberBody.source.ref,
+              source: undefined,
+            },
+          },
+        },
+      });
+      assert.equal(deniedMcp.body.result.isError, true);
+      assert.equal(JSON.parse(deniedMcp.body.result.content[0].text).code, "FORBIDDEN");
+
+      const outsider = await fx.provision({ scopes: ["*"] });
+      const hiddenRest = await fx.call("POST", "/v1/context/compile", {
+        key: outsider.key,
+        body: { subject_id: rememberBody.subject_id, task, max_tokens: 900 },
+      });
+      expectOk(hiddenRest);
+      assert.equal(hiddenRest.body.data.items.length, 0);
+      const hiddenMcp = await fx.call("POST", "/mcp", {
+        key: outsider.key,
+        body: {
+          jsonrpc: "2.0", id: 4, method: "tools/call",
+          params: {
+            name: "titen_compile",
+            arguments: { subject_id: rememberBody.subject_id, task, max_tokens: 900 },
+          },
+        },
+      });
+      assert.equal(JSON.parse(hiddenMcp.body.result.content[0].text).data.items.length, 0);
+    },
+  },
+  {
     name: "events can be listed with cursor-based polling",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });

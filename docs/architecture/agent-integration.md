@@ -134,11 +134,12 @@ values in mode-`0600` host configuration or the runtime's secret store.
         headers: { Authorization: "Bearer ${TITEN_API_KEY}" },
         toolFilter: {
           include: [
-            "titen_context",
             "titen_remember",
+            "titen_compile",
             "titen_feedback",
-            "titen_checkpoint",
-            "titen_lease",
+            "titen_checkpoint_save",
+            "titen_checkpoint_get",
+            "titen_lease_acquire",
             "titen_handoff",
           ],
         },
@@ -161,11 +162,12 @@ mcp_servers:
       Authorization: "Bearer ${TITEN_API_KEY}"
     tools:
       include:
-        - titen_context
         - titen_remember
+        - titen_compile
         - titen_feedback
-        - titen_checkpoint
-        - titen_lease
+        - titen_checkpoint_save
+        - titen_checkpoint_get
+        - titen_lease_acquire
         - titen_handoff
 ```
 
@@ -180,11 +182,12 @@ flush them.
 url = "http://127.0.0.1:8787/mcp"
 bearer_token_env_var = "TITEN_API_KEY"
 enabled_tools = [
-  "titen_context",
   "titen_remember",
+  "titen_compile",
   "titen_feedback",
-  "titen_checkpoint",
-  "titen_lease",
+  "titen_checkpoint_save",
+  "titen_checkpoint_get",
+  "titen_lease_acquire",
   "titen_handoff",
 ]
 default_tools_approval_mode = "writes"
@@ -537,24 +540,25 @@ infrastructure only when measured workloads cannot be met by indexed SQL joins.
 
 ## MCP tool surface
 
-Keep the default agent tool list small and unambiguous:
+Keep the default agent surface small and unambiguous. Six semantic families
+map to the seven wire tools that are actually shipped:
 
-| Tool               | Use                                                                  |
-| ------------------ | -------------------------------------------------------------------- |
-| `titen_context`    | compile bounded task context and resume state                        |
-| `titen_remember`   | append one bounded batch of typed durable observations/direct claims |
-| `titen_feedback`   | record used/useful/irrelevant/incorrect/harmful outcomes             |
-| `titen_checkpoint` | create, read, or compare-and-swap checkpoint state                   |
-| `titen_lease`      | acquire, renew, complete, or release bounded work ownership          |
-| `titen_handoff`    | list, offer, accept, decline, or complete handoffs                   |
+| Family       | Shipped wire tool(s)                                      | Use                                      |
+| ------------ | --------------------------------------------------------- | ---------------------------------------- |
+| context      | `titen_compile`                                           | compile bounded task context             |
+| remember     | `titen_remember`                                          | append one typed durable observation     |
+| feedback     | `titen_feedback`                                          | record recall outcomes                   |
+| checkpoint   | `titen_checkpoint_save`, `titen_checkpoint_get`           | save or read resumable state             |
+| lease        | `titen_lease_acquire`                                     | acquire or renew bounded work ownership  |
+| handoff      | `titen_handoff`                                           | offer work to another principal          |
 
 Administrative key, membership, retention, and webhook-subscription operations
 are not exposed to ordinary agent profiles by default.
 
 Memory Atlas is likewise not a seventh ordinary-agent MCP tool. Authorized
 operator clients compile read-only views through
-`POST /v1/memory-views/compile`; agents continue to use the six focused tools
-above.
+`POST /v1/memory-views/compile`; agents continue to use the six focused
+families above.
 Channel/release administration is also excluded. Publisher, approver, and
 gateway credentials use the narrower REST operations and capabilities defined
 in the API reference.
