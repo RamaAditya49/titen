@@ -18,7 +18,7 @@ The repository has no automated CI gate, so regressions can land without the doc
 
 ## Scope
 
-Add a GitHub Actions workflow for supported Node/Bun tooling that installs dependencies from the lockfile and runs the repository's existing workflow, build, and API checks. Keep credentials and deployment mutations out of CI.
+Add a GitHub Actions workflow for supported Node/Bun tooling that installs dependencies from the lockfile and runs the repository's existing workflow, API/SDK, integration, build, and browser checks. Keep credentials and deployment mutations out of CI.
 
 ## Out of scope
 
@@ -27,9 +27,10 @@ Deployments, live service smoke tests requiring secrets, and changes to applicat
 ## Acceptance criteria
 
 - **AC-CI-001 — Event-driven:** When a pull request or push targets `main`, Titen shall run a reproducible CI workflow on Ubuntu with Node 22 and Bun 1.2 tooling.
-- **AC-CI-002 — Unwanted behavior:** If dependency installation, workflow validation, build, or API checks fail, then Titen shall mark the CI run failed and prevent a passing check conclusion.
+- **AC-CI-002 — Unwanted behavior:** If dependency installation, workflow validation, API/SDK, integration, build, or browser checks fail, then Titen shall mark the CI run failed and prevent a passing check conclusion.
 - **AC-CI-003 — Ubiquitous:** Titen shall install dependencies from the committed lockfile and shall not require deployment credentials for the default CI path.
-- **AC-CI-004 — Event-driven:** When the CI workflow runs, Titen shall execute the repository workflow-doc check, production build, and API contract test command as separate observable steps.
+- **AC-CI-004 — Event-driven:** When the CI workflow runs, Titen shall execute the repository workflow-doc, API/SDK, integration, production build, and browser commands as separate observable steps.
+- **AC-CI-005 — Ubiquitous:** Titen shall pin third-party GitHub Actions to immutable commit SHAs while documenting their major release line.
 
 ## Done conditions
 
