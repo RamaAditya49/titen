@@ -38,5 +38,8 @@ export const notFound = () =>
 export const conflict = (message: string) =>
   new ApiError(409, "CONFLICT", message);
 
+export const unresolvedReference = (meta: Record<string, unknown>) =>
+  new ApiError(422, "UNRESOLVED_REFERENCE", "Import contains an unresolved reference.", meta);
+
 export const unavailable = (message: string, meta?: Record<string, unknown>) =>
   new ApiError(503, "UNAVAILABLE", message, meta);

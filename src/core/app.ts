@@ -55,7 +55,9 @@ export function capabilities(app: AppContext) {
   } as const;
 }
 
-const ROUTES: RouteDef[] = [
+export interface RouteInventoryEntry { method: string; path: string; scope: string | null }
+
+export const ROUTES: RouteDef[] = [
   {
     method: "GET",
     path: "/healthz",
@@ -182,6 +184,8 @@ const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/index/drain", scope: "index:write", handler: drainIndex },
 ];
 
+export const ROUTE_INVENTORY: RouteInventoryEntry[] = ROUTES.map(({ method, path, scope }) => ({ method, path, scope: scope ?? null }));
+
 async function readiness(ctx: RequestContext): Promise<Result> {
   const checks: Record<string, string> = {};
   let ready = true;
@@ -278,10 +282,11 @@ export function createApp(context: {
       return result.raw ?? success(result, requestId);
     } catch (error) {
       if (!(error instanceof ApiError)) {
-        // Unique/constraint failures mean the write conflicted; nothing partial
-        // survives because every write is one atomic batch.
+        // Only unique/primary-key failures are write collisions. Foreign-key
+        // references are preflighted by their handlers and must not be
+        // mislabeled as conflicts if an unexpected one reaches this boundary.
         const message = error instanceof Error ? error.message : "";
-        if (/UNIQUE|constraint|SQLITE_CONSTRAINT/i.test(message))
+        if (/UNIQUE|SQLITE_CONSTRAINT_(?:UNIQUE|PRIMARYKEY)/i.test(message))
           return failure(
             new ApiError(409, "CONFLICT", "Write conflicted with an existing record."),
             requestId,

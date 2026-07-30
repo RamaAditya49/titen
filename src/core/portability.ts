@@ -1,12 +1,18 @@
 import { MAX_BOUND_PARAMS, chunk } from "./db";
 import type { Stmt } from "./db";
-import { conflict, validationError } from "./errors";
+import { conflict, unresolvedReference, validationError } from "./errors";
 import { sha256Hex } from "./ids";
 import type { RequestContext, Result } from "./http";
 import { isRecord } from "./validate";
 
 export const EXPORT_FORMAT_VERSION = 1;
 export const EXPORT_TYPES = ["projects", "observations", "claims"] as const;
+export const EXPORT_DEPENDENCY_ORDER = [...EXPORT_TYPES];
+export const EXPORT_DEPENDENCIES: Record<(typeof EXPORT_TYPES)[number], string[]> = {
+  projects: [],
+  observations: ["projects"],
+  claims: ["projects", "observations"],
+};
 export const EXPORT_MAX_LIMIT = 2000;
 export const IMPORT_MAX_LINES = 2000;
 /** Statements per atomic batch, kept well inside D1's per-batch limits. */
@@ -96,6 +102,8 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
     type: "titen.export.header",
     format_version: EXPORT_FORMAT_VERSION,
     record_type: type,
+    dependency_order: EXPORT_DEPENDENCY_ORDER,
+    depends_on: EXPORT_DEPENDENCIES[type as (typeof EXPORT_TYPES)[number]],
     org_id: principal.orgId,
     exported_at: ctx.app.now().toISOString(),
     count: lines.length,
@@ -166,6 +174,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
 
   const at = ctx.app.now().toISOString();
   await assertNoForeignIds(ctx, principal.orgId, byType);
+  await assertReferencesResolve(ctx, principal.orgId, byType);
   const statements: Stmt[] = [];
 
   for (const row of byType.project!) {
@@ -273,6 +282,44 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     data: { format_version: EXPORT_FORMAT_VERSION, received },
     meta: { batches: Math.ceil(statements.length / IMPORT_BATCH) },
   };
+}
+
+
+async function existingIds(ctx: RequestContext, table: string, orgId: string, ids: string[]): Promise<Set<string>> {
+  const found = new Set<string>();
+  for (const group of chunk([...new Set(ids)])) {
+    if (!group.length) continue;
+    const rows = await ctx.app.db.all<{ id: string }>(
+      `SELECT id FROM ${table} WHERE org_id = ? AND id IN (${group.map(() => "?").join(", ")})`,
+      [orgId, ...group],
+    );
+    for (const row of rows) found.add(row.id);
+  }
+  return found;
+}
+
+async function assertReferencesResolve(
+  ctx: RequestContext,
+  orgId: string,
+  byType: Record<string, Record<string, unknown>[]>,
+): Promise<void> {
+  const importedProjects = new Set(byType.project!.map((row) => text(row.id, "id")));
+  const importedObservations = new Set(byType.observation!.map((row) => text(row.id, "id")));
+  const projectRefs: { recordType: string; field: string; id: string }[] = [];
+  for (const row of byType.observation!) if (maybe(row.project_id) !== null) projectRefs.push({ recordType: "observation", field: "project_id", id: String(row.project_id) });
+  for (const row of byType.claim!) if (maybe(row.project_id) !== null) projectRefs.push({ recordType: "claim", field: "project_id", id: String(row.project_id) });
+  const storedProjects = await existingIds(ctx, "projects", orgId, projectRefs.map((ref) => ref.id).filter((id) => !importedProjects.has(id)));
+  for (const ref of projectRefs) if (!importedProjects.has(ref.id) && !storedProjects.has(ref.id))
+    throw unresolvedReference({ record_type: ref.recordType, field: ref.field, dependency_type: "project" });
+
+  const sourceRefs: string[] = [];
+  for (const row of byType.claim!) for (const source of Array.isArray(row.sources) ? row.sources : []) {
+    if (!isRecord(source)) throw validationError("Each claim source must be an object.");
+    sourceRefs.push(text(source.observation_id, "observation_id"));
+  }
+  const storedObservations = await existingIds(ctx, "observations", orgId, sourceRefs.filter((id) => !importedObservations.has(id)));
+  if (sourceRefs.some((id) => !importedObservations.has(id) && !storedObservations.has(id)))
+    throw unresolvedReference({ record_type: "claim", field: "sources.observation_id", dependency_type: "observation" });
 }
 
 /**
