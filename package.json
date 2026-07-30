@@ -1,7 +1,7 @@
 {
   "name": "titen-memory",
   "version": "0.1.1",
-  "description": "Collaborative memory fabric for AI agents — evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
+  "description": "Collaborative memory fabric for AI agents \u2014 evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.17.0",
@@ -54,7 +54,7 @@
     "test": "pnpm build && playwright test",
     "test:browser": "playwright test",
     "test:api": "pnpm build:worker && bun test tests/contract tests/sdk",
-    "test:all": "pnpm test:api && pnpm test:integration && pnpm test && pnpm check:workflow",
+    "test:all": "pnpm test:api && pnpm test:integration && pnpm verify:dashboard-live && pnpm test && pnpm check:workflow",
     "build:worker": "WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir dist/worker",
     "build:npm": "bun build src/sdk.ts --outfile dist/npm/sdk.js --target node --format esm",
     "prepack": "bun run build:npm",
@@ -65,7 +65,10 @@
     "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test",
     "verify:dashboard-live": "bun scripts/verify-dashboard-live.ts",
     "verify:live": "bun scripts/verify-live.ts",
-    "test:integration": "bun test tests/integration"
+    "test:integration": "bun test tests/integration",
+    "example:golden-path": "bun examples/small-team-golden-path.ts",
+    "dashboard:adapter": "bun scripts/dashboard-adapter.ts",
+    "test:adapter": "bun test tests/integration/dashboard-adapter.test.ts"
   },
   "devDependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

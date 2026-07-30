@@ -11,3 +11,6 @@ playwright-report/
 *.db-shm
 *.db-wal
 graphify-out/
+
+# Project-local developer tools
+.tools/

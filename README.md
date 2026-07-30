@@ -65,18 +65,18 @@ browser against synthetic data. The other area names are non-interactive
 information-architecture labels, not shipped routes.
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-atlas-evidence.png" alt="Titen Memory Atlas Evidence Trace dashboard" width="100%">
+  <img src="./docs/assets/screenshots/dashboard-atlas-evidence.png" alt="Synthetic prototype of the Titen Memory Atlas Evidence Trace dashboard" width="100%">
 </p>
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-conflict-freshness.png" alt="Titen Conflict and Freshness dashboard with preserved perspectives" width="100%">
+  <img src="./docs/assets/screenshots/dashboard-conflict-freshness.png" alt="Synthetic prototype of the Titen Conflict and Freshness dashboard with preserved perspectives" width="100%">
 </p>
 
 <details>
 <summary><strong>Mobile inspection flow</strong></summary>
 
 <p align="center">
-  <img src="./docs/assets/screenshots/dashboard-mobile.png" alt="Titen Memory Atlas mobile inspection flow" width="354">
+  <img src="./docs/assets/screenshots/dashboard-mobile.png" alt="Synthetic prototype of the Titen Memory Atlas mobile inspection flow" width="354">
 </p>
 
 </details>
@@ -93,7 +93,17 @@ build and browser suite, or `pnpm screenshots` after a build to refresh the
 README images. See the [dashboard guide](./docs/dashboard.md) for the fixture,
 security, hosting, and rollback boundaries.
 
+## Dashboard implementation truth
+
+| Region | Status | Current truth |
+| --- | --- | --- |
+| Conflict & Freshness | Implemented; Verified locally | Optional subject-scoped Atlas data through the loopback same-origin adapter |
+| Evidence Trace, Neighborhood, Scope Preview | Interactive prototype | Synthetic fixture data |
+| Search, settings, billing, and other shell destinations | Planned | Non-interactive orientation labels |
+
 ## Quick start
+
+Follow the copy-pasteable [small-team golden path](./docs/guides/golden-path.md) to create scoped researcher, writer, operator, and reviewer principals and verify evidence, citations, handoff, feedback, conflict, and freshness end to end.
 
 ### Local / VPS (Bun)
 

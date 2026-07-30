@@ -1909,6 +1909,18 @@ export const CASES: Case[] = [
         assert.ok(Array.isArray(res.body.data.nodes), `${lens} must return nodes`);
       }
 
+      const other = await seedClaim(fx, owner.key, {
+        observation: { subject_id: "other_subject", content: "A contradictory other-subject result." },
+        claim: { statement: "Other subject base claim" },
+      });
+      const otherObs = await fx.call("POST", "/v1/observations", { key: owner.key, body: observation({ subject_id: "other_subject", content: "Other contradiction" }) });
+      expectOk(otherObs, 201);
+      await fx.call("POST", "/v1/consolidations", { key: owner.key, body: { subject_id: "other_subject", claims: [{ kind: "semantic_fact", statement: "Scoped disputed marker", sources: [{ observation_id: other.observationId, relation: "supports" }, { observation_id: otherObs.body.data.observation_id, relation: "contradicts" }] }] } });
+      const scoped = await fx.call("POST", "/v1/memory-views/compile", { key: owner.key, body: { lens: "conflict_freshness", subject_id: "user_rama" } });
+      expectOk(scoped);
+      assert.ok(!scoped.body.data.nodes.some((n: any) => n.label === "Scoped disputed marker"), "conflict lens must not leak another subject");
+      expectError(await fx.call("POST", "/v1/memory-views/compile", { key: owner.key, body: { lens: "conflict_freshness" } }), 400);
+
       expectError(
         await fx.call("POST", "/v1/memory-views/compile", {
           key: owner.key,

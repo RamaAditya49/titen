@@ -113,7 +113,7 @@ async function neighborhood(ctx: RequestContext, subjectId: string, orgId: strin
   return { lens: "neighborhood", focus_id: null, nodes, edges, metadata: { subject_id: subjectId, claim_count: claims.length } };
 }
 
-async function conflictFreshness(ctx: RequestContext, orgId: string, principalId: string, limit: number): Promise<ViewResult> {
+async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number): Promise<ViewResult> {
   const now = ctx.app.now();
 
   // Claims that have at least one contradicting source
@@ -121,9 +121,9 @@ async function conflictFreshness(ctx: RequestContext, orgId: string, principalId
     `SELECT DISTINCT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
        FROM claims c
        JOIN claim_sources s ON s.claim_id = c.id AND s.relation = 'contradicts'
-      WHERE c.org_id = ? AND c.status != 'revoked'
+      WHERE c.org_id = ? AND c.subject_id = ? AND c.status != 'revoked'
       ORDER BY c.created_at DESC LIMIT ?`,
-    [orgId, limit],
+    [orgId, subjectId, limit],
   );
 
   const nodes: Node[] = [];
@@ -152,7 +152,7 @@ async function conflictFreshness(ctx: RequestContext, orgId: string, principalId
     }
   }
 
-  return { lens: "conflict_freshness", focus_id: null, nodes, edges, metadata: { disputed_count: disputed.length } };
+  return { lens: "conflict_freshness", focus_id: null, nodes, edges, metadata: { subject_id: subjectId, disputed_count: disputed.length } };
 }
 
 async function scopePreview(ctx: RequestContext, orgId: string): Promise<ViewResult> {
@@ -226,7 +226,8 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
       break;
     }
     case "conflict_freshness": {
-      view = await conflictFreshness(ctx, orgId, principalId, limit);
+      if (!subjectId) throw validationError('Field "subject_id" is required for conflict_freshness lens.');
+      view = await conflictFreshness(ctx, subjectId, orgId, principalId, limit);
       break;
     }
     case "scope_preview": {

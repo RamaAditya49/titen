@@ -66,6 +66,21 @@ export interface CheckpointOptions {
   run_id?: string;
 }
 
+export interface LeaseOptions {
+  resource_type: string;
+  resource_id: string;
+  purpose: string;
+  ttl_seconds: number;
+}
+
+export interface HandoffOptions {
+  to_principal: string;
+  subject_id: string;
+  context_id?: string;
+  checkpoint_id?: string;
+  message?: string;
+}
+
 export class TitenError extends Error {
   status: number;
   code: string;
@@ -158,6 +173,33 @@ export class TitenClient {
 
   async deleteCheckpoint(checkpointId: string) {
     return this.request("DELETE", `/v1/checkpoints/${checkpointId}`);
+  }
+
+  // --- Coordination (records work; does not schedule it) ---
+
+  async acquireLease(options: LeaseOptions) {
+    return this.request("POST", "/v1/leases", options);
+  }
+
+  async releaseLease(leaseId: string) {
+    return this.request("DELETE", `/v1/leases/${leaseId}`);
+  }
+
+  async createHandoff(options: HandoffOptions) {
+    return this.request("POST", "/v1/handoffs", options);
+  }
+
+  async listHandoffs(status?: "pending" | "accepted" | "rejected") {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return this.request("GET", `/v1/handoffs${query}`);
+  }
+
+  async resolveHandoff(handoffId: string, status: "accepted" | "rejected") {
+    return this.request("POST", `/v1/handoffs/${handoffId}/resolve`, { status });
+  }
+
+  async compileView(lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "scope_preview", options: { subject_id?: string; focus_id?: string; limit?: number } = {}) {
+    return this.request("POST", "/v1/memory-views/compile", { lens, ...options });
   }
 
   // --- Keys ---
