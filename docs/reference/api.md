@@ -68,6 +68,22 @@ features explicitly listed as proposed are not routes.
   `audit/events`, and channel-scoped context paths are not aliases. Use the
   implemented inventory above.
 
+## Webhook delivery
+
+`POST /v1/webhooks` accepts only a configured allowlisted HTTPS hostname. The
+Bun runtime resolves and rejects private, link-local, special-use, mapped IPv4,
+and unsafe IPv6 addresses, re-resolves before every attempt, pins TLS to one
+approved address, and never follows redirects. Cloudflare returns `503` for
+webhook registration/delivery because Worker `fetch` cannot prove this pinning.
+
+Canonical writes enqueue durable delivery rows before outbound I/O. Claims are
+atomic leases that recover after expiry. `X-Titen-Delivery` is stable across
+retries; `X-Titen-Attempt` changes per network attempt. Delivery is
+at-least-once, times out after at most 10 seconds, and reaches `success` or
+terminal `failed` after five attempts. The drain response includes
+`delivery_attempts`, `delivered`, `pending_deliveries`, `failed_deliveries`,
+`oldest_retry_at`, `oldest_pending_at`, and `semantics: "at_least_once"`.
+
 ## Common behavior
 
 - Base path: `/v1`.
@@ -462,12 +478,14 @@ derived cache/vector or release-status maintenance job is stale.
   vector capability when enabled, outbox health, and release FTS plus
   customer-assertion verifier readiness when channel serving is enabled.
 
-`capabilities.background_repair` is configuration-derived: `enabled` means the
-Bun process created its in-process maintenance timer, `disabled` means Bun did
-not create one, and `external` means Cloudflare expects an external Cron Trigger
-that the request isolate cannot observe. It does not claim a recent successful
-pass; issue #11 tracks evidence-based scheduler freshness. Readiness performs no
-model or scheduler network probe.
+`capabilities.background_repair` is canonical scheduler evidence. `enabled`
+means a configured scheduler recorded a successful pass within its bounded
+freshness window, `stale` means the pass is absent, failed, malformed, or old,
+and `disabled` means this process has no configured scheduler. Readiness makes no
+model, webhook, or scheduler network call. It also reports verified migration
+objects and whether persisted signing secrets can be decrypted with the external
+keyring; either failure blocks protected API traffic while health diagnostics
+remain available.
 
 When Memory Atlas is disabled, it does not affect liveness/readiness. When
 enabled, readiness checks only the server-side compiler's canonical

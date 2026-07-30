@@ -1,6 +1,9 @@
 import type { Db } from "./db";
-import { deliverEvent, type Fetcher } from "./webhooks";
+import { processWebhooks } from "./webhooks";
 import type { VectorCapability } from "./vectors";
+import type { WebhookSecurity } from "./webhook-security";
+import type { SecretCipher } from "./secrets";
+import { eventAccessSql } from "./events";
 
 /**
  * Background maintenance: the work that must happen for configured features to
@@ -21,6 +24,82 @@ export interface MaintenanceResult {
   indexed: number;
   delivered: number;
   errors: string[];
+}
+
+export type BackgroundRepairState = "enabled" | "stale" | "disabled";
+
+/** Cheap canonical scheduler evidence for readiness; never performs network I/O. */
+export async function backgroundRepairState(options: {
+  db: Db;
+  configured: boolean;
+  now: Date;
+  staleAfterMs: number;
+}): Promise<BackgroundRepairState> {
+  if (!options.configured) return "disabled";
+  let rows: Array<{
+    last_success_at: string | null;
+    last_error_at: string | null;
+    expected_interval_ms: number;
+  }>;
+  try {
+    rows = await options.db.all(
+      `SELECT last_success_at, last_error_at, expected_interval_ms
+         FROM maintenance_state WHERE id = 'background'`,
+    );
+  } catch {
+    return "stale";
+  }
+  const row = rows[0];
+  if (!row) return "stale";
+  if (!row.last_success_at) return "stale";
+  const success = Date.parse(row.last_success_at);
+  const error = row.last_error_at ? Date.parse(row.last_error_at) : 0;
+  if (
+    !Number.isFinite(success) ||
+    (row.last_error_at !== null && (!Number.isFinite(error) || error >= success))
+  ) return "stale";
+  const recorded = Number(row.expected_interval_ms);
+  const staleAfter = Math.min(
+    86_400_000,
+    Math.max(options.staleAfterMs, Number.isFinite(recorded) ? recorded * 3 : 0),
+  );
+  return options.now.getTime() - success <= staleAfter ? "enabled" : "stale";
+}
+
+async function recordMaintenance(
+  db: Db,
+  result: MaintenanceResult,
+  now: Date,
+  expectedIntervalMs: number,
+): Promise<void> {
+  const timestamp = now.toISOString();
+  const success = result.errors.length === 0 ? timestamp : null;
+  const error = result.errors.length === 0 ? null : timestamp;
+  await db.batch([
+    {
+      sql: `INSERT INTO maintenance_state
+              (id, last_attempt_at, last_success_at, last_error_at, indexed, delivered, expected_interval_ms)
+            VALUES ('background', ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              last_attempt_at = excluded.last_attempt_at,
+              last_success_at = CASE
+                WHEN excluded.last_success_at IS NULL THEN maintenance_state.last_success_at
+                ELSE excluded.last_success_at
+              END,
+              last_error_at = excluded.last_error_at,
+              indexed = excluded.indexed,
+              delivered = excluded.delivered,
+              expected_interval_ms = excluded.expected_interval_ms`,
+      params: [
+        timestamp,
+        success,
+        error,
+        result.indexed,
+        result.delivered,
+        Math.max(1, Math.floor(expectedIntervalMs)),
+      ],
+    },
+  ]);
 }
 
 /** Organizations with queued indexing work, oldest queue first. */
@@ -56,20 +135,38 @@ export async function indexPendingForOrg(
   // Only claims are retrievable, so only claims need an embedding. Anything else
   // is retired so the queue cannot grow without bound.
   const retire: string[] = [];
-  const eligible: { outboxId: string; claimId: string; statement: string }[] = [];
+  const eligible: {
+    outboxId: string;
+    claimId: string;
+    statement: string;
+    subjectId: string;
+    projectId: string | null;
+  }[] = [];
   for (const row of pending) {
     if (row.record_type !== "claim") {
       retire.push(row.id);
       continue;
     }
-    const claim = await db.all<{ statement: string; status: string }>(
-      `SELECT statement, status FROM claims WHERE id = ? AND org_id = ?`,
+    const claim = await db.all<{
+      statement: string;
+      status: string;
+      subject_id: string;
+      project_id: string | null;
+    }>(
+      `SELECT statement, status, subject_id, project_id
+         FROM claims WHERE id = ? AND org_id = ?`,
       [row.record_id, orgId],
     );
     const found = claim[0];
     // A claim superseded or expired since it was queued is no longer retrievable.
     if (found && (found.status === "active" || found.status === "disputed"))
-      eligible.push({ outboxId: row.id, claimId: row.record_id, statement: found.statement });
+      eligible.push({
+        outboxId: row.id,
+        claimId: row.record_id,
+        statement: found.statement,
+        subjectId: found.subject_id,
+        projectId: found.project_id,
+      });
     else retire.push(row.id);
   }
 
@@ -80,7 +177,11 @@ export async function indexPendingForOrg(
       eligible.map((entry, index) => ({
         id: entry.claimId,
         vector: embeddings[index]!,
-        metadata: { org_id: orgId },
+        metadata: {
+          org_id: orgId,
+          subject_id: entry.subjectId,
+          project_id: entry.projectId ?? "",
+        },
       })),
     );
     indexed = eligible.length;
@@ -107,39 +208,43 @@ async function deliverPending(
   db: Db,
   limit: number,
   now: Date,
-  fetcher: Fetcher,
-): Promise<number> {
+  security?: WebhookSecurity,
+  cipher?: SecretCipher,
+): Promise<{ delivered: number; errors: string[] }> {
+  const nowString = now.toISOString();
   const orgs = await db.all<{ org_id: string }>(
-    `SELECT DISTINCT org_id FROM webhooks WHERE status = 'active'`,
-  );
-  let delivered = 0;
-  for (const { org_id: orgId } of orgs) {
-    // Events with no delivery attempt yet, matched by event id. Matching on kind
-    // instead is what limited delivery to the first event of each kind.
-    const events = await db.all<{ id: string; kind: string; payload: string }>(
-      `SELECT e.id, e.kind, e.payload FROM events e
-        WHERE e.org_id = ?
+    `SELECT org_id FROM (
+       SELECT w.org_id, COALESCE(d.next_retry_at, d.created_at) AS due_at
+         FROM webhook_deliveries d JOIN webhooks w ON w.id = d.webhook_id
+        WHERE w.status = 'active' AND w.principal_id IS NOT NULL
+          AND d.status = 'pending'
+          AND (d.next_retry_at IS NULL OR d.next_retry_at <= ?)
+          AND (d.lease_expires_at IS NULL OR d.lease_expires_at <= ?)
+       UNION ALL
+       SELECT w.org_id, e.created_at AS due_at
+         FROM webhooks w JOIN events e ON e.org_id = w.org_id
+        WHERE w.status = 'active' AND w.principal_id IS NOT NULL
+          AND ${eventAccessSql("e", "w.principal_id")}
+          AND w.created_at <= e.created_at
+          AND ((',' || w.events || ',') LIKE '%,*,%' OR (',' || w.events || ',') LIKE '%,' || e.kind || ',%')
           AND NOT EXISTS (
             SELECT 1 FROM webhook_deliveries d
-              JOIN webhooks w ON w.id = d.webhook_id
-             WHERE w.org_id = e.org_id AND d.event_id = e.id
+             WHERE d.webhook_id = w.id AND d.event_id = e.id
           )
-        ORDER BY e.created_at, e.id LIMIT ?`,
-      [orgId, limit],
-    );
-    for (const event of events) {
-      await deliverEvent(
-        db,
-        orgId,
-        { id: event.id, kind: event.kind },
-        JSON.parse(event.payload),
-        now,
-        fetcher,
-      );
-      delivered += 1;
+     ) work GROUP BY org_id ORDER BY MIN(due_at), org_id LIMIT 20`,
+    [nowString, nowString],
+  );
+  let delivered = 0;
+  const errors: string[] = [];
+  for (const { org_id: orgId } of orgs) {
+    try {
+      const result = await processWebhooks({ db, orgId, now, limit, security, cipher });
+      delivered += result.delivered;
+    } catch {
+      errors.push(`deliver:${orgId.slice(0, 12)}`);
     }
   }
-  return delivered;
+  return { delivered, errors };
 }
 
 /** One maintenance pass. Never throws: a bad tenant must not stop the others. */
@@ -148,8 +253,10 @@ export async function runMaintenance(options: {
   vectors?: VectorCapability;
   limit?: number;
   now?: Date;
-  fetcher?: Fetcher;
+  webhookSecurity?: WebhookSecurity;
+  secretCipher?: SecretCipher;
   deliverWebhooks?: boolean;
+  expectedIntervalMs?: number;
 }): Promise<MaintenanceResult> {
   const limit = options.limit ?? 50;
   const now = options.now ?? new Date();
@@ -177,15 +284,29 @@ export async function runMaintenance(options: {
 
   if (options.deliverWebhooks !== false) {
     try {
-      result.delivered = await deliverPending(
+      const delivery = await deliverPending(
         options.db,
         limit,
         now,
-        options.fetcher ?? globalThis.fetch,
+        options.webhookSecurity,
+        options.secretCipher,
       );
+      result.delivered = delivery.delivered;
+      result.errors.push(...delivery.errors);
     } catch {
-      result.errors.push("deliver");
+      result.errors.push("deliver:scan");
     }
+  }
+
+  try {
+    await recordMaintenance(
+      options.db,
+      result,
+      now,
+      options.expectedIntervalMs ?? 60_000,
+    );
+  } catch {
+    result.errors.push("state");
   }
 
   return result;

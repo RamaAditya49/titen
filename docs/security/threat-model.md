@@ -6,8 +6,8 @@ runtime, or externally reachable operation changes.
 ## Scope
 
 This model covers the Titen HTTP service, canonical SQL store, FTS projection,
-optional vector/model integrations, background repair, export/import, and the
-planned stateless MCP adapter, agent lifecycle hooks, and signed webhook/event
+optional vector/model integrations, background repair, export/import, the
+stateless MCP adapter, planned agent lifecycle hooks, and signed webhook/event
 delivery, plus the optional read-only Memory Atlas compiler. It covers personal, company, and enterprise
 deployments while features are enabled according to their release phase.
 
@@ -92,6 +92,8 @@ Rules at every boundary:
 - Checkpoints, leases, and handoffs are execution state, not factual evidence.
 - Secrets, raw prompts, private content, embeddings, and full private IDs stay
   out of normal logs and audit events.
+- Recoverable webhook and federation signing secrets are versioned AES-GCM
+  ciphertext bound to their record ID; keyrings remain outside canonical SQL.
 - Export, import, backup, and restore preserve scope and provenance.
 - External users never receive Titen credentials or direct canonical-memory
   access.
@@ -124,7 +126,7 @@ Rules at every boundary:
 | TM-15 | migration drift changes authorization or loses evidence                                                      | ordered versioned migrations, readiness gate, transactional changes when supported, compatible rollback plan                                                                                         | old/new fixture and cross-scope suite pass before deploy                                                             |
 | TM-16 | federation sends unauthorized data or accepts forged/replayed events                                         | source-side policy filter, destination validation, signatures/hashes, per-scope cursor, no credentials, conflict preservation                                                                        | added only with v1 federation fixtures and a separate protocol review                                                |
 | TM-17 | agent hook leaks a transcript/secret, recursively captures its own Titen calls, or blocks the host on outage | typed allowlisted capture, no raw transcript/chain-of-thought capture, secret scanning, recursion marker, bounded timeout, fail-open optional assistance                                             | canary secret absent; one host event yields at most the declared calls; outage returns within hook budget            |
-| TM-18 | webhook enables SSRF, forged/replayed orchestration, or synchronous availability failure                     | explicit allowlisted HTTPS destination, DNS/IP checks, signed timestamped event, replay window, event-id idempotency, post-commit outbox, bounded retry                                              | metadata/link-local destinations rejected; replay is idempotent; failed receiver cannot roll back memory             |
+| TM-18 | webhook enables SSRF, DNS rebinding, forged/replayed orchestration, or synchronous availability failure      | explicit hostname allowlist, HTTPS-only address-pinned transport, pre-connect DNS/IP checks, no redirects, HMAC, stable delivery ID, atomic lease, bounded timeout/retry                              | private, mapped IPv4, special IPv6, redirect, rebind, timeout, concurrent claim, and expired-lease fixtures pass      |
 | TM-19 | verified, tagged, similar, or model-generated content is published without disclosure approval               | exact claim-version release, separate approval capability, immutable released snapshot, no automatic activation, audit                                                                               | verified-but-unreleased and model-proposed records never enter channel context                                       |
 | TM-20 | channel/gateway query leaks internal, wrong-audience, or another customer's memory                           | gateway credential bound to channel/audience, short-lived signed customer assertion with issuer/audience/expiry/replay validation, subject-aware cache keys, release-only index, canonical hydration | anonymous/raw-subject, replayed assertion, and cross-channel/customer fixtures return no content or existence signal |
 | TM-21 | stale cache/vector hit continues serving a revoked, expired, replaced, or source-invalidated release         | canonical release and exact source-claim version/status/dispute/validity check after every candidate lookup; commit-time eligibility invalidation; rebuildable projections                           | revoked or source-invalidated release is absent from the next compile despite injected stale candidates              |

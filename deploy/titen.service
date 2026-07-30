@@ -9,6 +9,7 @@ User=titen
 Group=titen
 StateDirectory=titen
 WorkingDirectory=/opt/titen
+EnvironmentFile=-/etc/titen/titen.env
 ExecStart=/usr/local/bin/bun /opt/titen/src/runtime/bun/cli.ts serve --db /var/lib/titen/titen.db --port 8787 --host 127.0.0.1
 Restart=on-failure
 RestartSec=5
@@ -25,7 +26,6 @@ UMask=0077
 
 # Resource limits
 LimitNOFILE=65536
-MemoryMax=512M
 
 [Install]
 WantedBy=multi-user.target

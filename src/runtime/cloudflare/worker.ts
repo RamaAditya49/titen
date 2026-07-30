@@ -1,8 +1,10 @@
 import { createApp } from "../../core/app";
-import { migrate } from "../../core/migrations";
+import { migrate, schemaState } from "../../core/migrations";
 import { createD1Db, type D1Database } from "./d1";
 import { runMaintenance } from "../../core/maintenance";
 import { tryCreateVectorize } from "./vectors";
+import { parseSecretCipher, prepareSigningSecrets } from "../../core/secrets";
+import type { WebhookSecurity } from "../../core/webhook-security";
 
 export interface Env {
   DB: D1Database;
@@ -14,9 +16,36 @@ export interface Env {
   AI?: unknown;
   TITEN_EMBED_MODEL?: string;
   TITEN_EMBED_DIMS?: string;
+  /** Secret JSON keyring; keep in a Worker secret, never vars or D1. */
+  TITEN_SECRET_KEYS?: string;
+  /** Test-only fixed resolution; production has no generic address-pinned fetch. */
+  TITEN_WEBHOOK_ALLOWED_HOSTNAMES?: string;
+  TITEN_WEBHOOK_TEST_ADDRESSES?: string;
+}
+
+function testWebhookSecurity(env: Env): WebhookSecurity | undefined {
+  if (!env.TITEN_WEBHOOK_TEST_ADDRESSES) return undefined;
+  try {
+    const addresses = JSON.parse(env.TITEN_WEBHOOK_TEST_ADDRESSES) as unknown;
+    const hosts = env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES?.split(",").map((value) => value.trim()).filter(Boolean);
+    if (!hosts?.length || !Array.isArray(addresses) || !addresses.every((value) => typeof value === "string"))
+      return undefined;
+    return {
+      allowedHostnames: hosts,
+      resolve: async () => addresses,
+      dispatch: async () => ({
+        response: new Response("test transport refusal", { status: 503 }),
+        connectedAddress: addresses[0]!,
+      }),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 let migration: Promise<unknown> | undefined;
+let schemaVerification: Promise<boolean> | undefined;
+let secretPreparation: Promise<boolean> | undefined;
 
 /**
  * The Worker owns bindings and nothing else. All behavior lives in the shared
@@ -27,20 +56,47 @@ let migration: Promise<unknown> | undefined;
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const db = createD1Db(env.DB);
-    if (env.TITEN_AUTO_MIGRATE === "1") {
-      // One attempt per isolate. A concurrent isolate that loses the race is
-      // caught here and continues; readiness still reports the real version.
-      migration ??= migrate(db).catch(() => undefined);
-      await migration;
+    let migrationsReady = false;
+    try {
+      if (env.TITEN_AUTO_MIGRATE === "1") {
+        migration ??= migrate(db);
+        await migration;
+      }
+      schemaVerification ??= schemaState(db).then(
+        (schema) => schema.applied === schema.expected && schema.verified,
+      );
+      migrationsReady = await schemaVerification;
+      if (!migrationsReady) schemaVerification = undefined;
+    } catch {
+      // Retry on the next request. Until then only health/readiness may pass.
+      migration = undefined;
+      schemaVerification = undefined;
+      migrationsReady = false;
     }
     const vectors = tryCreateVectorize(env as any);
+    let secretCipher;
+    let secretStorageReady = false;
+    try {
+      secretCipher = parseSecretCipher(env.TITEN_SECRET_KEYS);
+      if (migrationsReady) {
+        secretPreparation ??= prepareSigningSecrets(db, secretCipher);
+        secretStorageReady = await secretPreparation;
+        if (!secretStorageReady) secretPreparation = undefined;
+      }
+    } catch {
+      secretPreparation = undefined;
+      secretCipher = undefined;
+    }
     const app = createApp({
       db,
       revision: env.TITEN_REVISION ?? "dev",
       runtime: "cloudflare-d1",
       vectors,
-      // The request isolate cannot observe whether its external Cron Trigger exists.
-      backgroundRepair: "external",
+      backgroundRepair: { configured: true, staleAfterMs: 180_000 },
+      migrationsReady,
+      secretStorageReady,
+      secretCipher,
+      webhookSecurity: testWebhookSecurity(env),
     });
     return app(request);
   },
@@ -54,9 +110,18 @@ export default {
   async scheduled(_event: unknown, env: Env, context: { waitUntil(p: Promise<unknown>): void }) {
     const db = createD1Db(env.DB);
     const vectors = tryCreateVectorize(env as never);
+    const secretCipher = parseSecretCipher(env.TITEN_SECRET_KEYS);
+    if (!(await prepareSigningSecrets(db, secretCipher)))
+      throw new Error("Signing-secret storage is not ready.");
     // waitUntil so the platform does not cancel the pass when the handler returns.
     context.waitUntil(
-      runMaintenance({ db, vectors }).then((result) => {
+      runMaintenance({
+        db,
+        vectors,
+        secretCipher,
+        webhookSecurity: testWebhookSecurity(env),
+        expectedIntervalMs: 60_000,
+      }).then((result) => {
         if (result.indexed || result.delivered || result.errors.length)
           console.log(
             `maintenance indexed=${result.indexed} delivered=${result.delivered}${

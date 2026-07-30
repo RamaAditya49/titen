@@ -389,9 +389,8 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // fingerprint, which stays useful for confirming which secret is
       // configured without revealing it.
       //
-      // ponytail: the shared secret is stored recoverably, as every HMAC webhook
-      // implementation must. The ceiling is that a database read discloses it;
-      // the upgrade path is envelope encryption with a KMS-held key.
+      // This historical column is rewrapped into an AES-GCM envelope during
+      // startup before protected traffic is accepted.
       `ALTER TABLE webhooks ADD COLUMN secret TEXT`,
     ],
   },
@@ -402,8 +401,7 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // it registered. That needs the shared key itself, for the same reason a
       // webhook signature does: HMAC is symmetric.
       //
-      // ponytail: stored recoverably, ceiling and upgrade path identical to the
-      // webhook secret in migration 7.
+      // This historical column is rewrapped like the webhook secret above.
       `ALTER TABLE federation_peers ADD COLUMN shared_secret TEXT`,
     ],
   },
@@ -480,11 +478,37 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // Existing subscriptions have no attributable principal and therefore
       // receive no private/team events until re-registered.
       `ALTER TABLE webhooks ADD COLUMN principal_id TEXT`,
+      `CREATE TABLE maintenance_state (
+         id TEXT PRIMARY KEY CHECK (id = 'background'),
+         last_attempt_at TEXT NOT NULL,
+         last_success_at TEXT,
+         last_error_at TEXT,
+         indexed INTEGER NOT NULL DEFAULT 0,
+         delivered INTEGER NOT NULL DEFAULT 0,
+         expected_interval_ms INTEGER NOT NULL
+       )`,
+      `ALTER TABLE webhook_deliveries ADD COLUMN lease_token TEXT`,
+      `ALTER TABLE webhook_deliveries ADD COLUMN lease_expires_at TEXT`,
+      `ALTER TABLE webhook_deliveries ADD COLUMN attempt_id TEXT`,
+      `CREATE INDEX webhook_deliveries_due
+         ON webhook_deliveries (status, next_retry_at, lease_expires_at)`,
+      // Vector schemas now enforce subject/project metadata before top-k. The
+      // projection is rebuildable, so every canonical claim is safely requeued.
+      `UPDATE index_outbox SET state = 'pending', attempts = 0 WHERE record_type = 'claim'`,
     ],
   },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
+
+const REQUIRED_OBJECTS = MIGRATIONS.flatMap(({ statements }) => statements).flatMap((sql) => {
+  const match = sql.match(/^CREATE\s+(?:VIRTUAL\s+)?(?:UNIQUE\s+)?(TABLE|INDEX)\s+([a-z0-9_]+)/i);
+  return match ? [{ type: match[1]!.toLowerCase(), name: match[2]! }] : [];
+});
+const REQUIRED_COLUMNS = MIGRATIONS.flatMap(({ statements }) => statements).flatMap((sql) => {
+  const match = sql.match(/^ALTER\s+TABLE\s+([a-z0-9_]+)\s+ADD\s+COLUMN\s+([a-z0-9_]+)/i);
+  return match ? [{ table: match[1]!, column: match[2]! }] : [];
+});
 
 async function appliedVersion(db: Db): Promise<number> {
   await db.exec(
@@ -499,32 +523,58 @@ async function appliedVersion(db: Db): Promise<number> {
   return rows[0]?.version ?? 0;
 }
 
-/** Apply pending migrations. Safe to call repeatedly and concurrently-ish. */
+/** Apply pending migrations as one cross-runtime atomic batch per version. */
 export async function migrate(db: Db): Promise<number> {
-  const current = await appliedVersion(db);
+  let current = await appliedVersion(db);
   for (const migration of MIGRATIONS) {
     if (migration.version <= current) continue;
-    for (const statement of migration.statements) await db.exec(statement);
-    await db.batch([
-      {
-        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
-        params: [migration.version, new Date().toISOString()],
-      },
-    ]);
+    try {
+      await db.batch([
+        ...migration.statements.map((sql) => ({ sql })),
+        {
+          sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+          params: [migration.version, new Date().toISOString()],
+        },
+      ]);
+      current = migration.version;
+    } catch (error) {
+      // Another isolate may have committed the same atomic migration first.
+      // Accept only a durable winner; every other failure remains fail-closed.
+      current = await appliedVersion(db);
+      if (current < migration.version) throw error;
+    }
   }
+  const state = await schemaState(db);
+  if (state.applied !== state.expected || !state.verified)
+    throw new Error("Database schema verification failed after migration.");
   return SCHEMA_VERSION;
 }
 
 /** Readiness needs the applied version without creating anything. */
 export async function schemaState(
   db: Db,
-): Promise<{ applied: number; expected: number }> {
+): Promise<{ applied: number; expected: number; verified: boolean }> {
   try {
     const rows = await db.all<{ version: number | null }>(
       `SELECT MAX(version) AS version FROM titen_migrations`,
     );
-    return { applied: rows[0]?.version ?? 0, expected: SCHEMA_VERSION };
+    const applied = rows[0]?.version ?? 0;
+    if (applied !== SCHEMA_VERSION)
+      return { applied, expected: SCHEMA_VERSION, verified: false };
+    for (const object of REQUIRED_OBJECTS) {
+      const found = await db.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+        [object.type, object.name],
+      );
+      if (!found.length) return { applied, expected: SCHEMA_VERSION, verified: false };
+    }
+    for (const required of REQUIRED_COLUMNS) {
+      const columns = await db.all<{ name: string }>(`PRAGMA table_info(${required.table})`);
+      if (!columns.some(({ name }) => name === required.column))
+        return { applied, expected: SCHEMA_VERSION, verified: false };
+    }
+    return { applied, expected: SCHEMA_VERSION, verified: true };
   } catch {
-    return { applied: 0, expected: SCHEMA_VERSION };
+    return { applied: 0, expected: SCHEMA_VERSION, verified: false };
   }
 }

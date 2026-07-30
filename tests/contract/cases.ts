@@ -91,7 +91,7 @@ export const CASES: Case[] = [
       assert.equal(res.body.data.capabilities.model, "disabled");
       assert.equal(
         res.body.data.capabilities.background_repair,
-        fx.runtime === "cloudflare-d1" ? "external" : "disabled",
+        fx.runtime === "cloudflare-d1" ? "stale" : "disabled",
       );
     },
   },
@@ -2084,7 +2084,7 @@ export const CASES: Case[] = [
       const created = await fx.call("POST", "/v1/webhooks", {
         key: owner.key,
         body: {
-          url: "https://example.test/titen",
+          url: "https://hooks.example.com/titen",
           secret: "a-shared-secret-value",
           events: ["claim.materialized"],
         },
@@ -2125,8 +2125,8 @@ export const CASES: Case[] = [
       const hook = await fx.call("POST", "/v1/webhooks", {
         key: owner.key,
         body: {
-          // Unroutable by design: the drain must record the attempt, not succeed.
-          url: "https://127.0.0.1:9/titen-sink",
+          // Test transport refuses by design: the attempt must remain retryable.
+          url: "https://hooks.example.com/titen-sink",
           secret: "drain-secret-value",
           events: ["*"],
         },
@@ -2265,6 +2265,15 @@ export const CASES: Case[] = [
       const owner = await fx.provision({ scopes: ["*"] });
       const member = await fx.provision({ orgId: owner.orgId, scopes: ["*"] });
       const outsider = await fx.provision({ orgId: owner.orgId, scopes: ["*"] });
+      const outsiderHook = await fx.call("POST", "/v1/webhooks", {
+        key: outsider.key,
+        body: {
+          url: "https://hooks.example.com/private-scope-probe",
+          secret: "outsider-scope-secret",
+          events: ["*"],
+        },
+      });
+      expectOk(outsiderHook, 201);
       const workspace = await fx.call("POST", "/v1/workspaces", { key: owner.key, body: { name: `scope-${Date.now()}` } });
       const workspaceId = workspace.body.data.workspace_id;
       for (const principal of [owner, member]) expectOk(await fx.call("POST", "/v1/memberships", {
@@ -2298,6 +2307,18 @@ export const CASES: Case[] = [
         const atlas = await fx.call("POST", "/v1/memory-views/compile", { key: principal.key, body: { lens: "neighborhood", subject_id: "user_rama" } });
         expectOk(atlas);
         assert.equal(atlas.body.data.metadata.claim_count, 0);
+        const drained = await fx.call("POST", "/v1/webhooks/deliver", { key: principal.key, body: {} });
+        expectOk(drained);
+        assert.equal(drained.body.data.events_drained, 0);
+        assert.equal(drained.body.data.pending_deliveries, 0);
+        assert.equal(drained.body.data.oldest_pending_at, null);
+        const deliveries = await fx.call(
+          "GET",
+          `/v1/webhooks/${outsiderHook.body.data.webhook_id}/deliveries`,
+          { key: principal.key },
+        );
+        expectOk(deliveries);
+        assert.equal(deliveries.body.data.deliveries.length, 0);
       }
     },
   },

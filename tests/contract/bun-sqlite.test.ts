@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { CASES, assertBatchAtomicity } from "./cases";
-import { clientVia, provisionWith, revokeWith, type Fixture } from "./harness";
+import { clientVia, provisionWith, revokeWith, TEST_SECRET_CIPHER, TEST_WEBHOOK_SECURITY, type Fixture } from "./harness";
 
 const directory = mkdtempSync(join(tmpdir(), "titen-bun-"));
 const dbPath = join(directory, "titen.db");
@@ -15,7 +15,16 @@ let handle: ReturnType<typeof openDatabase>;
 let db: ReturnType<typeof createSqliteDb>;
 
 async function start() {
-  running = await serve({ dbPath, port: 0, hostname: "127.0.0.1", quiet: true, revision: "test" });
+  running = await serve({
+    dbPath,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    revision: "test",
+    maintenanceIntervalMs: 0,
+    secretCipher: TEST_SECRET_CIPHER,
+    webhookSecurity: TEST_WEBHOOK_SECURITY,
+  });
   handle = openDatabase(dbPath);
   db = createSqliteDb(handle);
 }

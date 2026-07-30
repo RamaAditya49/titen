@@ -1,6 +1,6 @@
 import { first } from "./db";
 import type { Db } from "./db";
-import { notFound, validationError, conflict, forbidden } from "./errors";
+import { notFound, validationError, conflict, forbidden, unavailable } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { signPayload } from "./webhooks";
 import type { RequestContext, Result } from "./http";
@@ -24,14 +24,16 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
   const direction = requireEnum(body, "direction", DIRECTIONS);
 
   const id = newId("fpeer");
+  if (!ctx.app.secretCipher) throw unavailable("Signing-secret encryption is not configured.");
   const now = ctx.app.now().toISOString();
   const hash = await sha256Hex(sharedSecret);
+  const encrypted = await ctx.app.secretCipher.encrypt(sharedSecret, `federation:${id}`);
 
   await ctx.app.db.batch([
     {
       sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
-      params: [id, principal.orgId, name, endpoint, hash, sharedSecret, direction, now],
+      params: [id, principal.orgId, name, endpoint, hash, encrypted, direction, now],
     },
   ]);
 
@@ -290,16 +292,22 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
   // proves the batch came from the peer that was registered. Without it the
   // shared secret would be decorative and any authorized caller could inject
   // records attributed to a remote deployment.
-  if (peer.shared_secret) {
-    const offered = ctx.request.headers.get("x-titen-peer-signature");
-    if (!offered) throw forbidden("Peer signature header is required.");
-    const expected = `sha256=${await signPayload(peer.shared_secret, await ctx.rawBody())}`;
-    if (offered.length !== expected.length) throw forbidden("Peer signature is invalid.");
-    let mismatch = 0;
-    for (let index = 0; index < expected.length; index += 1)
-      mismatch |= offered.charCodeAt(index) ^ expected.charCodeAt(index);
-    if (mismatch !== 0) throw forbidden("Peer signature is invalid.");
+  if (!peer.shared_secret || !ctx.app.secretCipher)
+    throw unavailable("Federation signing key is unavailable.");
+  let sharedSecret: string;
+  try {
+    sharedSecret = await ctx.app.secretCipher.decrypt(peer.shared_secret, `federation:${peer.id}`);
+  } catch {
+    throw unavailable("Federation signing key is unavailable.");
   }
+  const offered = ctx.request.headers.get("x-titen-peer-signature");
+  if (!offered) throw forbidden("Peer signature header is required.");
+  const expected = `sha256=${await signPayload(sharedSecret, await ctx.rawBody())}`;
+  if (offered.length !== expected.length) throw forbidden("Peer signature is invalid.");
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1)
+    mismatch |= offered.charCodeAt(index) ^ expected.charCodeAt(index);
+  if (mismatch !== 0) throw forbidden("Peer signature is invalid.");
 
   const filters = await ctx.app.db.all<FilterRow>(
     `SELECT resource_type, include_kinds, exclude_subjects, min_trust FROM federation_filters WHERE peer_id = ?`,

@@ -3,6 +3,23 @@ import { newId } from "../../src/core/ids";
 import type { Db, Param } from "../../src/core/db";
 import type { Trust } from "../../src/core/validate";
 import type { VectorCapability } from "../../src/core/vectors";
+import { createSecretCipher } from "../../src/core/secrets";
+import type { WebhookSecurity } from "../../src/core/webhook-security";
+
+export const TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+export const TEST_SECRET_CIPHER = createSecretCipher({
+  active: "test-v1",
+  keys: { "test-v1": TEST_SECRET_KEY },
+});
+export const TEST_WEBHOOK_HOST = "hooks.example.com";
+export const TEST_WEBHOOK_SECURITY: WebhookSecurity = {
+  allowedHostnames: [TEST_WEBHOOK_HOST],
+  resolve: async () => ["93.184.216.34"],
+  dispatch: async ({ addresses }) => ({
+    response: new Response("test transport refusal", { status: 503 }),
+    connectedAddress: addresses[0]!,
+  }),
+};
 
 export interface Res {
   status: number;

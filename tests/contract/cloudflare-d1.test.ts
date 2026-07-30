@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, test } from "bun:test";
+import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Miniflare } from "miniflare";
 import { createD1Db } from "../../src/runtime/cloudflare/d1";
 import type { Db } from "../../src/core/db";
+import type { Stmt } from "../../src/core/db";
+import { migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { CASES, assertBatchAtomicity } from "./cases";
-import { clientVia, provisionWith, revokeWith, type Fixture } from "./harness";
+import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -19,21 +22,38 @@ const origin = "http://titen.test";
 
 let mf: Miniflare;
 let db: Db;
+let starting: Promise<void> | undefined;
 
 /** Real workerd with a real local D1 database, the same bundle wrangler deploys. */
 async function start() {
-  mf = new Miniflare({
+  const next = new Miniflare({
     modules: true,
     scriptPath,
     compatibilityDate: "2026-07-01",
     d1Databases: { DB: "titen-contract" },
     d1Persist: persist,
-    bindings: { TITEN_REVISION: "test", TITEN_AUTO_MIGRATE: "1" },
+    bindings: {
+      TITEN_REVISION: "test",
+      TITEN_AUTO_MIGRATE: "1",
+      TITEN_SECRET_KEYS: JSON.stringify({ active: "test-v1", keys: { "test-v1": TEST_SECRET_KEY } }),
+      TITEN_WEBHOOK_ALLOWED_HOSTNAMES: "hooks.example.com",
+      TITEN_WEBHOOK_TEST_ADDRESSES: JSON.stringify(["93.184.216.34"]),
+    },
   });
-  await mf.ready;
-  db = createD1Db((await mf.getD1Database("DB")) as never);
-  // Force the isolate to apply migrations before any case runs.
-  await mf.dispatchFetch(`${origin}/readyz`);
+  const ready = (async () => {
+    await next.ready;
+    const nextDb = createD1Db((await next.getD1Database("DB")) as never);
+    // Force the isolate to apply migrations before any case runs.
+    await next.dispatchFetch(`${origin}/readyz`);
+    mf = next;
+    db = nextDb;
+  })();
+  starting = ready;
+  try {
+    await ready;
+  } finally {
+    if (starting === ready) starting = undefined;
+  }
 }
 
 const client = () =>
@@ -80,6 +100,7 @@ const fixture: Fixture = {
 
 beforeAll(start);
 afterAll(async () => {
+  await starting;
   await mf.dispose();
   rmSync(persist, { recursive: true, force: true });
 });
@@ -88,7 +109,71 @@ test("batch writes are atomic on D1", async () => {
   await assertBatchAtomicity(db);
 });
 
-for (const contractCase of CASES)
-  test(`cloudflare-d1: ${contractCase.name}`, async () => {
-    await contractCase.run(fixture);
+test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
+  const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));
+  const stale = new Miniflare({
+    modules: true,
+    scriptPath,
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-stale" },
+    d1Persist: stalePersist,
+    bindings: { TITEN_REVISION: "stale", TITEN_AUTO_MIGRATE: "0" },
   });
+  try {
+    await stale.ready;
+    assert.equal((await stale.dispatchFetch(`${origin}/healthz`)).status, 200);
+    const readiness = await stale.dispatchFetch(`${origin}/readyz`);
+    assert.equal(readiness.status, 503);
+    const body = await readiness.json() as any;
+    assert.equal(body.meta.schema.applied, 0);
+    assert.equal((await stale.dispatchFetch(`${origin}/v1/observations`, { method: "POST" })).status, 503);
+  } finally {
+    await stale.dispose();
+    rmSync(stalePersist, { recursive: true, force: true });
+  }
+});
+
+test("a D1 migration batch rolls back on fault and concurrent retries converge", async () => {
+  const faultPersist = mkdtempSync(join(tmpdir(), "titen-d1-fault-"));
+  const fault = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-fault" },
+    d1Persist: faultPersist,
+  });
+  try {
+    await fault.ready;
+    const real = createD1Db((await fault.getD1Database("DB")) as never);
+    let inject = true;
+    const injected: Db = {
+      ...real,
+      async batch(statements: Stmt[]) {
+        if (inject && statements.at(-1)?.params?.[0] === SCHEMA_VERSION) {
+          inject = false;
+          await real.batch([
+            ...statements.slice(0, 3),
+            { sql: "INSERT INTO deliberately_missing_table(value) VALUES (1)" },
+          ]);
+          return;
+        }
+        await real.batch(statements);
+      },
+    };
+    await assert.rejects(() => migrate(injected));
+    assert.equal(Number((await real.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations"))[0]!.version), SCHEMA_VERSION - 1);
+    assert.deepEqual(await real.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state'"), []);
+    assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
+  } finally {
+    await fault.dispose();
+    rmSync(faultPersist, { recursive: true, force: true });
+  }
+});
+
+for (const contractCase of CASES) {
+  const name = `cloudflare-d1: ${contractCase.name}`;
+  const run = async () => contractCase.run(fixture);
+  if (contractCase.name === "committed memory survives a restart without a rebuild step")
+    test(name, run, 20_000);
+  else test(name, run);
+}

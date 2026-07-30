@@ -31,6 +31,9 @@ import {
 } from "./http";
 import type { Db } from "./db";
 import type { VectorCapability } from "./vectors";
+import { backgroundRepairState } from "./maintenance";
+import type { WebhookSecurity } from "./webhook-security";
+import type { SecretCipher } from "./secrets";
 
 export interface AppContext {
   db: Db;
@@ -41,17 +44,28 @@ export interface AppContext {
   runtime: string;
   /** Optional vector capability. Absent means FTS-only retrieval. */
   vectors?: VectorCapability;
-  /** Ownership of background indexing and webhook repair for this runtime. */
-  backgroundRepair: "enabled" | "disabled" | "external";
+  /** Scheduler intent; readiness still derives state from canonical evidence. */
+  backgroundRepair: { configured: boolean; staleAfterMs: number };
+  /** False only after a required startup migration failed. */
+  migrationsReady: boolean;
+  /** False when persisted signing secrets cannot be decrypted safely. */
+  secretStorageReady: boolean;
+  webhookSecurity?: WebhookSecurity;
+  secretCipher?: SecretCipher;
 }
 
 /** Capabilities are reported honestly based on what's configured. */
-export function capabilities(app: AppContext) {
+export async function capabilities(app: AppContext) {
   return {
     fts: "enabled",
     vector: app.vectors ? "enabled" : "disabled",
     model: app.vectors?.embedder ? "enabled" : "disabled",
-    background_repair: app.backgroundRepair,
+    background_repair: await backgroundRepairState({
+      db: app.db,
+      configured: app.backgroundRepair.configured,
+      now: app.now(),
+      staleAfterMs: app.backgroundRepair.staleAfterMs,
+    }),
     export_import: "enabled",
   } as const;
 }
@@ -192,12 +206,18 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   }
   const schema = await schemaState(ctx.app.db);
   checks.migrations =
-    schema.applied === schema.expected
+    schema.applied === schema.expected && schema.verified
       ? "ok"
-      : `pending (applied ${schema.applied}, expected ${schema.expected})`;
-  if (schema.applied !== schema.expected) ready = false;
+      : `invalid or pending (applied ${schema.applied}, expected ${schema.expected})`;
+  if (schema.applied !== schema.expected || !schema.verified) ready = false;
+  if (!ctx.app.migrationsReady) {
+    checks.migrations = "failed";
+    ready = false;
+  }
+  checks.signing_secrets = ctx.app.secretStorageReady ? "ok" : "failed";
+  if (!ctx.app.secretStorageReady) ready = false;
 
-  const caps = capabilities(ctx.app);
+  const caps = await capabilities(ctx.app);
   const body = {
     ready,
     runtime: ctx.app.runtime,
@@ -218,7 +238,11 @@ export function createApp(context: {
   revision?: string;
   runtime: string;
   vectors?: VectorCapability;
-  backgroundRepair?: "enabled" | "disabled" | "external";
+  backgroundRepair?: { configured: boolean; staleAfterMs: number };
+  migrationsReady?: boolean;
+  secretStorageReady?: boolean;
+  webhookSecurity?: WebhookSecurity;
+  secretCipher?: SecretCipher;
 }): (request: Request) => Promise<Response> {
   const app: AppContext = {
     db: context.db,
@@ -226,7 +250,11 @@ export function createApp(context: {
     revision: context.revision ?? "dev",
     runtime: context.runtime,
     vectors: context.vectors,
-    backgroundRepair: context.backgroundRepair ?? "disabled",
+    backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
+    migrationsReady: context.migrationsReady ?? true,
+    secretStorageReady: context.secretStorageReady ?? true,
+    webhookSecurity: context.webhookSecurity,
+    secretCipher: context.secretCipher,
   };
 
   return async function handle(request: Request): Promise<Response> {
@@ -237,6 +265,12 @@ export function createApp(context: {
       if (!matched) throw new ApiError(404, "NOT_FOUND", "Unknown endpoint.");
       if ("allowed" in matched)
         throw new ApiError(405, "METHOD_NOT_ALLOWED", `Allowed methods: ${matched.allowed.join(", ")}.`);
+      if (
+        (!app.migrationsReady || !app.secretStorageReady) &&
+        matched.route.path !== "/healthz" &&
+        matched.route.path !== "/readyz"
+      )
+        throw unavailable("Required database migration has not completed.");
 
       let cachedBody: string | undefined;
       const rawBody = async () => {

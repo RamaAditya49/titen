@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
-import { provisionWith } from "../contract/harness";
+import { provisionWith, TEST_SECRET_CIPHER } from "../contract/harness";
+import type { WebhookSecurity } from "../../src/core/webhook-security";
 
 /**
  * Signed webhook delivery against a real HTTP receiver over a real socket.
@@ -31,6 +32,9 @@ let receiver: { stop: () => void; port: number };
 let received: Received[] = [];
 let rejectNext = false;
 let key: string;
+let transportMode: "deliver" | "unreachable" | "timeout" | "redirect" = "deliver";
+let resolvedAddresses = ["93.184.216.34"];
+const WEBHOOK_HOST = "hooks.example.com";
 
 /** Independent verification: recompute the HMAC the way an integrator would. */
 async function hmacHex(secret: string, payload: string): Promise<string> {
@@ -55,7 +59,38 @@ async function call(method: string, path: string, body?: unknown) {
 }
 
 beforeAll(async () => {
-  titen = await serve({ dbPath, port: 0, hostname: "127.0.0.1", quiet: true, revision: "hook" });
+  const webhookSecurity: WebhookSecurity = {
+    allowedHostnames: [WEBHOOK_HOST],
+    timeoutMs: 30,
+    resolve: async () => resolvedAddresses,
+    async dispatch({ url, addresses, init }) {
+      if (transportMode === "unreachable") throw new Error("unreachable");
+      if (transportMode === "redirect")
+        return {
+          response: new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } }),
+          connectedAddress: addresses[0]!,
+        };
+      if (transportMode === "timeout")
+        await new Promise((_, reject) => {
+          init.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+        });
+      const destination = new URL(url);
+      return {
+        response: await fetch(`http://127.0.0.1:${receiver.port}${destination.pathname}`, init),
+        connectedAddress: addresses[0]!,
+      };
+    },
+  };
+  titen = await serve({
+    dbPath,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    revision: "hook",
+    maintenanceIntervalMs: 0,
+    secretCipher: TEST_SECRET_CIPHER,
+    webhookSecurity,
+  });
   const provisioned = await provisionWith(createSqliteDb(openDatabase(dbPath)), { scopes: ["*"] });
   key = provisioned.key;
 
@@ -85,9 +120,11 @@ afterAll(async () => {
 test("a delivered event arrives signed, and the signature verifies independently", async () => {
   received = [];
   rejectNext = false;
+  transportMode = "deliver";
+  resolvedAddresses = ["93.184.216.34"];
 
   const hook = await call("POST", "/v1/webhooks", {
-    url: `http://127.0.0.1:${receiver.port}/sink`,
+    url: `https://${WEBHOOK_HOST}/sink`,
     secret: SECRET,
     events: ["*"],
   });
@@ -136,9 +173,10 @@ test("a delivered event arrives signed, and the signature verifies independently
 test("a rejecting receiver is recorded as a failure and scheduled for retry", async () => {
   received = [];
   rejectNext = true;
+  transportMode = "deliver";
 
   const hook = await call("POST", "/v1/webhooks", {
-    url: `http://127.0.0.1:${receiver.port}/failing`,
+    url: `https://${WEBHOOK_HOST}/failing`,
     secret: SECRET,
     events: ["claim.materialized"],
   });
@@ -165,7 +203,7 @@ test("a rejecting receiver is recorded as a failure and scheduled for retry", as
     ],
   });
 
-  await call("POST", "/v1/webhooks/deliver", {});
+  const drain = await call("POST", "/v1/webhooks/deliver", {});
   assert.ok(received.length >= 1, "the failing receiver must still have been contacted");
 
   const deliveries = await call("GET", `/v1/webhooks/${hookId}/deliveries`, undefined);
@@ -181,6 +219,7 @@ test("a rejecting receiver is recorded as a failure and scheduled for retry", as
   assert.equal(record.response_status, 500, "the receiver's status must be stored");
   assert.equal(record.attempts, 1);
   assert.ok(record.next_retry_at, "a failed delivery must be scheduled for retry");
+  assert.equal(drain.body.data.oldest_retry_at, record.next_retry_at);
   assert.equal(record.status, "pending", "it stays pending until attempts are exhausted");
 
   rejectNext = false;
@@ -188,9 +227,9 @@ test("a rejecting receiver is recorded as a failure and scheduled for retry", as
 
 test("an unreachable destination fails without taking down the request", async () => {
   received = [];
-  // Port 9 discards traffic, so the connection cannot complete.
+  transportMode = "unreachable";
   const hook = await call("POST", "/v1/webhooks", {
-    url: "http://127.0.0.1:9/unreachable",
+    url: `https://${WEBHOOK_HOST}/unreachable`,
     secret: SECRET,
     events: ["*"],
   });
@@ -223,9 +262,10 @@ test("a second event of the same kind is also delivered", async () => {
   // silently skipped forever.
   received = [];
   rejectNext = false;
+  transportMode = "deliver";
 
   const hook = await call("POST", "/v1/webhooks", {
-    url: `http://127.0.0.1:${receiver.port}/repeat`,
+    url: `https://${WEBHOOK_HOST}/repeat`,
     secret: SECRET,
     events: ["observation.appended"],
   });
@@ -269,9 +309,10 @@ test("a second event of the same kind is also delivered", async () => {
 test("draining twice does not deliver the same event twice", async () => {
   received = [];
   rejectNext = false;
+  transportMode = "deliver";
 
   const hook = await call("POST", "/v1/webhooks", {
-    url: `http://127.0.0.1:${receiver.port}/once`,
+    url: `https://${WEBHOOK_HOST}/once`,
     secret: SECRET,
     events: ["*"],
   });

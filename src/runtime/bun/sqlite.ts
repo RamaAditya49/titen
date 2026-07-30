@@ -6,6 +6,9 @@ import type { Db, Param, Stmt } from "../../core/db";
 export function openDatabase(path: string): Database {
   const database = new Database(path, { create: true });
   database.run("PRAGMA journal_mode = WAL");
+  // SQLite's 1,000-page checkpoint keeps a 4 KiB-page WAL near 4.2 MiB when
+  // no long-lived reader prevents recycling. Keep it explicit and tested.
+  database.run("PRAGMA wal_autocheckpoint = 1000");
   database.run("PRAGMA foreign_keys = ON");
   database.run("PRAGMA busy_timeout = 5000");
   return database;

@@ -6,10 +6,10 @@ import type { Visibility } from "./validate";
 type RecordAlias = "c" | "o";
 
 /** SQL eligibility shared by every canonical memory projection. */
-export function recordAccessSql(alias: RecordAlias): string {
+export function recordAccessSql(alias: RecordAlias, principalSql = "?"): string {
   return `(
     ${alias}.visibility = 'organization'
-    OR (${alias}.visibility = 'private' AND ${alias}.actor_id = ?)
+    OR (${alias}.visibility = 'private' AND ${alias}.actor_id = ${principalSql})
     OR (
       ${alias}.visibility = 'team'
       AND ${alias}.workspace_id IS NOT NULL
@@ -17,7 +17,7 @@ export function recordAccessSql(alias: RecordAlias): string {
         SELECT 1 FROM memberships access_membership
          WHERE access_membership.org_id = ${alias}.org_id
            AND access_membership.workspace_id = ${alias}.workspace_id
-           AND access_membership.principal_id = ?
+           AND access_membership.principal_id = ${principalSql}
            AND access_membership.removed_at IS NULL
       )
     )

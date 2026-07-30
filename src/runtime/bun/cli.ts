@@ -5,6 +5,8 @@ import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { serve } from "./server";
+import { parseSecretCipher } from "../../core/secrets";
+import { createBunWebhookSecurity } from "./webhooks";
 
 const USAGE = `titen — self-hosted memory service
 
@@ -143,6 +145,8 @@ switch (command) {
         process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
           ? undefined
           : Number(process.env.TITEN_MAINTENANCE_INTERVAL_MS),
+      secretCipher: parseSecretCipher(process.env.TITEN_SECRET_KEYS),
+      webhookSecurity: createBunWebhookSecurity(process.env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES),
     });
     console.log(`titen listening on ${started.url} (database ${dbPath})`);
     break;

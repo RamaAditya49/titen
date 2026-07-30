@@ -9,25 +9,25 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 /** Visibility for event projections follows the canonical resource, not org alone. */
-export function eventAccessSql(alias = "e"): string {
+export function eventAccessSql(alias = "e", principalSql = "?"): string {
   return `(
     (${alias}.resource_type = 'observation' AND EXISTS (
       SELECT 1 FROM observations o WHERE o.id = ${alias}.resource_id
-        AND o.org_id = ${alias}.org_id AND ${recordAccessSql("o")}
+        AND o.org_id = ${alias}.org_id AND ${recordAccessSql("o", principalSql)}
     ))
     OR (${alias}.resource_type = 'claim' AND EXISTS (
       SELECT 1 FROM claims c WHERE c.id = ${alias}.resource_id
-        AND c.org_id = ${alias}.org_id AND ${recordAccessSql("c")}
+        AND c.org_id = ${alias}.org_id AND ${recordAccessSql("c", principalSql)}
     ))
     OR (${alias}.resource_type = 'handoff' AND EXISTS (
       SELECT 1 FROM handoffs h WHERE h.id = ${alias}.resource_id
-        AND h.org_id = ${alias}.org_id AND (h.from_principal = ? OR h.to_principal = ?)
+        AND h.org_id = ${alias}.org_id AND (h.from_principal = ${principalSql} OR h.to_principal = ${principalSql})
     ))
     OR (${alias}.resource_type = 'lease' AND EXISTS (
       SELECT 1 FROM leases l WHERE l.id = ${alias}.resource_id
-        AND l.org_id = ${alias}.org_id AND l.holder_id = ?
+        AND l.org_id = ${alias}.org_id AND l.holder_id = ${principalSql}
     ))
-    OR (${alias}.resource_type NOT IN ('observation', 'claim', 'handoff', 'lease') AND ${alias}.actor_id = ?)
+    OR (${alias}.resource_type NOT IN ('observation', 'claim', 'handoff', 'lease') AND ${alias}.actor_id = ${principalSql})
   )`;
 }
 
