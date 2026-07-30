@@ -17,6 +17,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-30
+
 ### Added
 
 - **An authorized reviewer queue in Memory Atlas.** The read-only lens derives
@@ -200,7 +202,8 @@ Releases are cut by hand from a maintainer's machine and deliberately have no
 GitHub Action, so an npm token never lives in repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.0
 [0.1.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.1.2
 [0.1.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.1.1
 [0.1.0]: https://www.npmjs.com/package/titen-memory/v/0.1.0
