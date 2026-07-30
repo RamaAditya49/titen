@@ -422,6 +422,51 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON webhook_deliveries (webhook_id, event_id)`,
     ],
   },
+  {
+    version: 10,
+    statements: [
+      `ALTER TABLE federation_peers ADD COLUMN issuer_namespace TEXT`,
+      `ALTER TABLE federation_filters ADD COLUMN canonical_ingest INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE federation_filters ADD COLUMN destination_visibility TEXT CHECK (destination_visibility IN ('private', 'team', 'organization'))`,
+      `ALTER TABLE federation_filters ADD COLUMN destination_max_trust TEXT CHECK (destination_max_trust IN ('unverified', 'asserted', 'verified', 'policy_approved'))`,
+      `CREATE TABLE external_actor_mappings (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         issuer_namespace TEXT NOT NULL,
+         external_subject TEXT NOT NULL,
+         local_actor_id TEXT NOT NULL,
+         display_name TEXT,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         UNIQUE(org_id, issuer_namespace, external_subject),
+         UNIQUE(org_id, issuer_namespace, local_actor_id)
+       )`,
+      `CREATE TABLE external_actor_mapping_history (
+         id TEXT PRIMARY KEY,
+         mapping_id TEXT NOT NULL REFERENCES external_actor_mappings(id),
+         old_local_actor_id TEXT NOT NULL,
+         new_local_actor_id TEXT NOT NULL,
+         authorized_by TEXT NOT NULL,
+         reason TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       )`,
+      `CREATE TABLE federation_ingest_provenance (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         peer_id TEXT NOT NULL REFERENCES federation_peers(id),
+         remote_event_id TEXT NOT NULL,
+         remote_resource_id TEXT NOT NULL,
+         remote_actor_subject TEXT NOT NULL,
+         local_actor_id TEXT NOT NULL,
+         local_record_type TEXT NOT NULL,
+         local_record_id TEXT NOT NULL,
+         remote_created_at TEXT,
+         received_at TEXT NOT NULL,
+         UNIQUE(org_id, peer_id, remote_event_id)
+       )`,
+      `CREATE INDEX federation_provenance_local ON federation_ingest_provenance (org_id, local_record_type, local_record_id)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

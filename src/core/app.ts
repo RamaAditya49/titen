@@ -13,7 +13,7 @@ import { handleMcp } from "./mcp";
 import { compileView } from "./atlas";
 import { createPolicy, listPolicies, createRelease, publishRelease, revokeRelease, queryRelease, channelContext } from "./governance";
 import { listAudit, exportAudit } from "./audit";
-import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
+import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog, updateExternalActor } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation } from "./observations";
 import { resolveProject } from "./projects";
@@ -172,6 +172,7 @@ const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/federation/pull", scope: "federation:write", handler: pullEvents },
   { method: "POST", path: "/v1/federation/push", scope: "federation:write", handler: pushEvents },
   { method: "GET", path: "/v1/federation/log", scope: "federation:read", handler: federationLog },
+  { method: "PATCH", path: "/v1/federation/external-actors/:id", scope: "federation:write", handler: updateExternalActor },
   { method: "POST", path: "/v1/webhooks", scope: "webhooks:write", handler: registerWebhook },
   { method: "GET", path: "/v1/webhooks", scope: "webhooks:read", handler: listWebhooks },
   { method: "DELETE", path: "/v1/webhooks/:id", scope: "webhooks:write", handler: deleteWebhook },

@@ -174,8 +174,12 @@ between Titen deployments. It is a transport and conflict-observation boundary,
 not canonical recallable-memory federation. Receiving an event does not by
 itself ingest the remote observation or claim into the destination canonical
 store, authorize it for recall, index it, or make it appear in compiled context.
-Those canonical federation semantics remain **Planned** and require a separate
-work item. Event exchange is needed only when one deployment cannot satisfy
+Destination-canonical ingestion is implemented for the bounded
+`observation.appended` event shape only when an active destination filter
+explicitly enables it. The destination assigns visibility, caps trust, maps the
+external actor by issuer namespace plus external subject, records remote
+provenance, and commits FTS/history/index-outbox work. Claims and every other
+event type remain transport-only. Event exchange is needed only when one deployment cannot satisfy
 ownership, region, or network boundaries.
 
 Event-exchange constraints:

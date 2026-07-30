@@ -400,3 +400,17 @@ authorized operator clients use its read-only REST endpoint.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
   complete Mem0 API compatibility.
+
+## Destination-canonical federation identity additions
+
+`POST /v1/federation/peers` accepts an optional stable `issuer_namespace`
+(defaulting to the endpoint). `POST /v1/federation/peers/:id/filters` accepts
+`canonical_ingest` (default `false`), `destination_visibility`, and
+`destination_max_trust`. Canonical ingestion is limited to complete signed
+`observation.appended` events; all other accepted events remain transport
+records.
+
+`PATCH /v1/federation/external-actors/:id` updates `display_name` without
+changing identity, or explicitly relinks with `relink_to` plus required
+`reason`. Both operations require `federation:write`; relinks retain history
+and both operations write audit metadata.

@@ -177,7 +177,12 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             principal.principalId,
             "observation",
             id,
-            { subject_id: subjectId, kind, trust, visibility },
+            {
+              subject_id: subjectId, project_id: projectId, agent_id: agentId, run_id: runId,
+              kind, content, content_hash: contentHash, source_type: sourceType,
+              source_ref: sourceRef, trust, visibility, occurred_at: occurredAt,
+              external_actor_subject: principal.principalId,
+            },
             ingestedAt,
           ),
         ],

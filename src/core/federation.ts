@@ -3,8 +3,10 @@ import type { Db } from "./db";
 import { notFound, validationError, conflict, forbidden } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { signPayload } from "./webhooks";
+import { historyStatement, outboxStatement } from "./observations";
+import { auditStatement } from "./audit";
 import type { RequestContext, Result } from "./http";
-import { LIMITS, requireObject, requireString, optionalString, requireEnum } from "./validate";
+import { LIMITS, requireObject, requireString, optionalString, requireEnum, optionalBoolean, optionalEnum, OBSERVATION_KINDS, VISIBILITIES } from "./validate";
 
 const DIRECTIONS = ["push", "pull", "bidirectional"] as const;
 const TRUST_FILTERS = ["unverified", "asserted", "verified", "policy_approved"] as const;
@@ -22,6 +24,7 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
   if (sharedSecret.length < 16)
     throw validationError('Field "shared_secret" must be at least 16 characters.');
   const direction = requireEnum(body, "direction", DIRECTIONS);
+  const issuerNamespace = optionalString(body, "issuer_namespace", LIMITS.identifier) ?? endpoint;
 
   const id = newId("fpeer");
   const now = ctx.app.now().toISOString();
@@ -29,9 +32,9 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
-      params: [id, principal.orgId, name, endpoint, hash, sharedSecret, direction, now],
+      sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at, issuer_namespace)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      params: [id, principal.orgId, name, endpoint, hash, sharedSecret, direction, now, issuerNamespace],
     },
   ]);
 
@@ -100,15 +103,18 @@ export async function addFilter(ctx: RequestContext): Promise<Result> {
   const includeKinds = optionalString(body, "include_kinds", 1000);
   const excludeSubjects = optionalString(body, "exclude_subjects", 1000);
   const minTrust = body.min_trust != null ? requireEnum(body, "min_trust", TRUST_FILTERS) : null;
+  const canonicalIngest = optionalBoolean(body, "canonical_ingest", false);
+  const destinationVisibility = canonicalIngest ? optionalEnum(body, "destination_visibility", VISIBILITIES, "team") : null;
+  const destinationMaxTrust = canonicalIngest ? optionalEnum(body, "destination_max_trust", TRUST_FILTERS, "asserted") : null;
 
   const id = newId("ffilt");
   const now = ctx.app.now().toISOString();
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO federation_filters (id, peer_id, resource_type, include_kinds, exclude_subjects, min_trust, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      params: [id, peerId, resourceType, includeKinds, excludeSubjects, minTrust, now],
+      sql: `INSERT INTO federation_filters (id, peer_id, resource_type, include_kinds, exclude_subjects, min_trust, created_at, canonical_ingest, destination_visibility, destination_max_trust)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [id, peerId, resourceType, includeKinds, excludeSubjects, minTrust, now, canonicalIngest ? 1 : 0, destinationVisibility, destinationMaxTrust],
     },
   ]);
 
@@ -150,6 +156,9 @@ interface FilterRow {
   include_kinds: string | null;
   exclude_subjects: string | null;
   min_trust: string | null;
+  canonical_ingest?: number;
+  destination_visibility?: string | null;
+  destination_max_trust?: string | null;
 }
 
 const TRUST_RANK: Record<string, number> = { unverified: 0, asserted: 1, verified: 2, policy_approved: 3 };
@@ -194,7 +203,7 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
   if (peer.direction === "push") throw forbidden("Peer is configured for push only.");
 
   const filters = await ctx.app.db.all<FilterRow>(
-    `SELECT resource_type, include_kinds, exclude_subjects, min_trust FROM federation_filters WHERE peer_id = ?`,
+    `SELECT resource_type, include_kinds, exclude_subjects, min_trust, canonical_ingest, destination_visibility, destination_max_trust FROM federation_filters WHERE peer_id = ?`,
     [peerId],
   );
 
@@ -277,9 +286,10 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
     direction: string;
     status: string;
     shared_secret: string | null;
+    issuer_namespace: string | null;
   }>(
     ctx.app.db,
-    `SELECT id, direction, status, shared_secret FROM federation_peers WHERE id = ? AND org_id = ?`,
+    `SELECT id, direction, status, shared_secret, issuer_namespace FROM federation_peers WHERE id = ? AND org_id = ?`,
     [peerId, principal.orgId],
   );
   if (!peer) throw notFound();
@@ -302,7 +312,7 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
   }
 
   const filters = await ctx.app.db.all<FilterRow>(
-    `SELECT resource_type, include_kinds, exclude_subjects, min_trust FROM federation_filters WHERE peer_id = ?`,
+    `SELECT resource_type, include_kinds, exclude_subjects, min_trust, canonical_ingest, destination_visibility, destination_max_trust FROM federation_filters WHERE peer_id = ?`,
     [peerId],
   );
 
@@ -351,8 +361,26 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
       continue;
     }
 
-    // Insert event
-    const actorId = typeof evt.actor_id === "string" ? evt.actor_id : principal.principalId;
+    // A remote actor reference is never a local actor ID. Resolve it within
+    // the registered issuer namespace so equal raw subjects from two peers do
+    // not collide or acquire local authority.
+    const externalSubject = typeof payload.external_actor_subject === "string"
+      ? payload.external_actor_subject
+      : (typeof evt.actor_id === "string" ? evt.actor_id : "unknown");
+    const issuer = peer.issuer_namespace ?? peer.id;
+    let mapping = await first<{ id: string; local_actor_id: string }>(ctx.app.db,
+      `SELECT id, local_actor_id FROM external_actor_mappings WHERE org_id = ? AND issuer_namespace = ? AND external_subject = ?`,
+      [principal.orgId, issuer, externalSubject]);
+    if (!mapping) mapping = { id: newId("xmap"), local_actor_id: newId("xactor") };
+    const actorId = mapping.local_actor_id;
+    const mappingExists = await first<{ id: string }>(ctx.app.db,
+      `SELECT id FROM external_actor_mappings WHERE id = ?`, [mapping.id]);
+    if (!mappingExists) stmts.push({
+      sql: `INSERT INTO external_actor_mappings (id, org_id, issuer_namespace, external_subject, local_actor_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+      params: [mapping.id, principal.orgId, issuer, externalSubject, actorId, now, now],
+    });
+
+    // Insert the transport event regardless of canonical eligibility.
     stmts.push({
       sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [evtId, principal.orgId, kind, actorId, resourceType, resourceId, JSON.stringify(payload), now],
@@ -362,6 +390,40 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
       params: [newId("flog"), peerId, resourceType, evtId, now],
     });
     results.push({ id: evtId, status: "success" });
+
+    const policy = filters.find((f) => f.resource_type === "observation" && f.canonical_ingest === 1);
+    const canonicalEligible = kind === "observation.appended" && resourceType === "observation" && policy;
+    if (canonicalEligible) {
+      const subjectId = typeof payload.subject_id === "string" ? payload.subject_id : null;
+      const observationKind = typeof payload.kind === "string" && (OBSERVATION_KINDS as readonly string[]).includes(payload.kind) ? payload.kind : null;
+      const content = typeof payload.content === "string" && payload.content.length <= LIMITS.content ? payload.content : null;
+      const contentHash = typeof payload.content_hash === "string" ? payload.content_hash : null;
+      const sourceType = typeof payload.source_type === "string" ? payload.source_type : null;
+      if (subjectId && observationKind && content && contentHash && sourceType) {
+        const localId = newId("obs");
+        const offeredTrust = typeof payload.trust === "string" ? payload.trust : "unverified";
+        const ceiling = policy.destination_max_trust ?? "asserted";
+        const trust = TRUST_RANK[offeredTrust] <= TRUST_RANK[ceiling] ? offeredTrust : ceiling;
+        const visibility = policy.destination_visibility ?? "team";
+        stmts.push({
+          sql: `INSERT INTO observations (id, org_id, subject_id, project_id, agent_id, run_id, actor_id, kind, content, content_hash, source_type, source_ref, trust, visibility, occurred_at, ingested_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          params: [localId, principal.orgId, subjectId,
+            typeof payload.agent_id === "string" ? payload.agent_id : null,
+            typeof payload.run_id === "string" ? payload.run_id : null,
+            actorId, observationKind, content, contentHash, `federation:${sourceType}`,
+            typeof payload.source_ref === "string" ? payload.source_ref : resourceId,
+            trust, visibility, typeof payload.occurred_at === "string" ? payload.occurred_at : null, now],
+        });
+        stmts.push({ sql: `INSERT INTO observations_fts (content, observation_id) VALUES (?, ?)`, params: [content, localId] });
+        stmts.push(historyStatement(principal.orgId, "observation", localId, 1, "federated_append", actorId, contentHash, now));
+        stmts.push(outboxStatement(principal.orgId, "observation", localId, "upsert", now));
+        stmts.push({
+          sql: `INSERT INTO federation_ingest_provenance (id, org_id, peer_id, remote_event_id, remote_resource_id, remote_actor_subject, local_actor_id, local_record_type, local_record_id, remote_created_at, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'observation', ?, ?, ?)`,
+          params: [newId("fprov"), principal.orgId, peerId, evtId, resourceId, externalSubject, actorId, localId, typeof evt.created_at === "string" ? evt.created_at : null, now],
+        });
+        results[results.length - 1] = { id: evtId, status: "success", detail: `canonical:${localId}` };
+      }
+    }
   }
 
   if (stmts.length > 0) await ctx.app.db.batch(stmts);
@@ -408,4 +470,43 @@ export async function federationLog(ctx: RequestContext): Promise<Result> {
   );
 
   return { data: { entries: rows } };
+}
+
+/** PATCH /v1/federation/external-actors/:id — rename or explicitly relink. */
+export async function updateExternalActor(ctx: RequestContext): Promise<Result> {
+  const principal = ctx.principal!;
+  const mappingId = ctx.params.id!;
+  const body = requireObject(await ctx.json());
+  const mapping = await first<{ id: string; local_actor_id: string; issuer_namespace: string; display_name: string | null }>(
+    ctx.app.db,
+    `SELECT id, local_actor_id, issuer_namespace, display_name FROM external_actor_mappings WHERE id = ? AND org_id = ?`,
+    [mappingId, principal.orgId],
+  );
+  if (!mapping) throw notFound();
+  const displayName = optionalString(body, "display_name", LIMITS.label);
+  const relinkTo = optionalString(body, "relink_to", LIMITS.identifier);
+  const reason = optionalString(body, "reason", LIMITS.label);
+  if (!displayName && !relinkTo) throw validationError('Field "display_name" or "relink_to" is required.');
+  if (relinkTo && !reason) throw validationError('Field "reason" is required for relink.');
+  if (relinkTo) {
+    const collision = await first<{ id: string }>(ctx.app.db,
+      `SELECT id FROM external_actor_mappings WHERE org_id = ? AND issuer_namespace = ? AND local_actor_id = ? AND id <> ?`,
+      [principal.orgId, mapping.issuer_namespace, relinkTo, mappingId]);
+    if (collision) throw conflict("Relink target already belongs to another external identity in this issuer namespace.");
+  }
+  const now = ctx.app.now().toISOString();
+  const nextActor = relinkTo ?? mapping.local_actor_id;
+  const statements = [{
+    sql: `UPDATE external_actor_mappings SET local_actor_id = ?, display_name = COALESCE(?, display_name), updated_at = ? WHERE id = ? AND org_id = ?`,
+    params: [nextActor, displayName, now, mappingId, principal.orgId],
+  }];
+  if (relinkTo) statements.push({
+    sql: `INSERT INTO external_actor_mapping_history (id, mapping_id, old_local_actor_id, new_local_actor_id, authorized_by, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    params: [newId("xhist"), mappingId, mapping.local_actor_id, relinkTo, principal.principalId, reason, now],
+  });
+  statements.push(auditStatement(principal.orgId, principal.principalId,
+    relinkTo ? "external_actor.relinked" : "external_actor.renamed", "external_actor_mapping", now,
+    mappingId, JSON.stringify({ old_local_actor_id: mapping.local_actor_id, new_local_actor_id: nextActor })));
+  await ctx.app.db.batch(statements);
+  return { data: { mapping_id: mappingId, local_actor_id: nextActor, display_name: displayName ?? mapping.display_name, updated_at: now } };
 }
