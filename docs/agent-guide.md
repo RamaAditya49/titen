@@ -3,7 +3,7 @@
 ## Quick start
 
 ```typescript
-import { TitenClient } from "titen/sdk";
+import { TitenClient } from "titen-memory/sdk";
 
 const titen = new TitenClient({
   url: "http://127.0.0.1:8787",
@@ -147,7 +147,7 @@ const key = await titen.createKey({
 ## Error handling
 
 ```typescript
-import { TitenError } from "titen/sdk";
+import { TitenError } from "titen-memory/sdk";
 
 try {
   await titen.observe({ ... });

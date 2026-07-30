@@ -4,10 +4,31 @@ Status: **verified** — P0 memory service operational on Bun 1.3+ with SQLite (
 
 ## Quick start
 
+Prerequisites: Bun 1.3+.
+
+```bash
+# Bootstrap org — prints org_id and api_key
+bunx titen-memory bootstrap --org 'My Org'
+
+# Start the memory service (defaults to 127.0.0.1:8787)
+bunx titen-memory serve
+
+# Verify
+curl http://127.0.0.1:8787/healthz
+```
+
+The `titen` CLI runs on Bun: it uses `bun:sqlite`. `npx titen-memory` fails
+unless Bun is on `PATH`, because the published `bin` carries a
+`#!/usr/bin/env bun` shebang. The SDK (`import { TitenClient } from
+"titen-memory"`) is plain `fetch` and runs on Node 22+, Bun, Deno, and workers
+alike.
+
+## Quick start from a clone
+
 Prerequisites: Bun 1.3+, git, pnpm.
 
 ```bash
-git clone https://github.com/anthropic-labs/titen.git
+git clone https://github.com/RamaAditya49/titen.git
 cd titen
 pnpm install
 
