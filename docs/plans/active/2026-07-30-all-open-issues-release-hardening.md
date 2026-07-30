@@ -12,45 +12,45 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 ---
 # Plan
 
-- [ ] Freeze the live issue/PR/branch snapshot and preserve the dirty deployment
+- [x] Freeze the live issue/PR/branch snapshot and preserve the dirty deployment
   worktree plus every branch with unique unabsorbed commits.
-- [ ] Make migrations atomic/recoverable and runtime startup fail closed; add
+- [x] Make migrations atomic/recoverable and runtime startup fail closed; add
   canonical maintenance freshness and an explicit bounded Bun WAL policy.
-- [ ] Add workspace binding and one shared record-authorization predicate, then
+- [x] Add workspace binding and one shared record-authorization predicate, then
   use it before retrieval, evidence, Atlas, export, event, and webhook projection.
-- [ ] Withdraw the incomplete v0.3 policy/channel routes, scopes, and verified
+- [x] Withdraw the incomplete v0.3 policy/channel routes, scopes, and verified
   maturity claims until their full security contracts have separate accepted work.
-- [ ] Fence lease, claim lifecycle, idempotency, and checkpoint operations at the
+- [x] Fence lease, claim lifecycle, idempotency, and checkpoint operations at the
   shared application/SQL boundary used by REST and MCP.
-- [ ] Validate an entire import before one atomic commit, reject non-identical ID
+- [x] Validate an entire import before one atomic commit, reject non-identical ID
   collisions and evidence-less claims, and keep canonical/FTS/provenance aligned.
-- [ ] Select bounded lexical terms without position bias and expose truncation
+- [x] Select bounded lexical terms without position bias and expose truncation
   diagnostics.
-- [ ] Harden webhook destination resolution and delivery claims/retries/timeouts,
+- [x] Harden webhook destination resolution and delivery claims/retries/timeouts,
   and replace canonical plaintext signing secrets with externally keyed
   authenticated ciphertext plus rotation/recovery documentation.
-- [ ] Align vector metadata/prefiltering before top-K across Vectorize and
+- [x] Align vector metadata/prefiltering before top-K across Vectorize and
   sqlite-vec, requeue rebuildable projections, and prove noisy-neighbor parity.
-- [ ] Remove duplicated domain SQL from MCP and add equivalent REST/MCP state,
+- [x] Remove duplicated domain SQL from MCP and add equivalent REST/MCP state,
   security, error, and capability tests.
-- [ ] Validate MCP Origin, protocol-version, no-SSE GET, and tool annotation
+- [x] Validate MCP Origin, protocol-version, no-SSE GET, and tool annotation
   behavior; replace stale integration claims with an official-source host matrix
   and record native adapter/public-directory deferrals in `PONYTAIL-DEBT.md`.
-- [ ] Add the reviewer workflow as a canonical read projection with stable
+- [x] Add the reviewer workflow as a canonical read projection with stable
   pagination and existing fenced lifecycle actions; add no generic queue tables.
-- [ ] Replace the fail-open CLI parser path with a small local command/flag map and
+- [x] Replace the fail-open CLI parser path with a small local command/flag map and
   table-test help and malformed invocations for every documented command.
-- [ ] Harden SDK constructor/response parsing, add mutation idempotency options,
+- [x] Harden SDK constructor/response parsing, add mutation idempotency options,
   and expose documented generic authenticated JSON/raw access plus a maintained
   typed-route capability matrix.
-- [ ] Make README repository references absolute and simplify pack verification
+- [x] Make README repository references absolute and simplify pack verification
   to public behavior: pack, install, inspect README, and execute the installed bin.
 - [ ] Check in the verified loopback-only rootless deployment unit, reconcile or
   remove unverified helpers/limits, document remote access choices, and repeat
   current image/vector/WAL/live evidence.
-- [ ] Serialize or isolate the workerd restart fixture so the documented clean
+- [x] Serialize or isolate the workerd restart fixture so the documented clean
   aggregate contract command has no disposed-instance cascade.
-- [ ] Run focused adversarial/fault tests, `pnpm test:all`, browser on an available
+- [x] Run focused adversarial/fault tests, `pnpm test:all`, browser on an available
   configured port, workflow checker+self-test, route/docs checks, Worker dry-run,
   normal/custom-prefix pack verification, and installed-tarball CLI/SDK smoke.
 - [ ] Request and execute the explicit operator window for the `rama-tuf` reboot;
