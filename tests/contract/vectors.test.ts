@@ -7,6 +7,12 @@ import { createApp } from "../../src/core/app";
 import { migrate } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { clientVia, fakeVectors, provisionWith } from "./harness";
+import {
+  RANK_WEIGHTS,
+  normalizeVectorSimilarity,
+  rankCandidates,
+  type RankInput,
+} from "../../src/core/rank";
 
 /**
  * The optional vector capability, exercised against the shared core.
@@ -37,6 +43,21 @@ const CLAIMS = [
 const TASK = "rollback release safety";
 
 let claimIds: string[] = [];
+
+const rankInput = (id: string, confidence: number, vector_boost?: number): RankInput => ({
+  id,
+  kind: "procedural",
+  trust: "verified",
+  confidence,
+  status: "active",
+  created_at: "2026-07-30T00:00:00.000Z",
+  bm25: 0,
+  disputed: false,
+  feedback_positive: 0,
+  feedback_negative: 0,
+  feedback_total: 0,
+  vector_boost,
+});
 
 async function seed(client: ReturnType<typeof clientVia>) {
   const observation = await client.call("POST", "/v1/observations", {
@@ -165,6 +186,80 @@ test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
     lexicalOrder,
     "with no similarity the ranking must match lexical-only",
   );
+});
+
+test("narrow-band vector similarity is normalized before ranking", () => {
+  const candidates = [rankInput("near", 0.8, 0.991), rankInput("exact", 0.8, 0.993)];
+  const normalized = normalizeVectorSimilarity(candidates);
+  assert.equal(normalized.get("near"), 0);
+  assert.equal(normalized.get("exact"), 1);
+  const ranked = rankCandidates(candidates, new Date("2026-07-30T00:00:00.000Z"));
+  assert.equal(ranked[0]!.candidate.id, "exact");
+  assert.equal(ranked[0]!.components.relevance, 1);
+
+  const tied = normalizeVectorSimilarity([rankInput("a", 1, 0.99), rankInput("b", 1, 0.99)]);
+  assert.equal(tied.get("a"), 1);
+  assert.equal(tied.get("b"), 1);
+});
+
+test("confidence is an explicit weighted and auditable ranking factor", () => {
+  assert.equal(Object.values(RANK_WEIGHTS).reduce((sum, weight) => sum + weight, 0), 1);
+  const ranked = rankCandidates(
+    [rankInput("low", 0.2), rankInput("high", 0.9)],
+    new Date("2026-07-30T00:00:00.000Z"),
+  );
+  assert.equal(ranked[0]!.candidate.id, "high");
+  assert.equal(ranked[0]!.components.confidence, 0.9);
+  assert.equal(ranked[1]!.components.confidence, 0.2);
+  assert.equal(ranked[0]!.score - ranked[1]!.score, 0.07);
+});
+
+async function pendingCount() {
+  const rows = await db.all<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM index_outbox WHERE state = 'pending'`,
+  );
+  return Number(rows[0]!.count);
+}
+
+test("index drain reports embedder outages as retryable and preserves pending rows", async () => {
+  const broken = fakeVectors();
+  broken.breakEmbedder();
+  const app = clientVia(createApp({ db, revision: "test", runtime: "bun-sqlite", vectors: broken }), origin);
+  const before = await pendingCount();
+  const failed = await app.call("POST", "/v1/index/drain", { key });
+  assert.equal(failed.status, 503);
+  assert.equal(failed.body.error.code, "UNAVAILABLE");
+  assert.equal(failed.body.meta.dependency, "embedder");
+  assert.equal(failed.body.meta.retryable, true);
+  assert.equal(failed.body.meta.pending, before);
+  assert.equal(await pendingCount(), before);
+
+  broken.restoreEmbedder();
+  const recovered = await app.call("POST", "/v1/index/drain", { key });
+  assert.equal(recovered.status, 200);
+  assert.ok(recovered.body.data.indexed > 0);
+  assert.ok((await pendingCount()) < before);
+});
+
+test("index drain reports vector-store outages as retryable and preserves pending rows", async () => {
+  await seed(withoutVectors());
+  const broken = fakeVectors();
+  broken.breakStore();
+  const app = clientVia(createApp({ db, revision: "test", runtime: "bun-sqlite", vectors: broken }), origin);
+  const before = await pendingCount();
+  const failed = await app.call("POST", "/v1/index/drain", { key });
+  assert.equal(failed.status, 503);
+  assert.equal(failed.body.error.code, "UNAVAILABLE");
+  assert.equal(failed.body.meta.dependency, "vector_store");
+  assert.equal(failed.body.meta.retryable, true);
+  assert.equal(failed.body.meta.pending, before);
+  assert.equal(await pendingCount(), before);
+
+  broken.restoreStore();
+  const recovered = await app.call("POST", "/v1/index/drain", { key });
+  assert.equal(recovered.status, 200);
+  assert.ok(recovered.body.data.indexed > 0);
+  assert.ok((await pendingCount()) < before);
 });
 
 test("an unavailable embedder degrades to lexical retrieval instead of failing", async () => {

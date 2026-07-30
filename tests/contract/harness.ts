@@ -149,16 +149,29 @@ export function fakeVectors(): VectorCapability & {
   setScore(id: string, score: number): void;
   /** Make the embedder throw, to prove retrieval degrades instead of failing. */
   breakEmbedder(): void;
+  restoreEmbedder(): void;
+  breakStore(): void;
+  restoreStore(): void;
   embedCalls: () => number;
 } {
   const scores = new Map<string, number>();
   let broken = false;
+  let storeBroken = false;
   let calls = 0;
 
   return {
     setScore: (id, score) => scores.set(id, score),
     breakEmbedder: () => {
       broken = true;
+    },
+    restoreEmbedder: () => {
+      broken = false;
+    },
+    breakStore: () => {
+      storeBroken = true;
+    },
+    restoreStore: () => {
+      storeBroken = false;
     },
     embedCalls: () => calls,
     embedder: {
@@ -177,6 +190,7 @@ export function fakeVectors(): VectorCapability & {
        * test cannot tell "indexed" from "silently dropped".
        */
       async upsert(records) {
+        if (storeBroken) throw new Error("vector store is unavailable");
         for (const record of records) if (!scores.has(record.id)) scores.set(record.id, 0.5);
       },
       async query(_vector, options) {
