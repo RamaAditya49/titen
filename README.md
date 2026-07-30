@@ -6,6 +6,10 @@
   <img alt="Status: P0 memory service" src="https://img.shields.io/badge/status-P0%20memory%20service-A9552A?style=flat&amp;labelColor=3E3630">
   <img alt="Cloudflare target" src="https://img.shields.io/badge/target-Cloudflare%20Workers-223A57?style=flat&amp;labelColor=3E3630">
   <img alt="VPS target" src="https://img.shields.io/badge/target-Bun%20%2B%20SQLite-223A57?style=flat&amp;labelColor=3E3630">
+  <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm: titen-memory" src="https://img.shields.io/npm/v/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=A9552A"></a>
+  <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm downloads" src="https://img.shields.io/npm/dm/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
+  <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm unpacked size" src="https://img.shields.io/npm/unpacked-size/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
+  <a href="https://github.com/RamaAditya49/titen/graphs/contributors"><img alt="GitHub contributors" src="https://img.shields.io/github/contributors/RamaAditya49/titen?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
   <a href="./LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
 </p>
 

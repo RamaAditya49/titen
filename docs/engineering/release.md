@@ -32,7 +32,8 @@ While below `1.0.0`:
 | Change | Bump | Example |
 | --- | --- | --- |
 | Breaking — removed route, changed response shape, renamed field | **minor** | `0.1.2` → `0.2.0` |
-| Feature, fix, docs, packaging | **patch** | `0.1.1` → `0.1.2` |
+| Compatible feature, fix, published docs, packaging | **patch** | `0.1.1` → `0.1.2` |
+| Internal tests, refactors, contributor process | **none** | no release |
 
 There is no major bump before `1.0.0`. `^0.1.0` does not match `0.2.0`, so the
 minor slot is the only breaking-change signal consumers get.
@@ -71,6 +72,12 @@ npm dist-tag add titen-memory@0.2.0 latest
 Every merged issue fix lands on `main` under `## [Unreleased]` in
 [`CHANGELOG.md`](../../CHANGELOG.md). **`main` is always the truth; npm `latest`
 is the last deliberate cut.** They are allowed to differ, and usually do.
+
+Every pull request declares `none`, `patch`, or `minor`, but ordinary pull
+requests never run `npm version`, edit `package.json#version`, create a tag, or
+add a released changelog heading. They add notable user-facing changes only to
+`Unreleased`. At release time, the maintainer chooses the highest impact in the
+batch, moves those entries under the dated version, and performs one bump.
 
 Publishing on every merge would burn version numbers on changes nobody asked
 for, and every one of them is permanent — npm allows unpublish only within 72
@@ -147,6 +154,21 @@ exception on record is **0.1.0**, published from a staging tree before the
 packaging work was committed — no commit represents it, so it has no tag.
 Do not retrofit one onto a later commit; that would point the tag at code the
 release never contained.
+
+### Where published links live
+
+- `README.md` links once to the stable
+  [`titen-memory`](https://www.npmjs.com/package/titen-memory) package page. Its
+  npm badge reads the current registry version, so releases do not hard-code a
+  version there.
+- `CHANGELOG.md` keeps that stable package link near the top. Each released
+  version reference points to its GitHub Release, which carries the tag and
+  release notes.
+- Use `https://www.npmjs.com/package/titen-memory/v/<version>` only when exact
+  registry evidence is needed. Do not copy version-specific npm links into the
+  README, product docs, or deployment docs.
+- `package.json` remains the source for npm's repository, homepage, and issue
+  links; do not duplicate that metadata in release notes.
 
 ## Verifying a candidate
 
