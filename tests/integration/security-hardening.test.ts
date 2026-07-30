@@ -80,8 +80,33 @@ test("signing secrets migrate from plaintext, rotate, and fail closed without th
   await db.batch([{
     sql: `INSERT INTO webhooks(id, org_id, url, secret_hash, secret, events, status, created_at)
           VALUES ('whk_null', 'org_1', 'https://hooks.example.com/null', 'hash', NULL, '*', 'active', '2026-07-30T00:00:00Z')`,
+  }, {
+    sql: `INSERT INTO webhooks(id, org_id, url, secret_hash, secret, events, status, created_at)
+          VALUES ('whk_paused_null', 'org_1', 'https://hooks.example.com/paused-null', 'hash', NULL, '*', 'paused', '2026-07-30T00:00:00Z')`,
+  }, {
+    sql: `INSERT INTO federation_peers(id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
+          VALUES ('fpeer_null', 'org_1', 'Null Peer', 'https://null-peer.example.com', 'hash', NULL, 'push', 'active', '2026-07-30T00:00:00Z')`,
+  }, {
+    sql: `INSERT INTO federation_peers(id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
+          VALUES ('fpeer_suspended_null', 'org_1', 'Suspended Null Peer', 'https://suspended-null-peer.example.com', 'hash', NULL, 'push', 'suspended', '2026-07-30T00:00:00Z')`,
   }]);
-  assert.equal(await prepareSigningSecrets(db, rotating), false, "an active legacy NULL secret requires operator recovery");
+  assert.equal(await prepareSigningSecrets(db, rotating), true, "unrecoverable active NULL secrets are terminalized");
+  assert.deepEqual(
+    await db.all<{ id: string; status: string }>("SELECT id, status FROM webhooks WHERE id LIKE 'whk_%null' ORDER BY id"),
+    [
+      { id: "whk_null", status: "disabled" },
+      { id: "whk_paused_null", status: "paused" },
+    ],
+  );
+  assert.deepEqual(
+    await db.all<{ id: string; status: string }>("SELECT id, status FROM federation_peers WHERE id LIKE 'fpeer_%null' ORDER BY id"),
+    [
+      { id: "fpeer_null", status: "suspended" },
+      { id: "fpeer_suspended_null", status: "suspended" },
+    ],
+  );
+  assert.equal((await db.all<{ status: string }>("SELECT status FROM webhooks WHERE id = 'whk_1'"))[0]!.status, "active");
+  assert.equal((await db.all<{ status: string }>("SELECT status FROM federation_peers WHERE id = 'fpeer_1'"))[0]!.status, "active");
   close();
 });
 

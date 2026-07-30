@@ -210,10 +210,12 @@ Webhook and federation HMAC secrets are AES-256-GCM ciphertext in canonical SQL;
 the keyring remains external. Generate a 32-byte key, place the JSON keyring in
 the service's mode-0600 environment file, then restart. Startup wraps legacy
 plaintext rows in bounded batches while readiness keeps authenticated traffic
-blocked until rewrapping completes. Active legacy rows
-whose recoverable secret is `NULL`, a missing keyring, or a wrong key keep
-readiness failed until the peer/webhook is re-registered or the correct key is
-restored.
+blocked until rewrapping completes. Startup fail-closes an active legacy row
+whose recoverable secret is `NULL` by disabling the webhook or suspending the
+federation peer. Readiness can then recover so the operator can delete and
+re-register the webhook or register a replacement peer; the legacy peer stays
+suspended and fail-closed. A missing or wrong keyring for any non-`NULL`
+persisted secret keeps readiness failed until the correct key is restored.
 
 To rotate, add `v2` while retaining `v1`, make `v2` active, restart and verify
 readiness, then remove `v1` and restart again. Never put either key in SQL,

@@ -183,6 +183,12 @@ export async function prepareSigningSecrets(
   db: Db,
   cipher: SecretCipher | undefined,
 ): Promise<boolean> {
+  // A NULL signing secret cannot be recovered. Terminalize only those active
+  // integrations so startup can resume without making an unsigned delivery.
+  await db.batch([
+    { sql: `UPDATE webhooks SET status = 'disabled' WHERE status = 'active' AND secret IS NULL` },
+    { sql: `UPDATE federation_peers SET status = 'suspended' WHERE status = 'active' AND shared_secret IS NULL` },
+  ]);
   const counts = await Promise.all([
     db.all<{ present: number; missing: number }>(
       `SELECT SUM(CASE WHEN secret IS NOT NULL THEN 1 ELSE 0 END) AS present,
