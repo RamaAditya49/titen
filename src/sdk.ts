@@ -2,7 +2,7 @@
  * Titen Agent SDK — minimal TypeScript client for the memory service.
  *
  * Usage:
- *   import { TitenClient } from "titen/sdk";
+ *   import { TitenClient } from "titen-memory/sdk";
  *   const titen = new TitenClient({ url: "http://127.0.0.1:8787", key: "titen_sk_..." });
  *   const obs = await titen.observe({ subject_id: "user_x", kind: "tool_result", content: "...", source: { type: "tool", ref: "..." } });
  *   const ctx = await titen.compile({ subject_id: "user_x", task: "...", max_tokens: 900 });

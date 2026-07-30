@@ -85,13 +85,33 @@ security, hosting, and rollback boundaries.
 
 ### Local / VPS (Bun)
 
+No clone required — the CLI ships on npm:
+
 ```bash
-pnpm install
-pnpm titen bootstrap --org 'My Org'
+bunx titen-memory bootstrap --org 'My Org'
 # Save the printed api_key — it cannot be shown again
-pnpm titen serve
+bunx titen-memory serve
 # Memory service at http://127.0.0.1:8787
 curl http://127.0.0.1:8787/healthz
+```
+
+The CLI needs **Bun**: it runs on `bun:sqlite`, so `npx titen-memory` only works
+with Bun on `PATH`. From a clone, the same commands are `pnpm titen bootstrap`
+and `pnpm titen serve` after `pnpm install`.
+
+### Agent SDK (any runtime)
+
+The client is plain `fetch` — Node 22+, Bun, Deno, and edge workers:
+
+```bash
+npm i titen-memory      # or: pnpm add titen-memory / bun add titen-memory
+```
+
+```ts
+import { TitenClient } from "titen-memory";
+
+const titen = new TitenClient({ url: "http://127.0.0.1:8787", key: process.env.TITEN_KEY! });
+const ctx = await titen.compile({ subject_id: "user_x", task: "…", max_tokens: 900 });
 ```
 
 ### Cloudflare Workers
