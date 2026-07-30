@@ -19,21 +19,25 @@
 </p>
 
 > [!NOTE]
-> Titen's P0 memory service is operational on both Cloudflare Workers/D1 and
-> Bun/SQLite. The Level 5 evidence loop (observe → claim → compile → feedback)
-> is verified by 32 contract tests on each runtime. Vector retrieval and model
-> consolidation remain planned; lexical FTS5 serves all retrieval today.
+> The service and collaboration contracts are implemented and verified locally
+> on Bun/SQLite and workerd/D1. The dashboard is an interactive synthetic-data
+> prototype. See the [evidence-based maturity matrix](./docs/ROADMAP.md#maturity-matrix)
+> for the exact boundary of each claim.
 
-Titen is a lightweight, open-source **Level 6 collaborative memory fabric**
-built on a **Level 5 evidence-grounded memory kernel**. It helps personal,
-company, and enterprise agents share context and coordinate work without
-collapsing evidence, private perspectives, decisions, and task state into one
-untrusted vector store.
+When 2–10 agents share a project, they often repeat research, act on stale
+context, collide on the same task, or lose decisions during handoff. **Titen
+turns their evidence, decisions, work state, and feedback into scoped,
+traceable context so the next agent can continue instead of starting over.**
 
-Titen is designed to make agents more effective, faster, stable under partial
-failure, and increasingly useful at managing memory. It does this through an
-evidence-to-context feedback lifecycle—not by treating RAG or a vector database
-as the complete memory system.
+The first product focus is a small team running a researcher, writer, operator,
+and reviewer. Titen preserves source evidence, compiles only authorized context,
+and makes ownership, handoffs, and disagreements explicit. It is self-hostable
+on Bun/SQLite or Cloudflare-compatible infrastructure and does not require a
+vector database.
+
+Titen calls the evidence-grounded context kernel **Level 5** and the
+collaboration layer **Level 6**. Those labels are optional product vocabulary,
+not prerequisites for understanding or adopting the product.
 
 ## Why Titen
 
@@ -148,14 +152,15 @@ The level model is Titen's product vocabulary, not an industry standard.
 | 3     | Typed memory tiers and relationships                                      |
 | 4     | Automatic extraction, consolidation, and forgetting                       |
 | **5** | **Evidence-grounded, temporal context compilation with outcome feedback** |
-| **6** | **Collaborative memory, governance, and optional federation**             |
+| **6** | **Collaborative memory, governance, and signed event exchange**           |
 
 Level 4 manages stored memories. Level 5 decides what one agent should see for
-its next action. Level 6 adds the shared identity, visibility, coordination,
-governance, and federation needed by teams of agents.
+its next action. Level 6 adds shared identity, visibility, coordination, and
+governance. The current cross-deployment feature exchanges signed events;
+canonical recallable-memory federation remains planned.
 
 ```text
-Level 6   identify → share → coordinate → hand off → govern → federate
+Level 6   identify → share → coordinate → hand off → govern → exchange signed events
                                    │
 Level 5     observe → derive claims → compile context → act → feedback
                                    │
@@ -276,10 +281,12 @@ citations and explicit uncertainty.
 
 ## Roadmap boundary
 
-The Level 6 roadmap adds permissioned, observer-specific memory between agents,
-including disagreement and consensus. The first collaboration release stays on
-one Titen deployment. Federation waits for a proven multi-region or data
-boundary need.
+The Level 6 collaboration layer adds permissioned, observer-specific memory
+between agents, including disagreement and explicit resolution. Signed
+federation event exchange is implemented for cross-deployment transport.
+Federating canonical recallable memory—including destination-side ingestion,
+indexing, authorization, and recall semantics—remains planned and waits for a
+proven multi-region or data-boundary need.
 
 Enterprise governance adds versioned channel knowledge releases. Public-facing
 chatbots remain external gateways: they retrieve only active releases for their

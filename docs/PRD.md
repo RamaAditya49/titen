@@ -1,6 +1,6 @@
 # Titen product requirements document
 
-- Status: product baseline; static synthetic dashboard implemented, memory service planned
+- Status: product baseline; see the evidence-based maturity matrix in [ROADMAP](./ROADMAP.md#maturity-matrix)
 - Product direction: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers and Bun on a VPS
@@ -12,8 +12,9 @@
 Titen helps AI agents remember and work together. It stores immutable evidence,
 derives temporal claims, compiles task-specific context, and records whether
 that context helped. A collaboration layer adds private, team, and organization
-visibility plus checkpoints, leases, handoffs, policy, audit, and optional
-federation.
+visibility plus checkpoints, leases, handoffs, policy, and audit. Signed
+federation event exchange is available; canonical recallable-memory federation
+remains planned.
 An enterprise release layer lets authorized CRM/chatbot gateways serve reviewed
 knowledge snapshots without exposing canonical memory.
 
@@ -35,16 +36,38 @@ Existing agent memory commonly fails in four ways:
 The result is duplicated work, conflicting actions, accidental data sharing,
 and confident reuse of untrusted memory.
 
-## 3. Users
+## 3. Beachhead user and canonical scenario
 
-| User                   | Need                                                        | Default deployment                |
-| ---------------------- | ----------------------------------------------------------- | --------------------------------- |
-| Individual             | Persistent private agent context across sessions            | Bun/SQLite or Worker/D1           |
-| Small team             | Shared project knowledge and parallel agent handoffs        | One Titen deployment              |
-| Company                | Workspace isolation, roles, audit, and retention            | Managed Worker or private VPS     |
-| CRM/chatbot operator   | Approved customer knowledge plus isolated customer context  | Authorized gateway + Titen        |
-| Enterprise             | Governance, data boundaries, regional nodes, and federation | Multiple governed deployments     |
-| Agent framework author | Stable HTTP/MCP memory and coordination primitives          | Embedded client or remote service |
+The beachhead is a **small team running 2–10 agents** on one project. They
+already feel context drift, duplicate research or execution, fragile handoffs,
+and conflicts between stale or differently sourced claims. Individual,
+company, enterprise, CRM, and framework users remain valid secondary personas,
+but they do not define the initial product story.
+
+The canonical scenario has four roles:
+
+1. a **researcher** records source-backed findings and unresolved uncertainty;
+2. a **writer** compiles a bounded, cited context pack and produces a draft;
+3. an **operator** claims the delivery task, records execution evidence, and
+   hands off the outcome;
+4. a **reviewer** traces claims to evidence, preserves or resolves conflicts,
+   and records feedback for later recall.
+
+The scenario succeeds when the writer and operator reuse the research without
+repeating it, no two agents silently own the same task, the reviewer can trace
+recalled claims and conflicts, and a handoff can be resumed from explicit state.
+Measure duplicate-work rate, successful handoff rate, lease-conflict rate,
+evidence coverage of recalled claims, context usefulness, and time-to-resume.
+
+### Comparison guidance
+
+- **Raw files/logs** are simple and inspectable, but callers must implement
+  scoping, freshness, conflict handling, packing, and coordination themselves.
+- **A vector database** improves semantic candidate search, but similarity is
+  not provenance, authorization, temporal validity, task ownership, or truth.
+- **Simpler memory libraries** are a better fit for one agent that only needs
+  persistence and recall. Titen earns its complexity when several agents need
+  evidence-grounded context plus coordination and explicit handoffs.
 
 ## 4. Jobs to be done
 
@@ -115,8 +138,8 @@ and confident reuse of untrusted memory.
 - channel, audience, approval, redaction, validity, and revocation policy for
   customer-facing knowledge;
 - governed Scope Preview and Knowledge Release lenses for authorized operators;
-- governed federation between deployments when required by region or data
-  ownership.
+- governed signed event exchange between deployments when required by region or
+  data ownership; canonical recallable-memory federation remains planned.
 
 ## 7. Functional requirements
 
@@ -413,7 +436,8 @@ planned area in documentation is not implementation evidence.
 - identity-provider interface when enterprise work starts;
 - exact signed customer-assertion format and issuer/key-rotation contract at
   v0.3;
-- federation transport after a real multi-node requirement exists;
+- transport/orchestration and canonical recallable-memory federation semantics
+  after a real multi-node requirement exists;
 - measured Memory Atlas server-side caps after the authorized reference fixture
   exists;
 - the first post-Atlas dashboard area, selected only after its operator journey

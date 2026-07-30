@@ -11,6 +11,24 @@ const titen = new TitenClient({
 });
 ```
 
+## Canonical team scenario
+
+For the beachhead team of 2–10 agents, use one shared project and distinct
+credentials for a researcher, writer, operator, and reviewer:
+
+1. the researcher observes source-backed findings;
+2. the writer compiles cited context and records the draft outcome;
+3. the operator acquires a lease, executes, checkpoints progress, and hands off;
+4. the reviewer inspects evidence and conflicts, then records feedback.
+
+A successful run has no repeated research, no silent duplicate owner, a
+resumable handoff, and evidence-linked context the reviewer can audit. Track
+handoff completion, lease conflicts, duplicate work, evidence coverage,
+context usefulness, and time-to-resume. Raw files remain suitable when the team
+can manage these guarantees itself; a vector database is only a retrieval
+index; simpler memory is preferable for a single agent that needs persistence
+without collaboration controls.
+
 ## Lifecycle
 
 An agent's memory loop:

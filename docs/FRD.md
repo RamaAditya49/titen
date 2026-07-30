@@ -61,7 +61,7 @@ The minimum useful path must work without an LLM or vector database.
 | v0.1    | complete Level 5 kernel, optional consolidation, temporal/conflict lifecycle, evidence inspection, private checkpoints, API-key lifecycle, export/import                                              | one agent can remember, verify, resume, and move its data safely                   |
 | v0.2    | identities and memberships, visibility, shared checkpoints, leases, handoffs, observer-specific claims, audit, stateless MCP, events/webhooks, read-only Memory Atlas, progressive dashboard boundary | two agents collaborate and operators diagnose memory without private-data leakage  |
 | v0.3    | roles and policy, approvals, channel knowledge releases, retention/legal hold, identity boundary, audit/recovery, governance Atlas lenses                                                             | company and enterprise policy, release, channel-isolation, and recovery tests pass |
-| v1      | governed federation                                                                                                                                                                                   | authorized scopes exchange events without losing provenance or conflicts           |
+| v1      | signed federation event exchange                                                                                                                                                                      | authorized scopes exchange signed events without losing provenance or conflicts    |
 
 No feature in a later release is required to implement an earlier gate.
 
@@ -937,7 +937,12 @@ Acceptance:
 - backup and audit export contain no credentials or embeddings;
 - a failed restore cannot overwrite the currently active canonical store.
 
-## 13. Federation feature
+## 13. Signed federation event exchange and planned memory federation
+
+The current feature boundary is signed, filtered event transport. Remote events
+do not become destination canonical claims, indexes, or recallable context by
+virtue of exchange. Canonical recallable-memory federation is planned and must
+define destination ingestion, authorization, lifecycle, and recall separately.
 
 ### FED-001 — Governed event exchange
 
