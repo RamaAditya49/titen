@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
+import { signPayload } from "../../src/core/webhooks";
 import type { Fixture, Res } from "./harness";
 
 export interface Case {
@@ -2305,7 +2306,7 @@ export const CASES: Case[] = [
       await fx.query(
         `INSERT INTO federation_peers
            (id, org_id, name, endpoint, shared_secret_hash, direction, status, created_at)
-         VALUES (?, ?, 'legacy', 'https://legacy-private.example.test', 'hash', 'pull', 'active', ?)`,
+         VALUES (?, ?, 'legacy', 'https://legacy-private.example.test#titen-legacy-peer=fpeer_legacy_unowned', 'hash', 'pull', 'suspended', ?)`,
         ["fpeer_legacy_unowned", owner.orgId, "2026-07-30T00:00:00.000Z"],
       );
       const ownerPeers = await fx.call("GET", "/v1/federation/peers", { key: owner.key });
@@ -2315,6 +2316,15 @@ export const CASES: Case[] = [
         key: owner.key,
         body: { peer_id: "fpeer_legacy_unowned" },
       }), 404);
+      expectOk(await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: "legacy-replacement",
+          endpoint: "https://legacy-private.example.test",
+          shared_secret: "legacy-replacement-secret",
+          direction: "pull",
+        },
+      }), 201);
 
       const visible = await seedClaim(fx, owner.key, {
         observation: { visibility: "private", content: "Owner-only federation marker." },
@@ -2324,6 +2334,45 @@ export const CASES: Case[] = [
         observation: { visibility: "private", content: "Sibling-only federation marker." },
         claim: { visibility: "private", statement: "Sibling federation marker is hidden." },
       });
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: owner.key,
+        body: { name: "federation-cursor-scope" },
+      });
+      expectOk(workspace, 201);
+      const workspaceId = workspace.body.data.workspace_id as string;
+      const membership = await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          workspace_id: workspaceId,
+          principal_id: owner.principalId,
+          principal_kind: "agent",
+          role: "member",
+        },
+      });
+      expectOk(membership, 201);
+      const teamObservation = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({
+          workspace_id: workspaceId,
+          visibility: "team",
+          content: "Revocable federation team marker.",
+        }),
+      });
+      expectOk(teamObservation, 201);
+      const teamConsolidation = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "user_rama",
+          workspace_id: workspaceId,
+          claims: [claim(teamObservation.body.data.observation_id, {
+            visibility: "team",
+            statement: "Revocable federation team marker is current.",
+          })],
+        },
+      });
+      expectOk(teamConsolidation, 201);
+      const teamObservationId = teamObservation.body.data.observation_id as string;
+      const teamClaimId = teamConsolidation.body.data.claims[0].claim_id as string;
 
       const pulled = await fx.call("POST", "/v1/federation/pull", {
         key: owner.key,
@@ -2333,8 +2382,14 @@ export const CASES: Case[] = [
       const resourceIds = new Set(pulled.body.data.events.map((event: any) => event.resource_id));
       assert.ok(resourceIds.has(visible.observationId), "the caller must receive its own private event");
       assert.ok(resourceIds.has(visible.claimId), "the caller must receive its own private claim event");
+      assert.ok(resourceIds.has(teamObservationId), "an active member must receive its team event");
+      assert.ok(resourceIds.has(teamClaimId), "an active member must receive its team claim event");
       assert.ok(!resourceIds.has(hidden.observationId), "a sibling's private observation event must not leak");
       assert.ok(!resourceIds.has(hidden.claimId), "a sibling's private claim event must not leak");
+
+      expectOk(await fx.call("DELETE", `/v1/memberships/${membership.body.data.membership_id}`, {
+        key: owner.key,
+      }));
 
       const again = await fx.call("POST", "/v1/federation/pull", {
         key: owner.key,
@@ -2342,7 +2397,110 @@ export const CASES: Case[] = [
       });
       expectOk(again);
       assert.equal(again.body.data.events.length, 0, "the owner's cursor must not replay its batch");
+      assert.ok(
+        again.body.data.events.every((event: any) => ![teamObservationId, teamClaimId].includes(event.resource_id)),
+        "revoked team events must stay hidden",
+      );
       assert.equal(again.body.data.cursor, pulled.body.data.cursor, "the owner's cursor must remain stable");
+    },
+  },
+  {
+    name: "federation push stores remote identity as an owner-visible untrusted wrapper",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "federation_receiver", scopes: ["*"] });
+      const victim = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "federation_victim",
+        scopes: ["*"],
+      });
+      const victimMemory = await seedClaim(fx, victim.key, {
+        observation: { visibility: "private", content: "Victim-local pointer target." },
+        claim: { visibility: "private", statement: "Victim-local pointer target is private." },
+      });
+      expectOk(await fx.call("POST", "/v1/webhooks", {
+        key: victim.key,
+        body: {
+          url: "https://hooks.example.com/federation-victim",
+          secret: "federation-victim-hook-secret",
+          events: ["*"],
+        },
+      }), 201);
+
+      const secret = "signed-remote-wrapper-secret";
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: "signed-inbound",
+          endpoint: "https://signed-inbound.example.test",
+          shared_secret: secret,
+          direction: "push",
+        },
+      });
+      expectOk(peer, 201);
+      const remoteEvents = [
+        {
+          id: "evt_remote_actor_injection",
+          kind: "remote.actor_probe",
+          actor_id: victim.principalId,
+          resource_type: "event",
+          resource_id: "remote_event_target",
+          payload: { marker: "actor" },
+          created_at: "2026-07-30T00:00:00.000Z",
+        },
+        {
+          id: "evt_remote_observation_pointer",
+          kind: "observation.appended",
+          actor_id: owner.principalId,
+          resource_type: "observation",
+          resource_id: victimMemory.observationId,
+          payload: { marker: "observation" },
+          created_at: "2026-07-30T00:00:01.000Z",
+        },
+        {
+          id: "evt_remote_claim_pointer",
+          kind: "claim.materialized",
+          actor_id: owner.principalId,
+          resource_type: "claim",
+          resource_id: victimMemory.claimId,
+          payload: { marker: "claim" },
+          created_at: "2026-07-30T00:00:02.000Z",
+        },
+      ];
+      const body = { peer_id: peer.body.data.peer_id, events: remoteEvents };
+      const pushed = await fx.call("POST", "/v1/federation/push", {
+        key: owner.key,
+        body,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(body))}` },
+      });
+      expectOk(pushed);
+      assert.ok(pushed.body.data.results.every((result: any) => result.status === "success"));
+
+      const victimFeed = await fx.call("GET", "/v1/events?limit=200", { key: victim.key });
+      expectOk(victimFeed);
+      const remoteIds = new Set(remoteEvents.map((event) => event.id));
+      assert.ok(
+        victimFeed.body.data.events.every((event: any) => !remoteIds.has(event.id)),
+        "remote actor and canonical pointers must not grant local victim visibility",
+      );
+      const victimDrain = await fx.call("POST", "/v1/webhooks/deliver", {
+        key: victim.key,
+        body: {},
+      });
+      expectOk(victimDrain);
+      assert.equal(victimDrain.body.data.events_drained, 0, "the victim webhook must not queue remote wrappers");
+
+      const ownerFeed = await fx.call("GET", "/v1/events?limit=200", { key: owner.key });
+      expectOk(ownerFeed);
+      const wrappers = ownerFeed.body.data.events.filter((event: any) => remoteIds.has(event.id));
+      assert.equal(wrappers.length, remoteEvents.length);
+      for (const wrapper of wrappers) {
+        const remote = remoteEvents.find((event) => event.id === wrapper.id)!;
+        assert.equal(wrapper.kind, "federation.received");
+        assert.equal(wrapper.actor_id, owner.principalId);
+        assert.equal(wrapper.resource_type, "federated_event");
+        assert.equal(wrapper.resource_id, remote.id);
+        assert.deepEqual(wrapper.payload.untrusted_remote_event, remote);
+      }
     },
   },
   {

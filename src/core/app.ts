@@ -232,6 +232,21 @@ async function readiness(ctx: RequestContext): Promise<Result> {
 
 const compiled = compileRoutes(ROUTES);
 
+/** Canonical origin trusted for browser-originated MCP requests. */
+export function parseMcpOrigin(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const url = new URL(value);
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || value !== url.origin)
+      throw new Error();
+    return url.origin;
+  } catch {
+    throw new Error(
+      "TITEN_MCP_ORIGIN must be an exact HTTP(S) origin without credentials, path, query, hash, or trailing slash.",
+    );
+  }
+}
+
 export function createApp(context: {
   db: Db;
   now?: () => Date;
@@ -243,7 +258,9 @@ export function createApp(context: {
   secretStorageReady?: boolean;
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
+  mcpOrigin?: string;
 }): (request: Request) => Promise<Response> {
+  const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
   const app: AppContext = {
     db: context.db,
     now: context.now ?? (() => new Date()),
@@ -266,11 +283,11 @@ export function createApp(context: {
         if (rawOrigin) {
           let origin: string;
           try {
-            origin = new URL(rawOrigin).origin;
+            origin = parseMcpOrigin(rawOrigin)!;
           } catch {
             throw forbidden("Invalid MCP Origin header.");
           }
-          if (origin !== url.origin)
+          if (origin !== (mcpOrigin ?? url.origin))
             throw forbidden("Cross-origin MCP requests are not allowed.");
         }
       }

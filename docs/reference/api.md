@@ -326,6 +326,16 @@ Return authorized metadata-only domain events after an opaque cursor. It lets an
 orchestrator poll when inbound webhooks are unavailable; it is not a transcript
 or raw memory feed.
 
+### Federation routes
+
+Each federation peer and cursor belongs to the principal that registered it.
+Signed push input proves the configured transport peer, not a local actor or
+canonical record. Accepted input is stored as an owner-visible
+`federation.received` event with resource type `federated_event`; the complete
+remote event remains untrusted under `payload.untrusted_remote_event`. Remote
+actor, resource type, and resource ID therefore never grant local feed or
+webhook visibility and never create canonical observations or claims.
+
 ### Proposed legacy webhook-subscription shape (not implemented)
 
 The implemented API uses `/v1/webhooks`, pause/resume action routes, and
@@ -507,19 +517,23 @@ families:
 Administrative key, membership, retention, and webhook-subscription operations
 are not enabled for ordinary agent profiles by default. MCP tools are stateless
 adapters over the same validated handlers as REST; restarting or disconnecting
-the MCP client loses no canonical state. `titen_compile` and
-`titen_checkpoint_get` are read-only; the other tools are write-capable so hosts
-can apply their native approval policy correctly. Server metadata uses the
-running build revision rather than a separately maintained MCP version.
+the MCP client loses no canonical state. Only `titen_checkpoint_get` is
+read-only. `titen_compile` persists a context run, and every other tool is also
+write-capable, so hosts can apply their native approval policy correctly. Server
+metadata uses the running build revision rather than a separately maintained MCP
+version.
 
 The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
-`GET /mcp` therefore returns `405`. A present `Origin` must match the endpoint
-origin or the request returns `403`; non-browser clients may omit it. The server
-negotiates protocol versions through `2025-11-25`, assumes the compatible
-`2025-03-26` behavior when the HTTP version header is absent, and returns `400`
-for an unsupported `MCP-Protocol-Version`. Tool discovery includes read-only,
-destructive, idempotent, and open-world hints; these are client hints only and
-never replace server-side scopes.
+`GET /mcp` therefore returns `405`. A present `Origin` must match the request URL
+origin, or the exact external origin configured by the Bun runtime's
+`TITEN_MCP_ORIGIN`, or the request returns `403`; non-browser clients may omit
+it. The configured value must be an HTTP(S) origin without credentials, path,
+query, hash, or trailing slash. Titen does not trust forwarded-protocol headers
+to derive it. The server negotiates protocol versions through `2025-11-25`,
+assumes the compatible `2025-03-26` behavior when the HTTP version header is
+absent, and returns `400` for an unsupported `MCP-Protocol-Version`. Tool
+discovery includes read-only, destructive, idempotent, and open-world hints;
+these are client hints only and never replace server-side scopes.
 
 Channel creation, release approval/activation/revocation, and channel context
 are not part of the ordinary agent MCP profile. Publisher, approver, and gateway

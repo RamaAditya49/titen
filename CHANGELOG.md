@@ -41,7 +41,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   state is principal-bound within an organization.
 - **Signing secrets are no longer canonical plaintext.** Webhook and federation
   secrets use versioned AES-256-GCM envelopes backed by an external keyring;
-  missing, wrong, or incomplete legacy migration state keeps readiness closed.
+  missing or wrong key material keeps readiness closed, while unrecoverable
+  legacy integrations without a secret are terminalized for safe replacement.
 - **The MCP transport validates its trust boundary.** Cross-origin browser
   requests and unsupported protocol revisions fail before tool execution, while
   tool annotations let hosts apply read/write approval policy correctly.
@@ -60,7 +61,13 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   filters execute before ranking on both runtimes.
 - **Webhook delivery survives retries, timeouts, crashes, and restart.** Queue
   claims are atomic, expired leases recover, pending age is observable, and
-  caller-visible queue state excludes other principals.
+  caller-visible queue state excludes other principals. Membership revocation
+  terminalizes queued delivery before any further outbound request.
+- **Federation peers and cursors are principal-bound.** Same-organization
+  credentials cannot discover, mutate, advance, or replay another principal's
+  peer or private event stream. Signed push data is stored as an owner-visible
+  untrusted wrapper, so remote actor and resource pointers grant no local
+  authority.
 - **Runtime and package gates reflect real operation.** Maintenance freshness,
   bounded WAL checkpoints, isolated workerd contract execution, rootless restart
   behavior, README links, SDK error parsing, CLI help, and npm install smokes are

@@ -147,6 +147,7 @@ switch (command) {
           : Number(process.env.TITEN_MAINTENANCE_INTERVAL_MS),
       secretCipher: parseSecretCipher(process.env.TITEN_SECRET_KEYS),
       webhookSecurity: createBunWebhookSecurity(process.env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES),
+      mcpOrigin: process.env.TITEN_MCP_ORIGIN,
     });
     console.log(`titen listening on ${started.url} (database ${dbPath})`);
     break;

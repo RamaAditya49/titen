@@ -151,10 +151,17 @@ test("events cross the network from one deployment into the other", async () => 
     `expected accepted events, got ${JSON.stringify(pushed.body.data.results)}`,
   );
 
-  // The signed exchange is durable, but an event whose canonical resource was
-  // not replicated stays hidden from the ordinary event projection.
+  // Remote identity and canonical pointers remain untrusted. The receiving
+  // principal sees local wrappers, never remote rows with local authority.
   const after = await call(east, "GET", "/v1/events");
-  assert.equal(after.body.data.events.length, 0, "an orphan event must not disclose a missing resource");
+  assert.equal(after.body.data.events.length, applied.length);
+  const remoteById = new Map(pulled.body.data.events.map((event: any) => [event.id, event]));
+  for (const wrapper of after.body.data.events) {
+    assert.equal(wrapper.kind, "federation.received");
+    assert.equal(wrapper.resource_type, "federated_event");
+    assert.equal(wrapper.resource_id, wrapper.id);
+    assert.deepEqual(wrapper.payload.untrusted_remote_event, remoteById.get(wrapper.id));
+  }
 
   // Both sides recorded the exchange.
   const sent = await call(west, "GET", `/v1/federation/log?peer_id=${outbound}`);

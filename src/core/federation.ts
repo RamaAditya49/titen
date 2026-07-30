@@ -211,9 +211,8 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
   if (peer.last_cursor) {
     const cursor = await first<{ created_at: string; id: string }>(
       ctx.app.db,
-      `SELECT e.created_at, e.id FROM events e
-        WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
-      [peer.last_cursor, principal.orgId, ...eventAccessParams(principal.principalId)],
+      `SELECT created_at, id FROM events WHERE id = ? AND org_id = ?`,
+      [peer.last_cursor, principal.orgId],
     );
     if (cursor) {
       conditions.push("(e.created_at > ? OR (e.created_at = ? AND e.id > ?))");
@@ -365,11 +364,32 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
       continue;
     }
 
-    // Insert event
-    const actorId = typeof evt.actor_id === "string" ? evt.actor_id : principal.principalId;
+    // A signed peer proves transport origin, not local identity or canonical
+    // record authority. Store the remote event as an explicitly untrusted
+    // wrapper owned by the authenticated peer principal.
+    const wrappedPayload = {
+      untrusted_remote_event: {
+        id: evtId,
+        kind,
+        actor_id: typeof evt.actor_id === "string" ? evt.actor_id : null,
+        resource_type: resourceType,
+        resource_id: resourceId,
+        payload,
+        created_at: typeof evt.created_at === "string" ? evt.created_at : null,
+      },
+    };
     stmts.push({
       sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      params: [evtId, principal.orgId, kind, actorId, resourceType, resourceId, JSON.stringify(payload), now],
+      params: [
+        evtId,
+        principal.orgId,
+        "federation.received",
+        principal.principalId,
+        "federated_event",
+        evtId,
+        JSON.stringify(wrappedPayload),
+        now,
+      ],
     });
     stmts.push({
       sql: `INSERT INTO federation_log (id, peer_id, direction, resource_type, resource_id, status, created_at) VALUES (?, ?, 'received', ?, ?, 'success', ?)`,

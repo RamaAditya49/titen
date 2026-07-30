@@ -67,6 +67,50 @@ test("concurrent migration callers converge on one complete schema", async () =>
   database.close();
 });
 
+test("migration retires unowned federation peers and releases their endpoint", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await db.exec(
+    `CREATE TABLE titen_migrations (
+       version INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL
+     )`,
+  );
+  for (const migration of MIGRATIONS.slice(0, -1)) {
+    await db.batch([
+      ...migration.statements.map((sql) => ({ sql })),
+      {
+        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+        params: [migration.version, "2026-07-30T00:00:00.000Z"],
+      },
+    ]);
+  }
+  await db.batch([
+    { sql: `INSERT INTO organizations (id, name, created_at) VALUES ('org_legacy', 'Legacy', '2026-07-30T00:00:00.000Z')` },
+    {
+      sql: `INSERT INTO federation_peers
+              (id, org_id, name, endpoint, shared_secret_hash, direction, status, created_at)
+            VALUES ('fpeer_legacy', 'org_legacy', 'Legacy', 'https://peer.example.test', 'hash', 'pull', 'active', '2026-07-30T00:00:00.000Z')`,
+    },
+  ]);
+
+  assert.equal(await migrate(db), SCHEMA_VERSION);
+  assert.deepEqual(
+    await db.all("SELECT principal_id, endpoint, status FROM federation_peers WHERE id = 'fpeer_legacy'"),
+    [{
+      principal_id: null,
+      endpoint: "https://peer.example.test#titen-legacy-peer=fpeer_legacy",
+      status: "suspended",
+    }],
+  );
+  await db.batch([{
+    sql: `INSERT INTO federation_peers
+            (id, org_id, principal_id, name, endpoint, shared_secret_hash, direction, status, created_at)
+          VALUES ('fpeer_replacement', 'org_legacy', 'agent_owner', 'Replacement', 'https://peer.example.test', 'hash', 'pull', 'active', '2026-07-30T00:00:01.000Z')`,
+  }]);
+  database.close();
+});
+
 test("a stale schema exposes diagnostics but blocks API traffic", async () => {
   const running = await serve({
     dbPath: join(temporary(), "titen.db"),

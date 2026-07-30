@@ -481,6 +481,12 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // Federation cursors are mutable authorization state. Legacy peers have
       // no attributable owner and therefore stay fail-closed until re-created.
       `ALTER TABLE federation_peers ADD COLUMN principal_id TEXT`,
+      // Keep legacy logs and filters, but retire the unusable peer and release
+      // its public endpoint so an attributable replacement can be registered.
+      `UPDATE federation_peers
+          SET endpoint = endpoint || '#titen-legacy-peer=' || id,
+              status = 'suspended'
+        WHERE principal_id IS NULL`,
       `CREATE TABLE maintenance_state (
          id TEXT PRIMARY KEY CHECK (id = 'background'),
          last_attempt_at TEXT NOT NULL,

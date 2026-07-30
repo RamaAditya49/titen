@@ -90,6 +90,7 @@ Docker is not required.
 TITEN_HOST=127.0.0.1
 TITEN_PORT=8787
 TITEN_DB_PATH=/var/lib/titen/titen.db
+TITEN_MCP_ORIGIN=https://titen.example.com
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
@@ -98,6 +99,12 @@ TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
 ```
 
 Model variables are optional. Observations and lexical context work without them.
+
+Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
+is the exact external origin (scheme, host, and optional port), with no trailing
+slash. Titen deliberately ignores forwarded-protocol headers, so an untrusted
+client cannot choose the accepted origin. Leave it unset for direct loopback or
+private-network access; the request URL origin remains the default.
 
 Local agents connect to `http://127.0.0.1:8787`. Remote agents use a TLS
 reverse proxy or private network with distinct revocable credentials.
@@ -212,9 +219,11 @@ the service's mode-0600 environment file, then restart. Startup wraps legacy
 plaintext rows in bounded batches while readiness keeps authenticated traffic
 blocked until rewrapping completes. Startup fail-closes an active legacy row
 whose recoverable secret is `NULL` by disabling the webhook or suspending the
-federation peer. Readiness can then recover so the operator can delete and
-re-register the webhook or register a replacement peer; the legacy peer stays
-suspended and fail-closed. A missing or wrong keyring for any non-`NULL`
+federation peer. Migration suspends an unattributed legacy peer and replaces its
+stored endpoint with a deterministic tombstone, so the operator can register an
+owned replacement at the original endpoint while the legacy log and filters
+remain preserved. Readiness can then recover; the legacy peer stays suspended
+and fail-closed. A missing or wrong keyring for any non-`NULL`
 persisted secret keeps readiness failed until the correct key is restored.
 
 To rotate, add `v2` while retaining `v1`, make `v2` active, restart and verify

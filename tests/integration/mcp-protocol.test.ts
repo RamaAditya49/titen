@@ -175,6 +175,72 @@ test("the HTTP transport rejects unsafe origins and unsupported revisions", asyn
   assert.equal(noStream.status, 405);
 });
 
+test("a TLS proxy origin is trusted only through explicit configuration", async () => {
+  const dbPath = join(directory, "external-origin.db");
+  const externalOrigin = "https://titen.example.com";
+  const proxied = await serve({
+    dbPath,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    revision: "mcp-proxy",
+    mcpOrigin: externalOrigin,
+  });
+  const database = openDatabase(dbPath);
+  const provisioned = await provisionWith(createSqliteDb(database), { scopes: ["*"] });
+  database.close();
+
+  const call = (origin: string) =>
+    fetch(`${proxied.url}/mcp`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${provisioned.key}`,
+        origin,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+
+  try {
+    assert.equal((await call(externalOrigin)).status, 200);
+    assert.equal((await call(proxied.url)).status, 403, "the internal HTTP origin is no longer trusted");
+    assert.equal((await call("https://attacker.example")).status, 403);
+  } finally {
+    await proxied.stop();
+  }
+
+  assert.equal(
+    (
+      await rpc(
+        { jsonrpc: "2.0", id: 11, method: "ping" },
+        { origin: externalOrigin, "x-forwarded-proto": "https" },
+      )
+    ).status,
+    403,
+    "forwarded protocol does not make an unconfigured external origin trusted",
+  );
+});
+
+test("invalid configured MCP origins fail before the server starts", async () => {
+  for (const [index, mcpOrigin] of [
+    "ftp://titen.example.com",
+    "https://user@titen.example.com",
+    "https://titen.example.com/path",
+    "https://titen.example.com/",
+  ].entries()) {
+    await assert.rejects(
+      serve({
+        dbPath: join(directory, `invalid-origin-${index}.db`),
+        port: 0,
+        hostname: "127.0.0.1",
+        quiet: true,
+        mcpOrigin,
+      }),
+      /TITEN_MCP_ORIGIN must be an exact HTTP\(S\) origin/,
+    );
+  }
+});
+
 test("a tool call returns MCP content and a failure stays readable", async () => {
   const called = await rpc({
     jsonrpc: "2.0",

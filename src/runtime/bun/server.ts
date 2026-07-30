@@ -1,4 +1,4 @@
-import { createApp } from "../../core/app";
+import { createApp, parseMcpOrigin } from "../../core/app";
 import { migrate, schemaState } from "../../core/migrations";
 import { runMaintenance } from "../../core/maintenance";
 import type { VectorCapability } from "../../core/vectors";
@@ -28,6 +28,8 @@ export interface ServeOptions {
   embedApiKey?: string;
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
+  /** Exact public MCP origin when TLS terminates at a trusted reverse proxy. */
+  mcpOrigin?: string;
 }
 
 /**
@@ -35,6 +37,7 @@ export interface ServeOptions {
  * comes from the shared core.
  */
 export async function serve(options: ServeOptions) {
+  const mcpOrigin = parseMcpOrigin(options.mcpOrigin);
   const database = openDatabase(options.dbPath);
   const db = createSqliteDb(database);
   let migrationsReady = true;
@@ -77,6 +80,7 @@ export async function serve(options: ServeOptions) {
     secretStorageReady,
     webhookSecurity: options.webhookSecurity,
     secretCipher: options.secretCipher,
+    mcpOrigin,
   });
 
   // @ts-ignore - Bun global is provided by the runtime.

@@ -39,6 +39,7 @@ sudo systemctl enable --now backup.timer
 # TLS (with Caddy)
 sudo cp deploy/caddy/Caddyfile /etc/caddy/Caddyfile
 # Edit: replace titen.example.com with your domain
+# Set TITEN_MCP_ORIGIN=https://titen.example.com in /etc/titen/titen.env
 sudo systemctl reload caddy
 ```
 
@@ -86,7 +87,12 @@ Store the external AES-256-GCM keyring in the mode-0600 environment file:
 ```text
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
+TITEN_MCP_ORIGIN=https://titen.example.com
 ```
+
+`TITEN_MCP_ORIGIN` is required only when TLS terminates at the reverse proxy.
+Use the exact public origin without a trailing slash; Titen does not trust
+`X-Forwarded-Proto` to choose it.
 
 The Bun runtime pins outbound TLS to a public DNS answer and refuses redirects,
 private/link-local addresses, non-HTTPS URLs, and hosts outside this allowlist.
