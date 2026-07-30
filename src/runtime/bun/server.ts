@@ -59,13 +59,35 @@ export async function serve(options: ServeOptions) {
     },
   });
 
+  let stopped = false;
+  const stop = async () => {
+    if (stopped) return;
+    stopped = true;
+    await server.stop(true);
+    database.close();
+  };
+
+  /**
+   * Without this a supervisor's SIGTERM is ignored, the shutdown times out, and
+   * the process is killed with the database still open. Every restart then pays
+   * the timeout and SQLite recovers a WAL it did not need to. Registered only
+   * when serving, so a test or CLI command that calls serve() directly and stops
+   * it itself is unaffected.
+   */
+  const shutdown = () => {
+    void stop().then(() => process.exit(0));
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
+
   return {
     server,
     database,
     url: `http://${options.hostname}:${server.port}`,
     stop: async () => {
-      await server.stop(true);
-      database.close();
+      process.off("SIGTERM", shutdown);
+      process.off("SIGINT", shutdown);
+      await stop();
     },
   };
 }

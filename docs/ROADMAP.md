@@ -141,7 +141,15 @@ Proven by execution:
 - `deploy/backup.sh` executed end to end, with the restored copy verified and
   accepted by the service;
 - the dashboard reading `POST /v1/memory-views/compile` from a live deployment
-  (`pnpm verify:dashboard-live`).
+  (`pnpm verify:dashboard-live`);
+- **a containerized deployment against a real embedding model.** Built with
+  podman on Fedora 44, running `embeddinggemma` through Ollama at 768
+  dimensions. `scripts/e2e.ts` drove the whole loop over HTTP against the
+  container: semantic recall retrieved a claim sharing *zero* keywords with the
+  query, ranked it above a decoy (relevance 0.4978 against 0.4806, the same
+  order as the model's own cosine of 0.4907 against 0.4162), and memory survived
+  a container restart. Index drain 134.9 ms, context compile p50 104.8 ms,
+  embedding 106.4 ms, image 623 MB.
 
 Not proven, and not claimed:
 
@@ -149,11 +157,15 @@ Not proven, and not claimed:
   `database_id`. Everything Cloudflare-side is verified against workerd and local
   D1 through Miniflare, plus `wrangler deploy --dry-run`. A first real deploy
   needs an account, a D1 database, and one smoke run against the deployed URL.
-- **A real VPS install.** The systemd units, Caddyfile, and monitor script are
-  written but have never run on a provisioned host. `backup.sh` has been executed
-  directly; it has not been executed by its timer under the `titen` user.
+- **A real VPS install via systemd.** The units, Caddyfile, and monitor script
+  are written but have never run on a provisioned host under the `titen` user.
+  The service itself has now run containerized on a real remote machine with a
+  real embedding model, so what remains unproven is specifically the systemd and
+  reverse-proxy wiring, not the service.
 - **Vectorize and Workers AI.** The Cloudflare vector adapter has no test,
-  because it needs live bindings. Its Bun counterpart is covered.
+  because it needs live bindings. Its Bun counterpart is covered by unit tests,
+  by the real-extension integration test, and by the containerized end-to-end
+  run against `embeddinggemma`.
 - **Retry escalation over time.** Webhook backoff schedules the next attempt and
   that is asserted; no test advances a clock through all five attempts to a
   `failed` terminal state.

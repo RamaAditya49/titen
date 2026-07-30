@@ -86,6 +86,64 @@ public route.
 `sqlite-vec` stores and searches vectors; it does not generate them. Pin and
 probe the version because its public API remains pre-v1.
 
+## Container install (verified)
+
+Optional. The service runs fine directly under Bun; this exists so a deployment
+can be reproduced without provisioning a host. Built and run with podman on
+Fedora 44; nothing in the `Dockerfile` is docker-specific.
+
+```bash
+podman build -t titen:latest .            # or: docker build
+podman volume create titen-data
+
+# Bootstrap once. Save the printed api_key; it cannot be shown again.
+podman run --rm -v titen-data:/var/lib/titen titen:latest \
+  bootstrap --db /var/lib/titen/titen.db --org 'My Org'
+
+# Serve. The embedding variables are optional; without them retrieval is
+# lexical-only and readiness reports the vector capability as disabled.
+podman run -d --name titen --network host -v titen-data:/var/lib/titen \
+  -e TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
+  -e TITEN_EMBED_MODEL=embeddinggemma \
+  -e TITEN_EMBED_DIMS=768 \
+  -e TITEN_VEC_DB_PATH=/var/lib/titen/vectors.db \
+  titen:latest serve --db /var/lib/titen/titen.db --host 127.0.0.1 --port 8787
+
+curl http://127.0.0.1:8787/readyz
+```
+
+Two things that will bite otherwise:
+
+- **The base image must use glibc.** `sqlite-vec` ships a glibc-linked prebuilt
+  binary; on Alpine it fails to load with `__memcpy_chk: symbol not found`. An
+  Alpine image still starts and serves, it just loses vector retrieval silently.
+  That is why the image is Debian-based and 623 MB rather than ~100 MB.
+- **Podman builds OCI images, which ignore `HEALTHCHECK`.** Use
+  `podman build --format docker` if you want it honoured, or rely on an external
+  probe against `/healthz`.
+
+### Indexing is a scheduled job
+
+Vector retrieval finds nothing until the indexing outbox is drained. Every write
+queues a row; embedding calls a model over the network, so a canonical write must
+not wait on one. Schedule it:
+
+```bash
+curl -sX POST http://127.0.0.1:8787/v1/index/drain?limit=50 \
+  -H "authorization: Bearer $TITEN_KEY"
+```
+
+The same applies to webhook delivery via `POST /v1/webhooks/deliver`.
+
+### Verified behavior
+
+A containerized run against `embeddinggemma` (768 dimensions) served through
+Ollama retrieved a claim that shared no keywords with the query, ranked it above
+a lexically similar decoy in the same order as the model's own cosine similarity,
+and preserved all memory across a container restart. Measured: index drain
+134.9 ms, context compile p50 104.8 ms, embedding 106.4 ms. Graceful shutdown
+completes in about 130 ms.
+
 ## Service hardening
 
 The production unit should use:

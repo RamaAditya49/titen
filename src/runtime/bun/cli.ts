@@ -87,11 +87,21 @@ const dbPath = text(flags.db, "titen.db");
 
 switch (command) {
   case "serve": {
+    // Vector retrieval is configured by environment, not by flags: the values
+    // are deployment facts (and one is a credential), so they belong in the unit
+    // file or the container environment rather than a shell history. Absent any
+    // of them the service serves lexical retrieval and says so in readiness.
+    const embedDims = Number(process.env.TITEN_EMBED_DIMS ?? "0");
     const started = await serve({
       dbPath,
       port: Number(text(flags.port, "8787")),
       hostname: text(flags.host, "127.0.0.1"),
       revision: text(flags.revision, "dev"),
+      vecDbPath: process.env.TITEN_VEC_DB_PATH ?? `${dbPath}.vec`,
+      embedBaseUrl: process.env.TITEN_EMBED_BASE_URL,
+      embedModel: process.env.TITEN_EMBED_MODEL,
+      embedDims: Number.isInteger(embedDims) && embedDims > 0 ? embedDims : undefined,
+      embedApiKey: process.env.TITEN_EMBED_API_KEY,
     });
     console.log(`titen listening on ${started.url} (database ${dbPath})`);
     break;

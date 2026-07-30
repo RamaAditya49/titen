@@ -46,15 +46,24 @@ const round = (value: number) => Math.round(value * 1e6) / 1e6;
  * stable provider score (FRD RET-001).
  */
 export function normalizeRelevance(candidates: RankInput[]): Map<string, number> {
-  const scores = candidates.map((candidate) => -candidate.bm25);
+  // A candidate the lexical index never matched carries bm25 = 0, because bm25()
+  // is negative for a real match. Those are normalized to zero rather than
+  // included in the span: otherwise a set with no lexical signal at all has a
+  // zero span and every candidate scores 1, which silently discards the ordering
+  // a vector store just provided.
+  const lexical = candidates.filter((candidate) => candidate.bm25 !== 0);
+  const scores = lexical.map((candidate) => -candidate.bm25);
   const best = Math.max(...scores, 0);
   const worst = Math.min(...scores, 0);
   const span = best - worst;
-  return new Map(
-    candidates.map((candidate, index) => [
+  const byId = new Map(
+    lexical.map((candidate, index) => [
       candidate.id,
       span === 0 ? 1 : (scores[index]! - worst) / span,
     ]),
+  );
+  return new Map(
+    candidates.map((candidate) => [candidate.id, byId.get(candidate.id) ?? 0]),
   );
 }
 

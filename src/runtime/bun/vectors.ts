@@ -32,8 +32,24 @@ export function createSqliteVecStore(
 
   try {
     // The prebuilt extension ships per-platform; absence is expected, not fatal.
-    const sqliteVec = require("sqlite-vec") as { load(database: unknown): void };
-    sqliteVec.load(db);
+    //
+    // Two loaders are attempted because the working one depends on how the
+    // package was installed. sqlite-vec's own load() passes a path ending in
+    // `.so`, and some Bun builds append the platform suffix again, producing
+    // `.so.so`. Stripping the suffix and loading directly is what works under
+    // `bun install`; load() is what works under a pnpm symlink layout. Trying
+    // both keeps one install method from silently losing vector retrieval.
+    const sqliteVec = require("sqlite-vec") as {
+      load(database: unknown): void;
+      getLoadablePath?(): string;
+    };
+    try {
+      sqliteVec.load(db);
+    } catch (error) {
+      const path = sqliteVec.getLoadablePath?.();
+      if (!path) throw error;
+      db.loadExtension(path.replace(/\.(so|dylib|dll)$/, ""));
+    }
     db.run(
       `CREATE VIRTUAL TABLE IF NOT EXISTS vec_claims USING vec0(
          id TEXT PRIMARY KEY,

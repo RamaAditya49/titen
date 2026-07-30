@@ -5,7 +5,7 @@ import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
 import { packUnderBudget, rankCandidates } from "./rank";
-import { ftsQuery, retrieveClaimCandidates } from "./retrieval";
+import { ftsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./retrieval";
 import { estimateJsonTokens } from "./tokens";
 import type { RequestContext, Result } from "./http";
 import {
@@ -52,36 +52,45 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
 
   const now = ctx.app.now();
   const at = now.toISOString();
+  const scope = { subjectId, projectId, at };
   const match = ftsQuery(task);
   const candidates = match
-    ? await retrieveClaimCandidates(ctx.app.db, principal, match, {
-        subjectId,
-        projectId,
-        at,
-      })
+    ? await retrieveClaimCandidates(ctx.app.db, principal, match, scope)
     : [];
 
-  // Hybrid: merge vector results when available
+  /**
+   * Hybrid retrieval. The vector index contributes recall, not only re-ranking:
+   * it runs even when lexical search found nothing, because the memory worth
+   * retrieving is often phrased nothing like the question. Ids it proposes are
+   * hydrated through the same scope-enforcing query as the lexical path, so a
+   * semantic hit can widen what is *found* but never what may be *read*.
+   */
   let vectorUsed = false;
-  if (ctx.app.vectors && candidates.length > 0) {
+  if (ctx.app.vectors) {
     try {
       const queryVec = (await ctx.app.vectors.embedder.embed([task]))[0];
       if (queryVec) {
-        const vectorHits = await ctx.app.vectors.store.query(queryVec, {
-          topK: 50,
+        const hits = await ctx.app.vectors.store.query(queryVec, {
+          topK: LIMITS.candidates,
           filter: { org_id: principal.orgId, subject_id: subjectId },
         });
-        // A candidate that both matches lexically and is semantically near the
-        // task carries its similarity into ranking.
-        const vectorScores = new Map(vectorHits.map((h) => [h.id, h.score]));
+        const similarity = new Map(hits.map((hit) => [hit.id, hit.score]));
+
+        const known = new Set(candidates.map((candidate) => candidate.id));
+        const unseen = [...similarity.keys()].filter((id) => !known.has(id));
+        if (unseen.length > 0)
+          candidates.push(
+            ...(await retrieveClaimsByIds(ctx.app.db, principal, unseen, scope)),
+          );
+
         for (const candidate of candidates) {
-          const score = vectorScores.get(candidate.id);
+          const score = similarity.get(candidate.id);
           if (score !== undefined) candidate.vector_boost = score;
         }
         vectorUsed = true;
       }
     } catch {
-      // Vector failure degrades gracefully to FTS-only
+      // A model or index outage degrades to whatever lexical search found.
     }
   }
 

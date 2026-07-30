@@ -8,6 +8,7 @@ import { exportRecords, importRecords } from "./portability";
 import { expireClaim, revokeClaim, supersedeClaim } from "./lifecycle";
 import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, releaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
 import { listEvents, getEvent } from "./events";
+import { drainIndex } from "./indexing";
 import { handleMcp } from "./mcp";
 import { compileView } from "./atlas";
 import { createPolicy, listPolicies, createRelease, publishRelease, revokeRelease, queryRelease, channelContext } from "./governance";
@@ -178,6 +179,7 @@ const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/webhooks/:id/resume", scope: "webhooks:write", handler: resumeWebhook },
   { method: "GET", path: "/v1/webhooks/:id/deliveries", scope: "webhooks:read", handler: listDeliveries },
   { method: "POST", path: "/v1/webhooks/deliver", scope: "webhooks:write", handler: drainWebhooks },
+  { method: "POST", path: "/v1/index/drain", scope: "index:write", handler: drainIndex },
 ];
 
 async function readiness(ctx: RequestContext): Promise<Result> {
