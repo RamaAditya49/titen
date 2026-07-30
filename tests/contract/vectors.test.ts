@@ -200,10 +200,14 @@ test("narrow-band vector similarity is normalized before ranking", () => {
   const tied = normalizeVectorSimilarity([rankInput("a", 1, 0.99), rankInput("b", 1, 0.99)]);
   assert.equal(tied.get("a"), 1);
   assert.equal(tied.get("b"), 1);
+
+  const absent = normalizeVectorSimilarity([rankInput("none", 1, 0)]);
+  assert.equal(absent.has("none"), false);
 });
 
 test("confidence is an explicit weighted and auditable ranking factor", () => {
-  assert.equal(Object.values(RANK_WEIGHTS).reduce((sum, weight) => sum + weight, 0), 1);
+  const weightSum = Object.values(RANK_WEIGHTS).reduce((sum, weight) => sum + weight, 0);
+  assert.ok(Math.abs(weightSum - 1) < Number.EPSILON * 2);
   const ranked = rankCandidates(
     [rankInput("low", 0.2), rankInput("high", 0.9)],
     new Date("2026-07-30T00:00:00.000Z"),

@@ -71,7 +71,7 @@ export function normalizeRelevance(candidates: RankInput[]): Map<string, number>
 
 /** Vector scores are provider-relative, so calibrate them inside this result set. */
 export function normalizeVectorSimilarity(candidates: RankInput[]): Map<string, number> {
-  const semantic = candidates.filter((candidate) => candidate.vector_boost !== undefined);
+  const semantic = candidates.filter((candidate) => (candidate.vector_boost ?? 0) > 0);
   if (semantic.length === 0) return new Map();
   const scores = semantic.map((candidate) => candidate.vector_boost!);
   const best = Math.max(...scores);

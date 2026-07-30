@@ -58,10 +58,10 @@ git diff --check
 | Check | Result |
 | --- | --- |
 | Workflow validation | `workflow docs OK`; checker self-test passed |
-| Ranking regressions | Added narrow-band, zero-span, explicit-confidence and weight-sum tests |
-| Dependency failures | Added embedder/store 503 metadata, pending preservation, and recovery tests |
-| TypeScript/build | Astro production build passed; Worker dry-run bundled 175.44 KiB / gzip 37.41 KiB |
-| Bun targeted tests | Not run: Bun is absent on this gateway |
-| Standalone `tsc` | Not available in project dependencies; no passing result claimed |
+| Ranking regressions | Narrow-band, zero-span, zero-similarity, explicit-confidence, and weight-sum tests passed |
+| Dependency failures | Embedder/store 503 metadata, pending preservation, and recovery tests passed |
+| Shared contract/SDK | 133 tests passed across Cloudflare D1, Bun SQLite, vector, and SDK suites |
+| Integration | 28 tests passed across sqlite-vec, maintenance, MCP, federation, and webhooks |
+| Build/browser | Worker dry-run bundled 175.44 KiB / gzip 37.42 KiB; Astro build and bundle budget passed; 8 browser tests passed on an alternate local port because 4399 was occupied by an unrelated checkout |
 | Whitespace | `git diff --check` passed |
 | Migration/deployment | Not applicable; no schema or deployed state changed |
