@@ -420,3 +420,18 @@ authorized operator clients use its read-only REST endpoint.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
   complete Mem0 API compatibility.
+
+## Operator work queue
+
+The queue records coordination state only; Titen does not select workers, schedule retries, or execute work. All routes require organization authentication, the named route scope, and membership in the work item's workspace. Readers may list but not mutate.
+
+| Method | Route | Scope | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/v1/work-items` | `work-items:write` | Create a pending bounded work item. |
+| `GET` | `/v1/work-items?workspace_id=...&status=...` | `work-items:read` | List visible workspace work items. |
+| `POST` | `/v1/work-items/:id/claim` | `work-items:claim` | Atomically claim with `{ttl_seconds}`; returns opaque `lease_token` and increasing `lease_version`. |
+| `POST` | `/v1/work-items/:id/heartbeat` | `work-items:claim` | Renew with `{lease_token,lease_version,ttl_seconds}` before expiry. |
+| `POST` | `/v1/work-items/:id/complete` | `work-items:claim` | Complete with the current fence plus `idempotency_key` and `outcome`. |
+| `POST` | `/v1/work-items/:id/requeue` | `work-items:claim` | Current claimant supplies its fence; workspace owner/admin may recover without it. |
+
+Claim, heartbeat, completion, and requeue use token/version fencing. An expired or reassigned worker receives `409 CONFLICT`. Completion repeats with the same claimant, idempotency key, and outcome return the stored response; changing the outcome conflicts. Events expose lifecycle metadata but omit payloads, outcomes, and tokens.

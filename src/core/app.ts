@@ -16,6 +16,7 @@ import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation } from "./observations";
+import { createWorkItem, listWorkItems, claimWorkItem, heartbeatWorkItem, completeWorkItem, requeueWorkItem } from "./work-items";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
 import { ApiError, unavailable, validationError } from "./errors";
@@ -151,6 +152,12 @@ const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/handoffs", scope: "handoffs:write", handler: createHandoff },
   { method: "POST", path: "/v1/handoffs/:id/resolve", scope: "handoffs:write", handler: resolveHandoff },
   { method: "GET", path: "/v1/handoffs", scope: "handoffs:read", handler: listHandoffs },
+  { method: "POST", path: "/v1/work-items", scope: "work-items:write", handler: createWorkItem },
+  { method: "GET", path: "/v1/work-items", scope: "work-items:read", handler: listWorkItems },
+  { method: "POST", path: "/v1/work-items/:id/claim", scope: "work-items:claim", handler: claimWorkItem },
+  { method: "POST", path: "/v1/work-items/:id/heartbeat", scope: "work-items:claim", handler: heartbeatWorkItem },
+  { method: "POST", path: "/v1/work-items/:id/complete", scope: "work-items:claim", handler: completeWorkItem },
+  { method: "POST", path: "/v1/work-items/:id/requeue", scope: "work-items:claim", handler: requeueWorkItem },
   { method: "POST", path: "/mcp", scope: "mcp:call", handler: handleMcp },
   { method: "GET", path: "/v1/events", scope: "events:read", handler: listEvents },
   { method: "GET", path: "/v1/events/:id", scope: "events:read", handler: getEvent },
