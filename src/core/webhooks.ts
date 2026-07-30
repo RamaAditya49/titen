@@ -249,11 +249,15 @@ export async function listDeliveries(ctx: RequestContext): Promise<Result> {
 export async function deliverEvent(
   db: Db,
   orgId: string,
-  eventKind: string,
+  event: { id: string; kind: string },
   payload: object,
   now: Date = new Date(),
   fetcher?: Fetcher,
 ): Promise<void> {
+  // Subscriptions are matched on kind; a delivery row records which event was
+  // attempted. Conflating the two made dedup match on kind, so only the first
+  // event of any kind was ever delivered.
+  const eventKind = event.kind;
   const hooks = await db.all<{
     id: string;
     url: string;
@@ -278,12 +282,22 @@ export async function deliverEvent(
   const nowStr = now.toISOString();
 
   for (const hook of matching) {
+    // Skip what this hook already received. The guard lives here rather than in
+    // each caller so the drain endpoint, the maintenance timer, and anything
+    // added later all get exactly-once delivery from one place.
+    const already = await first<{ id: string }>(
+      db,
+      `SELECT id FROM webhook_deliveries WHERE webhook_id = ? AND event_id = ?`,
+      [hook.id, event.id],
+    );
+    if (already) continue;
+
     const deliveryId = newId("dlv");
     const stmts: { sql: string; params: Param[] }[] = [
       {
         sql: `INSERT INTO webhook_deliveries (id, webhook_id, event_id, status, attempts, last_attempt_at, created_at)
               VALUES (?, ?, ?, 'pending', 0, NULL, ?)`,
-        params: [deliveryId, hook.id, eventKind, nowStr],
+        params: [deliveryId, hook.id, event.id, nowStr],
       },
     ];
 
@@ -317,7 +331,7 @@ export async function deliverEvent(
         stmts[0] = {
           sql: `INSERT INTO webhook_deliveries (id, webhook_id, event_id, status, attempts, last_attempt_at, response_status, created_at)
                 VALUES (?, ?, ?, 'success', 1, ?, ?, ?)`,
-          params: [deliveryId, hook.id, eventKind, nowStr, responseStatus, nowStr],
+          params: [deliveryId, hook.id, event.id, nowStr, responseStatus, nowStr],
         };
         stmts.push({
           sql: `UPDATE webhooks SET failure_count = 0, last_delivery_at = ? WHERE id = ?`,
@@ -335,7 +349,7 @@ export async function deliverEvent(
         stmts[0] = {
           sql: `INSERT INTO webhook_deliveries (id, webhook_id, event_id, status, attempts, last_attempt_at, next_retry_at, response_status, created_at)
                 VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
-          params: [deliveryId, hook.id, eventKind, deliveryStatus, nowStr, nextRetryAt, responseStatus, nowStr],
+          params: [deliveryId, hook.id, event.id, deliveryStatus, nowStr, nextRetryAt, responseStatus, nowStr],
         };
         stmts.push({
           sql: `UPDATE webhooks SET failure_count = ?, last_delivery_at = ? WHERE id = ?`,
@@ -384,7 +398,7 @@ export async function drainWebhooks(ctx: RequestContext): Promise<Result> {
     await deliverEvent(
       ctx.app.db,
       orgId,
-      event.kind,
+      { id: event.id, kind: event.kind },
       JSON.parse(event.payload),
       ctx.app.now(),
       globalThis.fetch,

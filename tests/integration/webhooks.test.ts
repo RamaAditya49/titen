@@ -170,11 +170,14 @@ test("a rejecting receiver is recorded as a failure and scheduled for retry", as
 
   const deliveries = await call("GET", `/v1/webhooks/${hookId}/deliveries`, undefined);
   assert.equal(deliveries.status, 200);
-  const attempted = deliveries.body.data.deliveries.filter(
-    (d: any) => d.event_id === "claim.materialized",
-  );
+  const attempted = deliveries.body.data.deliveries;
   assert.ok(attempted.length >= 1, "the attempt must be recorded");
   const record = attempted[0];
+  assert.match(
+    record.event_id,
+    /^evt_/,
+    "a delivery must identify the event it attempted, not its kind",
+  );
   assert.equal(record.response_status, 500, "the receiver's status must be stored");
   assert.equal(record.attempts, 1);
   assert.ok(record.next_retry_at, "a failed delivery must be scheduled for retry");
@@ -212,4 +215,82 @@ test("an unreachable destination fails without taking down the request", async (
     null,
     "no status exists when the connection never completed",
   );
+});
+
+test("a second event of the same kind is also delivered", async () => {
+  // The regression this file exists to prevent. Delivery dedup once matched on
+  // event kind, so the first observation.appended was sent and every later one was
+  // silently skipped forever.
+  received = [];
+  rejectNext = false;
+
+  const hook = await call("POST", "/v1/webhooks", {
+    url: `http://127.0.0.1:${receiver.port}/repeat`,
+    secret: SECRET,
+    events: ["observation.appended"],
+  });
+  assert.equal(hook.status, 201);
+  const hookId = hook.body.data.webhook_id as string;
+
+  const write = async (marker: string) => {
+    const res = await call("POST", "/v1/observations", {
+      subject_id: "user_hook_repeat",
+      kind: "tool_result",
+      content: `Repeat delivery evidence ${marker}.`,
+      source: { type: "tool", ref: `repeat#${marker}` },
+      trust: "verified",
+    });
+    assert.equal(res.status, 201);
+    return res.body.data.observation_id as string;
+  };
+
+  await write("first");
+  await call("POST", "/v1/webhooks/deliver", {});
+  const afterFirst = (
+    await call("GET", `/v1/webhooks/${hookId}/deliveries`, undefined)
+  ).body.data.deliveries.length;
+  assert.ok(afterFirst >= 1, "the first event of this kind must be delivered");
+
+  await write("second");
+  await call("POST", "/v1/webhooks/deliver", {});
+  const afterSecond = (
+    await call("GET", `/v1/webhooks/${hookId}/deliveries`, undefined)
+  ).body.data.deliveries;
+
+  assert.ok(
+    afterSecond.length > afterFirst,
+    `a later event of the same kind must also be delivered; had ${afterFirst}, now ${afterSecond.length}`,
+  );
+  // Each attempt names a distinct event, which is what makes dedup correct.
+  const ids = afterSecond.map((d: any) => d.event_id);
+  assert.equal(new Set(ids).size, ids.length, "each delivery must target one event");
+});
+
+test("draining twice does not deliver the same event twice", async () => {
+  received = [];
+  rejectNext = false;
+
+  const hook = await call("POST", "/v1/webhooks", {
+    url: `http://127.0.0.1:${receiver.port}/once`,
+    secret: SECRET,
+    events: ["*"],
+  });
+  const hookId = hook.body.data.webhook_id as string;
+
+  await call("POST", "/v1/observations", {
+    subject_id: "user_hook_once",
+    kind: "tool_result",
+    content: "Evidence that must be delivered exactly once.",
+    source: { type: "tool", ref: "once#1" },
+    trust: "verified",
+  });
+
+  await call("POST", "/v1/webhooks/deliver", {});
+  const first = (await call("GET", `/v1/webhooks/${hookId}/deliveries`, undefined)).body.data
+    .deliveries.length;
+  await call("POST", "/v1/webhooks/deliver", {});
+  const second = (await call("GET", `/v1/webhooks/${hookId}/deliveries`, undefined)).body.data
+    .deliveries.length;
+
+  assert.equal(second, first, "a repeated drain must not re-deliver an event");
 });

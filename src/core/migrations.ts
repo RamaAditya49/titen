@@ -407,6 +407,21 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE federation_peers ADD COLUMN shared_secret TEXT`,
     ],
   },
+  {
+    version: 9,
+    statements: [
+      // webhook_deliveries.event_id held the event *kind*, so delivery dedup
+      // matched on kind and only the first event of each kind was ever sent. The
+      // existing rows are therefore semantically wrong, and this is an
+      // operational delivery log rather than canonical evidence, so clearing it
+      // loses nothing that can be reconstructed from `events`.
+      `DELETE FROM webhook_deliveries`,
+      // One attempt row per webhook per event, enforced by the database so a
+      // replayed drain cannot double-deliver.
+      `CREATE UNIQUE INDEX webhook_deliveries_event
+         ON webhook_deliveries (webhook_id, event_id)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

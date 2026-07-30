@@ -114,21 +114,28 @@ async function deliverPending(
   );
   let delivered = 0;
   for (const { org_id: orgId } of orgs) {
-    // Only events nobody has attempted for this organization yet.
+    // Events with no delivery attempt yet, matched by event id. Matching on kind
+    // instead is what limited delivery to the first event of each kind.
     const events = await db.all<{ id: string; kind: string; payload: string }>(
       `SELECT e.id, e.kind, e.payload FROM events e
         WHERE e.org_id = ?
           AND NOT EXISTS (
             SELECT 1 FROM webhook_deliveries d
               JOIN webhooks w ON w.id = d.webhook_id
-             WHERE w.org_id = e.org_id AND d.event_id = e.kind
-               AND d.created_at >= e.created_at
+             WHERE w.org_id = e.org_id AND d.event_id = e.id
           )
         ORDER BY e.created_at, e.id LIMIT ?`,
       [orgId, limit],
     );
     for (const event of events) {
-      await deliverEvent(db, orgId, event.kind, JSON.parse(event.payload), now, fetcher);
+      await deliverEvent(
+        db,
+        orgId,
+        { id: event.id, kind: event.kind },
+        JSON.parse(event.payload),
+        now,
+        fetcher,
+      );
       delivered += 1;
     }
   }
