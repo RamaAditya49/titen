@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = process.env.PLAYWRIGHT_PORT ?? "4399";
+
 export default defineConfig({
   testDir: "./tests",
   // Browser specs only; tests/contract runs on Bun and workerd instead.
@@ -7,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: "line",
   use: {
-    baseURL: "http://127.0.0.1:4399",
+    baseURL: `http://127.0.0.1:${port}`,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -18,8 +20,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm preview --host 127.0.0.1 --port 4399",
-    url: "http://127.0.0.1:4399/dashboard/",
+    command: `pnpm preview --host 127.0.0.1 --port ${port}`,
+    url: `http://127.0.0.1:${port}/dashboard/`,
     reuseExistingServer: true,
     timeout: 30_000,
   },

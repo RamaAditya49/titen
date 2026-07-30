@@ -113,6 +113,29 @@ test("disconnects, clears private presentation, and reconnects without storage",
   await expect(page.locator('[data-inspector="focus"]')).toBeVisible();
 });
 
+test("uses only same-origin adapter responses for opt-in live Atlas", async ({ page }) => {
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", endpoint: "titen.internal" } }));
+  await page.route("**/dashboard-api/atlas/compile", async (route) => {
+    expect(route.request().headers().authorization).toBeUndefined();
+    const body = route.request().postDataJSON();
+    expect(body).toEqual({ lens: "conflict_freshness", subject_id: "default", limit: 5 });
+    await route.fulfill({ json: { data: { lens: "conflict_freshness", nodes: [{ id: "clm_live", type: "claim", label: "Live measured outcome", trust: "verified", status: "active", created_at: "2026-07-30T00:00:00Z" }], edges: [], metadata: {} } } });
+  });
+  await page.goto("/dashboard/?live=1");
+  await expect(page.locator(".runtime-label")).toHaveText("titen.internal · Conflict & Freshness live; other lenses synthetic");
+  await page.getByRole("button", { name: "Conflict & Freshness" }).click();
+  await expect(page.getByText("Live measured outcome")).toBeVisible();
+  expect(await page.content()).not.toContain("TITEN_API_KEY");
+});
+
+test("labels live adapter failure without relabelling fixture rows live", async ({ page }) => {
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", endpoint: "titen.internal" } }));
+  await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ status: 502, json: { error: { code: "UPSTREAM_UNAVAILABLE" } } }));
+  await page.goto("/dashboard/?live=1");
+  await expect(page.locator(".runtime-label")).toHaveText("live Atlas unavailable · demo retained");
+  await expect(page.locator(".connected-label")).toContainText("error");
+});
+
 test("keeps unavailable product areas as non-interactive orientation", async ({
   page,
 }) => {
@@ -153,6 +176,8 @@ test("uses a readable mobile trail and bounded tablet graph", async ({
     if (viewport.width < 640)
       expect(overflow.graph).toBeLessThanOrEqual(overflow.graphClient ?? 0);
     else expect(overflow.graph).toBeGreaterThan(overflow.graphClient ?? 0);
+    await expect(page.locator(".runtime-label")).toContainText("synthetic");
+    await expect(page.locator(".runtime-label")).toBeVisible();
   }
   await expect(
     page.getByRole("heading", { level: 1, name: "Memory Atlas" }),

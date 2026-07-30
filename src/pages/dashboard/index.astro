@@ -4,10 +4,10 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
-import { isConnected, endpointLabel, compileView, atlasSubject } from "./api";
+import { isConnected, endpointLabel } from "../../lib/dashboard-api";
 
-// Resolved at build time. With no endpoint configured the shell must say so
-// rather than imply a live service; the fixture below is synthetic either way.
+// The static build is always credential-free and starts in explicit demo mode.
+// A same-origin adapter may opt into live data after the page loads.
 const live = isConnected();
 const runtimeLabel = endpointLabel();
 
@@ -125,8 +125,6 @@ const conflictRows =
         selectable: node.status === "disputed",
       }))
     : FIXTURE_CONFLICT_ROWS;
-
-const dataSource = conflictRows === FIXTURE_CONFLICT_ROWS ? "fixture" : "live";
 
 
 const scopeRows = [
@@ -777,7 +775,7 @@ const compileSteps = [
                     aria-label="Conflict and freshness records"
                     tabindex="0"
                   >
-                    <div class="data-table conflict-table">
+                    <div class="data-table conflict-table" data-conflict-table>
                       <div class="table-head">
                         <span></span><span>claim</span><span>status</span><span
                           >trust</span
@@ -1175,7 +1173,9 @@ const compileSteps = [
           document.querySelector(".connected-label").innerHTML =
             "<i></i>connected";
           document.querySelector(".runtime-label").textContent =
-            "workers · sg-01 · d1";
+            "synthetic demo · no live connection";
+          document.querySelector(".connected-label").innerHTML =
+            "<i></i>preview";
           selectLens("evidence");
           selectInspector("focus");
         });
@@ -1200,6 +1200,44 @@ const compileSteps = [
           dialog.close();
         }
       });
+
+      // Live mode is opt-in and same-origin. The browser never receives the
+      // canonical key; the adapter owns it and allowlists this single action.
+      async function connectLiveAtlas() {
+        try {
+          const status = await fetch("/dashboard-api/status", { headers: { accept: "application/json" } });
+          if (!status.ok) return;
+          const connection = await status.json();
+          if (connection.mode !== "live") return;
+          document.querySelector(".runtime-label").textContent = `${connection.endpoint} · connecting`;
+          const response = await fetch("/dashboard-api/atlas/compile", {
+            method: "POST",
+            headers: { "content-type": "application/json", accept: "application/json" },
+            body: JSON.stringify({ lens: "conflict_freshness", subject_id: "default", limit: 5 }),
+          });
+          if (!response.ok) throw new Error("live Atlas request failed");
+          const envelope = await response.json();
+          const nodes = envelope?.data?.nodes;
+          if (!Array.isArray(nodes)) throw new Error("invalid live Atlas response");
+          const table = document.querySelector("[data-conflict-table]");
+          table.querySelectorAll(".table-row").forEach((row) => row.remove());
+          for (const node of nodes.slice(0, 5)) {
+            const row = document.createElement("div");
+            row.className = `table-row ${node.status === "disputed" ? "danger" : "warning"}`;
+            row.innerHTML = `<span aria-hidden="true">●</span><span></span><span></span><span></span><span>authorized</span><span>—</span><span>—</span>`;
+            row.children[1].textContent = String(node.label ?? "Untitled claim");
+            row.children[2].textContent = String(node.status ?? "active");
+            row.children[3].textContent = String(node.trust ?? "unknown");
+            table.append(row);
+          }
+          document.querySelector(".connected-label").innerHTML = "<i></i>connected";
+          document.querySelector(".runtime-label").textContent = `${connection.endpoint} · Conflict & Freshness live; other lenses synthetic`;
+        } catch {
+          document.querySelector(".connected-label").innerHTML = "<i></i>error";
+          document.querySelector(".runtime-label").textContent = "live Atlas unavailable · demo retained";
+        }
+      }
+      if (new URLSearchParams(location.search).get("live") === "1") connectLiveAtlas();
     </script>
   </body>
 </html>
