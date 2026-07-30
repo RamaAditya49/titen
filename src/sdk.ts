@@ -35,6 +35,10 @@ export interface MutationOptions {
   idempotencyKey?: string;
 }
 
+export interface ConsolidateOptions extends MutationOptions {
+  workspaceId?: string;
+}
+
 export interface Observation {
   subject_id: string;
   kind: "user_statement" | "tool_result" | "imported_source" | "decision" | "system_event";
@@ -42,6 +46,7 @@ export interface Observation {
   source: { type: string; ref?: string };
   trust?: "unverified" | "asserted" | "verified" | "policy_approved";
   visibility?: "private" | "team" | "organization";
+  workspace_id?: string;
   project_id?: string;
   agent_id?: string;
   run_id?: string;
@@ -246,10 +251,10 @@ export class TitenClient {
     subject_id: string,
     claims: Claim[],
     project_id?: string,
-    options: MutationOptions = {},
+    options: ConsolidateOptions = {},
   ) {
     return this.request("POST", "/v1/consolidations", {
-      json: { subject_id, claims, project_id },
+      json: { subject_id, claims, project_id, workspace_id: options.workspaceId },
       idempotencyKey: options.idempotencyKey,
     });
   }

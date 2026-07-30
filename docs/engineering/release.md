@@ -102,10 +102,10 @@ reaches `latest`.
 Not shipped: the Astro dashboard (`src/pages`, `src/styles`), the Cloudflare
 adapter (deploy that from a clone with `wrangler`), tests, and docs.
 
-Consumers install **three** packages — `titen`, `sqlite-vec`, and its platform
-binary. `astro`, `wrangler`, `playwright`, and `miniflare` are devDependencies
-and must stay there; moving one into `dependencies` puts a build toolchain on
-every user's disk.
+Consumers install **three** packages — `titen-memory`, `sqlite-vec`, and its
+platform binary. `astro`, `wrangler`, `playwright`, and `miniflare` are
+devDependencies and must stay there; moving one into `dependencies` puts a build
+toolchain on every user's disk.
 
 ## Publishing
 

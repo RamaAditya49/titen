@@ -17,7 +17,63 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **An authorized reviewer queue in Memory Atlas.** The read-only lens derives
+  deterministic review work, counts, ownership, evidence, and opaque pagination
+  from canonical state without introducing a second queue database.
+- **Durable, signed Bun webhooks and rootless deployment artifacts.** Delivery
+  uses bounded leases, stable delivery IDs, retries, terminal failure, TLS
+  address pinning, and externally keyed secret encryption; the checked-in
+  Quadlet keeps the public binding on loopback by default.
+- **Broader SDK and CLI coverage.** Typed claim lifecycle/reviewer operations,
+  generic authenticated JSON/raw requests, mutation idempotency, strict flag
+  validation, and installed-tarball verification now cover the shipped surface.
+- **Current agent integration guidance.** Claude Code, Codex, OpenClaw, Hermes,
+  Pi, and generic clients share one MCP/REST contract; deliberately deferred
+  native adapters are recorded in `PONYTAIL-DEBT.md`.
+
+### Security
+
+- **Authorization now precedes every protected projection.** Team records are
+  workspace-bound and require active membership across context, evidence,
+  exports, events, Atlas, vectors, and webhook delivery; checkpoint and webhook
+  state is principal-bound within an organization.
+- **Signing secrets are no longer canonical plaintext.** Webhook and federation
+  secrets use versioned AES-256-GCM envelopes backed by an external keyring;
+  missing, wrong, or incomplete legacy migration state keeps readiness closed.
+- **The MCP transport validates its trust boundary.** Cross-origin browser
+  requests and unsupported protocol revisions fail before tool execution, while
+  tool annotations let hosts apply read/write approval policy correctly.
+
+### Fixed
+
+- **Schema and mutation races now have one winner.** Migrations recover from
+  faults and concurrent startup, leases and claim lifecycle transitions are
+  fenced atomically, and idempotency binds the credential plus full request
+  identity on both SQLite and D1.
+- **Imports are fully preflighted and atomic.** Orphan evidence, collisions, and
+  invalid late rows roll back canonical, history, FTS, event, audit, and outbox
+  effects even beyond one database batch.
+- **Retrieval cannot lose authorized tail terms or top-K slots.** Lexical term
+  selection is position-independent, and vector organization/subject/project
+  filters execute before ranking on both runtimes.
+- **Webhook delivery survives retries, timeouts, crashes, and restart.** Queue
+  claims are atomic, expired leases recover, pending age is observable, and
+  caller-visible queue state excludes other principals.
+- **Runtime and package gates reflect real operation.** Maintenance freshness,
+  bounded WAL checkpoints, isolated workerd contract execution, rootless restart
+  behavior, README links, SDK error parsing, CLI help, and npm install smokes are
+  checked through the actual runtime paths.
+
+### Changed
+
+- **Breaking:** incomplete policy, channel, release, and caller-selected customer
+  context routes were removed until their authorization contracts are ready.
+  Pre-`1.0`, this requires the `0.2.0` minor release.
+- MCP tools now delegate to the same validated application operations as REST,
+  negotiate through protocol `2025-11-25`, and expose seven wire tools across six
+  semantic families.
 
 ## [0.1.2] — 2026-07-30
 

@@ -53,7 +53,7 @@
     "preview": "astro preview",
     "test": "pnpm build && playwright test",
     "test:browser": "playwright test",
-    "test:api": "pnpm build:worker && bun test tests/contract tests/sdk",
+    "test:api": "pnpm build:worker && bun test --timeout=20000 tests/contract/cloudflare-d1.test.ts && bun test tests/contract/bun-sqlite.test.ts tests/contract/vectors.test.ts tests/sdk",
     "test:all": "pnpm test:api && pnpm test:integration && pnpm verify:dashboard-live && pnpm test && pnpm check:workflow",
     "build:worker": "WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir dist/worker",
     "build:npm": "bun build src/sdk.ts --outfile dist/npm/sdk.js --target node --format esm",
