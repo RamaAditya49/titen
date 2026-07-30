@@ -235,10 +235,21 @@ Compile one authorized visual projection around a focus record.
 }
 ```
 
-The implemented lenses are `evidence_trace`, `neighborhood`, and
-`conflict_freshness`. Additional governance lenses remain planned until their
-policy gates pass. The example limits are caller requests, not normative
-server maxima; the server clamps them to measured deployment limits.
+The implemented lenses are `evidence_trace`, `neighborhood`,
+`conflict_freshness`, and the read-only `review_queue`. Additional operations
+and governance queues remain planned until their policy gates pass. The example
+limits are caller requests, not normative server maxima; the server clamps them
+to measured deployment limits.
+
+`review_queue` accepts optional `subject_id`, canonical `owner_id`,
+`review_reason` (`all`, `disputed`, `contradiction`, `low_confidence`, or
+`negative_feedback`), `cursor`, and `limit`. It returns claim nodes with
+deterministic `priority`, explicit `reasons`, canonical `owner_id`, bounded
+`next_action`, canonical-validity `deadline`, `terminal_state`, and only
+authorized `evidence_refs` and `audit_refs`. Metadata contains authorized
+page/remaining counts and an opaque
+stable keyset `next_cursor`. The lens is not an action route or canonical queue;
+supersede, expire, and revoke remain claim lifecycle operations.
 
 ```json
 {

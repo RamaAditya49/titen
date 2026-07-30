@@ -1920,6 +1920,162 @@ export const CASES: Case[] = [
       );
     },
   },
+  {
+    name: "review queue is authorized, deterministic, filtered, and keyset-paginated",
+    async run(fx) {
+      const reviewer = await fx.provision({ scopes: ["*"] });
+      const sibling = await fx.provision({ orgId: reviewer.orgId, scopes: ["*"] });
+
+      const harmful = await seedClaim(fx, reviewer.key, {
+        observation: { subject_id: "review_harmful", content: "harmful review marker" },
+        claim: { statement: "Harmful review marker claim." },
+      });
+      const harmfulContext = await fx.call("POST", "/v1/context/compile", {
+        key: reviewer.key,
+        body: { subject_id: "review_harmful", task: "harmful review marker", max_tokens: 900 },
+      });
+      expectOk(harmfulContext);
+      expectOk(await fx.call("POST", `/v1/context/${harmfulContext.body.data.context_id}/feedback`, {
+        key: reviewer.key,
+        body: { claim_id: harmful.claimId, outcome: "harmful" },
+      }), 201);
+
+      const disputedBase = await fx.call("POST", "/v1/observations", {
+        key: reviewer.key,
+        body: observation({ subject_id: "review_disputed", content: "review dispute supporting evidence" }),
+      });
+      const disputedCounter = await fx.call("POST", "/v1/observations", {
+        key: reviewer.key,
+        body: observation({ subject_id: "review_disputed", content: "review dispute contradiction" }),
+      });
+      expectOk(disputedBase, 201);
+      expectOk(disputedCounter, 201);
+      const disputed = await fx.call("POST", "/v1/consolidations", {
+        key: reviewer.key,
+        body: {
+          subject_id: "review_disputed",
+          claims: [{
+            kind: "semantic_fact",
+            statement: "Disputed reviewer claim.",
+            confidence: 0.9,
+            sources: [
+              { observation_id: disputedBase.body.data.observation_id, relation: "supports" },
+              { observation_id: disputedCounter.body.data.observation_id, relation: "contradicts" },
+            ],
+          }],
+        },
+      });
+      expectOk(disputed, 201);
+      const disputedId = disputed.body.data.claims[0].claim_id as string;
+
+      const incorrect = await seedClaim(fx, reviewer.key, {
+        observation: { subject_id: "review_incorrect", content: "incorrect review marker" },
+        claim: { statement: "Incorrect review marker claim." },
+      });
+      const incorrectContext = await fx.call("POST", "/v1/context/compile", {
+        key: reviewer.key,
+        body: { subject_id: "review_incorrect", task: "incorrect review marker", max_tokens: 900 },
+      });
+      expectOk(incorrectContext);
+      expectOk(await fx.call("POST", `/v1/context/${incorrectContext.body.data.context_id}/feedback`, {
+        key: reviewer.key,
+        body: { claim_id: incorrect.claimId, outcome: "incorrect" },
+      }), 201);
+
+      const low = await seedClaim(fx, reviewer.key, {
+        observation: { subject_id: "review_low", content: "low confidence review marker" },
+        claim: { statement: "Low confidence review marker claim.", confidence: 0.5 },
+      });
+      const hidden = await seedClaim(fx, sibling.key, {
+        observation: { subject_id: "review_hidden", content: "hidden low confidence marker" },
+        claim: { statement: "Hidden low confidence claim.", confidence: 0.4 },
+      });
+
+      await fx.query(
+        `INSERT INTO audit_log (id, org_id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at)
+         VALUES (?, ?, ?, 'claim.review', 'claim', ?, NULL, NULL, ?)`,
+        ["aud_review_visible", reviewer.orgId, reviewer.principalId, harmful.claimId, "2026-07-30T00:00:00.000Z"],
+      );
+      await fx.query(
+        `INSERT INTO audit_log (id, org_id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at)
+         VALUES (?, ?, ?, 'claim.review', 'claim', ?, NULL, NULL, ?)`,
+        ["aud_review_hidden", reviewer.orgId, sibling.principalId, hidden.claimId, "2026-07-30T00:00:00.000Z"],
+      );
+
+      const first = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", limit: 2 },
+      });
+      expectOk(first);
+      assert.deepEqual(first.body.data.nodes.map((node: any) => node.id), [harmful.claimId, disputedId]);
+      assert.deepEqual(first.body.data.nodes.map((node: any) => node.priority), [4, 3]);
+      assert.equal(first.body.data.metadata.remaining_count, 4);
+      assert.equal(first.body.data.metadata.page_count, 2);
+      assert.ok(first.body.data.metadata.next_cursor);
+      assert.equal(first.body.data.nodes[0].owner_id, reviewer.principalId);
+      assert.equal(first.body.data.nodes[0].next_action, "inspect_harmful_feedback");
+      assert.equal(first.body.data.nodes[0].deadline, null);
+      assert.equal(first.body.data.nodes[0].terminal_state, null);
+      assert.ok(first.body.data.nodes[0].evidence_refs.includes(harmful.observationId));
+      assert.deepEqual(first.body.data.nodes[0].audit_refs, ["aud_review_visible"]);
+      assert.ok(!JSON.stringify(first.body).includes(hidden.claimId));
+      assert.ok(!JSON.stringify(first.body).includes("aud_review_hidden"));
+
+      const viewOnly = await fx.provision({
+        orgId: reviewer.orgId,
+        principalId: reviewer.principalId,
+        scopes: ["views:compile"],
+      });
+      const withoutAuditScope = await fx.call("POST", "/v1/memory-views/compile", {
+        key: viewOnly.key,
+        body: { lens: "review_queue", limit: 1 },
+      });
+      expectOk(withoutAuditScope);
+      assert.deepEqual(withoutAuditScope.body.data.nodes[0].audit_refs, []);
+      assert.ok(withoutAuditScope.body.data.nodes[0].evidence_refs.includes(harmful.observationId));
+
+      const second = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", cursor: first.body.data.metadata.next_cursor, limit: 2 },
+      });
+      expectOk(second);
+      assert.deepEqual(second.body.data.nodes.map((node: any) => node.id), [incorrect.claimId, low.claimId]);
+      assert.equal(second.body.data.metadata.next_cursor, null);
+      assert.equal(new Set([...first.body.data.nodes, ...second.body.data.nodes].map((node: any) => node.id)).size, 4);
+
+      const negative = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", review_reason: "negative_feedback" },
+      });
+      expectOk(negative);
+      assert.deepEqual(negative.body.data.nodes.map((node: any) => node.id), [harmful.claimId, incorrect.claimId]);
+      const lowOnly = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", review_reason: "low_confidence", owner_id: reviewer.principalId },
+      });
+      expectOk(lowOnly);
+      assert.deepEqual(lowOnly.body.data.nodes.map((node: any) => node.id), [low.claimId]);
+      expectError(await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", cursor: "not-a-cursor" },
+      }), 400);
+      expectError(await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", review_reason: "invented" },
+      }), 400);
+
+      expectOk(await fx.call("POST", `/v1/claims/${low.claimId}/revoke`, {
+        key: reviewer.key,
+        body: { expected_version: 1, reason: "reviewed and withdrawn" },
+      }));
+      const afterTerminal = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reviewer.key,
+        body: { lens: "review_queue", review_reason: "low_confidence" },
+      });
+      expectOk(afterTerminal);
+      assert.ok(!afterTerminal.body.data.nodes.some((node: any) => node.id === low.claimId));
+    },
+  },
   // --- Post-v1: webhooks ---
   {
     name: "a webhook registers, validates its destination, and hides its secret",
