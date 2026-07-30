@@ -12,7 +12,7 @@
  *   TITEN_KEY=titen_sk_... \
  *   TITEN_EMBED_BASE_URL=http://host:11434/v1 \
  *   TITEN_EMBED_MODEL=embeddinggemma \
- *   bun scripts/e2e.ts
+ *   bun scripts/verify-live.ts
  */
 import assert from "node:assert/strict";
 
@@ -272,6 +272,7 @@ step(4, "lifecycle, portability, restart durability");
 const supersededBy = claimIds[1]!;
 const superseded = await api("POST", `/v1/claims/${claimIds[0]}/supersede`, {
   superseded_by: supersededBy,
+  expected_version: 1,
   reason: "end-to-end run",
 });
 assert.equal(superseded.status, "superseded");
