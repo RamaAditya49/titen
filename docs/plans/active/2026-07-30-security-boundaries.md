@@ -1,19 +1,24 @@
 ---
 work_id: security-boundaries-20-21-24
-status: done
-stage: done
-outcome: completed
+status: active
+stage: implement
+outcome: pending
 complexity: complex
 created: 2026-07-30
 updated: 2026-07-30
+review_after: 2026-08-06
 owner: wulan
-spec: docs/specs/done/2026-07-30-security-boundaries.md
+spec: docs/specs/active/2026-07-30-security-boundaries.md
 ---
 # Plan
 - [x] Add typed decision and central boundary guard.
 - [x] Add explicit single-tenant binding and app integration.
 - [x] Route scope checks through the guard and add no-side-effect tests.
-- [x] Document contracts and deferrals.
+- [x] Add database-enforced lease fencing and holder/admin release authorization.
+- [x] Keep bearer authentication authoritative in explicit single-tenant mode.
+- [ ] Add canonical workspace binding and shared eligibility to every #20 surface.
+- [ ] Add complete persisted-policy enforcement hooks required by #21.
+- [x] Document contracts and remaining work honestly.
 - [x] Run workflow, Bun tests, and worker build; record evidence.
 
 ## Acceptance evidence
@@ -24,7 +29,12 @@ spec: docs/specs/done/2026-07-30-security-boundaries.md
 | AC-SB-003 | PASS | configured `org_configured` binding test and `createApp.singleTenant` integration |
 | AC-SB-004 | PASS | zero-call downstream spy loop for policy/scope/visibility/trust/release-filter |
 | AC-SB-005 | PASS | deny-overrides, abstain, empty, and all-allow truth-table cases |
-| AC-SB-006 | PASS | worker dry-run PASS; existing bearer path remains default; Bun execution delegated to CI because Bun is unavailable locally |
+| AC-SB-006 | PASS | worker dry-run PASS; bearer authentication remains authoritative and configured tenant mismatch fails closed |
+
+Issue #20 and #21 acceptance is not claimed by this artifact. #24 has database
+uniqueness, atomic batch fencing, holder/admin authorization, same-holder renewal,
+expiry replacement, and a 20-contender shared contract test; Bun execution is
+still required on both runtime fixtures.
 
 ## Security, migration, deployment, smoke, rollback
 No schema migration or deployment. Rollback removes the additive module/config and restores direct scope checking. Runtime contracts are the smoke gate.

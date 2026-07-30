@@ -276,9 +276,10 @@ export function createApp(context: {
       };
 
       if (matched.route.scope) {
+        const authenticated = await authenticate(app.db, request);
         ctx.principal = context.singleTenant
-          ? bindSingleTenant(context.singleTenant)
-          : await authenticate(app.db, request);
+          ? bindSingleTenant(authenticated, context.singleTenant)
+          : authenticated;
         requireScope(ctx.principal, matched.route.scope);
       }
 

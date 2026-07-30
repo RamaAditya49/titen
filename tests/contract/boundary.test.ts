@@ -22,15 +22,16 @@ describe("fail-closed boundary", () => {
   });
 
   test("single tenant binding is explicit and complete", () => {
-    expect(() => bindSingleTenant(undefined)).toThrow();
-    expect(() => bindSingleTenant({ orgId: "", principalId: "svc", scopes: ["context:compile"], maxTrust: "asserted" })).toThrow();
-    expect(bindSingleTenant({ orgId: "org_configured", principalId: "svc", scopes: ["context:compile"], maxTrust: "asserted" }).orgId).toBe("org_configured");
+    const principal = { keyId: "key", orgId: "org_configured", principalId: "real", principalKind: "agent", scopes: ["context:compile"], maxTrust: "asserted" } as const;
+    expect(() => bindSingleTenant(principal as any, undefined)).toThrow();
+    expect(() => bindSingleTenant(principal as any, { orgId: "other" })).toThrow();
+    expect(bindSingleTenant(principal as any, { orgId: "org_configured" })).toBe(principal);
   });
 
   test("configured tenant still enforces scope before handler/storage", async () => {
     let storageCalls = 0;
     const guardedDb = { all: async () => { storageCalls++; return []; }, batch: async () => { storageCalls++; return []; } } as any;
-    const app = createApp({ db: guardedDb, runtime: "test", singleTenant: { orgId: "org_configured", principalId: "svc", scopes: [], maxTrust: "asserted" } });
+    const app = createApp({ db: guardedDb, runtime: "test", singleTenant: { orgId: "org_configured" } });
     const response = await app(new Request("http://titen.test/v1/context/compile", { method: "POST", body: "{}" }));
     expect(response.status).toBe(403);
     expect(storageCalls).toBe(0);

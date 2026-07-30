@@ -1,14 +1,15 @@
 ---
 work_id: security-boundaries-20-21-24
-status: done
-stage: done
-outcome: completed
+status: active
+stage: implement
+outcome: pending
 complexity: complex
 created: 2026-07-30
 updated: 2026-07-30
+review_after: 2026-08-06
 owner: wulan
 ---
-# Security boundaries (#20, #21, #24)
+# Security boundary foundation (#20, #21, #24)
 
 ## Problem and scope
 Boundary crossings need one fail-closed contract. Implement typed policy decisions, a central guard, and explicit configured single-tenant embedding identity. Authenticated credentials remain authoritative. #22 canonical federation promotion and #23 external actor identities are deferred as separate schema-heavy work; no unsafe partial implementation.
@@ -21,5 +22,12 @@ Boundary crossings need one fail-closed contract. Implement typed policy decisio
 - **AC-SB-005 — Ubiquitous:** Titen shall use deny-overrides precedence and require built-in policy evaluators to return explicit allow or deny; abstain shall mean incomplete and fail closed.
 - **AC-SB-006 — Ubiquitous:** Titen shall preserve authenticated behavior and dual-runtime compatibility without widening scopes.
 
-## Constraints, risks, done
-Public health/readiness remain tenant-neutral. Defaults do not widen access. Done requires mapped passing evidence and terminal paired artifacts.
+## Constraints, risks, completion state
+Public health/readiness remain tenant-neutral. Defaults do not widen access. This
+change establishes the decision contract, bearer-authoritative tenant binding,
+and database-fenced leases with holder authorization. It does **not** close #20
+or #21: canonical records still need workspace bindings and all retrieval/export
+surfaces need shared membership eligibility; every persisted policy kind still
+needs its complete runtime hook (approval workflow, visibility, trust, retention
+and legal hold). Those issues must remain open until dual-runtime acceptance
+tests pass.

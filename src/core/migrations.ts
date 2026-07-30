@@ -422,6 +422,15 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON webhook_deliveries (webhook_id, event_id)`,
     ],
   },
+  {
+    version: 10,
+    statements: [
+      // The database, not a read-before-write check, is the lease arbiter.
+      // Expired rows are fenced (released_at set) before replacement.
+      `CREATE UNIQUE INDEX leases_one_active_resource
+         ON leases (org_id, resource_type, resource_id) WHERE released_at IS NULL`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

@@ -22,6 +22,7 @@ export const SCOPES = [
   "memberships:read",
   "memberships:write",
   "leases:write",
+  "leases:admin",
   "handoffs:read",
   "handoffs:write",
   "mcp:call",
@@ -109,32 +110,22 @@ export function requireScope(principal: Principal, scope: string): void {
 }
 
 export interface SingleTenantBinding {
-  /** Explicit canonical organization identifier owned by configuration/storage. */
+  /** Explicit canonical organization identifier; this never supplies identity. */
   orgId: string;
-  principalId: string;
-  principalKind?: Principal["principalKind"];
-  scopes: string[];
-  maxTrust: Trust;
 }
 
 /**
  * Controlled embedding mode. There is deliberately no fallback tenant: an
  * absent or blank binding is an authentication failure, not a synthetic org.
  */
-export function bindSingleTenant(binding: SingleTenantBinding | undefined): Principal {
+export function bindSingleTenant(principal: Principal, binding: SingleTenantBinding | undefined): Principal {
   requireBoundary([
     binding?.orgId?.trim() ? allow("tenant") : deny("tenant", "single tenant is not configured"),
-    binding?.principalId?.trim() ? allow("policy") : deny("policy", "single-tenant principal is incomplete"),
+    binding?.orgId === principal.orgId
+      ? allow("tenant", "authenticated tenant matches configured tenant")
+      : deny("tenant", "authenticated tenant does not match configured tenant"),
   ]);
-  const value = binding!;
-  return {
-    keyId: "configured-single-tenant",
-    orgId: value.orgId,
-    principalId: value.principalId,
-    principalKind: value.principalKind ?? "service",
-    scopes: [...value.scopes],
-    maxTrust: value.maxTrust,
-  };
+  return principal;
 }
 
 /** A principal can never assert evidence more trusted than its own ceiling. */

@@ -1,5 +1,6 @@
 import { first } from "./db";
-import { notFound, validationError, conflict } from "./errors";
+import { notFound, validationError, conflict, forbidden } from "./errors";
+import { hasScope } from "./auth";
 import { eventStatement } from "./events";
 import { newId } from "./ids";
 import type { RequestContext, Result } from "./http";
@@ -124,17 +125,19 @@ export async function acquireLease(ctx: RequestContext): Promise<Result> {
   if (existing) {
     if (existing.holder_id !== principalId && new Date(existing.expires_at) > now)
       throw conflict(`Resource is leased by another principal until ${existing.expires_at}.`);
-    // Expired or same holder — release old
-    await ctx.app.db.batch([{
-      sql: `UPDATE leases SET released_at = ? WHERE id = ?`,
-      params: [nowIso, existing.id],
-    }]);
   }
 
   const id = newId("lease");
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
 
+  // One atomic batch fences the prior lease and inserts its successor. The
+  // partial unique index is the final arbiter when contenders raced the read.
   await ctx.app.db.batch([
+    ...(existing ? [{
+      sql: `UPDATE leases SET released_at = ? WHERE id = ? AND released_at IS NULL
+            AND (holder_id = ? OR expires_at <= ?)`,
+      params: [nowIso, existing.id, principalId, nowIso],
+    }] : []),
     {
       sql: `INSERT INTO leases (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds, expires_at, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -148,18 +151,21 @@ export async function acquireLease(ctx: RequestContext): Promise<Result> {
 }
 
 export async function releaseLease(ctx: RequestContext): Promise<Result> {
-  const { orgId } = ctx.principal!;
+  const { orgId, principalId } = ctx.principal!;
   const id = ctx.params.id!;
-  const row = await first<{ id: string }>(
+  const row = await first<{ id: string; holder_id: string }>(
     ctx.app.db,
-    `SELECT id FROM leases WHERE id = ? AND org_id = ? AND released_at IS NULL`,
+    `SELECT id, holder_id FROM leases WHERE id = ? AND org_id = ? AND released_at IS NULL`,
     [id, orgId],
   );
   if (!row) throw notFound();
+  if (row.holder_id !== principalId && !hasScope(ctx.principal!, "leases:admin"))
+    throw forbidden("Only the lease holder or a lease administrator may release it.");
   const now = ctx.app.now().toISOString();
   await ctx.app.db.batch([{
-    sql: `UPDATE leases SET released_at = ? WHERE id = ?`,
-    params: [now, id],
+    sql: `UPDATE leases SET released_at = ? WHERE id = ? AND released_at IS NULL
+          AND (holder_id = ? OR ? = 1)`,
+    params: [now, id, principalId, hasScope(ctx.principal!, "leases:admin") ? 1 : 0],
   }]);
   return { data: { lease_id: id, released_at: now } };
 }

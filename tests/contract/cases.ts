@@ -1444,6 +1444,13 @@ export const CASES: Case[] = [
       expectOk(lease, 201);
       assert.match(lease.body.data.lease_id, /^lease_/);
 
+      // A scoped writer is not implicitly allowed to release another holder's lease.
+      const writer = await fx.provision({ orgId: agent1.orgId, scopes: ["leases:write"] });
+      expectError(
+        await fx.call("DELETE", `/v1/leases/${lease.body.data.lease_id}`, { key: writer.key }),
+        403,
+      );
+
       // Conflict: same resource
       expectError(
         await fx.call("POST", "/v1/leases", {
@@ -1463,6 +1470,26 @@ export const CASES: Case[] = [
         body: { resource_type: "subject", resource_id: "user_rama", purpose: "review", ttl_seconds: 300 },
       });
       expectOk(lease2, 201);
+    },
+  },
+  {
+    name: "lease acquisition has exactly one winner under 20 concurrent contenders",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const contenders = await Promise.all(Array.from({ length: 20 }, (_, index) =>
+        fx.provision({ orgId: owner.orgId, principalId: `lease_contender_${index}`, scopes: ["leases:write"] })));
+      const results = await Promise.all(contenders.map((contender, index) =>
+        fx.call("POST", "/v1/leases", {
+          key: contender.key,
+          body: { resource_type: "subject", resource_id: "contended", purpose: `worker-${index}`, ttl_seconds: 300 },
+        })));
+      assert.equal(results.filter(result => result.status === 201).length, 1);
+      assert.equal(results.filter(result => result.status === 409).length, 19);
+      const active = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM leases WHERE org_id = ? AND resource_type = ? AND resource_id = ? AND released_at IS NULL`,
+        [owner.orgId, "subject", "contended"],
+      );
+      assert.equal(active[0]?.count, 1);
     },
   },
   {
