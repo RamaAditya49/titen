@@ -18,6 +18,69 @@ release GitHub Action and adding one is a decision, not a chore: the npm token
 would then live in repository secrets, and a compromised workflow could publish
 on its own. Publishing by hand keeps the credential on one machine.
 
+## Versioning and channels
+
+**Titen stays on `0.x` until the API stops moving.** SemVer clause 4 is explicit:
+*"Major version zero (0.y.z) is for initial development. Anything MAY change at
+any time."* That is an accurate description of Titen today — model-driven claim
+extraction is still planned and consolidation is deterministic. `1.0.0` is a
+promise of stability, not a maturity badge; cut it when breaking changes stop,
+not when the project feels finished.
+
+While below `1.0.0`:
+
+| Change | Bump | Example |
+| --- | --- | --- |
+| Breaking — removed route, changed response shape, renamed field | **minor** | `0.1.2` → `0.2.0` |
+| Feature, fix, docs, packaging | **patch** | `0.1.1` → `0.1.2` |
+
+There is no major bump before `1.0.0`. `^0.1.0` does not match `0.2.0`, so the
+minor slot is the only breaking-change signal consumers get.
+
+### Two dist-tags, not three
+
+| Tag | Command | What it is |
+| --- | --- | --- |
+| `latest` | `npm i titen-memory` | The current deliberate release. What everyone gets. |
+| `next` | `npm i titen-memory@next` | Optional prerelease for early feedback. |
+
+Prereleases are named `0.2.0-rc.1`, `0.2.0-rc.2`. Skip `alpha` and `beta`: a
+three-stage pipeline is ceremony a single-maintainer project will not honour,
+and an unused stage is worse than no stage because it implies a gate nobody
+runs.
+
+**A prerelease must be published with `--tag next`:**
+
+```bash
+npm version 0.2.0-rc.1
+npm publish --tag next        # WITHOUT --tag it becomes `latest` for everyone
+```
+
+SemVer clause 11.3 gives `0.2.0-rc.1 < 0.2.0`, and `^0.1.0` will not resolve a
+prerelease — but do not rely on that. The dist-tag is the real guard; the range
+rules are a backstop.
+
+Promote a prerelease without republishing:
+
+```bash
+npm dist-tag add titen-memory@0.2.0 latest
+```
+
+### Merging is not releasing
+
+Every merged issue fix lands on `main` under `## [Unreleased]` in
+[`CHANGELOG.md`](../../CHANGELOG.md). **`main` is always the truth; npm `latest`
+is the last deliberate cut.** They are allowed to differ, and usually do.
+
+Publishing on every merge would burn version numbers on changes nobody asked
+for, and every one of them is permanent — npm allows unpublish only within 72
+hours. Batch merges until there is a reason to ship: a fix someone is waiting
+on, a coherent set of changes, or a prerelease worth feedback.
+
+So, when asked *which version do we use* — `main` for development, `@latest`
+for anyone consuming Titen, `@next` only when a change needs testing before it
+reaches `latest`.
+
 ## What ships
 
 `package.json#files` is an allowlist, so the tarball is 41 files / ~73 kB:

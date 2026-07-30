@@ -4,9 +4,13 @@ All notable changes to Titen are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-While the version stays below `1.0.0`, a **minor** bump may carry a breaking
-change — any entry that does will say so under **Changed** and name the
-migration.
+
+Titen is in `0.x`: per SemVer clause 4, the public API is not yet stable. Below
+`1.0.0` a **minor** bump carries breaking changes and a **patch** carries
+everything else — any breaking entry appears under **Changed** and names the
+migration. Released versions live on npm under `latest`; prereleases
+(`0.2.0-rc.1`) under `next`. `main` may be ahead of both; see
+[versioning and channels](./docs/engineering/release.md#versioning-and-channels).
 
 The published npm package is [`titen-memory`](https://www.npmjs.com/package/titen-memory).
 The **CLI command is `titen`** regardless; see [Package name](#package-name).
