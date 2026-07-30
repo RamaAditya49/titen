@@ -292,6 +292,7 @@ export async function drainWebhookQueue(options: {
        JOIN events e ON e.id = d.event_id AND e.org_id = w.org_id
       WHERE w.org_id = ? AND w.status = 'active' AND w.principal_id IS NOT NULL
         AND (? IS NULL OR w.principal_id = ?) AND d.status = 'pending'
+        AND ${eventAccessSql("e", "w.principal_id")}
         AND (d.next_retry_at IS NULL OR d.next_retry_at <= ?)
         AND (d.lease_expires_at IS NULL OR d.lease_expires_at <= ?)
       ORDER BY COALESCE(d.next_retry_at, d.created_at), d.id LIMIT ?`,

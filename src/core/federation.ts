@@ -1,6 +1,7 @@
 import { first } from "./db";
 import type { Db } from "./db";
 import { notFound, validationError, conflict, forbidden, unavailable } from "./errors";
+import { eventAccessParams, eventAccessSql } from "./events";
 import { newId, sha256Hex } from "./ids";
 import { signPayload } from "./webhooks";
 import type { RequestContext, Result } from "./http";
@@ -201,17 +202,21 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
   );
 
   // Fetch events after cursor
-  const conditions: string[] = ["org_id = ?"];
-  const params: (string | number)[] = [principal.orgId];
+  const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
+  const params: (string | number)[] = [
+    principal.orgId,
+    ...eventAccessParams(principal.principalId),
+  ];
 
   if (peer.last_cursor) {
     const cursor = await first<{ created_at: string; id: string }>(
       ctx.app.db,
-      `SELECT created_at, id FROM events WHERE id = ? AND org_id = ?`,
-      [peer.last_cursor, principal.orgId],
+      `SELECT e.created_at, e.id FROM events e
+        WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
+      [peer.last_cursor, principal.orgId, ...eventAccessParams(principal.principalId)],
     );
     if (cursor) {
-      conditions.push("(created_at > ? OR (created_at = ? AND id > ?))");
+      conditions.push("(e.created_at > ? OR (e.created_at = ? AND e.id > ?))");
       params.push(cursor.created_at, cursor.created_at, cursor.id);
     }
   }
@@ -226,9 +231,9 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
     payload: string;
     created_at: string;
   }>(
-    `SELECT id, kind, actor_id, resource_type, resource_id, payload, created_at
-       FROM events WHERE ${conditions.join(" AND ")}
-       ORDER BY created_at ASC, id ASC LIMIT ?`,
+    `SELECT e.id, e.kind, e.actor_id, e.resource_type, e.resource_id, e.payload, e.created_at
+       FROM events e WHERE ${conditions.join(" AND ")}
+       ORDER BY e.created_at ASC, e.id ASC LIMIT ?`,
     params,
   );
 

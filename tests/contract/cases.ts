@@ -2260,6 +2260,47 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "federation pull does not expose another principal's private events",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "federation_owner", scopes: ["*"] });
+      const sibling = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "federation_sibling",
+        scopes: ["*"],
+      });
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: "private-boundary",
+          endpoint: "https://titen-private.example.test",
+          shared_secret: "private-boundary-secret",
+          direction: "pull",
+        },
+      });
+      expectOk(peer, 201);
+
+      const visible = await seedClaim(fx, owner.key, {
+        observation: { visibility: "private", content: "Owner-only federation marker." },
+        claim: { visibility: "private", statement: "Owner federation marker is visible." },
+      });
+      const hidden = await seedClaim(fx, sibling.key, {
+        observation: { visibility: "private", content: "Sibling-only federation marker." },
+        claim: { visibility: "private", statement: "Sibling federation marker is hidden." },
+      });
+
+      const pulled = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peer.body.data.peer_id },
+      });
+      expectOk(pulled);
+      const resourceIds = new Set(pulled.body.data.events.map((event: any) => event.resource_id));
+      assert.ok(resourceIds.has(visible.observationId), "the caller must receive its own private event");
+      assert.ok(resourceIds.has(visible.claimId), "the caller must receive its own private claim event");
+      assert.ok(!resourceIds.has(hidden.observationId), "a sibling's private observation event must not leak");
+      assert.ok(!resourceIds.has(hidden.claimId), "a sibling's private claim event must not leak");
+    },
+  },
+  {
     name: "team memory is visible only to active workspace members across projections",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });

@@ -191,6 +191,66 @@ test("webhook claims are exclusive, retries keep one delivery ID, and disable te
   close();
 });
 
+test("webhook retries stop when the subscriber loses event access", async () => {
+  const { db, close } = database();
+  await migrate(db);
+  const cipher = createSecretCipher({ active: "v1", keys: { v1: KEY_ONE } });
+  await db.batch([
+    { sql: "INSERT INTO organizations(id, name, created_at) VALUES ('org_1', 'Org', '2026-07-30T00:00:00Z')" },
+    { sql: "INSERT INTO workspaces(id, org_id, name, created_at) VALUES ('workspace_1', 'org_1', 'Team', '2026-07-30T00:00:00Z')" },
+    {
+      sql: `INSERT INTO memberships(id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+            VALUES ('membership_1', 'org_1', 'workspace_1', 'subscriber', 'agent', 'member', '2026-07-30T00:00:00Z')`,
+    },
+    {
+      sql: `INSERT INTO observations
+              (id, org_id, subject_id, actor_id, kind, content, content_hash, source_type,
+               trust, visibility, ingested_at, workspace_id)
+            VALUES ('obs_1', 'org_1', 'subject_1', 'writer', 'tool_result', 'secret', 'hash', 'tool',
+                    'verified', 'team', '2026-07-30T00:00:01Z', 'workspace_1')`,
+    },
+    {
+      sql: `INSERT INTO events(id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+            VALUES ('evt_1', 'org_1', 'observation.appended', 'writer', 'observation', 'obs_1', '{}',
+                    '2026-07-30T00:00:01Z')`,
+    },
+    {
+      sql: `INSERT INTO webhooks(id, org_id, principal_id, url, secret_hash, secret, events, status, created_at)
+            VALUES ('whk_1', 'org_1', 'subscriber', 'https://hooks.example.com/a', 'hash', ?, '*', 'active',
+                    '2026-07-30T00:00:00Z')`,
+      params: [await cipher.encrypt("shared-secret-value", "webhook:whk_1")],
+    },
+    {
+      sql: `INSERT INTO webhook_deliveries(id, webhook_id, event_id, status, attempts, next_retry_at, created_at)
+            VALUES ('dlv_1', 'whk_1', 'evt_1', 'pending', 1, '2026-07-30T00:01:00Z',
+                    '2026-07-30T00:00:02Z')`,
+    },
+    { sql: "UPDATE memberships SET removed_at = '2026-07-30T00:00:30Z' WHERE id = 'membership_1'" },
+  ]);
+  let calls = 0;
+  const security: WebhookSecurity = {
+    allowedHostnames: ["hooks.example.com"],
+    resolve: async () => ["93.184.216.34"],
+    dispatch: async ({ addresses }) => {
+      calls += 1;
+      return { response: new Response(null, { status: 200 }), connectedAddress: addresses[0]! };
+    },
+  };
+
+  const result = await drainWebhookQueue({
+    db,
+    orgId: "org_1",
+    now: new Date("2026-07-30T00:01:00Z"),
+    limit: 1,
+    security,
+    cipher,
+  });
+
+  assert.deepEqual(result, { attempted: 0, delivered: 0 });
+  assert.equal(calls, 0, "revoked membership must block outbound retry I/O");
+  close();
+});
+
 test("an expired lease is recovered and a timed-out dispatch returns to retry state", async () => {
   const { db, close } = database();
   await migrate(db);
