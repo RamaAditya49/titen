@@ -175,13 +175,13 @@ Claims evolve over time:
 
 ```typescript
 // Supersede: new knowledge replaces old
-await titen.supersede(oldClaimId, newClaimId, "Updated procedure");
+await titen.supersede(oldClaimId, newClaimId, 1, "Updated procedure");
 
 // Revoke: withdrawn claim
-await titen.revoke(claimId, "No longer valid");
+await titen.revoke(claimId, 1, "No longer valid");
 
 // Expire: stale information
-await titen.expire(claimId, "Outdated");
+await titen.expire(claimId, 1, "Outdated");
 ```
 
 Superseded, revoked, and expired claims stop appearing in compilation but their

@@ -144,11 +144,12 @@ test("claim lifecycle calls resolve through the client", async () => {
   const superseded = await titen.supersede(
     first.claims[0].claim_id,
     second.claims[0].claim_id,
+    1,
     "measured under load",
   );
   assert.equal(superseded.status, "superseded");
 
-  const revoked = await titen.revoke(second.claims[0].claim_id, "policy change");
+  const revoked = await titen.revoke(second.claims[0].claim_id, 1, "policy change");
   assert.equal(revoked.status, "revoked");
 });
 

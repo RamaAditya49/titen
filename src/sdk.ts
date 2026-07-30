@@ -275,18 +275,22 @@ export class TitenClient {
 
   // --- Lifecycle ---
 
-  async supersede(claimId: string, supersededBy: string, reason?: string) {
+  async supersede(claimId: string, supersededBy: string, expectedVersion: number, reason?: string) {
     return this.request("POST", `/v1/claims/${claimId}/supersede`, {
-      json: { superseded_by: supersededBy, reason },
+      json: { superseded_by: supersededBy, expected_version: expectedVersion, reason },
     });
   }
 
-  async revoke(claimId: string, reason?: string) {
-    return this.request("POST", `/v1/claims/${claimId}/revoke`, { json: { reason } });
+  async revoke(claimId: string, expectedVersion: number, reason?: string) {
+    return this.request("POST", `/v1/claims/${claimId}/revoke`, {
+      json: { expected_version: expectedVersion, reason },
+    });
   }
 
-  async expire(claimId: string, reason?: string) {
-    return this.request("POST", `/v1/claims/${claimId}/expire`, { json: { reason } });
+  async expire(claimId: string, expectedVersion: number, reason?: string) {
+    return this.request("POST", `/v1/claims/${claimId}/expire`, {
+      json: { expected_version: expectedVersion, reason },
+    });
   }
 
   // --- Checkpoints ---
@@ -328,7 +332,17 @@ export class TitenClient {
     return this.request("POST", `/v1/handoffs/${handoffId}/resolve`, { json: { status } });
   }
 
-  async compileView(lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "scope_preview", options: { subject_id?: string; focus_id?: string; limit?: number } = {}) {
+  async compileView(
+    lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue",
+    options: {
+      subject_id?: string;
+      focus_id?: string;
+      owner_id?: string;
+      review_reason?: "all" | "disputed" | "contradiction" | "low_confidence" | "negative_feedback";
+      cursor?: string;
+      limit?: number;
+    } = {},
+  ) {
     return this.request("POST", "/v1/memory-views/compile", { json: { lens, ...options } });
   }
 
