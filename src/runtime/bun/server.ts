@@ -43,11 +43,15 @@ export async function serve(options: ServeOptions) {
     embedDims: options.embedDims,
     embedApiKey: options.embedApiKey,
   });
+  const intervalMs = options.maintenanceIntervalMs ?? 15_000;
+  const backgroundRepair =
+    intervalMs > 0 && (vectors !== undefined || options.maintenanceIntervalMs !== undefined);
   const app = createApp({
     db,
     revision: options.revision ?? "dev",
     runtime: "bun-sqlite",
     vectors,
+    backgroundRepair: backgroundRepair ? "enabled" : "disabled",
   });
 
   // @ts-ignore - Bun global is provided by the runtime.
@@ -78,7 +82,6 @@ export async function serve(options: ServeOptions) {
    * searches nothing, and that was the behavior before this existed. Disable with
    * an interval of 0 when an external scheduler owns the work instead.
    */
-  const intervalMs = options.maintenanceIntervalMs ?? 15_000;
   let ticking = false;
   const tick = async () => {
     // Skip rather than queue: a slow model must not stack overlapping passes.
@@ -99,10 +102,7 @@ export async function serve(options: ServeOptions) {
       ticking = false;
     }
   };
-  const timer =
-    intervalMs > 0 && (vectors !== undefined || options.maintenanceIntervalMs !== undefined)
-      ? setInterval(tick, intervalMs)
-      : undefined;
+  const timer = backgroundRepair ? setInterval(tick, intervalMs) : undefined;
   // Never hold the process open on account of maintenance.
   timer?.unref?.();
 

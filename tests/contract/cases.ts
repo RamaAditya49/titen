@@ -89,6 +89,10 @@ export const CASES: Case[] = [
       assert.equal(res.body.data.capabilities.fts, "enabled");
       assert.equal(res.body.data.capabilities.vector, "disabled");
       assert.equal(res.body.data.capabilities.model, "disabled");
+      assert.equal(
+        res.body.data.capabilities.background_repair,
+        fx.runtime === "cloudflare-d1" ? "external" : "disabled",
+      );
     },
   },
   {
