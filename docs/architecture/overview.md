@@ -47,6 +47,7 @@ flowchart TB
     M --> WAI[Workers AI]
     M --> OAI[OpenAI-compatible HTTP]
     E --> W[Optional signed webhooks]
+    E --> F[Signed federation event exchange]
 ```
 
 ## Component responsibilities
@@ -61,6 +62,7 @@ flowchart TB
 | Dashboard client   | progressively shipped operator interface               | domain authority  |
 | Memory Atlas       | bounded authorized read-only projections               | canonical storage |
 | Event delivery     | post-commit events, retries, signed webhooks           | agent selection   |
+| Federation exchange | signed filtered event transport and cursors           | canonical remote recall |
 | SQL adapter        | canonical transactions, FTS, hydration, outbox         | semantic policy   |
 | Vector adapter     | rebuildable embedding index                            | canonical content |
 | Model gateway      | embeddings and optional structured extraction          | storage           |
@@ -87,14 +89,16 @@ compatible embedding model at write and query time.
 
 ## Repository state and target runtime shape
 
-The current checkout contains one static Astro dashboard, local assets,
-Playwright tests, workflow checks, and product/engineering documentation. The
-dashboard uses a frozen synthetic fixture and has no memory-service dependency.
+The current checkout contains the memory kernel, authenticated REST/MCP app,
+SQL migrations, Cloudflare and Bun entrypoints, and a shared dual-runtime
+contract suite. Their precise verification boundary is centralized in the
+[roadmap maturity matrix](../ROADMAP.md#maturity-matrix).
 
-The memory kernel, authenticated REST/MCP app, SQL migrations, Cloudflare/Bun
-entrypoints, and dual-runtime contract tests do not exist yet. P0 creates only
-the files required by its accepted vertical-spike work item. Split files or add
-adapters only after a measured ownership, size, or runtime boundary requires it.
+The Astro dashboard is an interactive prototype backed by a frozen synthetic
+fixture. Live dashboard/API integration is separate evidence and must not be
+inferred from the preview. Signed federation event exchange is implemented;
+turning remote events into authorized, indexed, recallable canonical memory is
+planned.
 
 ## Write path
 
@@ -192,7 +196,8 @@ remain source-tool calls instead of stale knowledge releases.
   unavailable areas have no route or control, even when the approved shell shows
   their non-interactive labels.
 - Expired lease/checkpoint never becomes a durable fact.
-- Federation failure never changes the local canonical event history.
+- Signed event-exchange failure never changes local canonical event history;
+  remote events do not become recallable canonical memory implicitly.
 
 ## Dependency budget
 

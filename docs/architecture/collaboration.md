@@ -167,13 +167,18 @@ Enterprise capabilities are layered onto the same model:
 SSO, SCIM, and policy language are integration boundaries, not mandatory kernel
 dependencies.
 
-## Federation
+## Signed federation event exchange
 
-Federation synchronizes authorized events between Titen deployments. It is
-required only when one deployment cannot satisfy ownership, region, or network
-boundaries.
+The implemented federation feature exchanges authorized, signed event records
+between Titen deployments. It is a transport and conflict-observation boundary,
+not canonical recallable-memory federation. Receiving an event does not by
+itself ingest the remote observation or claim into the destination canonical
+store, authorize it for recall, index it, or make it appear in compiled context.
+Those canonical federation semantics remain **Planned** and require a separate
+work item. Event exchange is needed only when one deployment cannot satisfy
+ownership, region, or network boundaries.
 
-Initial constraints:
+Event-exchange constraints:
 
 - append events and advance per-scope cursors;
 - filter by source policy before transmission;
