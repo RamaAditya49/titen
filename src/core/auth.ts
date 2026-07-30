@@ -2,6 +2,7 @@ import { first, type Db } from "./db";
 import { forbidden, unauthenticated } from "./errors";
 import { newId, randomToken, sha256Hex } from "./ids";
 import { TRUST_RANK, type Trust } from "./validate";
+import { allow, deny, requireBoundary } from "./boundary";
 
 export const KEY_PREFIX = "titen_sk_";
 
@@ -101,7 +102,39 @@ export function hasScope(principal: Principal, scope: string): boolean {
 }
 
 export function requireScope(principal: Principal, scope: string): void {
-  if (!hasScope(principal, scope)) throw forbidden(`Missing required scope "${scope}".`);
+  requireBoundary([
+    principal.orgId ? allow("tenant") : deny("tenant", "missing tenant"),
+    hasScope(principal, scope) ? allow("scope") : deny("scope", `missing ${scope}`),
+  ]);
+}
+
+export interface SingleTenantBinding {
+  /** Explicit canonical organization identifier owned by configuration/storage. */
+  orgId: string;
+  principalId: string;
+  principalKind?: Principal["principalKind"];
+  scopes: string[];
+  maxTrust: Trust;
+}
+
+/**
+ * Controlled embedding mode. There is deliberately no fallback tenant: an
+ * absent or blank binding is an authentication failure, not a synthetic org.
+ */
+export function bindSingleTenant(binding: SingleTenantBinding | undefined): Principal {
+  requireBoundary([
+    binding?.orgId?.trim() ? allow("tenant") : deny("tenant", "single tenant is not configured"),
+    binding?.principalId?.trim() ? allow("policy") : deny("policy", "single-tenant principal is incomplete"),
+  ]);
+  const value = binding!;
+  return {
+    keyId: "configured-single-tenant",
+    orgId: value.orgId,
+    principalId: value.principalId,
+    principalKind: value.principalKind ?? "service",
+    scopes: [...value.scopes],
+    maxTrust: value.maxTrust,
+  };
 }
 
 /** A principal can never assert evidence more trusted than its own ceiling. */

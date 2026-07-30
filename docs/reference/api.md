@@ -1,84 +1,13 @@
 # HTTP API reference
 
-Status: **implemented route inventory verified** against `src/core/app.ts` by
-`node scripts/check-route-docs.mjs`. Detailed examples below are descriptive;
-features explicitly listed as proposed are not routes.
-
-## Implemented route inventory
-
-<!-- ROUTE_INVENTORY_START -->
-- `DELETE /v1/checkpoints/:id`
-- `DELETE /v1/keys/:id`
-- `DELETE /v1/leases/:id`
-- `DELETE /v1/memberships/:id`
-- `DELETE /v1/webhooks/:id`
-- `GET /healthz`
-- `GET /readyz`
-- `GET /v1/audit`
-- `GET /v1/audit/export`
-- `GET /v1/channel-releases/:id`
-- `GET /v1/checkpoints`
-- `GET /v1/claims/:id/evidence`
-- `GET /v1/events`
-- `GET /v1/events/:id`
-- `GET /v1/export`
-- `GET /v1/federation/log`
-- `GET /v1/federation/peers`
-- `GET /v1/federation/peers/:id/filters`
-- `GET /v1/handoffs`
-- `GET /v1/keys`
-- `GET /v1/memberships`
-- `GET /v1/policies`
-- `GET /v1/webhooks`
-- `GET /v1/webhooks/:id/deliveries`
-- `GET /v1/workspaces`
-- `POST /mcp`
-- `POST /v1/channel-context`
-- `POST /v1/channel-releases`
-- `POST /v1/channel-releases/:id/publish`
-- `POST /v1/channel-releases/:id/revoke`
-- `POST /v1/checkpoints`
-- `POST /v1/claims/:id/expire`
-- `POST /v1/claims/:id/revoke`
-- `POST /v1/claims/:id/supersede`
-- `POST /v1/consolidations`
-- `POST /v1/context/:id/feedback`
-- `POST /v1/context/compile`
-- `POST /v1/federation/peers`
-- `POST /v1/federation/peers/:id/filters`
-- `POST /v1/federation/peers/:id/suspend`
-- `POST /v1/federation/pull`
-- `POST /v1/federation/push`
-- `POST /v1/handoffs`
-- `POST /v1/handoffs/:id/resolve`
-- `POST /v1/import`
-- `POST /v1/index/drain`
-- `POST /v1/keys`
-- `POST /v1/leases`
-- `POST /v1/memberships`
-- `POST /v1/memory-views/compile`
-- `POST /v1/observations`
-- `POST /v1/policies`
-- `POST /v1/projects/resolve`
-- `POST /v1/webhooks`
-- `POST /v1/webhooks/:id/pause`
-- `POST /v1/webhooks/:id/resume`
-- `POST /v1/webhooks/deliver`
-- `POST /v1/workspaces`
-<!-- ROUTE_INVENTORY_END -->
-
-## Proposed/unimplemented endpoints
-
-- Observation batch ingestion (`POST /v1/observations/batch`).
-- Channel CRUD (`/v1/channels`).
-- The old `webhook-subscriptions`, `webhook-deliveries`, `knowledge-releases`,
-  `audit/events`, and channel-scoped context paths are not aliases. Use the
-  implemented inventory above.
+Status: **P0 endpoints verified** on Cloudflare Workers/D1 and Bun/SQLite.
+Endpoint names, envelopes, and payload shapes are stable. Post-P0 operations
+remain draft until their implementation ships.
 
 ## Common behavior
 
 - Base path: `/v1`.
-- Streamable HTTP MCP endpoint: `/mcp`.
+- Planned Streamable HTTP MCP endpoint: `/mcp`.
 - Protected endpoints use `Authorization: Bearer <key>`.
 - JSON requests use `application/json`.
 - External field names use `snake_case`.
@@ -146,7 +75,7 @@ Append evidence.
 
 Only authorized service/agent identities may assert `verified` trust.
 
-### Proposed: `POST /v1/observations/batch`
+### `POST /v1/observations/batch`
 
 Append a bounded batch using the same item schema and authorization path as the
 single-observation endpoint. Each item has its own client mutation ID; the
@@ -176,30 +105,10 @@ Compile a task-specific context pack.
 The response includes selected claims, evidence IDs, trust, temporal validity,
 conflicts, score components, token usage, and a `context_id`.
 
-Ranking is auditable and deterministic. Lexical BM25 and vector similarity are
-each min-max normalized inside the authorized candidate set; relevance is the
-stronger normalized signal. The final score is:
-
-`0.40 relevance + 0.20 trust + 0.15 recency + 0.10 utility + 0.05 conflict + 0.10 confidence`
-
-Every factor is returned in `score_components`. A zero-span positive matched
-signal is assigned `1` for each matched candidate; absent lexical or vector
-signals, including vector similarity `0`, are `0`. Confidence is therefore an
-explicit weighted factor, not a hidden multiplier.
-
 ### `POST /v1/context/:id/feedback`
 
 Record used/useful/irrelevant/incorrect/harmful outcomes for the context or
 individual items.
-
-### `POST /v1/index/drain`
-
-Drain a bounded batch of pending indexing outbox rows into the configured vector
-store. If embedding or vector-store upsert is unavailable, the response is
-`503 UNAVAILABLE`; safe metadata includes `dependency` (`embedder` or
-`vector_store`), `retryable: true`, and `pending`, the number of rows selected
-by the bounded request. No selected outbox row advances on either dependency
-failure, so the same batch can be retried after recovery.
 
 ### `GET /v1/claims/:id/evidence`
 
@@ -219,8 +128,8 @@ Compile one authorized visual projection around a focus record.
 
 ```json
 {
-  "lens": "neighborhood",
-  "focus_id": "claim_...",
+  "lens": "memory_neighborhood",
+  "focus": { "type": "claim", "id": "claim_..." },
   "scope": { "project_id": "project_..." },
   "max_depth": 2,
   "max_nodes": 200,
@@ -228,7 +137,7 @@ Compile one authorized visual projection around a focus record.
 }
 ```
 
-The implemented lenses are `evidence_trace`, `neighborhood`, and
+The initial v0.2 lenses are `evidence_trace`, `memory_neighborhood`, and
 `conflict_freshness`. v0.3 adds `scope_preview` and `knowledge_release` after
 their policy gates pass. The example limits are caller requests, not normative
 server maxima; the server clamps them to measured deployment limits.
@@ -236,8 +145,8 @@ server maxima; the server clamps them to measured deployment limits.
 ```json
 {
   "view_id": "view_...",
-  "lens": "neighborhood",
-  "focus_id": "claim_...",
+  "lens": "memory_neighborhood",
+  "focus": { "type": "claim", "id": "claim_..." },
   "policy_snapshot": "policy_...",
   "nodes": [
     {
@@ -295,12 +204,7 @@ Return authorized metadata-only domain events after an opaque cursor. It lets an
 orchestrator poll when inbound webhooks are unavailable; it is not a transcript
 or raw memory feed.
 
-### Proposed legacy webhook-subscription shape (not implemented)
-
-The implemented API uses `/v1/webhooks`, pause/resume action routes, and
-`/v1/webhooks/:id/deliveries` as listed in the inventory. The names below are
-retained only as a proposal history and must not be used by clients.
-
+### Webhook subscriptions
 
 - `POST /v1/webhook-subscriptions`: create an authorized organization,
   workspace, or project subscription; v0.3 additionally permits an authorized
@@ -316,16 +220,11 @@ opaque event ID, scope reference, event type, record ID/version, occurrence
 time, and delivery attempt. Content is excluded by default. Requests are signed,
 bounded, retry-safe, and protected by destination allowlisting and SSRF checks.
 
-### Proposed legacy `GET /v1/audit/events` (not implemented)
+### `GET /v1/audit/events`
 
 List authorized metadata-only audit events with cursor pagination.
 
 ## Governed channel knowledge operations
-
-The channel CRUD and `knowledge-releases` names below are **proposed and not
-implemented**. Current governed release routes are `/v1/channel-releases` and
-`/v1/channel-context` in the inventory; their action is `publish`, not `activate`.
-
 
 These v0.3 operations implement
 [ADR-0002](../decisions/0002-channel-release-not-public-memory.md). Every
@@ -454,7 +353,7 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes the smallest ordinary-agent tool set:
+The planned `/mcp` endpoint exposes the smallest ordinary-agent tool set:
 
 - `titen_context`;
 - `titen_remember`;
@@ -502,13 +401,19 @@ authorized operator clients use its read-only REST endpoint.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
   complete Mem0 API compatibility.
 
-## Portability and backup restore
+## Complete boundary decision contract
 
-`GET /v1/export?type=projects|observations|claims` returns canonical NDJSON. Each
-header includes deterministic `dependency_order` (`projects`, `observations`,
-`claims`) and `depends_on`. Backups should retain all three streams and their
-headers. `POST /v1/import` preflights the complete request before mutation,
-accepts canonical records independent of NDJSON line order, and writes in
-canonical dependency order. Missing parents return `422 UNRESOLVED_REFERENCE`
-with only `record_type`, `field`, and `dependency_type`; no foreign record or
-content is disclosed. Re-import is idempotent.
+Protected crossings use `allow | deny | abstain` decisions. Authorization is
+`ALLOW iff decisions.length > 0 AND every required decision = allow`; `deny`
+overrides and `abstain` is an incomplete decision that fails closed. The common
+guard must run before fetch, embedding, vector-store, or sink effects.
+
+Embeddings that intentionally omit bearer credentials may opt into an explicit
+`singleTenant` application binding containing the canonical organization,
+principal, scopes, and trust ceiling. There is no synthetic/default tenant:
+missing or blank bindings fail authentication, and normal scope and downstream
+visibility/policy checks still apply.
+
+Canonical federation promotion and external actor identity tuples are not part
+of signed event transport; they require dedicated migrations and acceptance
+evidence before remote events become recallable canonical memory.

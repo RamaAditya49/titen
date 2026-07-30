@@ -1,4 +1,4 @@
-import { authenticate, requireScope } from "./auth";
+import { authenticate, bindSingleTenant, requireScope, type SingleTenantBinding } from "./auth";
 import { saveCheckpoint, getCheckpoint, deleteCheckpoint } from "./checkpoints";
 import { claimEvidence } from "./evidence";
 import { compileContext, recordFeedback } from "./context";
@@ -224,6 +224,8 @@ export function createApp(context: {
   revision?: string;
   runtime: string;
   vectors?: VectorCapability;
+  /** Explicit opt-in embedding identity; absent keeps bearer authentication required. */
+  singleTenant?: SingleTenantBinding;
 }): (request: Request) => Promise<Response> {
   const app: AppContext = {
     db: context.db,
@@ -274,7 +276,9 @@ export function createApp(context: {
       };
 
       if (matched.route.scope) {
-        ctx.principal = await authenticate(app.db, request);
+        ctx.principal = context.singleTenant
+          ? bindSingleTenant(context.singleTenant)
+          : await authenticate(app.db, request);
         requireScope(ctx.principal, matched.route.scope);
       }
 
