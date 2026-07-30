@@ -25,6 +25,20 @@ work are always complex. Complex work requires paired active spec/plan files
 with EARS acceptance criteria. Simple work may keep the same four stages inline
 in its issue or pull request.
 
+## Branches and parallel work
+
+- Branch from the latest `origin/main` and use `<type>/<short-scope>`, where
+  `type` is `feat`, `fix`, `docs`, `test`, `refactor`, or `chore`.
+- Keep one logical concern and one owner per branch. Do not share a working
+  branch; dependent work uses separate pull requests that declare their base
+  and merge order.
+- Contributors change `main` through pull requests. Direct pushes are reserved
+  for maintainer emergency reverts and must leave a follow-up issue or pull
+  request record.
+- Rebase onto current `origin/main` before final review, resolve conflicts on
+  the topic branch, and rerun affected checks. If the resulting diff changes,
+  request review again.
+
 ## Repository stage
 
 The memory service remains in product-definition/P0 preparation. The repository
@@ -58,7 +72,8 @@ that every relative Markdown link points to an existing file.
 ## Commit and pull request style
 
 Use Conventional Commit prefixes such as `feat:`, `fix:`, `docs:`, `test:`,
-`refactor:`, and `chore:`.
+`refactor:`, and `chore:`. Use the same format for the pull request title; it
+becomes the commit subject when the pull request is squash-merged.
 
 A pull request should state:
 
@@ -74,6 +89,44 @@ Before marking a pull request complete, close its workflow: record evidence for
 every acceptance ID, resolve all plan checkboxes, and move a complex spec/plan
 pair to `done/` together. Cancelled or superseded work also moves to `done/`
 with a concrete closure reason.
+
+Maintainers merge only a current, approved pull request with resolved review
+threads and reproducible verification. Use **squash merge**, then delete the
+topic branch; never reuse a merged branch. Merge dependent pull requests from
+base to tip and rebase each remaining branch after its base lands.
+
+## Version, changelog, and README
+
+Every pull request declares one release impact using the
+[release policy](./docs/engineering/release.md#versioning-and-channels):
+
+| Impact  | Use when |
+| ------- | -------- |
+| `none`  | No published package or user-facing behavior changes |
+| `patch` | Compatible feature, fix, published documentation, or packaging changes |
+| `minor` | A breaking change while Titen remains below `1.0.0` |
+
+Ordinary pull requests do not edit `package.json#version`, create tags, or add a
+released changelog heading. Add notable user-facing changes under
+[`CHANGELOG.md#Unreleased`](./CHANGELOG.md#unreleased) in the same pull request;
+the release maintainer batches merged work and performs the version bump.
+
+Update `README.md` in the same pull request when verified, shipped behavior
+changes any of these public entry points:
+
+- installation, quick start, commands, configuration, or system requirements;
+- public API/SDK behavior, supported runtimes, compatibility, or deprecations;
+- feature availability, implementation status, screenshots, or visible flows;
+- package contents, project links, or contributor-facing instructions already
+  summarized by the README.
+
+Do not update the README for an internal refactor, test-only change, or planned
+capability with no shipped behavior. The README is a summary: update the
+authoritative API, deployment, or product document alongside it. A pull request
+that changes implementation status must rebase first and reconcile both
+`README.md` and `docs/README.md` so concurrent work cannot restore a stale claim.
+The README links to the stable npm package page; version-specific links belong
+in the changelog and GitHub Release, not in general documentation.
 
 ## Architecture decisions
 
