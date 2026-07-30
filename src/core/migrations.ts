@@ -478,6 +478,9 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // Existing subscriptions have no attributable principal and therefore
       // receive no private/team events until re-registered.
       `ALTER TABLE webhooks ADD COLUMN principal_id TEXT`,
+      // Federation cursors are mutable authorization state. Legacy peers have
+      // no attributable owner and therefore stay fail-closed until re-created.
+      `ALTER TABLE federation_peers ADD COLUMN principal_id TEXT`,
       `CREATE TABLE maintenance_state (
          id TEXT PRIMARY KEY CHECK (id = 'background'),
          last_attempt_at TEXT NOT NULL,

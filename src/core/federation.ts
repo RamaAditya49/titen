@@ -32,9 +32,9 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO federation_peers (id, org_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
-      params: [id, principal.orgId, name, endpoint, hash, encrypted, direction, now],
+      sql: `INSERT INTO federation_peers (id, org_id, principal_id, name, endpoint, shared_secret_hash, shared_secret, direction, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      params: [id, principal.orgId, principal.principalId, name, endpoint, hash, encrypted, direction, now],
     },
   ]);
 
@@ -55,8 +55,8 @@ export async function listPeers(ctx: RequestContext): Promise<Result> {
     created_at: string;
   }>(
     `SELECT id, name, endpoint, direction, status, last_cursor, last_sync_at, created_at
-       FROM federation_peers WHERE org_id = ? ORDER BY created_at DESC`,
-    [principal.orgId],
+       FROM federation_peers WHERE org_id = ? AND principal_id = ? ORDER BY created_at DESC`,
+    [principal.orgId, principal.principalId],
   );
   return { data: { peers: rows.map((r) => ({ peer_id: r.id, ...r, id: undefined })) } };
 }
@@ -68,16 +68,16 @@ export async function suspendPeer(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string; status: string }>(
     ctx.app.db,
-    `SELECT id, status FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id, status FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
   if (peer.status === "revoked") throw forbidden("Cannot suspend a revoked peer.");
 
   await ctx.app.db.batch([
     {
-      sql: `UPDATE federation_peers SET status = 'suspended' WHERE id = ?`,
-      params: [peerId],
+      sql: `UPDATE federation_peers SET status = 'suspended' WHERE id = ? AND org_id = ? AND principal_id = ?`,
+      params: [peerId, principal.orgId, principal.principalId],
     },
   ]);
 
@@ -93,8 +93,8 @@ export async function addFilter(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
 
@@ -125,8 +125,8 @@ export async function listFilters(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
 
@@ -189,8 +189,8 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
 
   const peer = await first<{ id: string; direction: string; status: string; last_cursor: string | null }>(
     ctx.app.db,
-    `SELECT id, direction, status, last_cursor FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id, direction, status, last_cursor FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
   if (peer.status !== "active") throw forbidden("Peer is not active.");
@@ -255,8 +255,9 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
     const now = ctx.app.now().toISOString();
     await ctx.app.db.batch([
       {
-        sql: `UPDATE federation_peers SET last_cursor = ?, last_sync_at = ? WHERE id = ?`,
-        params: [lastRow.id, now, peerId],
+        sql: `UPDATE federation_peers SET last_cursor = ?, last_sync_at = ?
+              WHERE id = ? AND org_id = ? AND principal_id = ?`,
+        params: [lastRow.id, now, peerId, principal.orgId, principal.principalId],
       },
     ]);
 
@@ -286,8 +287,8 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
     shared_secret: string | null;
   }>(
     ctx.app.db,
-    `SELECT id, direction, status, shared_secret FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id, direction, status, shared_secret FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
   if (peer.status !== "active") throw forbidden("Peer is not active.");
@@ -398,11 +399,11 @@ export async function federationLog(ctx: RequestContext): Promise<Result> {
 
   if (!peerId) throw validationError('Query "peer_id" is required.');
 
-  // Verify peer belongs to org
+  // Verify peer belongs to the caller without disclosing same-org peers.
   const peer = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ?`,
-    [peerId, principal.orgId],
+    `SELECT id FROM federation_peers WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [peerId, principal.orgId, principal.principalId],
   );
   if (!peer) throw notFound();
 

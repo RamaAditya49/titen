@@ -2278,6 +2278,43 @@ export const CASES: Case[] = [
         },
       });
       expectOk(peer, 201);
+      const peerId = peer.body.data.peer_id as string;
+
+      const siblingPeers = await fx.call("GET", "/v1/federation/peers", { key: sibling.key });
+      expectOk(siblingPeers);
+      assert.equal(siblingPeers.body.data.peers.length, 0, "a sibling must not discover an owned peer");
+      expectError(await fx.call("GET", `/v1/federation/peers/${peerId}/filters`, { key: sibling.key }), 404);
+      expectError(await fx.call("POST", `/v1/federation/peers/${peerId}/filters`, {
+        key: sibling.key,
+        body: { resource_type: "event" },
+      }), 404);
+      expectError(await fx.call("POST", `/v1/federation/peers/${peerId}/suspend`, {
+        key: sibling.key,
+        body: {},
+      }), 404);
+      expectError(await fx.call("POST", "/v1/federation/pull", {
+        key: sibling.key,
+        body: { peer_id: peerId },
+      }), 404);
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: sibling.key,
+        body: { peer_id: peerId, events: [] },
+      }), 404);
+      expectError(await fx.call("GET", `/v1/federation/log?peer_id=${peerId}`, { key: sibling.key }), 404);
+
+      await fx.query(
+        `INSERT INTO federation_peers
+           (id, org_id, name, endpoint, shared_secret_hash, direction, status, created_at)
+         VALUES (?, ?, 'legacy', 'https://legacy-private.example.test', 'hash', 'pull', 'active', ?)`,
+        ["fpeer_legacy_unowned", owner.orgId, "2026-07-30T00:00:00.000Z"],
+      );
+      const ownerPeers = await fx.call("GET", "/v1/federation/peers", { key: owner.key });
+      expectOk(ownerPeers);
+      assert.deepEqual(ownerPeers.body.data.peers.map((candidate: any) => candidate.peer_id), [peerId]);
+      expectError(await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: "fpeer_legacy_unowned" },
+      }), 404);
 
       const visible = await seedClaim(fx, owner.key, {
         observation: { visibility: "private", content: "Owner-only federation marker." },
@@ -2290,7 +2327,7 @@ export const CASES: Case[] = [
 
       const pulled = await fx.call("POST", "/v1/federation/pull", {
         key: owner.key,
-        body: { peer_id: peer.body.data.peer_id },
+        body: { peer_id: peerId },
       });
       expectOk(pulled);
       const resourceIds = new Set(pulled.body.data.events.map((event: any) => event.resource_id));
@@ -2298,6 +2335,14 @@ export const CASES: Case[] = [
       assert.ok(resourceIds.has(visible.claimId), "the caller must receive its own private claim event");
       assert.ok(!resourceIds.has(hidden.observationId), "a sibling's private observation event must not leak");
       assert.ok(!resourceIds.has(hidden.claimId), "a sibling's private claim event must not leak");
+
+      const again = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peerId },
+      });
+      expectOk(again);
+      assert.equal(again.body.data.events.length, 0, "the owner's cursor must not replay its batch");
+      assert.equal(again.body.data.cursor, pulled.body.data.cursor, "the owner's cursor must remain stable");
     },
   },
   {
