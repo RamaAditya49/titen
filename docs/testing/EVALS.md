@@ -21,6 +21,15 @@ crossing scope boundaries. A benchmark score is secondary to these invariants:
 This document defines what must be measured. It does not publish results before
 the harness exists.
 
+## Live verification entry point
+
+The canonical live service smoke is `pnpm verify:live`, which runs
+`scripts/verify-live.ts` against an already provisioned deployment. Set
+`TITEN_URL` and `TITEN_KEY`; optional embedding checks use
+`TITEN_EMBED_BASE_URL` and `TITEN_EMBED_MODEL`. Deployment-specific runners
+may provide these variables, but this repository does not claim live evidence
+until the command is run against the provisioned service.
+
 ## Evaluation layers
 
 ### 1. Deterministic contract suite
