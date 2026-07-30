@@ -1,5 +1,5 @@
 import { first } from "./db";
-import { validationError } from "./errors";
+import { unavailable, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
 
 /**
@@ -68,16 +68,33 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
   let indexed = 0;
   if (eligible.length > 0) {
     // One embedding request for the batch, then one index write.
-    const vectors = await ctx.app.vectors.embedder.embed(
-      eligible.map((entry) => entry.statement),
-    );
-    await ctx.app.vectors.store.upsert(
-      eligible.map((entry, index) => ({
-        id: entry.claimId,
-        vector: vectors[index]!,
-        metadata: { org_id: principal.orgId },
-      })),
-    );
+    let vectors;
+    try {
+      vectors = await ctx.app.vectors.embedder.embed(
+        eligible.map((entry) => entry.statement),
+      );
+    } catch {
+      throw unavailable("Indexing dependency is unavailable.", {
+        dependency: "embedder",
+        retryable: true,
+        pending: pending.length,
+      });
+    }
+    try {
+      await ctx.app.vectors.store.upsert(
+        eligible.map((entry, index) => ({
+          id: entry.claimId,
+          vector: vectors[index]!,
+          metadata: { org_id: principal.orgId },
+        })),
+      );
+    } catch {
+      throw unavailable("Indexing dependency is unavailable.", {
+        dependency: "vector_store",
+        retryable: true,
+        pending: pending.length,
+      });
+    }
     indexed = eligible.length;
   }
 

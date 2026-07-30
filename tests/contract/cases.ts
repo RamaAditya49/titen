@@ -526,7 +526,7 @@ export const CASES: Case[] = [
       for (const field of ["kind", "trust", "confidence", "status", "valid_from", "score"])
         assert.ok(item[field] !== undefined, `item is missing ${field}`);
       assert.deepEqual(item.evidence_ids, [seeded.observationId]);
-      for (const component of ["relevance", "trust", "recency", "utility", "conflict"])
+      for (const component of ["relevance", "trust", "recency", "utility", "conflict", "confidence"])
         assert.ok(item.score_components[component] !== undefined, `missing ${component}`);
       assert.equal(res.body.meta.degraded.vector, "disabled");
       assert.equal(res.body.meta.degraded.model, "disabled");

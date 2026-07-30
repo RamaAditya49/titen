@@ -1,11 +1,12 @@
 import { TRUST_RANK, type Trust } from "./validate";
 
 export const RANK_WEIGHTS = {
-  relevance: 0.45,
+  relevance: 0.4,
   trust: 0.2,
   recency: 0.15,
   utility: 0.1,
-  conflict: 0.1,
+  conflict: 0.05,
+  confidence: 0.1,
 } as const;
 
 /** Feedback only moves ranking once enough signals exist (FRD CTX-002). */
@@ -35,6 +36,7 @@ export interface ScoreComponents {
   recency: number;
   utility: number;
   conflict: number;
+  confidence: number;
 }
 
 const round = (value: number) => Math.round(value * 1e6) / 1e6;
@@ -67,6 +69,22 @@ export function normalizeRelevance(candidates: RankInput[]): Map<string, number>
   );
 }
 
+/** Vector scores are provider-relative, so calibrate them inside this result set. */
+export function normalizeVectorSimilarity(candidates: RankInput[]): Map<string, number> {
+  const semantic = candidates.filter((candidate) => (candidate.vector_boost ?? 0) > 0);
+  if (semantic.length === 0) return new Map();
+  const scores = semantic.map((candidate) => candidate.vector_boost!);
+  const best = Math.max(...scores);
+  const worst = Math.min(...scores);
+  const span = best - worst;
+  return new Map(
+    semantic.map((candidate, index) => [
+      candidate.id,
+      span === 0 ? 1 : (scores[index]! - worst) / span,
+    ]),
+  );
+}
+
 /** Age uses whole days so repeated compilation inside a day is stable. */
 export function recencyScore(createdAt: string, now: Date): number {
   const ageDays = Math.max(
@@ -86,6 +104,7 @@ export function utilityScore(candidate: RankInput): number {
 export function scoreCandidate(
   candidate: RankInput,
   relevance: number,
+  vectorRelevance: number | undefined,
   now: Date,
 ): { score: number; components: ScoreComponents } {
   // A semantic hit is relevance evidence, so it competes with the lexical score
@@ -94,11 +113,10 @@ export function scoreCandidate(
   // With no vector capability the value is undefined and the result is
   // arithmetically identical to lexical-only ranking.
   //
-  // ponytail: max() of two differently-derived 0..1 scores. The ceiling is that
-  // bm25 is normalized within the candidate set while the vector score is
-  // absolute, so they are comparable but not calibrated. Upgrade path: learn the
-  // blend weight from context feedback.
-  const effectiveRelevance = Math.max(relevance, candidate.vector_boost ?? 0);
+  // Both retrieval signals are normalized within the same authorized candidate
+  // set before max(), avoiding provider-specific absolute similarity scales.
+  // Upgrade path: learn the blend weight from context feedback.
+  const effectiveRelevance = Math.max(relevance, vectorRelevance ?? 0);
 
   const components: ScoreComponents = {
     relevance: round(effectiveRelevance),
@@ -106,14 +124,16 @@ export function scoreCandidate(
     recency: round(recencyScore(candidate.created_at, now)),
     utility: round(utilityScore(candidate)),
     conflict: candidate.disputed ? 1 : 0,
+    confidence: round(candidate.confidence),
   };
   const score =
     components.relevance * RANK_WEIGHTS.relevance +
     components.trust * RANK_WEIGHTS.trust +
     components.recency * RANK_WEIGHTS.recency +
     components.utility * RANK_WEIGHTS.utility +
-    components.conflict * RANK_WEIGHTS.conflict;
-  return { score: round(score * candidate.confidence), components };
+    components.conflict * RANK_WEIGHTS.conflict +
+    components.confidence * RANK_WEIGHTS.confidence;
+  return { score: round(score), components };
 }
 
 export interface Ranked<T extends RankInput> {
@@ -125,10 +145,16 @@ export interface Ranked<T extends RankInput> {
 /** Ties break on id so two identical states rank identically. */
 export function rankCandidates<T extends RankInput>(candidates: T[], now: Date): Ranked<T>[] {
   const relevance = normalizeRelevance(candidates);
+  const vectorRelevance = normalizeVectorSimilarity(candidates);
   return candidates
     .map((candidate) => ({
       candidate,
-      ...scoreCandidate(candidate, relevance.get(candidate.id) ?? 0, now),
+      ...scoreCandidate(
+        candidate,
+        relevance.get(candidate.id) ?? 0,
+        vectorRelevance.get(candidate.id),
+        now,
+      ),
     }))
     .sort((left, right) =>
       right.score === left.score

@@ -105,10 +105,30 @@ Compile a task-specific context pack.
 The response includes selected claims, evidence IDs, trust, temporal validity,
 conflicts, score components, token usage, and a `context_id`.
 
+Ranking is auditable and deterministic. Lexical BM25 and vector similarity are
+each min-max normalized inside the authorized candidate set; relevance is the
+stronger normalized signal. The final score is:
+
+`0.40 relevance + 0.20 trust + 0.15 recency + 0.10 utility + 0.05 conflict + 0.10 confidence`
+
+Every factor is returned in `score_components`. A zero-span positive matched
+signal is assigned `1` for each matched candidate; absent lexical or vector
+signals, including vector similarity `0`, are `0`. Confidence is therefore an
+explicit weighted factor, not a hidden multiplier.
+
 ### `POST /v1/context/:id/feedback`
 
 Record used/useful/irrelevant/incorrect/harmful outcomes for the context or
 individual items.
+
+### `POST /v1/index/drain`
+
+Drain a bounded batch of pending indexing outbox rows into the configured vector
+store. If embedding or vector-store upsert is unavailable, the response is
+`503 UNAVAILABLE`; safe metadata includes `dependency` (`embedder` or
+`vector_store`), `retryable: true`, and `pending`, the number of rows selected
+by the bounded request. No selected outbox row advances on either dependency
+failure, so the same batch can be retried after recovery.
 
 ### `GET /v1/claims/:id/evidence`
 
