@@ -11,7 +11,6 @@ import { listEvents, getEvent } from "./events";
 import { drainIndex } from "./indexing";
 import { handleMcp } from "./mcp";
 import { compileView } from "./atlas";
-import { createPolicy, listPolicies, createRelease, publishRelease, revokeRelease, queryRelease, channelContext } from "./governance";
 import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
@@ -159,13 +158,6 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/events", scope: "events:read", handler: listEvents },
   { method: "GET", path: "/v1/events/:id", scope: "events:read", handler: getEvent },
   { method: "POST", path: "/v1/memory-views/compile", scope: "views:compile", handler: compileView },
-  { method: "POST", path: "/v1/policies", scope: "policies:write", handler: createPolicy },
-  { method: "GET", path: "/v1/policies", scope: "policies:read", handler: listPolicies },
-  { method: "POST", path: "/v1/channel-releases", scope: "releases:write", handler: createRelease },
-  { method: "POST", path: "/v1/channel-releases/:id/publish", scope: "releases:write", handler: publishRelease },
-  { method: "POST", path: "/v1/channel-releases/:id/revoke", scope: "releases:write", handler: revokeRelease },
-  { method: "GET", path: "/v1/channel-releases/:id", scope: "releases:read", handler: queryRelease },
-  { method: "POST", path: "/v1/channel-context", scope: "channel:read", handler: channelContext },
   { method: "GET", path: "/v1/audit", scope: "audit:read", handler: listAudit },
   { method: "GET", path: "/v1/audit/export", scope: "audit:export", handler: exportAudit },
   { method: "POST", path: "/v1/federation/peers", scope: "federation:write", handler: registerPeer },

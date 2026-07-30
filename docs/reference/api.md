@@ -16,7 +16,6 @@ features explicitly listed as proposed are not routes.
 - `GET /readyz`
 - `GET /v1/audit`
 - `GET /v1/audit/export`
-- `GET /v1/channel-releases/:id`
 - `GET /v1/checkpoints`
 - `GET /v1/claims/:id/evidence`
 - `GET /v1/events`
@@ -28,15 +27,10 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/handoffs`
 - `GET /v1/keys`
 - `GET /v1/memberships`
-- `GET /v1/policies`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
 - `GET /v1/workspaces`
 - `POST /mcp`
-- `POST /v1/channel-context`
-- `POST /v1/channel-releases`
-- `POST /v1/channel-releases/:id/publish`
-- `POST /v1/channel-releases/:id/revoke`
 - `POST /v1/checkpoints`
 - `POST /v1/claims/:id/expire`
 - `POST /v1/claims/:id/revoke`
@@ -58,7 +52,6 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
-- `POST /v1/policies`
 - `POST /v1/projects/resolve`
 - `POST /v1/webhooks`
 - `POST /v1/webhooks/:id/pause`
@@ -83,6 +76,8 @@ features explicitly listed as proposed are not routes.
 - JSON requests use `application/json`.
 - External field names use `snake_case`.
 - Requests may include `Idempotency-Key` on mutations.
+- An idempotency key is bound to its credential plus canonical method, concrete
+  path, normalized query, and JSON body; reuse for a different request is `409`.
 - Tenant/organization authority never comes from a request body.
 
 Success envelope:
@@ -133,6 +128,7 @@ Append evidence.
   "subject_id": "user_123",
   "agent_id": "agent_research",
   "run_id": "run_456",
+  "workspace_id": "ws_deploy",
   "kind": "tool_result",
   "content": "Production smoke returned 200 application/json.",
   "source": {
@@ -145,6 +141,9 @@ Append evidence.
 ```
 
 Only authorized service/agent identities may assert `verified` trust.
+Visibility defaults to `private`. `team` requires `workspace_id` and an active
+non-reader membership; this predicate is applied before retrieval, export,
+events, Atlas limits/counts, and webhook delivery.
 
 ### Proposed: `POST /v1/observations/batch`
 
@@ -158,6 +157,14 @@ invalid candidate does not force an adapter to resend accepted items.
 
 Materialize or reconcile claims for an authorized scope. Direct deterministic
 claims do not require a model. Automatic extraction is optional and bounded.
+Every claim needs supporting evidence from the same subject, project, and
+workspace, with no trust or visibility widening.
+
+### Claim lifecycle routes
+
+`supersede`, `revoke`, and `expire` require `expected_version`. A superseding
+claim must match the original subject, project, workspace, kind, and visibility;
+stale or concurrent transitions return `409` without partial history or events.
 
 ### `POST /v1/context/compile`
 
@@ -229,8 +236,8 @@ Compile one authorized visual projection around a focus record.
 ```
 
 The implemented lenses are `evidence_trace`, `neighborhood`, and
-`conflict_freshness`. v0.3 adds `scope_preview` and `knowledge_release` after
-their policy gates pass. The example limits are caller requests, not normative
+`conflict_freshness`. Additional governance lenses remain planned until their
+policy gates pass. The example limits are caller requests, not normative
 server maxima; the server clamps them to measured deployment limits.
 
 ```json
@@ -261,11 +268,8 @@ version, lifecycle, visibility, and release eligibility. Hidden candidates do
 not contribute edges, labels, or counts. Limit metadata describes only the
 authorized result.
 
-`scope_preview` additionally accepts a preview principal/scope only for callers
-with explicit preview capability. It reports that principal's eligibility but
-does not impersonate it, mint authority, or return source content the operator
-cannot inspect. `knowledge_release` follows the same distinction between
-verified evidence and active external release.
+Governance previews remain proposed and are not present in the current route
+inventory.
 
 ## Collaboration operations
 
@@ -322,9 +326,8 @@ List authorized metadata-only audit events with cursor pagination.
 
 ## Governed channel knowledge operations
 
-The channel CRUD and `knowledge-releases` names below are **proposed and not
-implemented**. Current governed release routes are `/v1/channel-releases` and
-`/v1/channel-context` in the inventory; their action is `publish`, not `activate`.
+All channel and `knowledge-releases` names below are **proposed and not
+implemented**. No governed release route is present in the current inventory.
 
 
 These v0.3 operations implement

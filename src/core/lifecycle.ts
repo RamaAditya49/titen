@@ -1,5 +1,6 @@
 import { first } from "./db";
-import { forbidden, notFound, validationError } from "./errors";
+import { recordAccessParams, recordAccessSql, authorizeRecordWorkspace } from "./authorization";
+import { conflict, notFound, validationError } from "./errors";
 import { sha256Hex } from "./ids";
 import { auditStatement } from "./audit";
 import { eventStatement } from "./events";
@@ -8,6 +9,7 @@ import type { RequestContext, Result } from "./http";
 import {
   LIMITS,
   optionalString,
+  requireInteger,
   requireObject,
   requireString,
 } from "./validate";
@@ -23,32 +25,56 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
   const body = requireObject(await ctx.json());
   const newClaimId = requireString(body, "superseded_by", LIMITS.identifier);
   const reason = optionalString(body, "reason", LIMITS.statement);
+  const expectedVersion = requireInteger(body, "expected_version", 1, Number.MAX_SAFE_INTEGER);
 
-  const claim = await first<{ id: string; org_id: string; status: string; actor_id: string; visibility: string }>(
+  const claim = await first<{ id: string; status: string; version: number; subject_id: string; project_id: string | null; workspace_id: string | null; kind: string; visibility: "private" | "team" | "organization" }>(
     ctx.app.db,
-    `SELECT id, org_id, status, actor_id, visibility FROM claims WHERE id = ? AND org_id = ?`,
-    [claimId, principal.orgId],
+    `SELECT c.id, c.status, c.version, c.subject_id, c.project_id, c.workspace_id, c.kind, c.visibility
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
+    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
   );
   if (!claim) throw notFound();
-  if (claim.visibility === "private" && claim.actor_id !== principal.principalId) throw notFound();
+  if (newClaimId === claimId) throw validationError("A claim cannot supersede itself.");
+  await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
+  if (claim.version !== expectedVersion) throw conflict("Claim version changed; reload it and retry.");
   if (claim.status !== "active" && claim.status !== "disputed")
     throw validationError(`Only active or disputed claims can be superseded (current: ${claim.status}).`);
 
-  const replacement = await first<{ id: string; status: string }>(
+  const replacement = await first<{ id: string; status: string; subject_id: string; project_id: string | null; workspace_id: string | null; kind: string; visibility: string }>(
     ctx.app.db,
-    `SELECT id, status FROM claims WHERE id = ? AND org_id = ?`,
-    [newClaimId, principal.orgId],
+    `SELECT c.id, c.status, c.subject_id, c.project_id, c.workspace_id, c.kind, c.visibility
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
+    [newClaimId, principal.orgId, ...recordAccessParams(principal.principalId)],
   );
   if (!replacement) throw notFound();
   if (replacement.status !== "active")
     throw validationError("The replacement claim must be active.");
+  if (
+    replacement.subject_id !== claim.subject_id
+    || replacement.project_id !== claim.project_id
+    || replacement.workspace_id !== claim.workspace_id
+    || replacement.kind !== claim.kind
+    || replacement.visibility !== claim.visibility
+  ) throw validationError("A replacement claim must match the original claim domain and visibility.");
+  const cycle = await first<{ found: number }>(
+    ctx.app.db,
+    `WITH RECURSIVE chain(id) AS (
+       SELECT ?
+       UNION
+       SELECT c.superseded_by FROM claims c JOIN chain ON c.id = chain.id
+        WHERE c.superseded_by IS NOT NULL
+     ) SELECT 1 AS found FROM chain WHERE id = ? LIMIT 1`,
+    [newClaimId, claimId],
+  );
+  if (cycle) throw validationError("Supersession would create a cycle.");
 
   const at = ctx.app.now().toISOString();
-  const version = await nextVersion(ctx, claimId);
-  await ctx.app.db.batch([
+  const version = expectedVersion + 1;
+  await lifecycleBatch(ctx, claimId, expectedVersion, [
     {
-      sql: `UPDATE claims SET status = 'superseded', superseded_by = ?, version = ? WHERE id = ? AND org_id = ?`,
-      params: [newClaimId, version, claimId, principal.orgId],
+      sql: `UPDATE claims SET status = 'superseded', superseded_by = ?, version = ?
+             WHERE id = ? AND org_id = ? AND version = ? AND status IN ('active', 'disputed')`,
+      params: [newClaimId, version, claimId, principal.orgId, expectedVersion],
     },
     historyStatement(
       principal.orgId, "claim", claimId, version, "supersede",
@@ -81,25 +107,29 @@ export async function revokeClaim(ctx: RequestContext): Promise<Result> {
   const claimId = ctx.params.id!;
   const body = requireObject(await ctx.json());
   const reason = optionalString(body, "reason", LIMITS.statement);
+  const expectedVersion = requireInteger(body, "expected_version", 1, Number.MAX_SAFE_INTEGER);
 
-  const claim = await first<{ id: string; org_id: string; status: string; actor_id: string; visibility: string }>(
+  const claim = await first<{ id: string; status: string; version: number; workspace_id: string | null; visibility: "private" | "team" | "organization" }>(
     ctx.app.db,
-    `SELECT id, org_id, status, actor_id, visibility FROM claims WHERE id = ? AND org_id = ?`,
-    [claimId, principal.orgId],
+    `SELECT c.id, c.status, c.version, c.workspace_id, c.visibility
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
+    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
   );
   if (!claim) throw notFound();
-  if (claim.visibility === "private" && claim.actor_id !== principal.principalId) throw notFound();
+  await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
+  if (claim.version !== expectedVersion) throw conflict("Claim version changed; reload it and retry.");
   if (claim.status === "revoked")
     return { data: { claim_id: claimId, status: "revoked", already_revoked: true } };
   if (claim.status === "superseded")
     throw validationError("A superseded claim cannot be revoked; revoke its replacement instead.");
 
   const at = ctx.app.now().toISOString();
-  const version = await nextVersion(ctx, claimId);
-  await ctx.app.db.batch([
+  const version = expectedVersion + 1;
+  await lifecycleBatch(ctx, claimId, expectedVersion, [
     {
-      sql: `UPDATE claims SET status = 'revoked', version = ? WHERE id = ? AND org_id = ?`,
-      params: [version, claimId, principal.orgId],
+      sql: `UPDATE claims SET status = 'revoked', version = ?
+             WHERE id = ? AND org_id = ? AND version = ? AND status != 'superseded'`,
+      params: [version, claimId, principal.orgId, expectedVersion],
     },
     historyStatement(
       principal.orgId, "claim", claimId, version, "revoke",
@@ -130,25 +160,29 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
   const claimId = ctx.params.id!;
   const body = requireObject(await ctx.json());
   const reason = optionalString(body, "reason", LIMITS.statement);
+  const expectedVersion = requireInteger(body, "expected_version", 1, Number.MAX_SAFE_INTEGER);
 
-  const claim = await first<{ id: string; org_id: string; status: string; actor_id: string; visibility: string; valid_to: string | null }>(
+  const claim = await first<{ id: string; status: string; version: number; workspace_id: string | null; visibility: "private" | "team" | "organization"; valid_to: string | null }>(
     ctx.app.db,
-    `SELECT id, org_id, status, actor_id, visibility, valid_to FROM claims WHERE id = ? AND org_id = ?`,
-    [claimId, principal.orgId],
+    `SELECT c.id, c.status, c.version, c.workspace_id, c.visibility, c.valid_to
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
+    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
   );
   if (!claim) throw notFound();
-  if (claim.visibility === "private" && claim.actor_id !== principal.principalId) throw notFound();
+  await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
+  if (claim.version !== expectedVersion) throw conflict("Claim version changed; reload it and retry.");
   if (claim.status === "expired")
     return { data: { claim_id: claimId, status: "expired", already_expired: true } };
   if (claim.status !== "active" && claim.status !== "disputed")
     throw validationError(`Only active or disputed claims can be expired (current: ${claim.status}).`);
 
   const at = ctx.app.now().toISOString();
-  const version = await nextVersion(ctx, claimId);
-  await ctx.app.db.batch([
+  const version = expectedVersion + 1;
+  await lifecycleBatch(ctx, claimId, expectedVersion, [
     {
-      sql: `UPDATE claims SET status = 'expired', valid_to = ?, version = ? WHERE id = ? AND org_id = ?`,
-      params: [at, version, claimId, principal.orgId],
+      sql: `UPDATE claims SET status = 'expired', valid_to = ?, version = ?
+             WHERE id = ? AND org_id = ? AND version = ? AND status IN ('active', 'disputed')`,
+      params: [at, version, claimId, principal.orgId, expectedVersion],
     },
     historyStatement(
       principal.orgId, "claim", claimId, version, "expire",
@@ -169,11 +203,23 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
   };
 }
 
-async function nextVersion(ctx: RequestContext, claimId: string): Promise<number> {
-  const row = await first<{ version: number }>(
-    ctx.app.db,
-    `SELECT version FROM claims WHERE id = ?`,
-    [claimId],
-  );
-  return (row?.version ?? 1) + 1;
+async function lifecycleBatch(
+  ctx: RequestContext,
+  claimId: string,
+  expectedVersion: number,
+  statements: Parameters<RequestContext["app"]["db"]["batch"]>[0],
+): Promise<void> {
+  try {
+    await ctx.app.db.batch([
+      {
+        sql: `INSERT INTO lifecycle_fences (claim_id, expected_version, created_at) VALUES (?, ?, ?)`,
+        params: [claimId, expectedVersion, ctx.app.now().toISOString()],
+      },
+      ...statements,
+    ]);
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE|constraint/i.test(error.message))
+      throw conflict("Claim version changed; reload it and retry.");
+    throw error;
+  }
 }

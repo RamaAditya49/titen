@@ -5,6 +5,7 @@ import { validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
+import { authorizeRecordWorkspace } from "./authorization";
 import type { RequestContext, Result } from "./http";
 import {
   LIMITS,
@@ -23,10 +24,10 @@ import {
 export const ENDPOINT = "POST /v1/observations";
 
 /**
- * P0 has no membership model yet, so `team` resolves to the authenticated
- * organization. `private` is enforced against the creating principal.
+ * Private is the only safe implicit visibility. Team records require an
+ * explicit workspace and active writer membership.
  */
-const DEFAULT_VISIBILITY = "team";
+const DEFAULT_VISIBILITY = "private";
 
 export function historyStatement(
   orgId: string,
@@ -89,6 +90,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const content = requireString(body, "content", LIMITS.content);
   const trust = optionalEnum(body, "trust", TRUST_LEVELS, "asserted");
   const visibility = optionalEnum(body, "visibility", VISIBILITIES, DEFAULT_VISIBILITY);
+  const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   const agentId = optionalString(body, "agent_id", LIMITS.identifier);
   const runId = optionalString(body, "run_id", LIMITS.identifier);
   const occurredAt = optionalTimestamp(body, "occurred_at");
@@ -104,13 +106,15 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     principal.orgId,
     optionalString(body, "project_id", LIMITS.identifier),
   );
+  await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
 
   const result = await commitIdempotent(
     ctx.app.db,
     principal,
-    ENDPOINT,
+    ctx.request,
     idempotencyKey(ctx.request),
     raw,
+    ctx.app.now(),
     async () => {
       const id = newId("obs");
       const ingestedAt = ctx.app.now().toISOString();
@@ -124,6 +128,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         kind,
         trust,
         visibility,
+        workspace_id: workspaceId,
         content_hash: contentHash,
         occurred_at: occurredAt,
         ingested_at: ingestedAt,
@@ -134,14 +139,15 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         statements: [
           {
             sql: `INSERT INTO observations
-                    (id, org_id, subject_id, project_id, agent_id, run_id, actor_id, kind, content,
+                    (id, org_id, subject_id, project_id, workspace_id, agent_id, run_id, actor_id, kind, content,
                      content_hash, source_type, source_ref, trust, visibility, occurred_at, ingested_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             params: [
               id,
               principal.orgId,
               subjectId,
               projectId,
+              workspaceId,
               agentId,
               runId,
               principal.principalId,
@@ -177,7 +183,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             principal.principalId,
             "observation",
             id,
-            { subject_id: subjectId, kind, trust, visibility },
+            { subject_id: subjectId, workspace_id: workspaceId, kind, trust, visibility },
             ingestedAt,
           ),
         ],

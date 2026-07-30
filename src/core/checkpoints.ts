@@ -26,6 +26,7 @@ export async function saveCheckpoint(ctx: RequestContext): Promise<Result> {
   const body = requireObject(await ctx.json());
   const subjectId = requireString(body, "subject_id", LIMITS.identifier);
   const agentId = optionalString(body, "agent_id", LIMITS.identifier) ?? principal.principalId;
+  if (agentId !== principal.principalId) throw notFound();
   const runId = optionalString(body, "run_id", LIMITS.identifier);
   const kind = requireString(body, "kind", LIMITS.label);
   if (!CHECKPOINT_KINDS.includes(kind as never))
@@ -56,8 +57,8 @@ export async function saveCheckpoint(ctx: RequestContext): Promise<Result> {
       sql: `UPDATE checkpoints
               SET state = ?, state_hash = ?, run_id = ?, ttl_seconds = ?,
                   expires_at = ?, updated_at = ?
-            WHERE id = ?`,
-      params: [serialized, stateHash, runId, ttlSeconds, expiresAt, at, existing.id],
+            WHERE id = ? AND org_id = ? AND agent_id = ?`,
+      params: [serialized, stateHash, runId, ttlSeconds, expiresAt, at, existing.id, principal.orgId, principal.principalId],
     }]);
     return {
       data: {
@@ -105,6 +106,7 @@ export async function getCheckpoint(ctx: RequestContext): Promise<Result> {
   const kind = ctx.url.searchParams.get("kind");
   if (!subjectId) throw validationError('Query "subject_id" is required.');
   if (!kind) throw validationError('Query "kind" is required.');
+  if (agentId !== principal.principalId) throw notFound();
 
   const now = ctx.app.now().toISOString();
   const row = await first<{
@@ -145,14 +147,14 @@ export async function deleteCheckpoint(ctx: RequestContext): Promise<Result> {
 
   const row = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM checkpoints WHERE id = ? AND org_id = ?`,
-    [checkpointId, principal.orgId],
+    `SELECT id FROM checkpoints WHERE id = ? AND org_id = ? AND agent_id = ?`,
+    [checkpointId, principal.orgId, principal.principalId],
   );
   if (!row) throw notFound();
 
   await ctx.app.db.batch([{
-    sql: `DELETE FROM checkpoints WHERE id = ? AND org_id = ?`,
-    params: [checkpointId, principal.orgId],
+    sql: `DELETE FROM checkpoints WHERE id = ? AND org_id = ? AND agent_id = ?`,
+    params: [checkpointId, principal.orgId, principal.principalId],
   }]);
 
   return { data: { checkpoint_id: checkpointId, deleted: true } };

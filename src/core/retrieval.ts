@@ -3,6 +3,7 @@ import type { Db } from "./db";
 import type { Principal } from "./auth";
 import { LIMITS } from "./validate";
 import type { RankInput } from "./rank";
+import { recordAccessParams, recordAccessSql } from "./authorization";
 
 /**
  * Builds a bounded FTS5 MATCH expression from free task text.
@@ -10,16 +11,42 @@ import type { RankInput } from "./rank";
  * Every term is quoted, so FTS5 operators inside user input are data rather
  * than query syntax. Returns null when the task has no indexable term.
  */
-export function ftsQuery(task: string, maxTerms = LIMITS.queryTerms): string | null {
+export interface FtsQueryPlan {
+  match: string | null;
+  termsUsed: number;
+  termsDropped: number;
+}
+
+function termSignal(term: string): number {
+  return (/[0-9]/u.test(term) ? 10_000 : 0)
+    + (/[_'-]/u.test(term) ? 5_000 : 0)
+    + Math.min(term.length, 1_000);
+}
+
+export function planFtsQuery(task: string, maxTerms = LIMITS.queryTerms): FtsQueryPlan {
   const matches = task.toLowerCase().matchAll(/[\p{L}\p{N}][\p{L}\p{N}_'-]*/gu);
   const terms = [...new Set([...matches].map((match) => match[0]))].filter(
     (term) => term.length > 1,
   );
-  if (terms.length === 0) return null;
-  return terms
-    .slice(0, maxTerms)
+  if (terms.length === 0) return { match: null, termsUsed: 0, termsDropped: 0 };
+  const selected = terms
+    .sort((left, right) => {
+      const bySignal = termSignal(right) - termSignal(left);
+      if (bySignal !== 0) return bySignal;
+      return left < right ? -1 : left > right ? 1 : 0;
+    })
+    .slice(0, maxTerms);
+  return {
+    match: selected
     .map((term) => `"${term.replaceAll('"', '""')}"`)
-    .join(" OR ");
+    .join(" OR "),
+    termsUsed: selected.length,
+    termsDropped: terms.length - selected.length,
+  };
+}
+
+export function ftsQuery(task: string, maxTerms = LIMITS.queryTerms): string | null {
+  return planFtsQuery(task, maxTerms).match;
 }
 
 export interface ClaimCandidate extends RankInput {
@@ -95,7 +122,7 @@ export async function retrieveClaimsByIds(
           AND c.status IN ('active', 'disputed')
           AND c.valid_from <= ?
           AND (c.valid_to IS NULL OR c.valid_to > ?)
-          AND (c.visibility <> 'private' OR c.actor_id = ?)`,
+          AND ${recordAccessSql("c")}`,
       [
         ...group,
         principal.orgId,
@@ -104,7 +131,7 @@ export async function retrieveClaimsByIds(
         scope.projectId,
         scope.at,
         scope.at,
-        principal.principalId,
+        ...recordAccessParams(principal.principalId),
       ],
     );
     found.push(...rows);
@@ -159,7 +186,7 @@ export async function retrieveClaimCandidates(
         AND c.status IN ('active', 'disputed')
         AND c.valid_from <= ?
         AND (c.valid_to IS NULL OR c.valid_to > ?)
-        AND (c.visibility <> 'private' OR c.actor_id = ?)
+        AND ${recordAccessSql("c")}
       ORDER BY bm25(claims_fts)
       LIMIT ?`,
     [
@@ -170,7 +197,7 @@ export async function retrieveClaimCandidates(
       scope.projectId,
       scope.at,
       scope.at,
-      principal.principalId,
+      ...recordAccessParams(principal.principalId),
       limit,
     ],
   );

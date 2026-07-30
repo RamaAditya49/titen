@@ -2,6 +2,7 @@ import { first } from "./db";
 import type { Db, Param } from "./db";
 import { notFound, validationError, forbidden } from "./errors";
 import { newId, sha256Hex } from "./ids";
+import { canPrincipalReadEvent, eventAccessParams, eventAccessSql } from "./events";
 import type { RequestContext, Result } from "./http";
 import { LIMITS, requireObject, requireString } from "./validate";
 
@@ -83,9 +84,9 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
 
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO webhooks (id, org_id, url, secret_hash, secret, events, status, failure_count, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'active', 0, ?)`,
-      params: [id, principal.orgId, url, secretHash, secret, eventsStr, now],
+      sql: `INSERT INTO webhooks (id, org_id, principal_id, url, secret_hash, secret, events, status, failure_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, ?)`,
+      params: [id, principal.orgId, principal.principalId, url, secretHash, secret, eventsStr, now],
     },
   ]);
 
@@ -120,8 +121,8 @@ export async function listWebhooks(ctx: RequestContext): Promise<Result> {
     created_at: string;
   }>(
     `SELECT id, url, events, status, failure_count, last_delivery_at, created_at
-       FROM webhooks WHERE org_id = ? ORDER BY created_at DESC`,
-    [principal.orgId],
+       FROM webhooks WHERE org_id = ? AND principal_id = ? ORDER BY created_at DESC`,
+    [principal.orgId, principal.principalId],
   );
 
   return {
@@ -143,8 +144,8 @@ export async function deleteWebhook(ctx: RequestContext): Promise<Result> {
 
   const hook = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM webhooks WHERE id = ? AND org_id = ?`,
-    [webhookId, principal.orgId],
+    `SELECT id FROM webhooks WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [webhookId, principal.orgId, principal.principalId],
   );
   if (!hook) throw notFound();
 
@@ -163,8 +164,8 @@ export async function pauseWebhook(ctx: RequestContext): Promise<Result> {
 
   const hook = await first<{ id: string; status: string }>(
     ctx.app.db,
-    `SELECT id, status FROM webhooks WHERE id = ? AND org_id = ?`,
-    [webhookId, principal.orgId],
+    `SELECT id, status FROM webhooks WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [webhookId, principal.orgId, principal.principalId],
   );
   if (!hook) throw notFound();
   if (hook.status === "disabled") throw forbidden("Cannot pause a disabled webhook.");
@@ -183,8 +184,8 @@ export async function resumeWebhook(ctx: RequestContext): Promise<Result> {
 
   const hook = await first<{ id: string; status: string }>(
     ctx.app.db,
-    `SELECT id, status FROM webhooks WHERE id = ? AND org_id = ?`,
-    [webhookId, principal.orgId],
+    `SELECT id, status FROM webhooks WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [webhookId, principal.orgId, principal.principalId],
   );
   if (!hook) throw notFound();
   if (hook.status === "disabled") throw forbidden("Cannot resume a disabled webhook. Re-register it.");
@@ -206,8 +207,8 @@ export async function listDeliveries(ctx: RequestContext): Promise<Result> {
 
   const hook = await first<{ id: string }>(
     ctx.app.db,
-    `SELECT id FROM webhooks WHERE id = ? AND org_id = ?`,
-    [webhookId, principal.orgId],
+    `SELECT id FROM webhooks WHERE id = ? AND org_id = ? AND principal_id = ?`,
+    [webhookId, principal.orgId, principal.principalId],
   );
   if (!hook) throw notFound();
 
@@ -265,9 +266,10 @@ export async function deliverEvent(
     secret_hash: string;
     events: string;
     failure_count: number;
+    principal_id: string | null;
   }>(
-    `SELECT id, url, secret, secret_hash, events, failure_count FROM webhooks
-       WHERE org_id = ? AND status = 'active'`,
+    `SELECT id, url, secret, secret_hash, events, failure_count, principal_id FROM webhooks
+       WHERE org_id = ? AND status = 'active' AND principal_id IS NOT NULL`,
     [orgId],
   );
 
@@ -282,6 +284,7 @@ export async function deliverEvent(
   const nowStr = now.toISOString();
 
   for (const hook of matching) {
+    if (!await canPrincipalReadEvent(db, orgId, hook.principal_id!, event.id)) continue;
     // Skip what this hook already received. The guard lives here rather than in
     // each caller so the drain endpoint, the maintenance timer, and anything
     // added later all get exactly-once delivery from one place.
@@ -382,16 +385,17 @@ export async function deliverEvent(
  * calling this same function, which needs no schema change.
  */
 export async function drainWebhooks(ctx: RequestContext): Promise<Result> {
-  const { orgId } = ctx.principal!;
+  const { orgId, principalId } = ctx.principal!;
   const after = ctx.url.searchParams.get("after") ?? "";
   const limitParam = Number(ctx.url.searchParams.get("limit") ?? "50");
   if (!Number.isInteger(limitParam) || limitParam < 1 || limitParam > 200)
     throw validationError('Query "limit" must be an integer between 1 and 200.');
 
   const events = await ctx.app.db.all<{ id: string; kind: string; payload: string }>(
-    `SELECT id, kind, payload FROM events
-      WHERE org_id = ? AND id > ? ORDER BY created_at, id LIMIT ?`,
-    [orgId, after, limitParam],
+    `SELECT e.id, e.kind, e.payload FROM events e
+      WHERE e.org_id = ? AND e.id > ? AND ${eventAccessSql("e")}
+      ORDER BY e.created_at, e.id LIMIT ?`,
+    [orgId, after, ...eventAccessParams(principalId), limitParam],
   );
 
   for (const event of events)

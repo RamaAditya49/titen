@@ -1,11 +1,13 @@
 import type { RequestContext, Result } from "./http";
 import { validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
-import { ftsQuery, retrieveClaimCandidates } from "./retrieval";
+import { planFtsQuery, retrieveClaimCandidates } from "./retrieval";
 import { rankCandidates, packUnderBudget } from "./rank";
 import { estimateJsonTokens } from "./tokens";
-import { first, chunk } from "./db";
+import { first } from "./db";
+import { acquireLeaseForPrincipal } from "./collaboration";
 import { CONTEXT_INSTRUCTIONS, POLICY_SNAPSHOT, MIN_BUDGET_TOKENS } from "./context";
+import { loadAuthorizedEvidenceIds } from "./evidence";
 
 // --- JSON-RPC types ---
 
@@ -108,7 +110,9 @@ async function toolRemember(ctx: RequestContext, args: Record<string, unknown>) 
   const sourceType = requireArg(args, "source_type");
   const sourceRef = (args.source_ref as string) || null;
   const trust = (args.trust as string) || "asserted";
-  const visibility = (args.visibility as string) || "team";
+  const visibility = (args.visibility as string) || "private";
+  if (visibility === "team")
+    throw validationError("MCP team visibility requires the workspace-aware remember contract.");
 
   const id = newId("obs");
   const at = ctx.app.now().toISOString();
@@ -146,9 +150,9 @@ async function toolCompile(ctx: RequestContext, args: Record<string, unknown>) {
 
   const now = ctx.app.now();
   const at = now.toISOString();
-  const match = ftsQuery(task);
-  const candidates = match
-    ? await retrieveClaimCandidates(ctx.app.db, principal, match, {
+  const lexical = planFtsQuery(task);
+  const candidates = lexical.match
+    ? await retrieveClaimCandidates(ctx.app.db, principal, lexical.match, {
         subjectId,
         projectId: null,
         at,
@@ -156,7 +160,11 @@ async function toolCompile(ctx: RequestContext, args: Record<string, unknown>) {
     : [];
 
   const ranked = rankCandidates(candidates, now);
-  const evidenceMap = await loadEvidenceIds(ctx, ranked.map(r => r.candidate.id));
+  const evidenceMap = await loadAuthorizedEvidenceIds(
+    ctx.app.db,
+    principal,
+    ranked.map(r => r.candidate.id),
+  );
 
   const entries = ranked.map(entry => {
     const item = {
@@ -194,6 +202,10 @@ async function toolCompile(ctx: RequestContext, args: Record<string, unknown>) {
     query: task,
     budget: { max_tokens: maxTokens, used_tokens: packed.usedTokens },
     items: packed.selected,
+    retrieval: {
+      query_terms_used: lexical.termsUsed,
+      dropped_query_terms: lexical.termsDropped,
+    },
     instructions: CONTEXT_INSTRUCTIONS,
   };
 }
@@ -289,36 +301,14 @@ async function toolLeaseAcquire(ctx: RequestContext, args: Record<string, unknow
   const resourceId = requireArg(args, "resource_id");
   const purpose = requireArg(args, "purpose");
   const ttlSeconds = typeof args.ttl_seconds === "number" ? args.ttl_seconds : 300;
-
-  const now = ctx.app.now();
-  const nowIso = now.toISOString();
-
-  const existing = await first<{ id: string; holder_id: string; expires_at: string }>(
+  if (!Number.isInteger(ttlSeconds) || ttlSeconds < 10 || ttlSeconds > 86400)
+    throw validationError("ttl_seconds must be an integer between 10 and 86400.");
+  return acquireLeaseForPrincipal(
     ctx.app.db,
-    `SELECT id, holder_id, expires_at FROM leases
-       WHERE org_id = ? AND resource_type = ? AND resource_id = ? AND released_at IS NULL`,
-    [principal.orgId, resourceType, resourceId],
+    principal,
+    { resourceType, resourceId, purpose, ttlSeconds },
+    ctx.app.now(),
   );
-
-  if (existing) {
-    if (existing.holder_id !== principal.principalId && new Date(existing.expires_at) > now)
-      throw new Error(`Resource is leased until ${existing.expires_at}.`);
-    await ctx.app.db.batch([{
-      sql: `UPDATE leases SET released_at = ? WHERE id = ?`,
-      params: [nowIso, existing.id],
-    }]);
-  }
-
-  const id = newId("lease");
-  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
-
-  await ctx.app.db.batch([{
-    sql: `INSERT INTO leases (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds, expires_at, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [id, principal.orgId, resourceType, resourceId, principal.principalId, purpose, ttlSeconds, expiresAt, nowIso],
-  }]);
-
-  return { lease_id: id, expires_at: expiresAt };
 }
 
 async function toolHandoff(ctx: RequestContext, args: Record<string, unknown>) {
@@ -337,30 +327,6 @@ async function toolHandoff(ctx: RequestContext, args: Record<string, unknown>) {
   }]);
 
   return { handoff_id: id, status: "pending" };
-}
-
-// --- Evidence loader (shared with context compile) ---
-
-async function loadEvidenceIds(
-  ctx: RequestContext,
-  claimIds: string[],
-): Promise<Map<string, string[]>> {
-  const grouped = new Map<string, string[]>();
-  if (claimIds.length === 0) return grouped;
-  for (const group of chunk(claimIds)) {
-    const rows = await ctx.app.db.all<{ claim_id: string; observation_id: string }>(
-      `SELECT claim_id, observation_id FROM claim_sources
-        WHERE claim_id IN (${group.map(() => "?").join(", ")})
-        ORDER BY claim_id, observation_id`,
-      group,
-    );
-    for (const row of rows) {
-      const list = grouped.get(row.claim_id) ?? [];
-      list.push(row.observation_id);
-      grouped.set(row.claim_id, list);
-    }
-  }
-  return grouped;
 }
 
 // --- Dispatch ---

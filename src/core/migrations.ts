@@ -422,6 +422,66 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON webhook_deliveries (webhook_id, event_id)`,
     ],
   },
+  {
+    version: 10,
+    statements: [
+      // Team visibility is a real workspace boundary. Legacy team rows remain
+      // fail-closed until an explicit future rebinding migration can prove scope.
+      `ALTER TABLE observations ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)`,
+      `ALTER TABLE claims ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)`,
+      `CREATE INDEX observations_workspace_scope
+         ON observations (org_id, workspace_id, subject_id, ingested_at)`,
+      `CREATE INDEX claims_workspace_scope
+         ON claims (org_id, workspace_id, subject_id, status)`,
+      // Preserve every lease row while deterministically retiring duplicate
+      // unreleased losers before the database starts enforcing one winner.
+      `UPDATE leases AS losing
+          SET released_at = losing.expires_at
+        WHERE losing.released_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM leases winning
+             WHERE winning.org_id = losing.org_id
+               AND winning.resource_type = losing.resource_type
+               AND winning.resource_id = losing.resource_id
+               AND winning.released_at IS NULL
+               AND (
+                 winning.expires_at > losing.expires_at
+                 OR (winning.expires_at = losing.expires_at AND winning.created_at > losing.created_at)
+                 OR (winning.expires_at = losing.expires_at AND winning.created_at = losing.created_at AND winning.id > losing.id)
+               )
+          )`,
+      `CREATE UNIQUE INDEX leases_one_unreleased_resource
+         ON leases (org_id, resource_type, resource_id) WHERE released_at IS NULL`,
+      // A claim/version fence makes concurrent lifecycle batches choose one
+      // winner without requiring an interactive transaction unavailable in D1.
+      `CREATE TABLE lifecycle_fences (
+         claim_id TEXT NOT NULL REFERENCES claims(id),
+         expected_version INTEGER NOT NULL,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (claim_id, expected_version)
+       )`,
+      `CREATE TABLE idempotency_v2 (
+         org_id TEXT NOT NULL,
+         key_id TEXT NOT NULL,
+         request_identity TEXT NOT NULL,
+         key_hash TEXT NOT NULL,
+         request_hash TEXT NOT NULL,
+         status INTEGER NOT NULL,
+         response TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         expires_at TEXT NOT NULL,
+         PRIMARY KEY (org_id, key_id, key_hash)
+       )`,
+      `CREATE INDEX idempotency_v2_expiry ON idempotency_v2 (expires_at)`,
+      `DROP INDEX context_feedback_mutation`,
+      `CREATE UNIQUE INDEX context_feedback_mutation
+         ON context_feedback (org_id, actor_id, client_mutation_id)
+         WHERE client_mutation_id IS NOT NULL`,
+      // Existing subscriptions have no attributable principal and therefore
+      // receive no private/team events until re-registered.
+      `ALTER TABLE webhooks ADD COLUMN principal_id TEXT`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
