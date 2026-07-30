@@ -64,6 +64,7 @@
     "check:routes": "node scripts/check-route-docs.mjs",
     "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test",
     "verify:dashboard-live": "bun scripts/verify-dashboard-live.ts",
+    "verify:live": "bun scripts/verify-live.ts",
     "test:integration": "bun test tests/integration"
   },
   "devDependencies": {
