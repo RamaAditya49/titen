@@ -47,6 +47,9 @@ The current batch groups the root causes as follows:
   work-item database or a second orchestration system.
 - Make MCP delegate to shared application operations and keep vector scope
   filtering equivalent across runtimes.
+- Bring the stateless MCP transport to the current interoperable minimum,
+  document the verified host packaging matrix, and record deliberately deferred
+  native adapters in the Ponytail debt ledger.
 - Harden the existing CLI, thin SDK, README, and installed-tarball verifier
   without a parser framework, generated SDK, or npm-private API.
 - Check in and document the verified rootless deployment path, keep loopback as
@@ -70,6 +73,8 @@ The current batch groups the root causes as follows:
 - A new ORM, queue, cache, database, dependency injection layer, CLI parser,
   SDK generator, KMS vendor, or GitHub Actions workflow.
 - Publicly opening a host firewall without an explicit operator choice.
+- Five speculative native host plugins or automatic transcript/lifecycle capture
+  before an adopter and a parity fixture justify each adapter.
 
 ## Constraints and risks
 
@@ -184,6 +189,11 @@ The current batch groups the root causes as follows:
   every cutoff issue with its specific reason and evidence, remove only
   enumerated merged/obsolete branches, and publish the exact verified `0.2.0`
   commit to npm and a matching GitHub release while Actions remains disabled.
+- **AC-RH-026 — Unwanted behavior:** If an MCP HTTP request carries an invalid
+  cross-origin source or unsupported protocol revision, then Titen shall reject
+  it before tool execution; otherwise its stateless endpoint shall expose the
+  current negotiated revision, safe tool annotations, and the required no-SSE
+  `GET` response, while host-native packaging remains explicitly documented debt.
 
 ## Done conditions
 

@@ -512,6 +512,15 @@ the MCP client loses no canonical state. `titen_compile` and
 can apply their native approval policy correctly. Server metadata uses the
 running build revision rather than a separately maintained MCP version.
 
+The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
+`GET /mcp` therefore returns `405`. A present `Origin` must match the endpoint
+origin or the request returns `403`; non-browser clients may omit it. The server
+negotiates protocol versions through `2025-11-25`, assumes the compatible
+`2025-03-26` behavior when the HTTP version header is absent, and returns `400`
+for an unsupported `MCP-Protocol-Version`. Tool discovery includes read-only,
+destructive, idempotent, and open-world hints; these are client hints only and
+never replace server-side scopes.
+
 Channel creation, release approval/activation/revocation, and channel context
 are not part of the ordinary agent MCP profile. Publisher, approver, and gateway
 service principals use the narrower REST capabilities above.

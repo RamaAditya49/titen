@@ -24,7 +24,7 @@ interface JsonRpcResponse {
 // --- JSON-RPC error codes ---
 
 /** Protocol revisions this server implements, newest first. */
-const SUPPORTED_PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
+const SUPPORTED_PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
@@ -58,6 +58,7 @@ const TOOL_SPECS: [name: string, description: string, args: string][] = [
     "to_principal! subject_id! message context_id checkpoint_id"],
 ];
 
+const READ_ONLY_TOOLS = new Set(["titen_compile", "titen_checkpoint_get"]);
 const TOOLS = TOOL_SPECS.map(([name, description, args]) => {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
@@ -76,7 +77,17 @@ const TOOLS = TOOL_SPECS.map(([name, description, args]) => {
           ? {}
           : { type: "string" };
   }
-  return { name, description, inputSchema: { type: "object", properties, required } };
+  return {
+    name,
+    description,
+    inputSchema: { type: "object", properties, required },
+    annotations: {
+      readOnlyHint: READ_ONLY_TOOLS.has(name),
+      destructiveHint: name === "titen_checkpoint_save",
+      idempotentHint: READ_ONLY_TOOLS.has(name),
+      openWorldHint: false,
+    },
+  };
 });
 
 // --- Helpers ---
@@ -186,9 +197,9 @@ const TOOL_HANDLERS: Record<string, (ctx: RequestContext, args: Record<string, u
  * MCP client parses the body looking for a top-level `jsonrpc` field and finds
  * nothing when the payload is nested, so every return below uses `raw`.
  */
-function jsonRpcBody(payload: unknown, requestId: string): Response {
+function jsonRpcBody(payload: unknown, requestId: string, status = 200): Response {
   return new Response(JSON.stringify(payload), {
-    status: 200,
+    status,
     headers: {
       "content-type": "application/json",
       "cache-control": "no-store",
@@ -213,6 +224,18 @@ export async function handleMcp(ctx: RequestContext): Promise<Result> {
     raw: jsonRpcBody(body, ctx.requestId),
     data: null,
   });
+
+  const protocolVersion = ctx.request.headers.get("mcp-protocol-version");
+  if (protocolVersion && !SUPPORTED_PROTOCOLS.includes(protocolVersion)) {
+    return {
+      raw: jsonRpcBody(
+        rpcError(null, INVALID_REQUEST, "Unsupported MCP-Protocol-Version."),
+        ctx.requestId,
+        400,
+      ),
+      data: null,
+    };
+  }
 
   let parsed: unknown;
   try {
@@ -279,6 +302,7 @@ async function dispatchRpc(
           name: tool.name,
           description: tool.description,
           inputSchema: tool.inputSchema,
+          annotations: tool.annotations,
         })),
       });
 

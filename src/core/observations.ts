@@ -57,14 +57,7 @@ export function historyStatement(
   };
 }
 
-/**
- * Every canonical write queues its own reindex work. P0 ships no consumer
- * because vector retrieval is disabled.
- *
- * ponytail: an outbox without a worker. The ceiling is that rows only
- * accumulate; the upgrade path is the vector indexer in v0.1, which drains
- * `pending` rows and needs no schema change.
- */
+/** Every canonical write queues its own durable, asynchronously drained work. */
 export function outboxStatement(
   orgId: string,
   recordType: string,

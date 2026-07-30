@@ -17,7 +17,7 @@ import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebho
 import { appendObservation } from "./observations";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
-import { ApiError, unavailable, validationError } from "./errors";
+import { ApiError, forbidden, unavailable, validationError } from "./errors";
 import {
   MAX_BODY_BYTES,
   compileRoutes,
@@ -261,6 +261,19 @@ export function createApp(context: {
     const requestId = newRequestId();
     try {
       const url = new URL(request.url);
+      if (url.pathname === "/mcp") {
+        const rawOrigin = request.headers.get("origin");
+        if (rawOrigin) {
+          let origin: string;
+          try {
+            origin = new URL(rawOrigin).origin;
+          } catch {
+            throw forbidden("Invalid MCP Origin header.");
+          }
+          if (origin !== url.origin)
+            throw forbidden("Cross-origin MCP requests are not allowed.");
+        }
+      }
       const matched = matchRoute(compiled, request.method, url.pathname);
       if (!matched) throw new ApiError(404, "NOT_FOUND", "Unknown endpoint.");
       if ("allowed" in matched)

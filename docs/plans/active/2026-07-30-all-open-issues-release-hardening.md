@@ -33,6 +33,9 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
   sqlite-vec, requeue rebuildable projections, and prove noisy-neighbor parity.
 - [ ] Remove duplicated domain SQL from MCP and add equivalent REST/MCP state,
   security, error, and capability tests.
+- [ ] Validate MCP Origin, protocol-version, no-SSE GET, and tool annotation
+  behavior; replace stale integration claims with an official-source host matrix
+  and record native adapter/public-directory deferrals in `PONYTAIL-DEBT.md`.
 - [ ] Add the reviewer workflow as a canonical read projection with stable
   pagination and existing fenced lifecycle actions; add no generic queue tables.
 - [ ] Replace the fail-open CLI parser path with a small local command/flag map and
@@ -111,6 +114,9 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 - AC-RH-025: merged commit, per-issue closure comments, branch deletion inventory,
   release gates, tag/GitHub/npm identity, dist-tag, public smokes, Actions-off, and
   zero open PR plus final late-issue snapshot.
+- AC-RH-026: invalid/same-origin/missing Origin cases, unsupported/current/legacy
+  protocol headers, authenticated `GET /mcp` 405, tool annotation assertions,
+  official host-source links, and a complete Ponytail marker ledger.
 
 ## Security, migration, deployment, and rollback
 

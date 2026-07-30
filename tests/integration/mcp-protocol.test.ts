@@ -80,6 +80,14 @@ test("initialize negotiates a protocol revision and names the server", async () 
   assert.equal(current.body.result.serverInfo.name, "titen");
   assert.ok(current.body.result.capabilities.tools, "tools capability must be declared");
 
+  const latest = await rpc({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "initialize",
+    params: { protocolVersion: "2025-11-25" },
+  });
+  assert.equal(latest.body.result.protocolVersion, "2025-11-25");
+
   // An older client must not be forced onto a newer revision.
   const older = await rpc({
     jsonrpc: "2.0",
@@ -97,7 +105,7 @@ test("initialize negotiates a protocol revision and names the server", async () 
     params: { protocolVersion: "1999-01-01" },
   });
   assert.ok(
-    ["2025-06-18", "2025-03-26", "2024-11-05"].includes(
+    ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"].includes(
       unknown.body.result.protocolVersion,
     ),
     "the fallback must be a revision this server implements",
@@ -128,7 +136,40 @@ test("ping answers, and the full handshake completes in order", async () => {
     assert.ok(typeof tool.description === "string" && tool.description.length > 0);
     assert.equal(tool.inputSchema.type, "object", "each tool needs an object schema");
     assert.ok(Array.isArray(tool.inputSchema.required));
+    assert.equal(typeof tool.annotations.readOnlyHint, "boolean");
+    assert.equal(typeof tool.annotations.destructiveHint, "boolean");
+    assert.equal(typeof tool.annotations.idempotentHint, "boolean");
+    assert.equal(tool.annotations.openWorldHint, false);
   }
+});
+
+test("the HTTP transport rejects unsafe origins and unsupported revisions", async () => {
+  const crossOrigin = await rpc(
+    { jsonrpc: "2.0", id: 1, method: "ping" },
+    { origin: "https://attacker.example" },
+  );
+  assert.equal(crossOrigin.status, 403);
+
+  const sameOrigin = await rpc(
+    { jsonrpc: "2.0", id: 2, method: "ping" },
+    { origin: running.url },
+  );
+  assert.equal(sameOrigin.status, 200);
+
+  const unsupported = await rpc(
+    { jsonrpc: "2.0", id: 3, method: "ping" },
+    { "mcp-protocol-version": "1999-01-01" },
+  );
+  assert.equal(unsupported.status, 400);
+  assert.equal(unsupported.body.error.code, -32600);
+
+  const noStream = await fetch(`${running.url}/mcp`, {
+    headers: {
+      accept: "text/event-stream",
+      authorization: `Bearer ${key}`,
+    },
+  });
+  assert.equal(noStream.status, 405);
 });
 
 test("a tool call returns MCP content and a failure stays readable", async () => {
