@@ -221,9 +221,10 @@ test("webhook retries stop when the subscriber loses event access", async () => 
       params: [await cipher.encrypt("shared-secret-value", "webhook:whk_1")],
     },
     {
-      sql: `INSERT INTO webhook_deliveries(id, webhook_id, event_id, status, attempts, next_retry_at, created_at)
+      sql: `INSERT INTO webhook_deliveries
+              (id, webhook_id, event_id, status, attempts, next_retry_at, created_at, lease_token, lease_expires_at)
             VALUES ('dlv_1', 'whk_1', 'evt_1', 'pending', 1, '2026-07-30T00:01:00Z',
-                    '2026-07-30T00:00:02Z')`,
+                    '2026-07-30T00:00:02Z', 'stale-lease', '2026-07-30T00:02:00Z')`,
     },
     { sql: "UPDATE memberships SET removed_at = '2026-07-30T00:00:30Z' WHERE id = 'membership_1'" },
   ]);
@@ -248,6 +249,12 @@ test("webhook retries stop when the subscriber loses event access", async () => 
 
   assert.deepEqual(result, { attempted: 0, delivered: 0 });
   assert.equal(calls, 0, "revoked membership must block outbound retry I/O");
+  assert.deepEqual(
+    (await db.all<{ status: string; next_retry_at: string | null; lease_token: string | null; lease_expires_at: string | null }>(
+      "SELECT status, next_retry_at, lease_token, lease_expires_at FROM webhook_deliveries WHERE id = 'dlv_1'",
+    ))[0],
+    { status: "expired", next_retry_at: null, lease_token: null, lease_expires_at: null },
+  );
   close();
 });
 

@@ -284,6 +284,21 @@ export async function drainWebhookQueue(options: {
   if (!options.security) throw unavailable("Webhook delivery security is not configured.");
   if (!options.cipher) throw unavailable("Signing-secret encryption is not configured.");
   const nowString = options.now.toISOString();
+  await options.db.batch([{
+    sql: `UPDATE webhook_deliveries
+             SET status = 'expired', next_retry_at = NULL,
+                 lease_token = NULL, lease_expires_at = NULL
+           WHERE id IN (
+             SELECT d.id FROM webhook_deliveries d
+             JOIN webhooks w ON w.id = d.webhook_id
+             JOIN events e ON e.id = d.event_id AND e.org_id = w.org_id
+              WHERE w.org_id = ? AND d.status = 'pending'
+                AND (? IS NULL OR w.principal_id = ?)
+                AND (w.principal_id IS NULL OR NOT ${eventAccessSql("e", "w.principal_id")})
+              ORDER BY COALESCE(d.next_retry_at, d.created_at), d.id LIMIT ?
+           )`,
+    params: [options.orgId, options.principalId ?? null, options.principalId ?? null, options.limit],
+  }]);
   const due = await options.db.all<DueDelivery>(
     `SELECT d.id, d.webhook_id, d.event_id, d.attempts,
             w.url, w.secret, e.kind, e.payload
