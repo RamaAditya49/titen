@@ -28,9 +28,11 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/handoffs`
 - `GET /v1/keys`
 - `GET /v1/memberships`
+- `GET /v1/operator-queues/reviewer`
 - `GET /v1/policies`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
+- `GET /v1/work-items`
 - `GET /v1/workspaces`
 - `POST /mcp`
 - `POST /v1/channel-context`
@@ -58,12 +60,18 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
+- `POST /v1/operator-queues/reviewer/:id/actions`
 - `POST /v1/policies`
 - `POST /v1/projects/resolve`
 - `POST /v1/webhooks`
 - `POST /v1/webhooks/:id/pause`
 - `POST /v1/webhooks/:id/resume`
 - `POST /v1/webhooks/deliver`
+- `POST /v1/work-items`
+- `POST /v1/work-items/:id/claim`
+- `POST /v1/work-items/:id/complete`
+- `POST /v1/work-items/:id/heartbeat`
+- `POST /v1/work-items/:id/requeue`
 - `POST /v1/workspaces`
 <!-- ROUTE_INVENTORY_END -->
 
@@ -512,3 +520,9 @@ accepts canonical records independent of NDJSON line order, and writes in
 canonical dependency order. Missing parents return `422 UNRESOLVED_REFERENCE`
 with only `record_type`, `field`, and `dependency_type`; no foreign record or
 content is disclosed. Re-import is idempotent.
+
+## Opinionated reviewer queue
+
+`GET /v1/operator-queues/reviewer?project_id=...&status=open&limit=25&cursor=...` returns an authorized, deterministic keyset page sourced from canonical claims and evidence. Ordering is priority descending, deadline ascending, claim ID ascending. Priority is `1000 disputed + 100 per contradiction + round((1-confidence)*100) + min(age_days,90)`. Filters: `project_id`, `status=open|all|superseded|expired|revoked`, `limit`, and opaque `cursor`. Counts describe only the returned authorized page.
+
+`POST /v1/operator-queues/reviewer/:claim_id/actions` accepts `action` (`supersede`, `expire`, or `revoke`), optional `reason`, and `superseded_by` for supersession. It delegates to the canonical claim lifecycle, preserving history, events, audit, evidence, and terminal status. The dashboard consumes this API and is never authoritative.

@@ -17,6 +17,7 @@ import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvent
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation } from "./observations";
 import { createWorkItem, listWorkItems, claimWorkItem, heartbeatWorkItem, completeWorkItem, requeueWorkItem } from "./work-items";
+import { listReviewerQueue, actReviewerQueue } from "./reviewer-queue";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
 import { ApiError, unavailable, validationError } from "./errors";
@@ -154,6 +155,8 @@ export const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/handoffs", scope: "handoffs:write", handler: createHandoff },
   { method: "POST", path: "/v1/handoffs/:id/resolve", scope: "handoffs:write", handler: resolveHandoff },
   { method: "GET", path: "/v1/handoffs", scope: "handoffs:read", handler: listHandoffs },
+  { method: "GET", path: "/v1/operator-queues/reviewer", scope: "evidence:read", handler: listReviewerQueue },
+  { method: "POST", path: "/v1/operator-queues/reviewer/:id/actions", scope: "claims:write", handler: actReviewerQueue },
   { method: "POST", path: "/v1/work-items", scope: "work-items:write", handler: createWorkItem },
   { method: "GET", path: "/v1/work-items", scope: "work-items:read", handler: listWorkItems },
   { method: "POST", path: "/v1/work-items/:id/claim", scope: "work-items:claim", handler: claimWorkItem },

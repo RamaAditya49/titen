@@ -163,6 +163,15 @@ export class TitenClient {
     return this.request("DELETE", `/v1/checkpoints/${checkpointId}`);
   }
 
+  // --- Opinionated reviewer queue (canonical claims/evidence projection) ---
+  async listReviewerQueue(options: { project_id?: string; status?: string; limit?: number; cursor?: string } = {}) {
+    const q = new URLSearchParams(); for (const [k,v] of Object.entries(options)) if (v !== undefined) q.set(k, String(v));
+    return this.request("GET", `/v1/operator-queues/reviewer${q.size ? `?${q}` : ""}`);
+  }
+  async actReviewerQueue(claimId: string, action: "supersede"|"expire"|"revoke", options: { reason?: string; superseded_by?: string } = {}) {
+    return this.request("POST", `/v1/operator-queues/reviewer/${claimId}/actions`, { action, ...options });
+  }
+
   // --- Operator coordination queue (state only; callers execute work) ---
   async createWorkItem(options: WorkItemCreate) { return this.request("POST", "/v1/work-items", options); }
   async listWorkItems(workspaceId: string, status?: string) {

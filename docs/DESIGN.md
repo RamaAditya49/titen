@@ -225,3 +225,7 @@ channels. Color alone never carries meaning.
 
 These criteria define product design behavior. Each implemented slice must copy
 the applicable behavior into its own active EARS work spec and evidence plan.
+
+## Opinionated queue interaction model
+
+Reviewer, Operations, and Publication are workflows, not generic navigation shells. Each renders the same authorized headless queue response: priority order, owner, next action, deadline/TTL, evidence, audit link, and terminal state. Empty-state counts come only from the filtered backend response. The first shipped slice is Reviewer Queue at `GET /v1/operator-queues/reviewer`; `POST /v1/operator-queues/reviewer/:id/actions` resolves through the canonical claim lifecycle. Operations and Publication remain defined contracts until their canonical projections ship; they must not appear as active dashboard controls beforehand.

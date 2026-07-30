@@ -1152,3 +1152,13 @@ A feature may enter implementation only when:
 4. the API reference is updated for externally visible behavior;
 5. the smallest feature slice satisfies the release gate without scaffolding
    later releases.
+
+## Opinionated operator queues (issue #31)
+
+All queues are backend-authoritative projections of canonical records. Authorization and tenant/scope visibility are applied before candidates, counts, or cursors are produced. Shared fields are `queue_item_id`, `status`, `severity`, deterministic `priority`, `owner`, `next_action`, `deadline` or `ttl_seconds`, evidence references, audit reference, and `terminal_state`.
+
+- **Reviewer queue:** canonical claim plus claim-source projection. States: `open -> superseded|expired|revoked`; disputes, contradiction count, confidence and age determine priority. Actions delegate to canonical claim lifecycle operations.
+- **Operations queue:** canonical handoff/checkpoint/lease projection. States: `actionable -> resumed|completed|cancelled|expired`; blocked handoffs, expired/near-expiry leases, stale checkpoints and retry evidence determine priority. Owner is handoff recipient or lease/checkpoint principal.
+- **Publication queue:** canonical channel-release projection. States: `pending_approval -> approved -> active -> suspended|replaced|expired|revoked`; audience/scope preview, approver, version, validity and disclosure risk determine priority.
+
+Stable filters and keyset cursors are part of each queue API. A dashboard may consume these APIs but MUST NOT cache authority, recompute eligibility, or perform lifecycle writes outside canonical action endpoints.
