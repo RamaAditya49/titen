@@ -62,10 +62,10 @@ pnpm titen key create --org-id <org_id> --label 'my agent'
 - One Bun process using `Bun.serve`.
 - One SQLite database using `bun:sqlite`.
 - FTS5 in the canonical database.
-- Optional `sqlite-vec` extension (planned).
+- Optional `sqlite-vec` extension for semantic retrieval.
 - Optional OpenAI-compatible embedding/extraction endpoint.
 - systemd timer or in-process bounded timer for repair/consolidation.
-- REST under `/v1`; Streamable HTTP MCP at `/mcp` (planned).
+- REST under `/v1`; Streamable HTTP MCP at `/mcp`.
 - An external CRM/chatbot gateway may call protected channel-context operations;
   the Titen process itself does not expose anonymous memory search.
 - Optional Memory Atlas static client behind the same reverse proxy or a
@@ -203,13 +203,20 @@ The production unit should use:
 - Restore into a new file, run SQLite integrity checks, then point the service
   at the verified file.
 - Vector indexes are rebuildable and do not block canonical restore.
+- For portable application-level backup, retain all three NDJSON streams from
+  `GET /v1/export` (`projects`, `observations`, `claims`) and their headers.
+  Restore may combine the streams in any line order: `POST /v1/import` preflights
+  dependencies before mutation and writes in canonical dependency order.
+- `UNRESOLVED_REFERENCE` means the backup is missing a required project or
+  observation stream; it is not a write conflict. Re-import is idempotent.
 
-## Planned
+## Implemented optional capabilities
 
-- `sqlite-vec` semantic vector retrieval.
+- `sqlite-vec` semantic vector retrieval when configured.
 - Streamable HTTP MCP at `/mcp`.
-- Memory Atlas visual projection.
 - Signed webhook delivery with retry/replay.
-- Channel-release activation/revocation for CRM/public gateways.
-- Postgres + `pgvector` scale adapter (when measured corpus size or concurrency
-  justifies another database service).
+- Channel-release publish/revoke for governed gateways.
+
+The provisioned systemd/Caddy deployment and deploy-script cleanup remain tracked
+in issue #14 and are owned by Shinta; this documentation batch does not modify
+that deployment scope.

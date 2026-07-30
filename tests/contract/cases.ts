@@ -1021,6 +1021,8 @@ export const CASES: Case[] = [
       assert.equal(header.type, "titen.export.header");
       assert.equal(header.format_version, 1);
       assert.equal(header.complete, true);
+      assert.deepEqual(header.dependency_order, ["projects", "observations", "claims"]);
+      assert.deepEqual(header.depends_on, ["projects"]);
       assert.equal(observationLines.length, 2);
       assert.ok(!String(observations.body).includes("titen_sk_"), "export must carry no key");
 
@@ -1085,6 +1087,71 @@ export const CASES: Case[] = [
         body: `${observationLines.join("\n")}\n`,
       });
       expectError(collision, 409, "CONFLICT");
+    },
+  },
+  {
+    name: "import preflights references and accepts child-before-parent atomically",
+    async run(fx) {
+      const target = await fx.provision({ scopes: ["*"] });
+      const projectId = "project_import_parent_000000000000";
+      const observationId = "obs_import_child_000000000000000";
+      const project = { type: "project", id: projectId, reference: "rama/import-portability", created_at: "2026-07-30T00:00:00.000Z" };
+      const observationRow = {
+        type: "observation", id: observationId, subject_id: "user_rama", project_id: projectId,
+        kind: "tool_result", content: "portable evidence", source_type: "tool", trust: "verified",
+        visibility: "team", occurred_at: "2026-07-30T00:00:00.000Z", ingested_at: "2026-07-30T00:00:00.000Z",
+      };
+      const header = { type: "titen.export.header", format_version: 1, record_type: "observations" };
+      const body = [header, observationRow, project].map(JSON.stringify).join("\n") + "\n";
+      expectOk(await fx.callRaw("POST", "/v1/import", { key: target.key, body }));
+      expectOk(await fx.callRaw("POST", "/v1/import", { key: target.key, body }));
+      const counts = await fx.query<{ projects: number; observations: number }>(
+        `SELECT (SELECT COUNT(*) FROM projects WHERE org_id = ?) AS projects,
+                (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations`,
+        [target.orgId, target.orgId],
+      );
+      assert.equal(Number(counts[0]!.projects), 1);
+      assert.equal(Number(counts[0]!.observations), 1);
+
+      const canonicalCounts = async () => (await fx.query<{
+        projects: number; observations: number; claims: number; claim_sources: number;
+      }>(
+        `SELECT (SELECT COUNT(*) FROM projects WHERE org_id = ?) AS projects,
+                (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims,
+                (SELECT COUNT(*) FROM claim_sources cs JOIN claims c ON c.id = cs.claim_id WHERE c.org_id = ?) AS claim_sources`,
+        [target.orgId, target.orgId, target.orgId, target.orgId],
+      ))[0]!;
+      const beforeFailure = await canonicalCounts();
+      const missingId = "project_missing_parent_00000000000";
+      const missing = { ...observationRow, id: "obs_missing_parent_0000000000000", project_id: missingId };
+      const failed = await fx.callRaw("POST", "/v1/import", { key: target.key, body: JSON.stringify(missing) + "\n" });
+      expectError(failed, 422, "UNRESOLVED_REFERENCE");
+      assert.deepEqual(
+        { record_type: failed.body.meta.record_type, field: failed.body.meta.field, dependency_type: failed.body.meta.dependency_type },
+        { record_type: "observation", field: "project_id", dependency_type: "project" },
+      );
+      assert.ok(!JSON.stringify(failed.body).includes(missingId), "diagnostic must not disclose referenced ids");
+      assert.deepEqual(await canonicalCounts(), beforeFailure, "failed project preflight must not partially mutate");
+
+      const missingObservationId = "obs_missing_source_00000000000000";
+      const missingClaim = {
+        type: "claim", id: "claim_missing_source_000000000000", subject_id: "user_rama",
+        project_id: null, kind: "procedural", statement: "This claim must not import.",
+        trust: "verified", visibility: "team", status: "active",
+        valid_from: "2026-07-30T00:00:00.000Z",
+        sources: [{ observation_id: missingObservationId, relation: "supports" }],
+      };
+      const failedClaim = await fx.callRaw("POST", "/v1/import", {
+        key: target.key, body: JSON.stringify(missingClaim) + "\n",
+      });
+      expectError(failedClaim, 422, "UNRESOLVED_REFERENCE");
+      assert.deepEqual(
+        { record_type: failedClaim.body.meta.record_type, field: failedClaim.body.meta.field, dependency_type: failedClaim.body.meta.dependency_type },
+        { record_type: "claim", field: "sources.observation_id", dependency_type: "observation" },
+      );
+      assert.ok(!JSON.stringify(failedClaim.body).includes(missingObservationId), "diagnostic must not disclose referenced ids");
+      assert.deepEqual(await canonicalCounts(), beforeFailure, "failed source preflight must not partially mutate");
     },
   },
   // --- v0.1: Temporal supersession ---
