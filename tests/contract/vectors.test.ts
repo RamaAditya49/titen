@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createApp } from "../../src/core/app";
 import { migrate } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
+import { createVectorizeStore } from "../../src/runtime/cloudflare/vectors";
 import { clientVia, fakeVectors, provisionWith } from "./harness";
 import {
   RANK_WEIGHTS,
@@ -32,6 +33,7 @@ const vectors = fakeVectors();
 let db: ReturnType<typeof createSqliteDb>;
 let handle: ReturnType<typeof openDatabase>;
 let key: string;
+let orgId: string;
 let subjectId: string;
 
 /** Three claims that all match the query lexically, so only ranking separates them. */
@@ -43,6 +45,8 @@ const CLAIMS = [
 const TASK = "rollback release safety";
 
 let claimIds: string[] = [];
+
+const vectorScope = () => ({ org_id: orgId, subject_id: subjectId, project_id: "" });
 
 const rankInput = (id: string, confidence: number, vector_boost?: number): RankInput => ({
   id,
@@ -102,6 +106,7 @@ beforeAll(async () => {
   await migrate(db);
   const provisioned = await provisionWith(db, { scopes: ["*"] });
   key = provisioned.key;
+  orgId = provisioned.orgId;
   subjectId = "user_vectors";
   await seed(withoutVectors());
 });
@@ -131,6 +136,33 @@ test("compilation reports vector retrieval as used and calls the embedder", asyn
   assert.equal(res.body.meta.degraded.vector, "used");
   assert.ok(vectors.embedCalls() > before, "the query must be embedded once");
   assert.ok(res.body.data.items.length >= 1);
+  assert.deepEqual(vectors.lastFilter(), {
+    org_id: orgId,
+    subject_id: subjectId,
+  });
+});
+
+test("Vectorize receives the same canonical metadata and query filter", async () => {
+  let upserted: unknown;
+  let queried: unknown;
+  const store = createVectorizeStore({
+    async upsert(records) {
+      upserted = records;
+    },
+    async query(_vector, options) {
+      queried = options;
+      return { matches: [] };
+    },
+    async deleteByIds() {},
+  });
+  const scope = { org_id: "org", subject_id: "subject", project_id: "project" };
+  await store.upsert([{ id: "claim", vector: new Float32Array([1, 0]), metadata: scope }]);
+  await store.query(new Float32Array([1, 0]), { topK: 2, filter: scope });
+
+  assert.deepEqual(upserted, [
+    { id: "claim", values: [1, 0], metadata: scope },
+  ]);
+  assert.deepEqual(queried, { topK: 2, filter: scope });
 });
 
 test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
@@ -151,7 +183,7 @@ test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
     weakestBefore.score_components.relevance < 1,
     "the chosen claim must start below the top relevance",
   );
-  vectors.setScore(weakest, 1);
+  vectors.setScore(weakest, 1, vectorScope());
 
   const hybrid = await withVectors().call("POST", "/v1/context/compile", {
     key,
@@ -176,7 +208,7 @@ test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
   );
 
   // Clearing the score restores the original order: the boost is not persisted.
-  vectors.setScore(weakest, 0);
+  vectors.setScore(weakest, 0, vectorScope());
   const cleared = await withVectors().call("POST", "/v1/context/compile", {
     key,
     body: { subject_id: subjectId, task: TASK, max_tokens: 2000 },
@@ -243,6 +275,11 @@ test("index drain reports embedder outages as retryable and preserves pending ro
   assert.equal(recovered.status, 200);
   assert.ok(recovered.body.data.indexed > 0);
   assert.ok((await pendingCount()) < before);
+  assert.deepEqual(broken.metadataFor(claimIds[0]!), {
+    org_id: orgId,
+    subject_id: subjectId,
+    project_id: "",
+  });
 });
 
 test("index drain reports vector-store outages as retryable and preserves pending rows", async () => {
@@ -295,7 +332,7 @@ test("an unavailable embedder degrades to lexical retrieval instead of failing",
 test("scoping still runs before retrieval when vectors are enabled", async () => {
   // The vector index is deliberately told every claim is a perfect match. Scope
   // is enforced in SQL before ranking, so a foreign reader must still see none.
-  for (const id of claimIds) vectors.setScore(id, 1);
+  for (const id of claimIds) vectors.setScore(id, 1, vectorScope());
 
   const intruder = await provisionWith(db, { scopes: ["*"] });
   const res = await withVectors().call("POST", "/v1/context/compile", {
@@ -306,5 +343,5 @@ test("scoping still runs before retrieval when vectors are enabled", async () =>
   assert.equal(res.body.data.items.length, 0, "a vector hit cannot bypass scope");
   assert.equal(res.body.meta.candidates, 0);
 
-  for (const id of claimIds) vectors.setScore(id, 0);
+  for (const id of claimIds) vectors.setScore(id, 0, vectorScope());
 });

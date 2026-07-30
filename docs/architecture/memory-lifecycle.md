@@ -488,9 +488,10 @@ When semantic retrieval is enabled:
 
 1. Workers AI or another embedding provider converts eligible text to vectors.
 2. D1 commits canonical records and an indexing outbox.
-3. Vectorize stores only opaque IDs, minimal scope metadata, record version,
-   and vector values.
-4. A query is embedded with the same fingerprint and sent to Vectorize.
+3. Vectorize stores only opaque IDs, canonical `org_id`, `subject_id`, and
+   project-scope metadata, record version, and vector values.
+4. A query is embedded with the same fingerprint and sent to Vectorize with
+   those scope filters applied before top-k selection.
 5. Returned IDs are hydrated and authorized again from D1.
 
 Vectorize insert and upsert visibility is asynchronous. Titen therefore treats
@@ -503,6 +504,11 @@ and never makes Vectorize the canonical record.
 server. Its public project remains pre-v1, so Titen must pin and test an exact
 version. The base design assumes exact KNN behavior; any approximate index path
 must earn adoption through compatibility, recall, and latency measurements.
+
+The Bun adapter stores the same organization, subject, and project metadata in
+the rebuildable `vec0` table and applies it inside the KNN query. Canonical SQL
+still re-authorizes returned IDs, but foreign vectors cannot consume the bounded
+top-k window before that hydration step.
 
 This path is attractive for small and medium local corpora because deployment,
 backup, authorization joins, and canonical hydration stay close to one SQLite

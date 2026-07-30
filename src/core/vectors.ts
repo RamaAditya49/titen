@@ -16,11 +16,19 @@ export interface VectorMatch {
   score: number;
 }
 
+/** Rebuildable index metadata. It narrows work before top-k; SQL stays authoritative. */
+export interface VectorMetadata {
+  org_id: string;
+  subject_id: string;
+  /** Empty string represents an unscoped canonical project. */
+  project_id: string;
+}
+
 export interface VectorStore {
   /** Store or update vectors for the given record IDs. */
-  upsert(records: { id: string; vector: Float32Array; metadata?: Record<string, string> }[]): Promise<void>;
+  upsert(records: { id: string; vector: Float32Array; metadata: VectorMetadata }[]): Promise<void>;
   /** Find the top-k nearest neighbors for a query vector within a namespace. */
-  query(vector: Float32Array, options: { topK: number; namespace?: string; filter?: Record<string, string> }): Promise<VectorMatch[]>;
+  query(vector: Float32Array, options: { topK: number; namespace?: string; filter?: Partial<VectorMetadata> }): Promise<VectorMatch[]>;
   /** Remove vectors by ID. */
   remove(ids: string[]): Promise<void>;
 }

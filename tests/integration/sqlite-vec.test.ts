@@ -33,6 +33,12 @@ const axis = (index: number) => {
   return vector;
 };
 
+const metadata = (org_id: string, subject_id = "subject", project_id = "") => ({
+  org_id,
+  subject_id,
+  project_id,
+});
+
 afterAll(() => {
   rmSync(directory, { recursive: true, force: true });
 });
@@ -48,9 +54,9 @@ test("the prebuilt extension is present on this platform", () => {
 test("nearest-neighbour search returns the closest vector first", async () => {
   if (!available) return;
   await store!.upsert([
-    { id: "claim_a", vector: axis(0) },
-    { id: "claim_b", vector: axis(1) },
-    { id: "claim_c", vector: axis(2) },
+    { id: "claim_a", vector: axis(0), metadata: metadata("org") },
+    { id: "claim_b", vector: axis(1), metadata: metadata("org") },
+    { id: "claim_c", vector: axis(2), metadata: metadata("org") },
   ]);
 
   const hits = await store!.query(axis(1), { topK: 3 });
@@ -65,13 +71,17 @@ test("nearest-neighbour search returns the closest vector first", async () => {
 
 test("an upsert replaces a vector rather than duplicating its id", async () => {
   if (!available) return;
-  await store!.upsert([{ id: "claim_move", vector: axis(0) }]);
+  await store!.upsert([
+    { id: "claim_move", vector: axis(0), metadata: metadata("org") },
+  ]);
   const before = await store!.query(axis(0), { topK: 5 });
   const beforeCount = before.filter((h) => h.id === "claim_move").length;
   assert.equal(beforeCount, 1);
 
   // Same id, different direction: it must move, not appear twice.
-  await store!.upsert([{ id: "claim_move", vector: axis(3) }]);
+  await store!.upsert([
+    { id: "claim_move", vector: axis(3), metadata: metadata("org") },
+  ]);
   const near = await store!.query(axis(3), { topK: 5 });
   assert.equal(near.filter((h) => h.id === "claim_move").length, 1, "no duplicate id");
   assert.equal(near[0]!.id, "claim_move", "it must now be nearest to its new direction");
@@ -79,13 +89,38 @@ test("an upsert replaces a vector rather than duplicating its id", async () => {
 
 test("removal takes a vector out of results", async () => {
   if (!available) return;
-  await store!.upsert([{ id: "claim_gone", vector: axis(2) }]);
+  await store!.upsert([
+    { id: "claim_gone", vector: axis(2), metadata: metadata("org") },
+  ]);
   assert.ok((await store!.query(axis(2), { topK: 5 })).some((h) => h.id === "claim_gone"));
   await store!.remove(["claim_gone"]);
   assert.ok(
     !(await store!.query(axis(2), { topK: 5 })).some((h) => h.id === "claim_gone"),
     "a removed vector must not be returned",
   );
+});
+
+test("scope metadata filters before the nearest-neighbour limit", async () => {
+  if (!available) return;
+  const foreign = Array.from({ length: 24 }, (_, index) => ({
+    id: `foreign_${index}`,
+    vector: axis(0),
+    metadata: metadata("foreign", "same-subject"),
+  }));
+  await store!.upsert([
+    ...foreign,
+    {
+      id: "authorized",
+      vector: new Float32Array([0.9, 0.1, 0, 0]),
+      metadata: metadata("authorized", "same-subject"),
+    },
+  ]);
+
+  const hits = await store!.query(axis(0), {
+    topK: 1,
+    filter: { org_id: "authorized", subject_id: "same-subject" },
+  });
+  assert.deepEqual(hits.map((hit) => hit.id), ["authorized"]);
 });
 
 test("vectors live outside the canonical database", () => {
@@ -191,7 +226,13 @@ test("the real store drives compilation through the shared core", async () => {
   // Index the claim, and point the query at the same direction.
   const task = "release rollback rehearsal";
   embeddings.set(task, axis(1));
-  await store!.upsert([{ id: claimId, vector: axis(1) }]);
+  await store!.upsert([
+    {
+      id: claimId,
+      vector: axis(1),
+      metadata: metadata(provisioned.orgId, "user_realvec"),
+    },
+  ]);
 
   const compiled = await client.call("POST", "/v1/context/compile", {
     key: provisioned.key,

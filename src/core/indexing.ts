@@ -49,11 +49,23 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
 
   // A claim may have been superseded or expired since it was queued; only
   // retrievable claims are worth an embedding call.
-  const eligible: { outboxId: string; claimId: string; statement: string }[] = [];
+  const eligible: {
+    outboxId: string;
+    claimId: string;
+    statement: string;
+    subjectId: string;
+    projectId: string | null;
+  }[] = [];
   for (const row of claimRows) {
-    const claim = await first<{ statement: string; status: string }>(
+    const claim = await first<{
+      statement: string;
+      status: string;
+      subject_id: string;
+      project_id: string | null;
+    }>(
       ctx.app.db,
-      `SELECT statement, status FROM claims WHERE id = ? AND org_id = ?`,
+      `SELECT statement, status, subject_id, project_id
+         FROM claims WHERE id = ? AND org_id = ?`,
       [row.record_id, principal.orgId],
     );
     if (claim && (claim.status === "active" || claim.status === "disputed"))
@@ -61,6 +73,8 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         outboxId: row.id,
         claimId: row.record_id,
         statement: claim.statement,
+        subjectId: claim.subject_id,
+        projectId: claim.project_id,
       });
     else others.push(row);
   }
@@ -85,7 +99,11 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         eligible.map((entry, index) => ({
           id: entry.claimId,
           vector: vectors[index]!,
-          metadata: { org_id: principal.orgId },
+          metadata: {
+            org_id: principal.orgId,
+            subject_id: entry.subjectId,
+            project_id: entry.projectId ?? "",
+          },
         })),
       );
     } catch {

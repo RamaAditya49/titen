@@ -72,7 +72,11 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       if (queryVec) {
         const hits = await ctx.app.vectors.store.query(queryVec, {
           topK: LIMITS.candidates,
-          filter: { org_id: principal.orgId, subject_id: subjectId },
+          filter: {
+            org_id: principal.orgId,
+            subject_id: subjectId,
+            ...(projectId ? { project_id: projectId } : {}),
+          },
         });
         const similarity = new Map(hits.map((hit) => [hit.id, hit.score]));
 

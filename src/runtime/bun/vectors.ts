@@ -50,10 +50,18 @@ export function createSqliteVecStore(
       if (!path) throw error;
       db.loadExtension(path.replace(/\.(so|dylib|dll)$/, ""));
     }
+    const columns = db
+      .query(`PRAGMA table_info(vec_claims)`)
+      .all() as { name: string }[];
+    if (columns.length > 0 && !columns.some((column) => column.name === "subject_id"))
+      db.run(`DROP TABLE vec_claims`);
     db.run(
       `CREATE VIRTUAL TABLE IF NOT EXISTS vec_claims USING vec0(
          id TEXT PRIMARY KEY,
-         embedding float[${dimensions}]
+         embedding float[${dimensions}],
+         org_id TEXT partition key,
+         subject_id TEXT,
+         project_id TEXT
        )`,
     );
   } catch {
@@ -73,22 +81,36 @@ export function createSqliteVecStore(
       // left missing.
       const remove = db.prepare(`DELETE FROM vec_claims WHERE id = ?`);
       const insert = db.prepare(
-        `INSERT INTO vec_claims (id, embedding) VALUES (?, ?)`,
+        `INSERT INTO vec_claims
+           (id, embedding, org_id, subject_id, project_id)
+         VALUES (?, ?, ?, ?, ?)`,
       );
       db.transaction((batch: typeof records) => {
         for (const record of batch) {
           remove.run(record.id);
-          insert.run(record.id, bytes(record.vector));
+          insert.run(
+            record.id,
+            bytes(record.vector),
+            record.metadata.org_id,
+            record.metadata.subject_id,
+            record.metadata.project_id,
+          );
         }
       })(records);
     },
     async query(vector, options) {
+      const filters = Object.entries(options.filter ?? {});
       const rows = db
         .query(
           `SELECT id, distance FROM vec_claims
-            WHERE embedding MATCH ? ORDER BY distance LIMIT ?`,
+            WHERE embedding MATCH ?
+              ${filters.map(([column]) => `AND ${column} = ?`).join(" ")}
+            ORDER BY distance LIMIT ?`,
         )
-        .all(bytes(vector), options.topK) as { id: string; distance: number }[];
+        .all(bytes(vector), ...filters.map(([, value]) => value), options.topK) as {
+          id: string;
+          distance: number;
+        }[];
       return rows.map((row) => ({ id: row.id, score: 1 / (1 + row.distance) }));
     },
     async remove(ids) {
