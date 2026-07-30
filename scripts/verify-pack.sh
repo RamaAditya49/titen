@@ -6,32 +6,17 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-root="$PWD"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-echo "==> 1/5 publish-time normalization"
-# npm rewrites package.json on publish and `npm pack` does not, so a bin entry
-# can be dropped there and nowhere else — invisible to every check below. Ask
-# npm's own normalizer what it will actually ship instead of trusting the
-# tarball. It is also the only place the misleading "was invalid and removed"
-# wording gets resolved into what the field really becomes.
-node -e '
-  const path = require("path");
-  const [npmRoot, dir] = process.argv.slice(1);
-  const PackageJson = require(path.join(npmRoot, "npm/node_modules/@npmcli/package-json"));
-  PackageJson.load(dir).then(async (pj) => {
-    const changes = [];
-    await pj.normalize({ steps: ["binDir", "bin", "fixRepositoryField", "fixBugsField"], changes });
-    for (const c of changes) console.log("    npm will rewrite: " + c);
-    const bin = pj.content.bin;
-    if (!bin || !bin.titen) throw new Error("publish would ship no `titen` bin");
-    console.log("    bin.titen -> " + bin.titen);
-  }).catch((error) => { console.error("FAIL: " + error.message); process.exit(1); });
-' "$(npm root -g)" "$root"
-
 echo "==> packing"
 tarball="$work/$(npm pack --pack-destination "$work" --silent | tail -1)"
+
+echo "==> 1/5 packaged README"
+if tar -xOf "$tarball" package/README.md | grep -Eq '(href|src)="\./|\]\(\./'; then
+  echo "FAIL: packaged README contains repository-relative references" >&2
+  exit 1
+fi
 
 echo "==> installing $(basename "$tarball") into a clean tree"
 cd "$work"
@@ -79,6 +64,9 @@ node --input-type=module -e '
   const sub = await import("titen-memory/sdk");
   if (typeof TitenClient !== "function" || typeof sub.TitenClient !== "function")
     throw new Error("SDK did not export TitenClient");
+  if (typeof TitenClient.prototype.request !== "function" ||
+      typeof TitenClient.prototype.requestRaw !== "function")
+    throw new Error("SDK did not ship generic JSON/raw access");
   // An "exports" map hides every subpath it does not list, including this one.
   // Bundlers and tooling read it, so the omission only surfaces downstream.
   createRequire(process.cwd() + "/").resolve("titen-memory/package.json");

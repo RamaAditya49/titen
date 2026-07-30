@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
-import { TitenClient, TitenError } from "../../src/sdk";
+import { TITEN_SDK_TYPED_ROUTES, TitenClient, TitenError } from "../../src/sdk";
 import { provisionWith } from "../contract/harness";
 
 /**
@@ -207,4 +207,187 @@ test("a validation failure arrives as a typed error", async () => {
       return true;
     },
   );
+});
+
+test("constructor configuration fails early with stable field errors", () => {
+  const cases: [unknown, RegExp][] = [
+    [undefined, /config is required/],
+    [{}, /url is required/],
+    [{ url: "", key: "k" }, /url is required/],
+    [{ url: "not a url", key: "k" }, /url is required/],
+    [{ url: "file:///tmp/titen", key: "k" }, /absolute http\(s\) URL/],
+    [{ url: "http://example.test", key: undefined }, /key is required/],
+    [{ url: "http://example.test", key: "" }, /key is required/],
+    [{ url: "http://example.test", key: "k", fetch: null }, /fetch must be a function/],
+    [{ url: "http://example.test", key: "secret-value", fetch: 0 }, /fetch must be a function/],
+  ];
+  for (const [config, message] of cases)
+    assert.throws(
+      () => new TitenClient(config as never),
+      (error: unknown) => {
+        assert.ok(error instanceof TypeError);
+        assert.match(error.message, message);
+        assert.doesNotMatch(error.message, /secret-value/);
+        return true;
+      },
+    );
+
+  assert.doesNotThrow(
+    () => new TitenClient({ url: "https://example.test/", key: "k", fetch }),
+  );
+});
+
+test("empty and non-JSON responses never leak parser or gateway details", async () => {
+  const call = async (response: Response) =>
+    new TitenClient({
+      url: "http://example.test",
+      key: "test",
+      fetch: async () => response,
+    }).health();
+
+  assert.equal(await call(new Response(null, { status: 204 })), undefined);
+  assert.equal(await call(new Response(null, { status: 200 })), undefined);
+
+  const failures: [Response, number, string][] = [
+    [new Response(null, { status: 500 }), 500, "HTTP_ERROR"],
+    [
+      new Response("<h1>private upstream detail</h1>", {
+        status: 502,
+        headers: { "content-type": "text/html" },
+      }),
+      502,
+      "HTTP_ERROR",
+    ],
+    [
+      new Response("{bad", {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      }),
+      503,
+      "HTTP_ERROR",
+    ],
+    [
+      Response.json(
+        { error: { code: "UPSTREAM_DOWN", message: "Dependency unavailable." } },
+        { status: 503 },
+      ),
+      503,
+      "UPSTREAM_DOWN",
+    ],
+  ];
+  for (const [response, status, code] of failures)
+    await assert.rejects(
+      () => call(response),
+      (error: unknown) => {
+        assert.ok(error instanceof TitenError);
+        assert.equal(error.status, status);
+        assert.equal(error.code, code);
+        assert.doesNotMatch(error.message, /private upstream detail|Unexpected token|JSON/);
+        return true;
+      },
+    );
+
+  await assert.rejects(
+    () =>
+      call(
+        new Response("{bad", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    (error: unknown) =>
+      error instanceof TitenError && error.status === 200 && error.code === "INVALID_RESPONSE",
+  );
+});
+
+test("mutation idempotency reaches the server and preserves replay semantics", async () => {
+  const idempotencyKey = `sdk-retry-${crypto.randomUUID()}`;
+  const observation = {
+    subject_id: `user_sdk_retry_${crypto.randomUUID()}`,
+    kind: "tool_result" as const,
+    content: "Retry-safe SDK observation.",
+    source: { type: "tool", ref: "sdk-retry" },
+  };
+  const first = await titen.observe(observation, { idempotencyKey });
+  const replay = await titen.observe(observation, { idempotencyKey });
+  assert.equal(replay.observation_id, first.observation_id);
+
+  await assert.rejects(
+    () =>
+      titen.observe(
+        { ...observation, content: "Changed retry body." },
+        { idempotencyKey },
+      ),
+    (error: unknown) =>
+      error instanceof TitenError && error.status === 409 && error.code === "CONFLICT",
+  );
+});
+
+test("generic JSON and raw access preserve auth without allowing overrides", async () => {
+  const events = await titen.request<any>("GET", "/v1/events?limit=1");
+  assert.ok(Array.isArray(events.events));
+
+  const exported = await titen.requestRaw(
+    "GET",
+    "/v1/export?type=observations&limit=1",
+  );
+  assert.match(exported.headers.get("content-type") ?? "", /application\/x-ndjson/);
+  const firstLine = (await exported.text()).split("\n")[0]!;
+  assert.equal(JSON.parse(firstLine).type, "titen.export.header");
+
+  let called = false;
+  const local = new TitenClient({
+    url: "http://example.test",
+    key: "configured-key",
+    fetch: async () => {
+      called = true;
+      return Response.json({ data: {} });
+    },
+  });
+  await assert.rejects(
+    () =>
+      local.request("GET", "/v1/events", {
+        headers: { authorization: "Bearer attacker-selected" },
+      }),
+    /authorization cannot be overridden/,
+  );
+  await assert.rejects(
+    () => local.request("GET", "//attacker.example/v1/events"),
+    /path must be an absolute API path/,
+  );
+  assert.equal(called, false, "an invalid generic request must fail before network I/O");
+});
+
+test("typed mutation sends one idempotency header and the capability matrix stays live", async () => {
+  let headers = new Headers();
+  const local = new TitenClient({
+    url: "http://example.test",
+    key: "configured-key",
+    fetch: async (_input, init) => {
+      headers = new Headers(init?.headers);
+      return Response.json({ data: { observation_id: "obs_test" } });
+    },
+  });
+  await local.observe(
+    {
+      subject_id: "subject",
+      kind: "tool_result",
+      content: "captured",
+      source: { type: "test" },
+    },
+    { idempotencyKey: "retry-one" },
+  );
+  assert.equal(headers.get("authorization"), "Bearer configured-key");
+  assert.equal(headers.get("idempotency-key"), "retry-one");
+  assert.equal(
+    [...headers.keys()].filter((name) => name === "idempotency-key").length,
+    1,
+  );
+
+  for (const [method] of TITEN_SDK_TYPED_ROUTES)
+    assert.equal(
+      typeof (TitenClient.prototype as unknown as Record<string, unknown>)[method],
+      "function",
+      `${method} is documented but missing`,
+    );
 });
