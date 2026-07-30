@@ -18,6 +18,10 @@
   <a href="#documentation">Docs</a>
 </p>
 
+<p align="center">
+  Built with <a href="https://cadis.digital/">C.A.D.I.S. Agent</a>.
+</p>
+
 > [!NOTE]
 > Titen's P0 memory service is operational on both Cloudflare Workers/D1 and
 > Bun/SQLite. The Level 5 evidence loop (observe → claim → compile → feedback)
