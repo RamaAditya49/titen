@@ -102,6 +102,10 @@ switch (command) {
       embedModel: process.env.TITEN_EMBED_MODEL,
       embedDims: Number.isInteger(embedDims) && embedDims > 0 ? embedDims : undefined,
       embedApiKey: process.env.TITEN_EMBED_API_KEY,
+      maintenanceIntervalMs:
+        process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
+          ? undefined
+          : Number(process.env.TITEN_MAINTENANCE_INTERVAL_MS),
     });
     console.log(`titen listening on ${started.url} (database ${dbPath})`);
     break;

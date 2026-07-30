@@ -171,8 +171,13 @@ export function fakeVectors(): VectorCapability & {
       },
     },
     store: {
-      async upsert() {
-        /* the fixture pins scores directly */
+      /**
+       * Records what was indexed. A pinned score still wins, so a case can
+       * control ranking, but an unpinned upsert is still observable — otherwise a
+       * test cannot tell "indexed" from "silently dropped".
+       */
+      async upsert(records) {
+        for (const record of records) if (!scores.has(record.id)) scores.set(record.id, 0.5);
       },
       async query(_vector, options) {
         return [...scores.entries()]

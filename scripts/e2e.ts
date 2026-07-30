@@ -122,16 +122,28 @@ for (const statement of facts) {
 }
 ok(`${claimIds.length} claims materialized under subject ${SUBJECT}`);
 
-// Nothing is searchable by vector until the indexing outbox is drained. This is
-// the step an operator schedules; without it a configured vector capability
-// finds nothing, because the index is empty.
+// Indexing must happen on its own. Nothing here calls /v1/index/drain: the
+// service runs a maintenance pass on an interval, and a caller should never need
+// to know that embedding is asynchronous.
 if (vectorEnabled) {
-  const drained = await api("POST", "/v1/index/drain?limit=50");
-  console.log(
-    `    indexed ${drained.indexed} claim(s) with ${drained.model} at ${drained.dimensions} dims, ${drained.remaining} pending`,
-  );
-  assert.ok(drained.indexed >= claimIds.length, "every new claim must be indexed");
-  ok("indexing outbox drained into the vector store");
+  const deadline = Date.now() + 30_000;
+  let waited = 0;
+  let ready = false;
+  while (Date.now() < deadline) {
+    const compiled = await api("POST", "/v1/context/compile", {
+      subject_id: SUBJECT,
+      task: QUERY,
+      max_tokens: 1200,
+    });
+    if (compiled.items.length > 0) {
+      ready = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    waited += 1;
+  }
+  assert.ok(ready, "the service must index new claims without being asked");
+  ok(`automatic indexing made memory searchable after ~${waited}s, no manual drain`);
 }
 
 const context = await api("POST", "/v1/context/compile", {

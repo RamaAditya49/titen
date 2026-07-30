@@ -1,5 +1,7 @@
 import { createApp } from "../../core/app";
 import { migrate } from "../../core/migrations";
+import { runMaintenance } from "../../core/maintenance";
+import type { VectorCapability } from "../../core/vectors";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { tryCreateVectors } from "./vectors";
 
@@ -10,6 +12,13 @@ export interface ServeOptions {
   revision?: string;
   autoMigrate?: boolean;
   quiet?: boolean;
+  /** Milliseconds between maintenance passes. 0 disables the timer. */
+  maintenanceIntervalMs?: number;
+  /**
+   * A ready-made capability, used instead of deriving one from the environment.
+   * Lets a caller embedding this server supply its own store or model.
+   */
+  vectors?: VectorCapability;
   vecDbPath?: string;
   embedBaseUrl?: string;
   embedModel?: string;
@@ -25,7 +34,9 @@ export async function serve(options: ServeOptions) {
   const database = openDatabase(options.dbPath);
   const db = createSqliteDb(database);
   if (options.autoMigrate !== false) await migrate(db);
-  const vectors = tryCreateVectors({
+  const vectors =
+    options.vectors ??
+    tryCreateVectors({
     vecDbPath: options.vecDbPath,
     embedBaseUrl: options.embedBaseUrl,
     embedModel: options.embedModel,
@@ -60,9 +71,45 @@ export async function serve(options: ServeOptions) {
   });
 
   let stopped = false;
+
+  /**
+   * Maintenance runs in-process because the alternative is that it does not run
+   * at all: a deployment with a vector capability whose index is never populated
+   * searches nothing, and that was the behavior before this existed. Disable with
+   * an interval of 0 when an external scheduler owns the work instead.
+   */
+  const intervalMs = options.maintenanceIntervalMs ?? 15_000;
+  let ticking = false;
+  const tick = async () => {
+    // Skip rather than queue: a slow model must not stack overlapping passes.
+    if (ticking || stopped) return;
+    ticking = true;
+    try {
+      const result = await runMaintenance({ db, vectors });
+      if (!options.quiet && (result.indexed > 0 || result.delivered > 0 || result.errors.length))
+        console.log(
+          `maintenance indexed=${result.indexed} delivered=${result.delivered}${
+            result.errors.length ? ` errors=${result.errors.join(",")}` : ""
+          }`,
+        );
+    } catch {
+      // runMaintenance already contains its own failures; this is a backstop so a
+      // timer callback can never take the process down.
+    } finally {
+      ticking = false;
+    }
+  };
+  const timer =
+    intervalMs > 0 && (vectors !== undefined || options.maintenanceIntervalMs !== undefined)
+      ? setInterval(tick, intervalMs)
+      : undefined;
+  // Never hold the process open on account of maintenance.
+  timer?.unref?.();
+
   const stop = async () => {
     if (stopped) return;
     stopped = true;
+    if (timer) clearInterval(timer);
     await server.stop(true);
     database.close();
   };

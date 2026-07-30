@@ -1,6 +1,7 @@
 import { createApp } from "../../core/app";
 import { migrate } from "../../core/migrations";
 import { createD1Db, type D1Database } from "./d1";
+import { runMaintenance } from "../../core/maintenance";
 import { tryCreateVectorize } from "./vectors";
 
 export interface Env {
@@ -40,5 +41,27 @@ export default {
       vectors,
     });
     return app(request);
+  },
+
+  /**
+   * Cron Trigger entry point. Cloudflare has no in-process timer, so the same
+   * maintenance the Bun runtime runs on an interval is driven here by a schedule.
+   * Configure it in wrangler.jsonc under `triggers.crons`; without one, indexing
+   * and webhook delivery must be driven by calling their endpoints.
+   */
+  async scheduled(_event: unknown, env: Env, context: { waitUntil(p: Promise<unknown>): void }) {
+    const db = createD1Db(env.DB);
+    const vectors = tryCreateVectorize(env as never);
+    // waitUntil so the platform does not cancel the pass when the handler returns.
+    context.waitUntil(
+      runMaintenance({ db, vectors }).then((result) => {
+        if (result.indexed || result.delivered || result.errors.length)
+          console.log(
+            `maintenance indexed=${result.indexed} delivered=${result.delivered}${
+              result.errors.length ? ` errors=${result.errors.join(",")}` : ""
+            }`,
+          );
+      }),
+    );
   },
 };

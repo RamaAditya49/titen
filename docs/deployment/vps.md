@@ -122,18 +122,33 @@ Two things that will bite otherwise:
   `podman build --format docker` if you want it honoured, or rely on an external
   probe against `/healthz`.
 
-### Indexing is a scheduled job
+### Indexing runs itself
 
-Vector retrieval finds nothing until the indexing outbox is drained. Every write
-queues a row; embedding calls a model over the network, so a canonical write must
-not wait on one. Schedule it:
+Embedding calls a model over the network, so it cannot happen inside a canonical
+write. The service therefore runs a bounded maintenance pass on an interval that
+drains the indexing outbox and delivers webhooks. Nothing needs scheduling for
+vector retrieval to work.
+
+```
+TITEN_MAINTENANCE_INTERVAL_MS=15000   # default; 0 disables the timer
+```
+
+Set it to `0` only when an external scheduler owns the work, and then drive it
+yourself:
 
 ```bash
 curl -sX POST http://127.0.0.1:8787/v1/index/drain?limit=50 \
   -H "authorization: Bearer $TITEN_KEY"
+curl -sX POST http://127.0.0.1:8787/v1/webhooks/deliver \
+  -H "authorization: Bearer $TITEN_KEY"
 ```
 
-The same applies to webhook delivery via `POST /v1/webhooks/deliver`.
+On Cloudflare there is no in-process timer, so the Worker exposes a `scheduled`
+handler instead. Add a Cron Trigger to `wrangler.jsonc`:
+
+```jsonc
+"triggers": { "crons": ["*/1 * * * *"] }
+```
 
 ### Verified behavior
 

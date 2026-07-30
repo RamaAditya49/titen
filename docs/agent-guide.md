@@ -166,9 +166,33 @@ try {
 4. Observations are append-only. Evidence is never deleted.
 5. Checkpoints are task state, not facts. They expire.
 
-## MCP integration (planned v0.2)
+## MCP integration
 
-A Streamable HTTP MCP endpoint at `/mcp` will expose tools for:
-`context`, `remember`, `feedback`, `checkpoint`, `lease`, `handoff`.
+Titen speaks MCP over HTTP at `/mcp`, so an agent host can use it without the
+SDK. The endpoint is authenticated: pass the API key as a bearer token.
 
-Until then, use the REST SDK above.
+```json
+{
+  "mcpServers": {
+    "titen": {
+      "url": "http://127.0.0.1:8787/mcp",
+      "headers": { "Authorization": "Bearer titen_sk_..." }
+    }
+  }
+}
+```
+
+Tools: `titen_remember`, `titen_compile`, `titen_feedback`,
+`titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`,
+`titen_handoff`.
+
+Protocol notes, verified against a real handshake:
+
+- the response body is the JSON-RPC object itself, with no wrapper;
+- `initialize` echoes your `protocolVersion` when it is one of `2025-06-18`,
+  `2025-03-26`, or `2024-11-05`, so an older client is not forced forward;
+- notifications such as `notifications/initialized` receive `202` with an empty
+  body and never a reply;
+- `ping` is supported, and request batches are answered per id;
+- a tool failure comes back as a readable result with `isError: true`, not as a
+  transport error, so the model can see what went wrong.

@@ -1428,26 +1428,35 @@ export const CASES: Case[] = [
   },
   // --- v0.2: MCP and Events ---
   {
-    name: "MCP initialize and tool list returns valid JSON-RPC",
+    name: "MCP replies with a bare JSON-RPC body on both runtimes",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });
+      // Asserted on the wire, not through an envelope: the reply must be the
+      // JSON-RPC object itself or no MCP client can read it.
       const init = await fx.call("POST", "/mcp", {
         key: agent.key,
         body: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
       });
-      expectOk(init);
-      assert.equal(init.body.data.jsonrpc, "2.0");
-      assert.equal(init.body.data.id, 1);
-      assert.ok(init.body.data.result.serverInfo.name === "titen");
+      assert.equal(init.status, 200);
+      assert.equal(init.body.jsonrpc, "2.0");
+      assert.equal(init.body.id, 1);
+      assert.equal(init.body.result.serverInfo.name, "titen");
+      assert.equal(init.body.data, undefined, "no Titen envelope may wrap an MCP reply");
 
       const tools = await fx.call("POST", "/mcp", {
         key: agent.key,
         body: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
       });
-      expectOk(tools);
-      assert.ok(tools.body.data.result.tools.length >= 5);
-      assert.ok(tools.body.data.result.tools.some((t: any) => t.name === "titen_remember"));
-      assert.ok(tools.body.data.result.tools.some((t: any) => t.name === "titen_compile"));
+      assert.equal(tools.body.result.tools.length >= 7, true);
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_remember"));
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_compile"));
+
+      // A notification must be accepted without a body on either runtime.
+      const notified = await fx.call("POST", "/mcp", {
+        key: agent.key,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+      });
+      assert.equal(notified.status, 202);
     },
   },
   {
@@ -1473,8 +1482,9 @@ export const CASES: Case[] = [
           },
         },
       });
-      expectOk(remember);
-      assert.ok(remember.body.data.result.content[0].text.includes("obs_"));
+      assert.equal(remember.status, 200);
+      assert.equal(remember.body.jsonrpc, "2.0");
+      assert.ok(remember.body.result.content[0].text.includes("obs_"));
 
       // Compile
       const compile = await fx.call("POST", "/mcp", {
@@ -1487,9 +1497,9 @@ export const CASES: Case[] = [
           },
         },
       });
-      expectOk(compile);
-      // May or may not find results depending on whether claim was consolidated
-      assert.ok(compile.body.data.result.content[0].text);
+      assert.equal(compile.status, 200);
+      assert.equal(compile.body.jsonrpc, "2.0");
+      assert.ok(compile.body.result.content[0].text);
     },
   },
   {
