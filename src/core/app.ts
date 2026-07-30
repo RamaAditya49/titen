@@ -42,6 +42,8 @@ export interface AppContext {
   runtime: string;
   /** Optional vector capability. Absent means FTS-only retrieval. */
   vectors?: VectorCapability;
+  /** Ownership of background indexing and webhook repair for this runtime. */
+  backgroundRepair: "enabled" | "disabled" | "external";
 }
 
 /** Capabilities are reported honestly based on what's configured. */
@@ -49,8 +51,8 @@ export function capabilities(app: AppContext) {
   return {
     fts: "enabled",
     vector: app.vectors ? "enabled" : "disabled",
-    model: app.vectors ? "enabled" : "disabled",
-    background_repair: "disabled",
+    model: app.vectors?.embedder ? "enabled" : "disabled",
+    background_repair: app.backgroundRepair,
     export_import: "enabled",
   } as const;
 }
@@ -224,6 +226,7 @@ export function createApp(context: {
   revision?: string;
   runtime: string;
   vectors?: VectorCapability;
+  backgroundRepair?: "enabled" | "disabled" | "external";
 }): (request: Request) => Promise<Response> {
   const app: AppContext = {
     db: context.db,
@@ -231,6 +234,7 @@ export function createApp(context: {
     revision: context.revision ?? "dev",
     runtime: context.runtime,
     vectors: context.vectors,
+    backgroundRepair: context.backgroundRepair ?? "disabled",
   };
 
   return async function handle(request: Request): Promise<Response> {

@@ -105,6 +105,13 @@ test("a written claim is indexed without anyone calling the drain endpoint", asy
   );
 });
 
+test("readiness reports the maintenance timer that is actually running", async () => {
+  const response = await fetch(`${running.url}/readyz`);
+  const body = (await response.json()) as any;
+  assert.equal(response.status, 200);
+  assert.equal(body.data.capabilities.background_repair, "enabled");
+});
+
 test("a claim that stopped being retrievable is retired, not embedded forever", async () => {
   const observation = await api("POST", "/v1/observations", {
     subject_id: "user_maint_retire",

@@ -39,6 +39,8 @@ export default {
       revision: env.TITEN_REVISION ?? "dev",
       runtime: "cloudflare-d1",
       vectors,
+      // The request isolate cannot observe whether its external Cron Trigger exists.
+      backgroundRepair: "external",
     });
     return app(request);
   },

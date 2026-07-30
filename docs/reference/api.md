@@ -448,6 +448,13 @@ derived cache/vector or release-status maintenance job is stale.
   vector capability when enabled, outbox health, and release FTS plus
   customer-assertion verifier readiness when channel serving is enabled.
 
+`capabilities.background_repair` is configuration-derived: `enabled` means the
+Bun process created its in-process maintenance timer, `disabled` means Bun did
+not create one, and `external` means Cloudflare expects an external Cron Trigger
+that the request isolate cannot observe. It does not claim a recent successful
+pass; issue #11 tracks evidence-based scheduler freshness. Readiness performs no
+model or scheduler network probe.
+
 When Memory Atlas is disabled, it does not affect liveness/readiness. When
 enabled, readiness checks only the server-side compiler's canonical
 dependencies; an optional browser renderer is never a service-readiness gate.
