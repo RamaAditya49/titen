@@ -22,7 +22,7 @@ observed.
 | `src/core/indexing.ts:16` | Re-embed the current claim statement without a stored version hash | Repeated claim writes can waste embedding calls | Measured repeated embeddings are material; persist and compare the indexed statement hash |
 | `src/core/tokens.ts:4` | Conservative four-characters-per-token estimate | Less accurate for code and non-Latin text | A configured model tokenizer is available; retain this as the no-model fallback |
 | `src/core/vectors.ts:8` | Keep only a small shared vector boundary | Provider/store dimension mismatch is detected late | More than one embedding dimension/provider is supported; add a readiness mismatch check |
-| `src/core/webhooks.ts:436` | Queue one bounded event page per pass | A large tenant backlog may need several ticks | Oldest pending work exceeds the maintenance freshness window; add per-organization cursors |
+| `src/core/webhooks.ts:452` | Queue one bounded event page per pass | A large tenant backlog may need several ticks | Oldest pending work exceeds the maintenance freshness window; add per-organization cursors |
 
 ## Test harness
 
