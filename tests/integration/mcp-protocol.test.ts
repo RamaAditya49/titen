@@ -141,6 +141,9 @@ test("ping answers, and the full handshake completes in order", async () => {
     assert.equal(typeof tool.annotations.idempotentHint, "boolean");
     assert.equal(tool.annotations.openWorldHint, false);
   }
+  const compile = tools.body.result.tools.find((tool: any) => tool.name === "titen_compile");
+  assert.equal(compile.annotations.readOnlyHint, false, "compile records a context run");
+  assert.equal(compile.annotations.idempotentHint, false, "compile creates a new context run");
 });
 
 test("the HTTP transport rejects unsafe origins and unsupported revisions", async () => {
@@ -231,6 +234,20 @@ test("protocol-level errors use JSON-RPC error codes", async () => {
   });
   const parseError = (await malformed.json()) as any;
   assert.equal(parseError.error.code, -32700, "unparseable input is -32700");
+
+  const emptyBatch = await rpc([]);
+  assert.equal(emptyBatch.body.error.code, -32600, "an empty batch is one invalid request");
+});
+
+test("null ids are answered and missing ids are notifications", async () => {
+  const nullId = await rpc({ jsonrpc: "2.0", id: null, method: "ping" });
+  assert.equal(nullId.status, 200);
+  assert.equal(nullId.body.id, null, "an explicit null id is echoed in the response");
+  assert.deepEqual(nullId.body.result, {});
+
+  const notification = await rpc({ jsonrpc: "2.0", method: "tools/list" });
+  assert.equal(notification.status, 202);
+  assert.equal(notification.text, "", "tools/list without an id must not be answered");
 });
 
 test("a batch answers only the requests in it", async () => {
