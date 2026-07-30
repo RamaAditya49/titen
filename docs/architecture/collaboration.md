@@ -189,3 +189,7 @@ Event-exchange constraints:
 
 Do not choose CRDT or consensus algorithms until concrete offline/concurrent
 mutation cases are measured.
+
+## Operator work queue protocol
+
+A work item is coordination state layered on workspace membership. Creation makes it pending; claim is a single conditional SQL update from pending/failed/expired to leased. The winner receives an opaque token plus a monotonically increasing version. Heartbeat and completion require claimant identity, token, version, and an unexpired lease. Requeue clears ownership and increments the version so every older worker is fenced. Titen records lifecycle events but leaves worker selection, polling cadence, execution, and retry policy to callers.

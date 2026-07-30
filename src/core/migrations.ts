@@ -422,6 +422,41 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON webhook_deliveries (webhook_id, event_id)`,
     ],
   },
+  {
+    version: 10,
+    statements: [
+      `CREATE TABLE work_items (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+         kind TEXT NOT NULL,
+         payload TEXT NOT NULL,
+         priority INTEGER NOT NULL DEFAULT 0,
+         status TEXT NOT NULL CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
+         claimant_id TEXT,
+         lease_token TEXT,
+         lease_version INTEGER NOT NULL DEFAULT 0,
+         lease_expires_at TEXT,
+         attempts INTEGER NOT NULL DEFAULT 0,
+         outcome TEXT,
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         completed_at TEXT
+       )`,
+      `CREATE INDEX work_items_available ON work_items (org_id, workspace_id, status, priority, created_at)`,
+      `CREATE INDEX work_items_claimant ON work_items (org_id, claimant_id, status)`,
+      `CREATE TABLE work_item_completions (
+         work_item_id TEXT NOT NULL REFERENCES work_items(id),
+         claimant_id TEXT NOT NULL,
+         idempotency_key TEXT NOT NULL,
+         request_hash TEXT NOT NULL,
+         response TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (work_item_id, claimant_id, idempotency_key)
+       )`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

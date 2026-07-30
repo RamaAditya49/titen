@@ -1495,6 +1495,50 @@ export const CASES: Case[] = [
   },
   // --- v0.2: MCP and Events ---
   {
+    name: "operator work items fence stale workers and complete idempotently",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const worker = await fx.provision({ orgId: owner.orgId, scopes: ["*"] });
+      const successor = await fx.provision({ orgId: owner.orgId, scopes: ["*"] });
+      const ws = await fx.call("POST", "/v1/workspaces", { key: owner.key, body: { name: `queue-${Date.now()}-${fx.runtime}` } });
+      expectOk(ws, 201); const workspaceId = ws.body.data.workspace_id;
+      for (const principal_id of [owner.principalId, worker.principalId, successor.principalId]) {
+        expectOk(await fx.call("POST", "/v1/memberships", { key: owner.key, body: { workspace_id: workspaceId, principal_id, principal_kind: "agent", role: principal_id === owner.principalId ? "owner" : "member" } }), 201);
+      }
+      const created = await fx.call("POST", "/v1/work-items", { key: owner.key, body: { workspace_id: workspaceId, kind: "review", payload: { artifact: "safe-id" }, priority: 2 } });
+      expectOk(created, 201); const id = created.body.data.work_item_id;
+      const [a, b] = await Promise.all([
+        fx.call("POST", `/v1/work-items/${id}/claim`, { key: worker.key, body: { ttl_seconds: 60 } }),
+        fx.call("POST", `/v1/work-items/${id}/claim`, { key: successor.key, body: { ttl_seconds: 60 } }),
+      ]);
+      assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+      const winner = a.status === 200 ? { res:a, agent:worker } : { res:b, agent:successor };
+      const loser = a.status === 200 ? successor : worker;
+      const fence = { lease_token:winner.res.body.data.lease_token, lease_version:winner.res.body.data.lease_version };
+      expectOk(await fx.call("POST", `/v1/work-items/${id}/heartbeat`, { key:winner.agent.key, body:{...fence,ttl_seconds:120} }));
+      expectError(await fx.call("POST", `/v1/work-items/${id}/heartbeat`, { key:loser.key, body:{...fence,ttl_seconds:120} }),409);
+      const done = await fx.call("POST", `/v1/work-items/${id}/complete`, { key:winner.agent.key, body:{...fence,idempotency_key:"done-1",outcome:{result:"pass"}} }); expectOk(done);
+      const repeat = await fx.call("POST", `/v1/work-items/${id}/complete`, { key:winner.agent.key, body:{...fence,idempotency_key:"done-1",outcome:{result:"pass"}} }); expectOk(repeat); assert.deepEqual(repeat.body.data,done.body.data);
+      expectError(await fx.call("POST", `/v1/work-items/${id}/complete`, { key:winner.agent.key, body:{...fence,idempotency_key:"done-1",outcome:{result:"different"}} }),409);
+      const events = await fx.call("GET", "/v1/events", { key:owner.key }); expectOk(events);
+      const serialized=JSON.stringify(events.body.data.events.filter((e:any)=>e.resource_id===id)); assert.ok(!serialized.includes(fence.lease_token)); assert.ok(!serialized.includes("safe-id")); assert.ok(!serialized.includes("pass"));
+    },
+  },
+  {
+    name: "requeue increments the fence and rejects the previous worker",
+    async run(fx) {
+      const owner=await fx.provision({scopes:["*"]}); const worker=await fx.provision({orgId:owner.orgId,scopes:["*"]});
+      const ws=await fx.call("POST","/v1/workspaces",{key:owner.key,body:{name:`retry-${Date.now()}-${fx.runtime}`}}); const workspaceId=ws.body.data.workspace_id;
+      for(const [principal_id,role] of [[owner.principalId,"owner"],[worker.principalId,"member"]]) expectOk(await fx.call("POST","/v1/memberships",{key:owner.key,body:{workspace_id:workspaceId,principal_id,principal_kind:"agent",role}}),201);
+      const created=await fx.call("POST","/v1/work-items",{key:owner.key,body:{workspace_id:workspaceId,kind:"retry"}}); const id=created.body.data.work_item_id;
+      const first=await fx.call("POST",`/v1/work-items/${id}/claim`,{key:worker.key,body:{ttl_seconds:60}}); expectOk(first);
+      const old={lease_token:first.body.data.lease_token,lease_version:first.body.data.lease_version};
+      const requeued=await fx.call("POST",`/v1/work-items/${id}/requeue`,{key:owner.key,body:{reason:"manual retry"}}); expectOk(requeued); assert.ok(requeued.body.data.lease_version>old.lease_version);
+      const second=await fx.call("POST",`/v1/work-items/${id}/claim`,{key:worker.key,body:{ttl_seconds:60}}); expectOk(second); assert.ok(second.body.data.lease_version>requeued.body.data.lease_version);
+      expectError(await fx.call("POST",`/v1/work-items/${id}/heartbeat`,{key:worker.key,body:{...old,ttl_seconds:60}}),409);
+    },
+  },
+  {
     name: "MCP replies with a bare JSON-RPC body on both runtimes",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });

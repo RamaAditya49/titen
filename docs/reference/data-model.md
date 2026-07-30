@@ -535,3 +535,7 @@ plans expose a measured need. Every by-ID query still includes
 
 Resolve these through the dual-runtime spike and record expensive-to-reverse
 choices as ADRs before publishing migration `0001`.
+
+## Operator coordination work items
+
+`work_items` stores a bounded unit's workspace, opaque JSON payload, priority, lifecycle state, claimant, lease expiry, attempt count, and monotonically increasing fencing version. The lease token is never returned by listing or copied to events. `work_item_completions` stores claimant-scoped idempotency results. These tables are coordination state, not semantic memory or an execution/orchestration engine.

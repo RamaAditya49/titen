@@ -66,6 +66,9 @@ export interface CheckpointOptions {
   run_id?: string;
 }
 
+export interface WorkItemFence { lease_token: string; lease_version: number }
+export interface WorkItemCreate { workspace_id: string; kind: string; payload?: unknown; priority?: number }
+
 export class TitenError extends Error {
   status: number;
   code: string;
@@ -159,6 +162,17 @@ export class TitenClient {
   async deleteCheckpoint(checkpointId: string) {
     return this.request("DELETE", `/v1/checkpoints/${checkpointId}`);
   }
+
+  // --- Operator coordination queue (state only; callers execute work) ---
+  async createWorkItem(options: WorkItemCreate) { return this.request("POST", "/v1/work-items", options); }
+  async listWorkItems(workspaceId: string, status?: string) {
+    const q = new URLSearchParams({ workspace_id: workspaceId }); if (status) q.set("status", status);
+    return this.request("GET", `/v1/work-items?${q}`);
+  }
+  async claimWorkItem(id: string, ttl_seconds: number) { return this.request("POST", `/v1/work-items/${id}/claim`, { ttl_seconds }); }
+  async heartbeatWorkItem(id: string, fence: WorkItemFence, ttl_seconds: number) { return this.request("POST", `/v1/work-items/${id}/heartbeat`, { ...fence, ttl_seconds }); }
+  async completeWorkItem(id: string, fence: WorkItemFence, idempotency_key: string, outcome: unknown) { return this.request("POST", `/v1/work-items/${id}/complete`, { ...fence, idempotency_key, outcome }); }
+  async requeueWorkItem(id: string, fence?: WorkItemFence, reason?: string) { return this.request("POST", `/v1/work-items/${id}/requeue`, { ...fence, reason }); }
 
   // --- Keys ---
 
