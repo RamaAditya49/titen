@@ -11,6 +11,7 @@ import { migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
+import { assertPopulatedV11IntegrityMigration } from "./integrity-migration";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -163,12 +164,12 @@ test("a D1 migration batch rolls back on fault and concurrent retries converge",
     };
     await assert.rejects(() => migrate(injected));
     assert.equal(Number((await real.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations"))[0]!.version), SCHEMA_VERSION - 1);
-    const fts = await real.all<{ sql: string }>(
-      `SELECT sql FROM sqlite_master
-        WHERE name IN ('observations_fts', 'claims_fts') ORDER BY name`,
+    const integrity = await real.all<{ name: string; sql: string }>(
+      `SELECT name, sql FROM sqlite_master
+        WHERE name IN ('checkpoints_scope', 'event_order') ORDER BY name`,
     );
-    assert.equal(fts.length, 2);
-    for (const table of fts) assert.doesNotMatch(table.sql, /org_scope/);
+    assert.deepEqual(integrity.map(({ name }) => name), ["checkpoints_scope"]);
+    assert.doesNotMatch(integrity[0]!.sql, /UNIQUE/);
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
   } finally {
     await fault.dispose();
@@ -189,6 +190,25 @@ test("a populated schema-v10 D1 database rebuilds scoped Porter FTS", async () =
     await migrationRuntime.ready;
     const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
     await assertPopulatedV10RetrievalMigration(migrationDb);
+  } finally {
+    await migrationRuntime.dispose();
+    rmSync(migrationPersist, { recursive: true, force: true });
+  }
+});
+
+test("a populated schema-v11 D1 database repairs collaboration integrity", async () => {
+  const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-integrity-migration-"));
+  const migrationRuntime = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-integrity-migration" },
+    d1Persist: migrationPersist,
+  });
+  try {
+    await migrationRuntime.ready;
+    const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
+    await assertPopulatedV11IntegrityMigration(migrationDb);
   } finally {
     await migrationRuntime.dispose();
     rmSync(migrationPersist, { recursive: true, force: true });

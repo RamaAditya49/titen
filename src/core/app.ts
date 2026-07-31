@@ -1,12 +1,12 @@
 import { authenticate, requireScope } from "./auth";
 import { saveCheckpoint, getCheckpoint, deleteCheckpoint } from "./checkpoints";
 import { claimEvidence } from "./evidence";
-import { compileContext, recordFeedback } from "./context";
+import { compileContext, getContext, recordFeedback } from "./context";
 import { consolidate } from "./claims";
 import { createKey, listKeys, revokeKey } from "./keys";
 import { exportRecords, importRecords } from "./portability";
 import { expireClaim, revokeClaim, supersedeClaim } from "./lifecycle";
-import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, releaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
+import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, listLeases, releaseLease, forceReleaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
 import { listEvents, getEvent } from "./events";
 import { drainIndex } from "./indexing";
 import { handleMcp } from "./mcp";
@@ -113,6 +113,12 @@ export const ROUTES: RouteDef[] = [
     handler: compileContext,
   },
   {
+    method: "GET",
+    path: "/v1/context/:id",
+    scope: "handoffs:read",
+    handler: getContext,
+  },
+  {
     method: "POST",
     path: "/v1/context/:id/feedback",
     scope: "feedback:write",
@@ -155,6 +161,12 @@ export const ROUTES: RouteDef[] = [
     handler: getCheckpoint,
   },
   {
+    method: "GET",
+    path: "/v1/checkpoints/:id",
+    scope: "checkpoints:read",
+    handler: getCheckpoint,
+  },
+  {
     method: "DELETE",
     path: "/v1/checkpoints/:id",
     scope: "checkpoints:write",
@@ -171,7 +183,9 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/memberships", scope: "memberships:read", handler: listMembers },
   { method: "DELETE", path: "/v1/memberships/:id", scope: "memberships:write", handler: removeMember },
   { method: "POST", path: "/v1/leases", scope: "leases:write", handler: acquireLease },
+  { method: "GET", path: "/v1/leases", scope: "leases:read", handler: listLeases },
   { method: "DELETE", path: "/v1/leases/:id", scope: "leases:write", handler: releaseLease },
+  { method: "POST", path: "/v1/leases/:id/force-release", scope: "leases:write", handler: forceReleaseLease },
   { method: "POST", path: "/v1/handoffs", scope: "handoffs:write", handler: createHandoff },
   { method: "POST", path: "/v1/handoffs/:id/resolve", scope: "handoffs:write", handler: resolveHandoff },
   { method: "GET", path: "/v1/handoffs", scope: "handoffs:read", handler: listHandoffs },

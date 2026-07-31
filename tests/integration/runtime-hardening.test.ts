@@ -8,6 +8,7 @@ import { backgroundRepairState, runMaintenance } from "../../src/core/maintenanc
 import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
+import { assertPopulatedV11IntegrityMigration } from "../contract/integrity-migration";
 
 const directories: string[] = [];
 const temporary = () => {
@@ -46,17 +47,16 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
     assert.equal(Number(version[0]!.version), SCHEMA_VERSION - 1);
-    const fts = await db.all<{ sql: string }>(
-      `SELECT sql FROM sqlite_master
-        WHERE name IN ('observations_fts', 'claims_fts') ORDER BY name`,
+    const integrity = await db.all<{ name: string; sql: string }>(
+      `SELECT name, sql FROM sqlite_master
+        WHERE name IN ('checkpoints_scope', 'event_order') ORDER BY name`,
     );
-    assert.equal(fts.length, 2);
-    for (const table of fts)
-      assert.doesNotMatch(
-        table.sql,
-        /org_scope/,
-        `migration must roll back after statement ${failureAfter + 1}`,
-      );
+    assert.deepEqual(
+      integrity.map(({ name }) => name),
+      ["checkpoints_scope"],
+      `migration must roll back after statement ${failureAfter + 1}`,
+    );
+    assert.doesNotMatch(integrity[0]!.sql, /UNIQUE/);
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
   }
@@ -114,6 +114,13 @@ test("migration retires unowned federation peers and releases their endpoint", a
             (id, org_id, principal_id, name, endpoint, shared_secret_hash, direction, status, created_at)
           VALUES ('fpeer_replacement', 'org_legacy', 'agent_owner', 'Replacement', 'https://peer.example.test', 'hash', 'pull', 'active', '2026-07-30T00:00:01.000Z')`,
   }]);
+  database.close();
+});
+
+test("a populated schema-v11 SQLite database repairs collaboration integrity", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await assertPopulatedV11IntegrityMigration(db);
   database.close();
 });
 

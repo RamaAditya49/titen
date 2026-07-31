@@ -21,6 +21,7 @@ export const SCOPES = [
   "workspaces:write",
   "memberships:read",
   "memberships:write",
+  "leases:read",
   "leases:write",
   "handoffs:read",
   "handoffs:write",

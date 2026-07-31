@@ -26,6 +26,21 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   credential. The standalone Titen Memory skill is public on ClawHub; its
   bundle-plugin package is staged while an upstream inspector incident blocks
   live package publication.
+- Handoff recipients can read the exact delegated checkpoint and currently
+  authorized context pack; operators can page organization leases and active
+  organization-level owners/admins can force-release a failed agent's lease.
+
+### Fixed
+
+- Checkpoint saves and handoff resolutions now have database-enforced single
+  winners under D1 latency, with deterministic duplicate repair and safe
+  handoff foreign keys during migration.
+- Idempotent retries now follow the acting principal across API-key rotation
+  while retaining the original credential ID for audit and preserving
+  cross-principal isolation.
+- Event polling and federation pulls now page by a database-assigned monotonic
+  sequence without changing public event-ID cursors, preventing equal-timestamp
+  UUID ordering from skipping committed events.
 
 - An explicitly scoped REST tombstone removes readable observation and
   dependent-claim text while retaining hashes, provenance, and audit history.

@@ -1,4 +1,5 @@
 import { first } from "./db";
+import { recordAccessParams, recordAccessSql } from "./authorization";
 import type { Principal } from "./auth";
 import type { Db } from "./db";
 import { notFound, validationError, conflict } from "./errors";
@@ -61,6 +62,15 @@ export async function addMember(ctx: RequestContext): Promise<Result> {
   const role = requireEnum(body, "role", MEMBER_ROLES);
   const id = newId("mbr");
   const now = ctx.app.now().toISOString();
+
+  if (workspaceId) {
+    const workspace = await first<{ id: string }>(
+      ctx.app.db,
+      `SELECT id FROM workspaces WHERE id = ? AND org_id = ?`,
+      [workspaceId, orgId],
+    );
+    if (!workspace) throw notFound();
+  }
 
   await ctx.app.db.batch([{
     sql: `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
@@ -211,6 +221,102 @@ export async function releaseLease(ctx: RequestContext): Promise<Result> {
   return { data: { lease_id: id, released_at: now } };
 }
 
+/** GET /v1/leases — bounded organization-scoped active lease inventory. */
+export async function listLeases(ctx: RequestContext): Promise<Result> {
+  const { orgId } = ctx.principal!;
+  const rawLimit = ctx.url.searchParams.get("limit") ?? "50";
+  const limit = Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200)
+    throw validationError('Query "limit" must be an integer between 1 and 200.');
+
+  const after = ctx.url.searchParams.get("after");
+  let afterCreatedAt: string | null = null;
+  if (after) {
+    const cursor = await first<{ created_at: string }>(
+      ctx.app.db,
+      `SELECT created_at FROM leases
+        WHERE id = ? AND org_id = ?`,
+      [after, orgId],
+    );
+    if (!cursor) throw validationError('Query "after" references an unknown lease.');
+    afterCreatedAt = cursor.created_at;
+  }
+
+  const rows = await ctx.app.db.all<{
+    id: string;
+    resource_type: string;
+    resource_id: string;
+    holder_id: string;
+    purpose: string;
+    ttl_seconds: number;
+    expires_at: string;
+    created_at: string;
+  }>(
+    `SELECT id, resource_type, resource_id, holder_id, purpose, ttl_seconds,
+            expires_at, created_at
+       FROM leases
+      WHERE org_id = ? AND released_at IS NULL
+        AND (? IS NULL OR created_at > ? OR (created_at = ? AND id > ?))
+      ORDER BY created_at, id
+      LIMIT ?`,
+    [orgId, afterCreatedAt, afterCreatedAt, afterCreatedAt, after, limit + 1],
+  );
+  const page = rows.slice(0, limit);
+  const now = ctx.app.now().toISOString();
+  return {
+    data: {
+      leases: page.map((row) => ({
+        lease_id: row.id,
+        resource_type: row.resource_type,
+        resource_id: row.resource_id,
+        holder_id: row.holder_id,
+        purpose: row.purpose,
+        ttl_seconds: row.ttl_seconds,
+        expires_at: row.expires_at,
+        created_at: row.created_at,
+        status: row.expires_at <= now ? "expired" : "active",
+      })),
+      limit,
+      cursor: rows.length > limit ? page[page.length - 1]!.id : null,
+    },
+  };
+}
+
+/** Organization owners/admins may recover a lease held by a failed agent. */
+export async function forceReleaseLease(ctx: RequestContext): Promise<Result> {
+  const { orgId, principalId } = ctx.principal!;
+  const role = await first<{ role: string }>(
+    ctx.app.db,
+    `SELECT role FROM memberships
+      WHERE org_id = ? AND workspace_id IS NULL AND principal_id = ?
+        AND role IN ('owner', 'admin') AND removed_at IS NULL
+      LIMIT 1`,
+    [orgId, principalId],
+  );
+  if (!role) throw notFound();
+
+  const id = ctx.params.id!;
+  const lease = await first<{ id: string; holder_id: string }>(
+    ctx.app.db,
+    `SELECT id, holder_id FROM leases
+      WHERE id = ? AND org_id = ? AND released_at IS NULL`,
+    [id, orgId],
+  );
+  if (!lease) throw notFound();
+
+  const now = ctx.app.now().toISOString();
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE leases SET released_at = ?
+            WHERE id = ? AND org_id = ? AND released_at IS NULL`,
+      params: [now, id, orgId],
+    },
+    eventStatement(orgId, "lease.force_released", principalId, "lease", id,
+      { holder_id: lease.holder_id }, now),
+  ]);
+  return { data: { lease_id: id, released_at: now, forced: true } };
+}
+
 // --- Handoffs ---
 
 export async function createHandoff(ctx: RequestContext): Promise<Result> {
@@ -221,6 +327,54 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
   const contextId = optionalString(body, "context_id", LIMITS.identifier);
   const checkpointId = optionalString(body, "checkpoint_id", LIMITS.identifier);
   const message = optionalString(body, "message", LIMITS.statement);
+
+  const recipient = await first<{ principal_id: string }>(
+    ctx.app.db,
+    `SELECT principal_id FROM api_keys
+      WHERE org_id = ? AND principal_id = ? AND revoked_at IS NULL
+      UNION
+     SELECT principal_id FROM memberships
+      WHERE org_id = ? AND principal_id = ? AND removed_at IS NULL
+      LIMIT 1`,
+    [orgId, toPrincipal, orgId, toPrincipal],
+  );
+  if (!recipient) throw notFound();
+
+  if (contextId) {
+    const context = await first<{ id: string }>(
+      ctx.app.db,
+      `SELECT id FROM context_runs
+        WHERE id = ? AND org_id = ? AND subject_id = ?`,
+      [contextId, orgId, subjectId],
+    );
+    if (!context) throw notFound();
+    const hidden = await first<{ count: number }>(
+      ctx.app.db,
+      `SELECT COUNT(*) AS count
+         FROM context_run_items i
+         JOIN claims c ON c.id = i.claim_id
+        WHERE i.context_id = ? AND c.org_id = ?
+          AND (NOT ${recordAccessSql("c")} OR NOT ${recordAccessSql("c")})`,
+      [
+        contextId,
+        orgId,
+        ...recordAccessParams(principalId),
+        ...recordAccessParams(toPrincipal),
+      ],
+    );
+    if (Number(hidden?.count ?? 0) > 0) throw notFound();
+  }
+
+  if (checkpointId) {
+    const checkpoint = await first<{ id: string }>(
+      ctx.app.db,
+      `SELECT id FROM checkpoints
+        WHERE id = ? AND org_id = ? AND agent_id = ? AND subject_id = ?
+          AND expires_at > ?`,
+      [checkpointId, orgId, principalId, subjectId, ctx.app.now().toISOString()],
+    );
+    if (!checkpoint) throw notFound();
+  }
 
   const id = newId("hoff");
   const now = ctx.app.now().toISOString();
@@ -254,13 +408,26 @@ export async function resolveHandoff(ctx: RequestContext): Promise<Result> {
     throw validationError("Only the target principal can resolve a handoff.");
 
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([
-    {
-      sql: `UPDATE handoffs SET status = ?, resolved_at = ? WHERE id = ?`,
-      params: [status, now, id],
-    },
-    eventStatement(orgId, `handoff.${status}`, principalId, "handoff", id, { status }, now),
-  ]);
+  try {
+    await ctx.app.db.batch([
+      {
+        sql: `INSERT INTO handoff_resolutions
+                (handoff_id, org_id, actor_id, status, resolved_at)
+              VALUES (?, ?, ?, ?, ?)`,
+        params: [id, orgId, principalId, status, now],
+      },
+      {
+        sql: `UPDATE handoffs SET status = ?, resolved_at = ?
+              WHERE id = ? AND org_id = ? AND to_principal = ? AND status = 'pending'`,
+        params: [status, now, id, orgId, principalId],
+      },
+      eventStatement(orgId, `handoff.${status}`, principalId, "handoff", id, { status }, now),
+    ]);
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE|PRIMARY KEY|constraint/i.test(error.message))
+      throw conflict("Handoff was already resolved.");
+    throw error;
+  }
 
   return { data: { handoff_id: id, status, resolved_at: now } };
 }

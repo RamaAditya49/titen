@@ -1,6 +1,7 @@
 import { first } from "./db";
 import type { Stmt } from "./db";
 import { notFound } from "./errors";
+import { recordAccessParams, recordAccessSql } from "./authorization";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
@@ -209,6 +210,121 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       query_terms_used: lexical.termsUsed,
       dropped_query_terms: lexical.termsDropped,
     },
+  };
+}
+
+/** Read a stored context only through its actor or an explicit live handoff. */
+export async function getContext(ctx: RequestContext): Promise<Result> {
+  const principal = ctx.principal!;
+  const contextId = ctx.params.id!;
+  const run = await first<{
+    id: string;
+    actor_id: string;
+    subject_id: string;
+    project_id: string | null;
+    task_hash: string;
+    max_tokens: number;
+    used_tokens: number;
+    policy_snapshot: string;
+    degraded: string;
+    created_at: string;
+  }>(
+    ctx.app.db,
+    `SELECT id, actor_id, subject_id, project_id, task_hash, max_tokens,
+            used_tokens, policy_snapshot, degraded, created_at
+       FROM context_runs WHERE id = ? AND org_id = ?`,
+    [contextId, principal.orgId],
+  );
+  if (!run) throw notFound();
+
+  let delegated = false;
+  if (run.actor_id !== principal.principalId) {
+    delegated = Boolean(await first<{ present: number }>(
+      ctx.app.db,
+      `SELECT 1 AS present FROM handoffs
+        WHERE org_id = ? AND to_principal = ? AND context_id = ?
+          AND status IN ('pending', 'accepted')
+        LIMIT 1`,
+      [principal.orgId, principal.principalId, contextId],
+    ));
+    if (!delegated) throw notFound();
+  }
+
+  const rows = await ctx.app.db.all<{
+    id: string;
+    kind: string;
+    statement: string;
+    confidence: number;
+    trust: string;
+    status: string;
+    observer_id: string | null;
+    valid_from: string;
+    valid_to: string | null;
+    score: number;
+    score_components: string;
+    disputed: number;
+  }>(
+    `SELECT c.id, c.kind, c.statement, c.confidence, c.trust, c.status,
+            c.observer_id, c.valid_from, c.valid_to, i.score,
+            i.score_components,
+            CASE WHEN c.status = 'disputed' OR EXISTS (
+              SELECT 1 FROM claim_sources s
+               WHERE s.claim_id = c.id AND s.relation = 'contradicts'
+            ) THEN 1 ELSE 0 END AS disputed
+       FROM context_run_items i
+       JOIN claims c ON c.id = i.claim_id
+      WHERE i.context_id = ? AND c.org_id = ? AND ${recordAccessSql("c")}
+      ORDER BY i.position`,
+    [contextId, principal.orgId, ...recordAccessParams(principal.principalId)],
+  );
+  const count = await first<{ count: number }>(
+    ctx.app.db,
+    `SELECT COUNT(*) AS count FROM context_run_items WHERE context_id = ?`,
+    [contextId],
+  );
+  // A delegated pack is one authorization unit. Returning a partial pack would
+  // expose its hidden shape and no longer match the compiled budget.
+  if (rows.length !== Number(count?.count ?? 0)) throw notFound();
+
+  const evidence = await loadAuthorizedEvidenceIds(
+    ctx.app.db,
+    principal,
+    rows.map((row) => row.id),
+  );
+  const items = rows.map((row) => ({
+    claim_id: row.id,
+    claim: row.statement,
+    kind: row.kind,
+    confidence: row.confidence,
+    trust: row.trust,
+    status: row.status,
+    observer_id: row.observer_id,
+    valid_from: row.valid_from,
+    valid_to: row.valid_to,
+    evidence_ids: evidence.get(row.id) ?? [],
+    score: row.score,
+    score_components: JSON.parse(row.score_components),
+  }));
+
+  return {
+    data: {
+      context_id: run.id,
+      task_hash: run.task_hash,
+      scope: { subject_id: run.subject_id, project_id: run.project_id },
+      budget: { max_tokens: run.max_tokens, used_tokens: run.used_tokens },
+      items,
+      conflicts: rows
+        .filter((row) => Number(row.disputed) === 1)
+        .map((row) => ({
+          claim_id: row.id,
+          reason: "contradicting_evidence",
+          evidence_ids: evidence.get(row.id) ?? [],
+        })),
+      policy_snapshot: run.policy_snapshot,
+      instructions: CONTEXT_INSTRUCTIONS,
+      created_at: run.created_at,
+    },
+    meta: { degraded: JSON.parse(run.degraded), delegated },
   };
 }
 

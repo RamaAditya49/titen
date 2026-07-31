@@ -554,12 +554,188 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          FROM claims`,
     ],
   },
+  {
+    version: 12,
+    statements: [
+      // A checkpoint scope has one current head. Point handoffs at the newest
+      // duplicate before retiring older rows, then let SQLite arbitrate every
+      // future upsert on both runtimes.
+      `UPDATE handoffs
+          SET checkpoint_id = (
+            SELECT winning.id
+              FROM checkpoints losing
+              JOIN checkpoints winning
+                ON winning.org_id = losing.org_id
+               AND winning.subject_id = losing.subject_id
+               AND winning.agent_id = losing.agent_id
+               AND winning.kind = losing.kind
+             WHERE losing.id = handoffs.checkpoint_id
+             ORDER BY winning.updated_at DESC, winning.created_at DESC, winning.id DESC
+             LIMIT 1
+          )
+        WHERE checkpoint_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+              FROM checkpoints losing
+              JOIN checkpoints winning
+                ON winning.org_id = losing.org_id
+               AND winning.subject_id = losing.subject_id
+               AND winning.agent_id = losing.agent_id
+               AND winning.kind = losing.kind
+             WHERE losing.id = handoffs.checkpoint_id
+               AND winning.id <> losing.id
+          )`,
+      `DELETE FROM checkpoints
+        WHERE EXISTS (
+          SELECT 1 FROM checkpoints newer
+           WHERE newer.org_id = checkpoints.org_id
+             AND newer.subject_id = checkpoints.subject_id
+             AND newer.agent_id = checkpoints.agent_id
+             AND newer.kind = checkpoints.kind
+             AND (
+               newer.updated_at > checkpoints.updated_at
+               OR (newer.updated_at = checkpoints.updated_at AND newer.created_at > checkpoints.created_at)
+               OR (newer.updated_at = checkpoints.updated_at AND newer.created_at = checkpoints.created_at AND newer.id > checkpoints.id)
+             )
+        )`,
+      `DROP INDEX checkpoints_scope`,
+      `CREATE UNIQUE INDEX checkpoints_scope
+         ON checkpoints (org_id, subject_id, agent_id, kind)`,
+      // Composite parent keys make the handoff foreign keys organization-safe,
+      // even for direct SQL clients that bypass the HTTP preflight.
+      `CREATE UNIQUE INDEX context_runs_org_identity ON context_runs (id, org_id)`,
+      `CREATE UNIQUE INDEX checkpoints_org_identity ON checkpoints (id, org_id)`,
+      `ALTER TABLE handoffs RENAME TO handoffs_legacy`,
+      `CREATE TABLE handoffs (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         from_principal TEXT NOT NULL,
+         to_principal TEXT NOT NULL,
+         subject_id TEXT NOT NULL,
+         context_id TEXT,
+         checkpoint_id TEXT,
+         message TEXT,
+         status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'expired')),
+         created_at TEXT NOT NULL,
+         resolved_at TEXT,
+         FOREIGN KEY (context_id, org_id) REFERENCES context_runs(id, org_id),
+         FOREIGN KEY (checkpoint_id, org_id) REFERENCES checkpoints(id, org_id)
+       )`,
+      // Existing dangling or cross-organization decorations never granted
+      // access. Preserve the handoff itself and retire only the unsafe pointer.
+      `INSERT INTO handoffs
+         (id, org_id, from_principal, to_principal, subject_id, context_id,
+          checkpoint_id, message, status, created_at, resolved_at)
+       SELECT h.id, h.org_id, h.from_principal, h.to_principal, h.subject_id,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM context_runs r
+                 WHERE r.id = h.context_id AND r.org_id = h.org_id
+                   AND r.subject_id = h.subject_id
+                   AND NOT EXISTS (
+                     SELECT 1
+                       FROM context_run_items i
+                       JOIN claims c ON c.id = i.claim_id
+                      WHERE i.context_id = r.id AND c.org_id = h.org_id
+                        AND (
+                          NOT (
+                            c.visibility = 'organization'
+                            OR (c.visibility = 'private' AND c.actor_id = h.from_principal)
+                            OR (c.visibility = 'team' AND c.workspace_id IS NOT NULL AND EXISTS (
+                              SELECT 1 FROM memberships m
+                               WHERE m.org_id = c.org_id
+                                 AND m.workspace_id = c.workspace_id
+                                 AND m.principal_id = h.from_principal
+                                 AND m.removed_at IS NULL
+                            ))
+                          )
+                          OR NOT (
+                            c.visibility = 'organization'
+                            OR (c.visibility = 'private' AND c.actor_id = h.to_principal)
+                            OR (c.visibility = 'team' AND c.workspace_id IS NOT NULL AND EXISTS (
+                              SELECT 1 FROM memberships m
+                               WHERE m.org_id = c.org_id
+                                 AND m.workspace_id = c.workspace_id
+                                 AND m.principal_id = h.to_principal
+                                 AND m.removed_at IS NULL
+                            ))
+                          )
+                        )
+                   )
+              ) THEN h.context_id ELSE NULL END,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM checkpoints c
+                 WHERE c.id = h.checkpoint_id AND c.org_id = h.org_id
+                   AND c.agent_id = h.from_principal
+                   AND c.subject_id = h.subject_id
+              ) THEN h.checkpoint_id ELSE NULL END,
+              h.message, h.status, h.created_at, h.resolved_at
+         FROM handoffs_legacy h`,
+      `DROP TABLE handoffs_legacy`,
+      `CREATE INDEX handoffs_to ON handoffs (org_id, to_principal, status)`,
+      `CREATE TABLE handoff_resolutions (
+         handoff_id TEXT PRIMARY KEY REFERENCES handoffs(id),
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         actor_id TEXT NOT NULL,
+         status TEXT NOT NULL CHECK (status IN ('accepted', 'rejected')),
+         resolved_at TEXT NOT NULL
+       )`,
+      // Principal scope survives credential rotation. key_id remains the
+      // credential that created the replay record and is never rewritten.
+      `CREATE TABLE idempotency_v3 (
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         principal_id TEXT NOT NULL,
+         key_id TEXT NOT NULL REFERENCES api_keys(id),
+         request_identity TEXT NOT NULL,
+         key_hash TEXT NOT NULL,
+         request_hash TEXT NOT NULL,
+         status INTEGER NOT NULL,
+         response TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         expires_at TEXT NOT NULL,
+         PRIMARY KEY (org_id, principal_id, key_hash)
+       )`,
+      `INSERT INTO idempotency_v3
+         (org_id, principal_id, key_id, request_identity, key_hash, request_hash,
+          status, response, created_at, expires_at)
+       SELECT i.org_id, a.principal_id, i.key_id, i.request_identity, i.key_hash,
+              i.request_hash, i.status, i.response, i.created_at, i.expires_at
+         FROM idempotency_v2 i
+         JOIN api_keys a ON a.id = i.key_id AND a.org_id = i.org_id
+        WHERE NOT EXISTS (
+          SELECT 1
+            FROM idempotency_v2 newer
+            JOIN api_keys newer_key
+              ON newer_key.id = newer.key_id AND newer_key.org_id = newer.org_id
+           WHERE newer.org_id = i.org_id
+             AND newer_key.principal_id = a.principal_id
+             AND newer.key_hash = i.key_hash
+             AND (
+               newer.created_at > i.created_at
+               OR (newer.created_at = i.created_at AND newer.key_id > i.key_id)
+             )
+        )`,
+      `CREATE INDEX idempotency_v3_expiry ON idempotency_v3 (expires_at)`,
+      // Event IDs stay stable public replay keys; this local sequence supplies
+      // the commit order UUIDs cannot encode.
+      `CREATE TABLE event_order (
+         seq INTEGER PRIMARY KEY AUTOINCREMENT,
+         event_id TEXT NOT NULL UNIQUE REFERENCES events(id) ON DELETE CASCADE
+       )`,
+      `INSERT INTO event_order (event_id)
+       SELECT id FROM events ORDER BY created_at, id`,
+      `CREATE TRIGGER events_assign_order
+         AFTER INSERT ON events
+         BEGIN
+           INSERT INTO event_order (event_id) VALUES (NEW.id);
+         END`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
 
 const REQUIRED_OBJECTS = MIGRATIONS.flatMap(({ statements }) => statements).flatMap((sql) => {
-  const match = sql.match(/^CREATE\s+(?:VIRTUAL\s+)?(?:UNIQUE\s+)?(TABLE|INDEX)\s+([a-z0-9_]+)/i);
+  const match = sql.match(/^CREATE\s+(?:VIRTUAL\s+)?(?:UNIQUE\s+)?(TABLE|INDEX|TRIGGER)\s+([a-z0-9_]+)/i);
   return match ? [{ type: match[1]!.toLowerCase(), name: match[2]! }] : [];
 });
 const REQUIRED_COLUMNS = MIGRATIONS.flatMap(({ statements }) => statements).flatMap((sql) => {

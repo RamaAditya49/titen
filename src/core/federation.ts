@@ -1,7 +1,7 @@
 import { first } from "./db";
 import type { Db } from "./db";
 import { notFound, validationError, conflict, forbidden, unavailable } from "./errors";
-import { eventAccessParams, eventAccessSql } from "./events";
+import { eventAccessParams, eventAccessSql, resolveEventCursor } from "./events";
 import { newId, sha256Hex } from "./ids";
 import { signPayload } from "./webhooks";
 import type { RequestContext, Result } from "./http";
@@ -209,15 +209,11 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
   ];
 
   if (peer.last_cursor) {
-    const cursor = await first<{ created_at: string; id: string }>(
-      ctx.app.db,
-      `SELECT created_at, id FROM events WHERE id = ? AND org_id = ?`,
-      [peer.last_cursor, principal.orgId],
-    );
-    if (cursor) {
-      conditions.push("(e.created_at > ? OR (e.created_at = ? AND e.id > ?))");
-      params.push(cursor.created_at, cursor.created_at, cursor.id);
-    }
+    const sequence = await resolveEventCursor(ctx.app.db, principal.orgId, peer.last_cursor);
+    if (sequence === undefined)
+      throw conflict("Federation cursor references an unknown event.");
+    conditions.push("eo.seq > ?");
+    params.push(sequence);
   }
 
   params.push(200);
@@ -230,9 +226,11 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
     payload: string;
     created_at: string;
   }>(
-    `SELECT e.id, e.kind, e.actor_id, e.resource_type, e.resource_id, e.payload, e.created_at
-       FROM events e WHERE ${conditions.join(" AND ")}
-       ORDER BY e.created_at ASC, e.id ASC LIMIT ?`,
+    `SELECT e.id, e.kind, e.actor_id, e.resource_type, e.resource_id, e.payload,
+            e.created_at
+       FROM event_order eo JOIN events e ON e.id = eo.event_id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY eo.seq LIMIT ?`,
     params,
   );
 
@@ -270,7 +268,12 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
     }
   }
 
-  return { data: { events, cursor: lastRow?.id ?? peer.last_cursor } };
+  return {
+    data: {
+      events,
+      cursor: lastRow?.id ?? peer.last_cursor,
+    },
+  };
 }
 
 /** POST /v1/federation/push — receive events from a remote peer. */

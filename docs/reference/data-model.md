@@ -2,7 +2,8 @@
 
 Status: logical target schema. Current migrations implement the canonical
 kernel, `index_outbox`, and delivery state; model-assisted `enrichment_jobs`,
-leases/fingerprints, and vector `submitted/ready` semantics remain proposed.
+their worker lease/fingerprint semantics, and vector `submitted/ready` states
+remain proposed. Collaboration leases described below are implemented.
 
 ## Authority and precedence
 
@@ -316,33 +317,39 @@ evidence, trust, visibility, or authorization.
 
 ## Execution and collaboration state
 
-### `checkpoints` and `checkpoint_versions`
+### `checkpoints`
 
-`checkpoints` stores the current head: owner, responsible principal, work key,
-scope, visibility, status, current version, TTL, last activity, and optional
-result observation IDs. The bounded state payload lives in append-only
-`checkpoint_versions` with actor and time.
+The implemented v0.2 table stores one bounded current head for each
+organization, subject, agent, and kind, with optional run ID, state hash, TTL,
+expiry, creation time, and update time. A unique scope index plus one SQL upsert
+prevents duplicate heads. There is no shipped `checkpoint_versions` table yet.
 
-Checkpoint updates use compare-and-swap on the expected version. Expired
-checkpoints are excluded from context by default but retained according to
-policy.
+An unexpired head is private to its agent unless a pending or accepted handoff
+references that exact checkpoint for its intended recipient. Expired heads are
+not readable through the API.
 
 ### `leases`
 
-Added in v0.2. Required fields: organization/scope, work key, holder, status,
-acquired/renewed/expiry times, idempotency key, and linked checkpoint.
+The implemented v0.2 table stores organization, resource type and ID, holder,
+purpose, TTL, expiry, creation time, and optional release time. A partial unique
+index permits at most one unreleased row per organization/resource pair;
+acquisition, expiry reclaim, and same-holder renewal are atomic.
 
-At most one unexpired active lease exists for a normalized work key in an
-authorized scope. Acquisition and renewal are atomic.
+Unreleased rows are listed through a bounded organization-scoped cursor. An
+active organization-level `owner` or `admin` membership may force-release a
+lease; no new administrator model is inferred from an API key label.
 
 ### `handoffs`
 
-Added in v0.2. Required fields: sender, intended recipient/team, checkpoint,
-expected next action, visible evidence references, status, version, and
-lifecycle timestamps.
+The implemented v0.2 table stores organization, sender, intended principal,
+subject, optional context/checkpoint references, optional message, status, and
+lifecycle timestamps. Context and checkpoint references use composite
+organization-safe foreign keys and API preflight also verifies ownership,
+subject, expiry, and sender/recipient visibility.
 
-Statuses: `offered`, `accepted`, `declined`, `completed`, and `cancelled`.
-Responsibility changes only on acceptance.
+Statuses are `pending`, `accepted`, `rejected`, and the reserved `expired`.
+`handoff_resolutions` supplies one unique fence per handoff so only one
+concurrent acceptance/rejection and its event can commit.
 
 ## Derived projections and reliability
 
@@ -456,8 +463,19 @@ does not mutate the source record.
 ### `idempotency_records`
 
 Maps organization, actor, operation, and idempotency key to a normalized request
-hash plus stable response reference. Reusing the key with another payload is a
-conflict, not a second mutation.
+hash plus stable response reference. The implemented primary scope is
+organization, principal, and key hash, so key rotation preserves a retry while
+another principal stays isolated. The credential `key_id` that first committed
+the record remains as audit metadata. Reusing the key with another route or
+payload is a conflict, not a second mutation.
+
+### `event_order`
+
+Public event IDs remain stable UUID-based replay keys. A local autoincrementing
+sequence is assigned by an insert trigger and drives event and federation
+paging. Pre-migration equal-timestamp events are backfilled deterministically by
+timestamp and ID; every event committed after migration follows database write
+order even when timestamps are identical.
 
 ### `schema_meta`
 

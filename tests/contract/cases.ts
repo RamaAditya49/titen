@@ -1492,6 +1492,16 @@ export const CASES: Case[] = [
       const removed = await fx.call("DELETE", `/v1/memberships/${added.body.data.membership_id}`, { key: owner.key });
       expectOk(removed);
       assert.ok(removed.body.data.removed_at);
+
+      expectError(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          workspace_id: "ws_missing",
+          principal_id: "agent_helper",
+          principal_kind: "agent",
+          role: "member",
+        },
+      }), 404);
     },
   },
   {
@@ -1527,6 +1537,85 @@ export const CASES: Case[] = [
         body: { resource_type: "subject", resource_id: "user_rama", purpose: "review", ttl_seconds: 300 },
       });
       expectOk(lease2, 201);
+    },
+  },
+  {
+    name: "lease introspection is bounded and only organization owners or admins force release",
+    async run(fx) {
+      const holder = await fx.provision({ scopes: ["*"] });
+      const admin = await fx.provision({ orgId: holder.orgId, scopes: ["*"] });
+      const member = await fx.provision({ orgId: holder.orgId, scopes: ["*"] });
+      const outsider = await fx.provision({ scopes: ["*"] });
+
+      for (const [agent, role] of [[admin, "admin"], [member, "member"]] as const) {
+        expectOk(await fx.call("POST", "/v1/memberships", {
+          key: holder.key,
+          body: {
+            principal_id: agent.principalId,
+            principal_kind: "agent",
+            role,
+          },
+        }), 201);
+      }
+
+      const lease = await fx.call("POST", "/v1/leases", {
+        key: holder.key,
+        body: {
+          resource_type: "subject",
+          resource_id: `recover-${Date.now()}`,
+          purpose: "recover crashed agent",
+          ttl_seconds: 600,
+        },
+      });
+      expectOk(lease, 201);
+
+      const listed = await fx.call("GET", "/v1/leases?limit=10", { key: admin.key });
+      expectOk(listed);
+      assert.ok(listed.body.data.leases.some((entry: any) => (
+        entry.lease_id === lease.body.data.lease_id && entry.holder_id === holder.principalId
+      )));
+      const foreign = await fx.call("GET", "/v1/leases?limit=200", { key: outsider.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.leases.length, 0);
+      expectError(await fx.call("GET", "/v1/leases?limit=201", { key: admin.key }), 400);
+      expectError(await fx.call("POST", `/v1/leases/${lease.body.data.lease_id}/force-release`, {
+        key: member.key,
+        body: {},
+      }), 404);
+
+      const forced = await fx.call("POST", `/v1/leases/${lease.body.data.lease_id}/force-release`, {
+        key: admin.key,
+        body: {},
+      });
+      expectOk(forced);
+      assert.equal(forced.body.data.forced, true);
+
+      await fx.query(
+        `WITH RECURSIVE n(value) AS (
+           VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 205
+         )
+         INSERT INTO leases
+           (id, org_id, resource_type, resource_id, holder_id, purpose,
+            ttl_seconds, expires_at, created_at)
+         SELECT 'lease_inventory_' || printf('%03d', value), ?, 'subject',
+                'inventory_' || printf('%03d', value), ?, 'inventory', 600,
+                '2099-01-01T00:00:00.000Z',
+                '2026-07-31T00:00:00.' || printf('%03d', value) || 'Z'
+           FROM n`,
+        [holder.orgId, holder.principalId],
+      );
+      const bounded = await fx.call("GET", "/v1/leases?limit=200", { key: admin.key });
+      expectOk(bounded);
+      assert.equal(bounded.body.data.leases.length, 200);
+      assert.ok(bounded.body.data.cursor);
+      const tail = await fx.call(
+        "GET",
+        `/v1/leases?limit=200&after=${bounded.body.data.cursor}`,
+        { key: admin.key },
+      );
+      expectOk(tail);
+      assert.equal(tail.body.data.leases.length, 5);
+      assert.equal(tail.body.data.cursor, null);
     },
   },
   {
@@ -1568,6 +1657,179 @@ export const CASES: Case[] = [
       });
       expectOk(resolved);
       assert.equal(resolved.body.data.status, "accepted");
+    },
+  },
+  {
+    name: "handoffs delegate only validated checkpoint and authorized context references",
+    async run(fx) {
+      const sender = await fx.provision({ scopes: ["*"] });
+      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const sibling = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const foreign = await fx.provision({ scopes: ["*"] });
+      const subjectId = `handoff-scope-${Date.now()}`;
+
+      expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: { to_principal: "agent_missing", subject_id: subjectId },
+      }), 404);
+
+      const privateSubject = `${subjectId}-private`;
+      await seedClaim(fx, sender.key, {
+        observation: {
+          subject_id: privateSubject,
+          content: "Private handoff marker must remain sender-only.",
+        },
+        claim: { statement: "Private handoff marker remains sender-only." },
+      });
+      const privateContext = await fx.call("POST", "/v1/context/compile", {
+        key: sender.key,
+        body: { subject_id: privateSubject, task: "private handoff marker", max_tokens: 600 },
+      });
+      expectOk(privateContext);
+      assert.equal(privateContext.body.data.items.length, 1);
+      expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: {
+          to_principal: receiver.principalId,
+          subject_id: privateSubject,
+          context_id: privateContext.body.data.context_id,
+        },
+      }), 404);
+
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: sender.key,
+        body: { name: `handoff-team-${Date.now()}` },
+      });
+      expectOk(workspace, 201);
+      const workspaceId = workspace.body.data.workspace_id as string;
+      const memberships: Record<string, string> = {};
+      for (const agent of [sender, receiver]) {
+        const membership = await fx.call("POST", "/v1/memberships", {
+          key: sender.key,
+          body: {
+            workspace_id: workspaceId,
+            principal_id: agent.principalId,
+            principal_kind: "agent",
+            role: "member",
+          },
+        });
+        expectOk(membership, 201);
+        memberships[agent.principalId] = membership.body.data.membership_id;
+      }
+
+      const observed = await fx.call("POST", "/v1/observations", {
+        key: sender.key,
+        body: observation({
+          subject_id: subjectId,
+          workspace_id: workspaceId,
+          visibility: "team",
+          content: "The handed deployment context is visible to this workspace.",
+        }),
+      });
+      expectOk(observed, 201);
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: sender.key,
+        body: {
+          subject_id: subjectId,
+          workspace_id: workspaceId,
+          claims: [claim(observed.body.data.observation_id, {
+            visibility: "team",
+            statement: "The receiver may resume the handed deployment context.",
+          })],
+        },
+      });
+      expectOk(consolidated, 201);
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: sender.key,
+        body: { subject_id: subjectId, task: "resume handed deployment context", max_tokens: 900 },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.data.items.length, 1);
+
+      const checkpoint = await fx.call("POST", "/v1/checkpoints", {
+        key: sender.key,
+        body: {
+          subject_id: subjectId,
+          kind: "task_state",
+          state: { step: "verify" },
+          ttl_seconds: 600,
+        },
+      });
+      expectOk(checkpoint, 201);
+
+      for (const invalid of [
+        { context_id: "ctx_missing" },
+        { checkpoint_id: "ckpt_missing" },
+        { context_id: compiled.body.data.context_id, subject_id: "wrong-subject" },
+        { checkpoint_id: checkpoint.body.data.checkpoint_id, subject_id: "wrong-subject" },
+      ]) expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: { to_principal: receiver.principalId, subject_id: subjectId, ...invalid },
+      }), 404);
+
+      expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: {
+          to_principal: receiver.principalId,
+          subject_id: subjectId,
+          context_id: (await fx.call("POST", "/v1/context/compile", {
+            key: foreign.key,
+            body: { subject_id: subjectId, task: "foreign empty context", max_tokens: 256 },
+          })).body.data.context_id,
+        },
+      }), 404);
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: {
+          to_principal: receiver.principalId,
+          subject_id: subjectId,
+          context_id: compiled.body.data.context_id,
+          checkpoint_id: checkpoint.body.data.checkpoint_id,
+          message: "Resume from the exact stored state.",
+        },
+      });
+      expectOk(handoff, 201);
+
+      const handedCheckpoint = await fx.call(
+        "GET",
+        `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`,
+        { key: receiver.key },
+      );
+      expectOk(handedCheckpoint);
+      assert.deepEqual(handedCheckpoint.body.data.state, { step: "verify" });
+      const handedContext = await fx.call(
+        "GET",
+        `/v1/context/${compiled.body.data.context_id}`,
+        { key: receiver.key },
+      );
+      expectOk(handedContext);
+      assert.equal(handedContext.body.meta.delegated, true);
+      assert.equal(handedContext.body.data.items[0].claim_id, consolidated.body.data.claims[0].claim_id);
+      expectError(await fx.call("GET", `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`, {
+        key: sibling.key,
+      }), 404);
+      expectError(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
+        key: sibling.key,
+      }), 404);
+
+      expectOk(await fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
+        key: receiver.key,
+        body: { status: "accepted" },
+      }));
+      expectOk(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
+        key: receiver.key,
+      }));
+
+      expectOk(await fx.call("DELETE", `/v1/memberships/${memberships[receiver.principalId]}`, {
+        key: sender.key,
+      }));
+      expectError(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
+        key: receiver.key,
+      }), 404);
+      expectOk(await fx.call("GET", `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`, {
+        key: receiver.key,
+      }));
     },
   },
   // --- v0.2: MCP and Events ---
@@ -1908,6 +2170,79 @@ export const CASES: Case[] = [
       expectOk(single);
       assert.equal(single.body.data.id, cursor);
       expectError(await fx.call("GET", `/v1/events/${cursor}`, { key: intruder.key }), 404);
+    },
+  },
+  {
+    name: "same-timestamp event and federation pages follow database sequence without skips",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const timestamp = "2026-07-31T12:00:00.000Z";
+      for (const id of ["evt_same_z", "evt_same_a", "evt_same_m"])
+        await fx.query(
+          `INSERT INTO events
+             (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+           VALUES (?, ?, 'same.timestamp', ?, 'probe', ?, '{}', ?)`,
+          [id, owner.orgId, owner.principalId, id, timestamp],
+        );
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 3; page += 1) {
+        const result = await fx.call(
+          "GET",
+          `/v1/events?limit=1${cursor ? `&after=${cursor}` : ""}`,
+          { key: owner.key },
+        );
+        expectOk(result);
+        assert.equal(result.body.data.events.length, 1);
+        seen.push(result.body.data.events[0].id);
+        cursor = result.body.data.cursor;
+      }
+      assert.deepEqual(seen, ["evt_same_z", "evt_same_a", "evt_same_m"]);
+      const legacy = await fx.call("GET", "/v1/events?after=evt_same_z&limit=1", {
+        key: owner.key,
+      });
+      expectOk(legacy);
+      assert.equal(legacy.body.data.events[0].id, "evt_same_a");
+
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: `same-ms-${Date.now()}`,
+          endpoint: `https://same-ms-${Date.now()}.example.test`,
+          shared_secret: "same-millisecond-secret",
+          direction: "pull",
+        },
+      });
+      expectOk(peer, 201);
+      await fx.query(
+        `WITH RECURSIVE n(value) AS (
+           VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 205
+         )
+         INSERT INTO events
+           (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+         SELECT 'evt_federation_' || printf('%03d', 206 - value), ?,
+                'same.timestamp', ?, 'probe',
+                'evt_federation_' || printf('%03d', 206 - value), '{}', ?
+           FROM n`,
+        [owner.orgId, owner.principalId, timestamp],
+      );
+      const first = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peer.body.data.peer_id },
+      });
+      expectOk(first);
+      assert.equal(first.body.data.events.length, 200);
+      const second = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peer.body.data.peer_id },
+      });
+      expectOk(second);
+      assert.equal(second.body.data.events.length, 8);
+      const all = [...first.body.data.events, ...second.body.data.events];
+      assert.equal(new Set(all.map((event: any) => event.id)).size, 208);
+      assert.deepEqual(all.slice(0, 3).map((event: any) => event.id), seen);
+      assert.equal(all.at(-1).id, "evt_federation_001");
     },
   },
   {
@@ -2713,25 +3048,93 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "idempotency binds credential and full request identity",
+    name: "concurrent checkpoint saves retain one head and handoff resolution has one winner",
+    async run(fx) {
+      const sender = await fx.provision({ scopes: ["*"] });
+      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const subjectId = `integrity-race-${Date.now()}`;
+      const saves = await Promise.all(Array.from({ length: 12 }, (_, index) =>
+        fx.call("POST", "/v1/checkpoints", {
+          key: sender.key,
+          body: {
+            subject_id: subjectId,
+            kind: "task_state",
+            state: { complete_submission: index },
+            ttl_seconds: 600,
+          },
+        })));
+      assert.equal(saves.filter((result) => result.status === 201).length, 1);
+      assert.equal(saves.filter((result) => result.status === 200).length, 11);
+      assert.equal(new Set(saves.map((result) => result.body.data.checkpoint_id)).size, 1);
+      const heads = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM checkpoints
+          WHERE org_id = ? AND subject_id = ? AND agent_id = ? AND kind = 'task_state'`,
+        [sender.orgId, subjectId, sender.principalId],
+      );
+      assert.equal(Number(heads[0]!.count), 1);
+      const current = await fx.call("GET", `/v1/checkpoints?subject_id=${subjectId}&kind=task_state`, {
+        key: sender.key,
+      });
+      expectOk(current);
+      assert.ok(Number.isInteger(current.body.data.state.complete_submission));
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: { to_principal: receiver.principalId, subject_id: subjectId },
+      });
+      expectOk(handoff, 201);
+      const resolutions = await Promise.all(Array.from({ length: 12 }, (_, index) =>
+        fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
+          key: receiver.key,
+          body: { status: index % 2 === 0 ? "accepted" : "rejected" },
+        })));
+      assert.equal(resolutions.filter((result) => result.status === 200).length, 1);
+      assert.ok(resolutions.every((result) => [200, 404, 409].includes(result.status)));
+      const durable = await fx.query<{ resolutions: number; events: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM handoff_resolutions WHERE handoff_id = ?) AS resolutions,
+           (SELECT COUNT(*) FROM events
+             WHERE resource_type = 'handoff' AND resource_id = ?
+               AND kind IN ('handoff.accepted', 'handoff.rejected')) AS events`,
+        [handoff.body.data.handoff_id, handoff.body.data.handoff_id],
+      );
+      assert.deepEqual(durable[0], { resolutions: 1, events: 1 });
+    },
+  },
+  {
+    name: "idempotency survives key rotation while separating principals and request identity",
     async run(fx) {
       const firstAgent = await fx.provision({ scopes: ["*"] });
+      const rotatedAgent = await fx.provision({
+        orgId: firstAgent.orgId,
+        principalId: firstAgent.principalId,
+        scopes: ["*"],
+      });
       const secondAgent = await fx.provision({ orgId: firstAgent.orgId, scopes: ["*"] });
       const key = "shared-client-key";
       const firstBody = observation({ subject_id: "idem-owner", content: "canonical replay body" });
       const first = await fx.call("POST", "/v1/observations", { key: firstAgent.key, headers: { "idempotency-key": key }, body: firstBody });
       expectOk(first, 201);
+      await fx.revoke(firstAgent.keyId);
       const canonicalReplay = await fx.call("POST", "/v1/observations", {
-        key: firstAgent.key,
+        key: rotatedAgent.key,
         headers: { "idempotency-key": key },
         body: { trust: firstBody.trust, source: firstBody.source, content: firstBody.content, kind: firstBody.kind, subject_id: firstBody.subject_id },
       });
       expectOk(canonicalReplay);
       assert.equal(canonicalReplay.body.meta.replayed, true);
+      assert.equal(canonicalReplay.body.data.observation_id, first.body.data.observation_id);
+      const audit = await fx.query<{ key_id: string; principal_id: string }>(
+        `SELECT key_id, principal_id FROM idempotency_v3
+          WHERE org_id = ? AND principal_id = ?`,
+        [firstAgent.orgId, firstAgent.principalId],
+      );
+      assert.deepEqual(audit, [{ key_id: firstAgent.keyId, principal_id: firstAgent.principalId }]);
       const otherCredential = await fx.call("POST", "/v1/observations", { key: secondAgent.key, headers: { "idempotency-key": key }, body: firstBody });
       expectOk(otherCredential, 201);
+      assert.notEqual(otherCredential.body.data.observation_id, first.body.data.observation_id);
       const crossRoute = await fx.call("POST", "/v1/consolidations", {
-        key: firstAgent.key,
+        key: rotatedAgent.key,
         headers: { "idempotency-key": key },
         body: { subject_id: "idem-owner", claims: [claim(first.body.data.observation_id)] },
       });

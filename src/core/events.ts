@@ -8,6 +8,22 @@ import type { RequestContext, Result } from "./http";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
+/** Resolve the stable event-ID cursor to its database-assigned order. */
+export async function resolveEventCursor(
+  db: Db,
+  orgId: string,
+  cursor: string,
+): Promise<number | undefined> {
+  const found = await first<{ seq: number }>(
+    db,
+    `SELECT eo.seq FROM event_order eo
+      JOIN events e ON e.id = eo.event_id
+     WHERE e.id = ? AND e.org_id = ?`,
+    [cursor, orgId],
+  );
+  return found ? Number(found.seq) : undefined;
+}
+
 /** Visibility for event projections follows the canonical resource, not org alone. */
 export function eventAccessSql(alias = "e", principalSql = "?"): string {
   return `(
@@ -103,27 +119,25 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
     limit = Math.min(parsed, MAX_LIMIT);
   }
 
-  // When a cursor is provided, resolve its created_at to paginate correctly.
-  let afterCreatedAt: string | null = null;
-  let afterId: string | null = null;
+  let afterSequence: number | null = null;
   if (after) {
-    const cursor = await first<{ created_at: string; id: string }>(
+    const cursor = await first<{ seq: number }>(
       ctx.app.db,
-      `SELECT e.created_at, e.id FROM events e
-        WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
+      `SELECT eo.seq FROM event_order eo
+        JOIN events e ON e.id = eo.event_id
+       WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
       [after, principal.orgId, ...eventAccessParams(principal.principalId)],
     );
     if (!cursor) throw validationError('Query "after" references an unknown event.');
-    afterCreatedAt = cursor.created_at;
-    afterId = cursor.id;
+    afterSequence = Number(cursor.seq);
   }
 
   const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
   const params: (string | number)[] = [principal.orgId, ...eventAccessParams(principal.principalId)];
 
-  if (afterCreatedAt && afterId) {
-    conditions.push("(created_at > ? OR (created_at = ? AND id > ?))");
-    params.push(afterCreatedAt, afterCreatedAt, afterId);
+  if (afterSequence !== null) {
+    conditions.push("eo.seq > ?");
+    params.push(afterSequence);
   }
 
   if (kindFilter) {
@@ -133,10 +147,11 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
 
   params.push(limit);
 
-  const sql = `SELECT id, kind, actor_id, resource_type, resource_id, payload, created_at
-    FROM events e
+  const sql = `SELECT e.id, e.kind, e.actor_id, e.resource_type, e.resource_id,
+      e.payload, e.created_at
+    FROM event_order eo JOIN events e ON e.id = eo.event_id
     WHERE ${conditions.join(" AND ")}
-    ORDER BY created_at ASC, id ASC
+    ORDER BY eo.seq
     LIMIT ?`;
 
   const rows = await ctx.app.db.all<{
@@ -159,6 +174,8 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
     created_at: r.created_at,
   }));
 
+  // Keep the public cursor equal to the event ID for existing clients. The ID
+  // now resolves to event_order.seq; it no longer supplies the ordering.
   const cursor = events.length > 0 ? events[events.length - 1]!.id : null;
 
   return { data: { events, cursor } };

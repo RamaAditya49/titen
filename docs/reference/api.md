@@ -18,7 +18,9 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/audit`
 - `GET /v1/audit/export`
 - `GET /v1/checkpoints`
+- `GET /v1/checkpoints/:id`
 - `GET /v1/claims/:id/evidence`
+- `GET /v1/context/:id`
 - `GET /v1/events`
 - `GET /v1/events/:id`
 - `GET /v1/export`
@@ -27,6 +29,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/federation/peers/:id/filters`
 - `GET /v1/handoffs`
 - `GET /v1/keys`
+- `GET /v1/leases`
 - `GET /v1/memberships`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
@@ -50,6 +53,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/index/drain`
 - `POST /v1/keys`
 - `POST /v1/leases`
+- `POST /v1/leases/:id/force-release`
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
@@ -104,8 +108,11 @@ terminal `failed` after five attempts. The drain response includes
 - JSON requests use `application/json`.
 - External field names use `snake_case`.
 - Requests may include `Idempotency-Key` on mutations.
-- An idempotency key is bound to its credential plus canonical method, concrete
-  path, normalized query, and JSON body; reuse for a different request is `409`.
+- An idempotency key is bound to the acting principal plus canonical method,
+  concrete path, normalized query, and JSON body. Rotation to another key for
+  the same principal replays the original response; the originating `key_id`
+  remains stored for audit. Reuse for a different request is `409`, and another
+  principal has an independent key space.
 - Tenant/organization authority never comes from a request body.
 - JSON bodies may nest at most 64 object/array levels. Free text rejects unsafe
   terminal and bidirectional controls while retaining tab and line feed.
@@ -353,27 +360,56 @@ These ship after the Level 5 kernel gate.
 
 ### `POST /v1/checkpoints`
 
-Create or version resumable task state with explicit TTL.
+Create or replace resumable task state with explicit TTL. One current head is
+stored for each organization, subject, agent, and kind; concurrent saves use a
+single database upsert and cannot create duplicate heads.
+
+`GET /v1/checkpoints` reads the caller's current head by subject, agent, and
+kind. `GET /v1/checkpoints/:id` also lets the intended recipient read the exact
+unexpired checkpoint referenced by a pending or accepted handoff. Other
+same-organization principals receive the same `404` as a missing record.
 
 ### `POST /v1/leases`
 
-Acquire or renew an idempotent, expiring claim to a bounded work item.
+Acquire or renew an expiring claim to a bounded work item. `GET /v1/leases`
+requires `leases:read`, returns only unreleased leases in the authenticated
+organization, accepts `limit` from 1 through 200 plus an opaque `after` cursor,
+and labels rows `active` or `expired` without exposing another organization.
+
+`POST /v1/leases/:id/force-release` requires `leases:write` plus an active
+organization-level membership with role `owner` or `admin`. Workspace roles and
+ordinary members cannot force-release an organization-scoped lease.
 
 ### `POST /v1/handoffs`
 
-Offer, accept, decline, or complete a handoff referencing a checkpoint and
-evidence.
+Create a pending handoff to a known active principal. A supplied context must
+match the organization and subject, and every item must be currently visible to
+both sender and recipient. A supplied checkpoint must be an unexpired
+sender-owned checkpoint for the same subject. Missing, foreign,
+cross-organization, inaccessible, and mismatched references return `404` before
+the foreign-key write.
+
+`POST /v1/handoffs/:id/resolve` accepts `accepted` or `rejected` from the exact
+recipient. A database fence commits only one terminal resolution and event
+under concurrent calls.
+
+`GET /v1/context/:id` requires `handoffs:read`. It returns an actor-owned run or
+the exact run delegated to the intended recipient by a pending or accepted
+handoff. Every context item is re-authorized at read time; if any item is no
+longer visible, the whole pack fails closed with `404`.
 
 ### `GET /v1/handoffs`
 
-List authorized handoffs by status, recipient/team, project, and cursor. This is
-the default pull path for ephemeral agents that cannot receive webhooks.
+List pending handoffs addressed to the authenticated principal. This is the
+default pull path for ephemeral agents that cannot receive webhooks.
 
 ### `GET /v1/events`
 
 Return authorized metadata-only domain events after an opaque cursor. It lets an
 orchestrator poll when inbound webhooks are unavailable; it is not a transcript
-or raw memory feed.
+or raw memory feed. Public cursors remain stable event IDs; the database maps
+them to a monotonic local sequence, so equal-timestamp pages and federation
+pulls do not order by random UUIDs or skip committed events.
 
 ### Federation routes
 

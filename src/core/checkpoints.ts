@@ -44,71 +44,55 @@ export async function saveCheckpoint(ctx: RequestContext): Promise<Result> {
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
   const stateHash = await sha256Hex(serialized);
 
-  // Upsert: same org+subject+agent+kind replaces the previous checkpoint.
-  const existing = await first<{ id: string }>(
-    ctx.app.db,
-    `SELECT id FROM checkpoints
-       WHERE org_id = ? AND subject_id = ? AND agent_id = ? AND kind = ?`,
-    [principal.orgId, subjectId, agentId, kind],
-  );
-
-  if (existing) {
-    await ctx.app.db.batch([{
-      sql: `UPDATE checkpoints
-              SET state = ?, state_hash = ?, run_id = ?, ttl_seconds = ?,
-                  expires_at = ?, updated_at = ?
-            WHERE id = ? AND org_id = ? AND agent_id = ?`,
-      params: [serialized, stateHash, runId, ttlSeconds, expiresAt, at, existing.id, principal.orgId, principal.principalId],
-    }]);
-    return {
-      data: {
-        checkpoint_id: existing.id,
-        subject_id: subjectId,
-        agent_id: agentId,
-        kind,
-        state_hash: stateHash,
-        expires_at: expiresAt,
-        updated: true,
-      },
-    };
-  }
-
   const id = newId("ckpt");
-  await ctx.app.db.batch([{
-    sql: `INSERT INTO checkpoints
-            (id, org_id, subject_id, agent_id, run_id, kind, state, state_hash,
-             ttl_seconds, expires_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [
+  const saved = await first<{ id: string; created: number }>(
+    ctx.app.db,
+    `INSERT INTO checkpoints
+       (id, org_id, subject_id, agent_id, run_id, kind, state, state_hash,
+        ttl_seconds, expires_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(org_id, subject_id, agent_id, kind) DO UPDATE SET
+       state = excluded.state,
+       state_hash = excluded.state_hash,
+       run_id = excluded.run_id,
+       ttl_seconds = excluded.ttl_seconds,
+       expires_at = excluded.expires_at,
+       updated_at = excluded.updated_at
+     RETURNING id, id = ? AS created`,
+    [
       id, principal.orgId, subjectId, agentId, runId, kind,
-      serialized, stateHash, ttlSeconds, expiresAt, at, at,
+      serialized, stateHash, ttlSeconds, expiresAt, at, at, id,
     ],
-  }]);
+  );
+  if (!saved) throw new Error("Checkpoint upsert returned no row.");
+  const created = Number(saved.created) === 1;
 
   return {
-    status: 201,
+    status: created ? 201 : 200,
     data: {
-      checkpoint_id: id,
+      checkpoint_id: saved.id,
       subject_id: subjectId,
       agent_id: agentId,
       kind,
       state_hash: stateHash,
       expires_at: expiresAt,
-      updated: false,
+      updated: !created,
     },
   };
 }
 
 export async function getCheckpoint(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
+  const now = ctx.app.now().toISOString();
+  const checkpointId = ctx.params.id;
   const subjectId = ctx.url.searchParams.get("subject_id");
   const agentId = ctx.url.searchParams.get("agent_id") ?? principal.principalId;
   const kind = ctx.url.searchParams.get("kind");
-  if (!subjectId) throw validationError('Query "subject_id" is required.');
-  if (!kind) throw validationError('Query "kind" is required.');
-  if (agentId !== principal.principalId) throw notFound();
+  if (!checkpointId && !subjectId)
+    throw validationError('Query "subject_id" is required.');
+  if (!checkpointId && !kind)
+    throw validationError('Query "kind" is required.');
 
-  const now = ctx.app.now().toISOString();
   const row = await first<{
     id: string; subject_id: string; agent_id: string; run_id: string | null;
     kind: string; state: string; state_hash: string; ttl_seconds: number;
@@ -118,11 +102,34 @@ export async function getCheckpoint(ctx: RequestContext): Promise<Result> {
     `SELECT id, subject_id, agent_id, run_id, kind, state, state_hash,
             ttl_seconds, expires_at, created_at, updated_at
        FROM checkpoints
-      WHERE org_id = ? AND subject_id = ? AND agent_id = ? AND kind = ?
+      WHERE org_id = ?
+        AND (? IS NULL OR id = ?)
+        AND (? IS NOT NULL OR (subject_id = ? AND agent_id = ? AND kind = ?))
         AND expires_at > ?`,
-    [principal.orgId, subjectId, agentId, kind, now],
+    [
+      principal.orgId,
+      checkpointId ?? null,
+      checkpointId ?? null,
+      checkpointId ?? null,
+      subjectId,
+      agentId,
+      kind,
+      now,
+    ],
   );
   if (!row) throw notFound();
+
+  if (row.agent_id !== principal.principalId) {
+    const delegated = await first<{ present: number }>(
+      ctx.app.db,
+      `SELECT 1 AS present FROM handoffs
+        WHERE org_id = ? AND to_principal = ? AND checkpoint_id = ?
+          AND status IN ('pending', 'accepted')
+        LIMIT 1`,
+      [principal.orgId, principal.principalId, row.id],
+    );
+    if (!delegated) throw notFound();
+  }
 
   return {
     data: {
