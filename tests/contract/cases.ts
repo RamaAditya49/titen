@@ -1690,7 +1690,8 @@ export const CASES: Case[] = [
   {
     name: "a checkpoint saves, retrieves, updates, and deletes resumable state",
     async run(fx) {
-      const agent = await fx.provision();
+      const agent = await fx.provision({ scopes: ["*"] });
+      const recipient = await fx.provision({ orgId: agent.orgId, scopes: ["*"] });
 
       // Save
       const saved = await fx.call("POST", "/v1/checkpoints", {
@@ -1728,6 +1729,16 @@ export const CASES: Case[] = [
       assert.equal(updated.body.data.checkpoint_id, saved.body.data.checkpoint_id);
       assert.equal(updated.body.data.updated, true);
 
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: agent.key,
+        body: {
+          to_principal: recipient.principalId,
+          subject_id: "user_rama",
+          checkpoint_id: saved.body.data.checkpoint_id,
+        },
+      });
+      expectOk(handoff, 201);
+
       // Delete
       const deleted = await fx.call("DELETE", `/v1/checkpoints/${saved.body.data.checkpoint_id}`, {
         key: agent.key,
@@ -1742,6 +1753,9 @@ export const CASES: Case[] = [
         }),
         404,
       );
+      const received = await fx.call("GET", "/v1/handoffs", { key: recipient.key });
+      expectOk(received);
+      assert.equal(received.body.data.handoffs[0].checkpoint_id, null);
     },
   },
   {

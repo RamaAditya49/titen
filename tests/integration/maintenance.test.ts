@@ -244,6 +244,13 @@ test("maintenance deletes only one bounded page of expired execution state", asy
   }
   statements.push(
     {
+      sql: `INSERT INTO handoffs
+              (id, org_id, from_principal, to_principal, subject_id, checkpoint_id, status, created_at)
+            VALUES ('handoff_expired_checkpoint', ?, ?, 'recipient', 'cleanup-subject-0',
+                    'ckpt_expired_0', 'accepted', ?)`,
+      params: [actor.orgId, actor.principalId, expired[0]!],
+    },
+    {
       sql: `INSERT INTO idempotency_v3
               (org_id, principal_id, key_id, request_identity, key_hash, request_hash, status, response, created_at, expires_at)
             VALUES (?, ?, ?, 'POST /active', 'active-key', 'active-request', 201, '{}', ?, ?)`,
@@ -331,5 +338,8 @@ test("maintenance deletes only one bounded page of expired execution state", asy
       history: 1,
     },
   );
+  assert.deepEqual(await isolated.all(
+    `SELECT checkpoint_id FROM handoffs WHERE id = 'handoff_expired_checkpoint'`,
+  ), [{ checkpoint_id: null }]);
   handle.close();
 });

@@ -269,6 +269,14 @@ async function sweepEphemeral(db: Db, now: Date, limit: number): Promise<void> {
       params: [at, limit],
     },
     {
+      sql: `UPDATE handoffs SET checkpoint_id = NULL
+             WHERE checkpoint_id IN (
+               SELECT id FROM checkpoints WHERE expires_at <= ?
+                ORDER BY expires_at, id LIMIT ?
+             )`,
+      params: [at, limit],
+    },
+    {
       sql: `DELETE FROM checkpoints WHERE id IN (
               SELECT id FROM checkpoints WHERE expires_at <= ?
                ORDER BY expires_at, id LIMIT ?

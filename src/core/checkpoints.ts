@@ -159,10 +159,17 @@ export async function deleteCheckpoint(ctx: RequestContext): Promise<Result> {
   );
   if (!row) throw notFound();
 
-  await ctx.app.db.batch([{
-    sql: `DELETE FROM checkpoints WHERE id = ? AND org_id = ? AND agent_id = ?`,
-    params: [checkpointId, principal.orgId, principal.principalId],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE handoffs SET checkpoint_id = NULL
+             WHERE org_id = ? AND checkpoint_id = ?`,
+      params: [principal.orgId, checkpointId],
+    },
+    {
+      sql: `DELETE FROM checkpoints WHERE id = ? AND org_id = ? AND agent_id = ?`,
+      params: [checkpointId, principal.orgId, principal.principalId],
+    },
+  ]);
 
   return { data: { checkpoint_id: checkpointId, deleted: true } };
 }
