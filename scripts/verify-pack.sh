@@ -101,9 +101,11 @@ tool_names="$(printf '%s' "$tools" | node --input-type=module -e '
 expected_tools='titen_checkpoint_get
 titen_checkpoint_save
 titen_compile
+titen_consolidate
 titen_feedback
 titen_handoff
 titen_lease_acquire
+titen_project_resolve
 titen_remember'
 [ "$tool_names" = "$expected_tools" ] \
   || { echo "FAIL: installed MCP tool list differs" >&2; exit 1; }
@@ -118,7 +120,8 @@ node --input-type=module -e '
   if (typeof TitenClient !== "function" || typeof sub.TitenClient !== "function")
     throw new Error("SDK did not export TitenClient");
   if (typeof TitenClient.prototype.request !== "function" ||
-      typeof TitenClient.prototype.requestRaw !== "function")
+      typeof TitenClient.prototype.requestRaw !== "function" ||
+      typeof TitenClient.prototype.requestWithMeta !== "function")
     throw new Error("SDK did not ship generic JSON/raw access");
   // An "exports" map hides every subpath it does not list, including this one.
   // Bundlers and tooling read it, so the omission only surfaces downstream.

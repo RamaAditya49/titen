@@ -266,7 +266,7 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Requests MUST have bounded depth, nodes, edges, labels, execution time, and
   response bytes, with explicit truncation or degraded metadata.
 - The view compiler MUST use the same authenticated REST contract on
-  Cloudflare and VPS, remain outside the six ordinary-agent MCP tools, and add
+  Cloudflare and VPS, remain outside the ordinary-agent MCP tool profile, and add
   no graph-database or renderer dependency to the core.
 
 ### FR-12 — progressive dashboard information architecture

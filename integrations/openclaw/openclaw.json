@@ -12,6 +12,8 @@
           "include": [
             "titen_compile",
             "titen_remember",
+            "titen_consolidate",
+            "titen_project_resolve",
             "titen_feedback",
             "titen_checkpoint_save",
             "titen_checkpoint_get",

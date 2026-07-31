@@ -13,7 +13,7 @@ owner: CADIS
 
 ## Problem
 
-Titen's existing Codex plugin proves the portable Agent Skill and seven-tool
+Titen's existing Codex plugin proves the portable Agent Skill and original seven-tool
 MCP contract, but users of Claude Code, ZCode, Cursor, OpenClaw, Hermes, Pi,
 OpenCode, Windsurf, and TRAE still have to reconstruct host-specific packaging
 or configuration. ClawHub authentication is available to the maintainer, but no
@@ -27,7 +27,8 @@ artifacts the same thing would create false compatibility claims.
 ## In scope
 
 - Keep the existing authenticated Titen `/mcp` endpoint as the only memory tool
-  implementation and the existing seven ordinary-agent tools as the contract.
+  implementation and expose nine ordinary-agent tools, adding only project
+  resolution and explicit consolidation through existing domain handlers.
 - Add a Claude marketplace bundle that is also installable by ZCode and
   OpenClaw and publish that bundle to ClawHub. Exclude the Claude-only remote
   MCP declaration from the ClawHub artifact and ship OpenClaw's native remote
@@ -81,7 +82,7 @@ artifacts the same thing would create false compatibility claims.
 ## Acceptance criteria
 
 - **AC-CHD-001 — Ubiquitous:** Titen shall keep one authenticated `/mcp`
-  implementation and seven ordinary-agent tools; no distribution artifact shall
+  implementation and nine ordinary-agent tools; no distribution artifact shall
   add a server, proxy, database, model client, or memory policy implementation.
 - **AC-CHD-002 — Event-driven:** When Claude Code or ZCode loads the Titen
   Claude marketplace bundle, the host shall discover one `titen-memory` skill

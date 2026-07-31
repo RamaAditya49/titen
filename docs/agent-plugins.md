@@ -29,10 +29,10 @@ agent its own narrow, revocable key. Never paste a key into a repository file.
 | Windsurf | Native MCP config + model-decision rule | `integrations/windsurf` |
 | TRAE | Native MCP UI recipe + Agent Skill | `.agents/skills/titen-memory` |
 
-The plugin names differ, but all hosts receive the same seven server tools:
-`titen_compile`, `titen_remember`, `titen_feedback`,
-`titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`, and
-`titen_handoff`.
+The plugin names differ, but current repository artifacts target the same nine
+server tools: `titen_project_resolve`, `titen_compile`, `titen_remember`,
+`titen_consolidate`, `titen_feedback`, `titen_checkpoint_save`,
+`titen_checkpoint_get`, `titen_lease_acquire`, and `titen_handoff`.
 
 ## Codex
 
@@ -82,6 +82,10 @@ from ClawHub:
 clawhub install titen-memory
 clawhub skill verify titen-memory
 ```
+
+The public `titen-memory@0.1.0` skill remains the verified earlier seven-tool
+snapshot. Do not claim the current nine-tool skill is published until a new
+ClawHub package passes the external inspector.
 
 Merge only the `mcp.servers.titen` entry from
 `integrations/openclaw/openclaw.json` into the OpenClaw config, then run:
@@ -139,8 +143,10 @@ mcp_servers:
       Authorization: "Bearer ${TITEN_API_KEY}"
     tools:
       include:
+        - titen_project_resolve
         - titen_compile
         - titen_remember
+        - titen_consolidate
         - titen_feedback
         - titen_checkpoint_save
         - titen_checkpoint_get
@@ -188,7 +194,7 @@ Merge the `titen` entry from `integrations/windsurf/mcp_config.json` into
 `~/.codeium/windsurf/mcp_config.json`, then copy
 `integrations/windsurf/titen-memory.md` to
 `.windsurf/rules/titen-memory.md` in the target workspace. Restart Cascade and
-verify that the seven tools appear. Windsurf expands `${env:NAME}` in remote MCP
+verify that the nine tools appear. Windsurf expands `${env:NAME}` in remote MCP
 URLs and headers; see [Cascade MCP](https://docs.windsurf.com/windsurf/cascade/mcp)
 and [Rules](https://docs.windsurf.com/windsurf/cascade/memories).
 

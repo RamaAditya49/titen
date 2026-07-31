@@ -130,12 +130,15 @@ test("ping answers, and the full handshake completes in order", async () => {
 
   const tools = await rpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
   assert.ok(Array.isArray(tools.body.result.tools), "tools must be an array");
-  assert.ok(tools.body.result.tools.length >= 7, "every tool must be advertised");
+  assert.equal(tools.body.result.tools.length, 9, "every ordinary-agent tool must be advertised");
   for (const tool of tools.body.result.tools) {
     assert.ok(typeof tool.name === "string" && tool.name.length > 0);
     assert.ok(typeof tool.description === "string" && tool.description.length > 0);
     assert.equal(tool.inputSchema.type, "object", "each tool needs an object schema");
+    assert.equal(tool.inputSchema.additionalProperties, false);
     assert.ok(Array.isArray(tool.inputSchema.required));
+    for (const property of Object.values(tool.inputSchema.properties) as Array<Record<string, unknown>>)
+      assert.equal(typeof property.description, "string", `${tool.name} property lacks a description`);
     assert.equal(typeof tool.annotations.readOnlyHint, "boolean");
     assert.equal(typeof tool.annotations.destructiveHint, "boolean");
     assert.equal(typeof tool.annotations.idempotentHint, "boolean");
@@ -144,6 +147,36 @@ test("ping answers, and the full handshake completes in order", async () => {
   const compile = tools.body.result.tools.find((tool: any) => tool.name === "titen_compile");
   assert.equal(compile.annotations.readOnlyHint, false, "compile records a context run");
   assert.equal(compile.annotations.idempotentHint, false, "compile creates a new context run");
+  const remember = tools.body.result.tools.find((tool: any) => tool.name === "titen_remember");
+  assert.deepEqual(remember.inputSchema.properties.kind.enum, [
+    "user_statement", "tool_result", "imported_source", "decision", "system_event",
+  ]);
+  assert.deepEqual(remember.inputSchema.properties.trust.enum, [
+    "unverified", "asserted", "verified", "policy_approved",
+  ]);
+  assert.deepEqual(remember.inputSchema.properties.visibility.enum, [
+    "private", "team", "organization",
+  ]);
+  assert.equal(
+    remember.annotations.idempotentHint,
+    false,
+    "remember is idempotent only when the optional idempotency key is present",
+  );
+  const consolidate = tools.body.result.tools.find((tool: any) => tool.name === "titen_consolidate");
+  assert.equal(consolidate.inputSchema.properties.claims.type, "array");
+  assert.equal(consolidate.inputSchema.properties.claims.items.additionalProperties, false);
+  assert.deepEqual(consolidate.inputSchema.properties.claims.items.properties.kind.enum, [
+    "semantic_fact", "episodic_event", "preference", "procedural", "decision", "relationship",
+  ]);
+  assert.equal(consolidate.annotations.idempotentHint, false);
+  const resolve = tools.body.result.tools.find((tool: any) => tool.name === "titen_project_resolve");
+  assert.equal(resolve.inputSchema.properties.create.type, "boolean");
+  assert.equal(resolve.annotations.readOnlyHint, false, "project resolution may create when authorized");
+  const checkpointGet = tools.body.result.tools.find(
+    (tool: any) => tool.name === "titen_checkpoint_get",
+  );
+  assert.equal(checkpointGet.annotations.readOnlyHint, true);
+  assert.equal(checkpointGet.annotations.idempotentHint, true);
 });
 
 test("the HTTP transport rejects unsafe origins and unsupported revisions", async () => {
@@ -261,8 +294,32 @@ test("a tool call returns MCP content and a failure stays readable", async () =>
   assert.equal(called.body.jsonrpc, "2.0");
   const content = called.body.result.content;
   assert.ok(Array.isArray(content) && content[0].type === "text");
-  assert.ok(content[0].text.includes("obs_"), "the tool must report what it wrote");
+  const remembered = JSON.parse(content[0].text);
+  assert.match(remembered.data.observation_id, /^obs_/);
+  assert.equal(remembered.meta.replayed, false);
   assert.notEqual(called.body.result.isError, true);
+
+  const checkpoint = await rpc({
+    jsonrpc: "2.0",
+    id: 3,
+    method: "tools/call",
+    params: {
+      name: "titen_checkpoint_save",
+      arguments: {
+        subject_id: "user_mcp_compliance",
+        kind: "task_state",
+        state: { step: 1 },
+        ttl_seconds: 600,
+      },
+    },
+  });
+  const checkpointPayload = JSON.parse(checkpoint.body.result.content[0].text);
+  assert.match(checkpointPayload.data.checkpoint_id, /^ckpt_/);
+  assert.deepEqual(
+    Object.keys(checkpointPayload),
+    ["data"],
+    "every successful tool result keeps the same data envelope",
+  );
 
   // A bad argument is a readable tool result, not a transport error: the model
   // has to be able to see what it got wrong.

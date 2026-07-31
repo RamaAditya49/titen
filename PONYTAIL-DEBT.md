@@ -29,7 +29,6 @@ observed.
 | `src/core/context.ts:54` | Anchor compilation to the current time | Point-in-time recall is unavailable | A caller needs historical recall; thread an optional `at` through retrieval (#118) |
 | `src/core/db.ts:41` | Use one global SQL parameter chunk size | Wide lists multiply expensive statement round trips | A profile shows material multiplication; tune the hot path (#121) |
 | `src/core/idempotency.ts:21` | Keep a fixed 24-hour retry window | Later re-ingest can duplicate records | Re-sync behavior is required; add content-level convergence (#101) |
-| `src/core/mcp.ts:45` | Expose only the common seven-tool agent path | REST-only capabilities remain unreachable over MCP | Consolidation/search is approved for ordinary agents (#88, #89) |
 | `src/core/migrations.ts:10` | Keep migrations forward-only | Failed upgrades recover from a snapshot | Deployment review needs preview; document snapshots and add `migrate --dry-run` (#116) |
 | `src/core/migrations.ts:267` | Accept a retention policy kind without enforcing it | Append-only satellite tables grow indefinitely | Retention policy is implemented in maintenance (#105) |
 | `src/core/observations.ts:63` | Enqueue indexing work without checking vector capability | Default no-vector deployments accumulate an undrained outbox | Skip or retire rows when vector indexing is unavailable (#105) |

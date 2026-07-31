@@ -547,10 +547,12 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes seven wire tools in six ordinary-agent
+The implemented `/mcp` endpoint exposes nine wire tools in eight ordinary-agent
 families:
 
+- `titen_project_resolve`;
 - `titen_remember`;
+- `titen_consolidate`;
 - `titen_compile`;
 - `titen_feedback`;
 - `titen_checkpoint_save`;
@@ -565,7 +567,10 @@ the MCP client loses no canonical state. Only `titen_checkpoint_get` is
 read-only. `titen_compile` persists a context run, and every other tool is also
 write-capable, so hosts can apply their native approval policy correctly. Server
 metadata uses the running build revision rather than a separately maintained MCP
-version.
+version. Every successful tool's text content serializes one stable
+`{ "data": ..., "meta"?: ... }` envelope. Tool schemas publish enforced enums,
+property descriptions, and `additionalProperties: false`; annotations remain
+conservative when a tool can mutate or is idempotent only with an optional key.
 
 The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
 `GET /mcp` therefore returns `405`. A present `Origin` must match the request URL

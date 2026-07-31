@@ -1535,9 +1535,11 @@ export const CASES: Case[] = [
         key: agent.key,
         body: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
       });
-      assert.equal(tools.body.result.tools.length >= 7, true);
+      assert.equal(tools.body.result.tools.length, 9);
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_remember"));
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_consolidate"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_compile"));
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_project_resolve"));
 
       // A notification must be accepted without a body on either runtime.
       const notified = await fx.call("POST", "/mcp", {
@@ -1548,9 +1550,23 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "MCP titen_remember and titen_compile tools work end-to-end",
+    name: "MCP resolves, remembers, consolidates, and recalls on both runtimes",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });
+
+      const project = await fx.call("POST", "/mcp", {
+        key: agent.key,
+        body: {
+          jsonrpc: "2.0", id: 2, method: "tools/call",
+          params: {
+            name: "titen_project_resolve",
+            arguments: { reference: "github.com/RamaAditya49/titen", create: true },
+          },
+        },
+      });
+      const projectPayload = JSON.parse(project.body.result.content[0].text);
+      assert.equal(projectPayload.data.reference, "ramaaditya49/titen");
+      assert.match(projectPayload.data.project_id, /^project_/);
 
       // Remember
       const remember = await fx.call("POST", "/mcp", {
@@ -1566,6 +1582,7 @@ export const CASES: Case[] = [
               source_type: "test",
               source_ref: "mcp#1",
               trust: "verified",
+              project_id: projectPayload.data.project_id,
             },
           },
         },
@@ -1573,21 +1590,52 @@ export const CASES: Case[] = [
       assert.equal(remember.status, 200);
       assert.equal(remember.body.jsonrpc, "2.0");
       assert.ok(remember.body.result.content[0].text.includes("obs_"));
+      const observationId = JSON.parse(remember.body.result.content[0].text).data.observation_id;
+
+      const consolidate = await fx.call("POST", "/mcp", {
+        key: agent.key,
+        body: {
+          jsonrpc: "2.0", id: 4, method: "tools/call",
+          params: {
+            name: "titen_consolidate",
+            arguments: {
+              subject_id: "user_mcp",
+              project_id: projectPayload.data.project_id,
+              claims: [{
+                kind: "procedural",
+                statement: "MCP integration evidence is retrievable after explicit consolidation.",
+                sources: [{ observation_id: observationId, relation: "supports" }],
+              }],
+            },
+          },
+        },
+      });
+      const consolidationPayload = JSON.parse(consolidate.body.result.content[0].text);
+      assert.equal(consolidate.body.result.isError, undefined);
+      const claimId = consolidationPayload.data.claims[0].claim_id;
+      assert.match(claimId, /^claim_/);
 
       // Compile
       const compile = await fx.call("POST", "/mcp", {
         key: agent.key,
         body: {
-          jsonrpc: "2.0", id: 4, method: "tools/call",
+          jsonrpc: "2.0", id: 5, method: "tools/call",
           params: {
             name: "titen_compile",
-            arguments: { subject_id: "user_mcp", task: "MCP tool integration test", max_tokens: 900 },
+            arguments: {
+              subject_id: "user_mcp",
+              project_id: projectPayload.data.project_id,
+              task: "retrievable explicit consolidation evidence",
+              max_tokens: 900,
+            },
           },
         },
       });
       assert.equal(compile.status, 200);
       assert.equal(compile.body.jsonrpc, "2.0");
-      assert.ok(compile.body.result.content[0].text);
+      const compiledPayload = JSON.parse(compile.body.result.content[0].text);
+      assert.equal(compiledPayload.data.items[0].claim_id, claimId);
+      assert.ok(compiledPayload.data.items.length > 0, "MCP recall must return the claim it created");
     },
   },
   {

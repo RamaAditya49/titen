@@ -2,8 +2,17 @@ import type { RequestContext, Result } from "./http";
 import { ApiError } from "./errors";
 import { appendObservation } from "./observations";
 import { compileContext, recordFeedback } from "./context";
+import { consolidate } from "./claims";
+import { resolveProject } from "./projects";
 import { getCheckpoint, saveCheckpoint } from "./checkpoints";
 import { acquireLease, createHandoff } from "./collaboration";
+import {
+  CLAIM_KINDS,
+  CLAIM_RELATIONS,
+  OBSERVATION_KINDS,
+  TRUST_LEVELS,
+  VISIBILITIES,
+} from "./validate";
 
 // --- JSON-RPC types ---
 
@@ -36,21 +45,88 @@ const INTERNAL_ERROR = -32603;
 const CHECKPOINT_KINDS = ["task_state", "conversation", "workflow", "cursor"];
 const OUTCOMES = ["used", "useful", "irrelevant", "incorrect", "harmful"];
 
+const ARG_DESCRIPTIONS: Record<string, string> = {
+  reference: "Stable project reference such as lowercase owner/repo.",
+  create: "Create the project when missing; requires project creation authority.",
+  subject_id: "Stable subject identifier for this memory or work item.",
+  kind: "Operation-specific record kind.",
+  content: "Observation content to preserve as evidence.",
+  source_type: "Source category, such as chat, tool, document, or import.",
+  source_ref: "Stable non-secret reference back to the source.",
+  trust: "Evidence trust level authorized for the caller.",
+  visibility: "Narrowest audience allowed to read the record.",
+  workspace_id: "Opaque Titen workspace identifier when team visibility is used.",
+  project_id: "Opaque project identifier returned by titen_project_resolve.",
+  agent_id: "Stable agent identifier when distinct from the authenticated principal.",
+  run_id: "Stable host run or session identifier.",
+  occurred_at: "ISO 8601 time when the observed event occurred.",
+  idempotency_key: "Stable retry key for this exact mutation.",
+  claims: "Claims to materialize from existing observation evidence.",
+  task: "Concrete task or query used to rank memory.",
+  max_tokens: "Maximum token budget for the compiled context pack.",
+  include_checkpoints: "Include eligible resumable state when supported.",
+  context_id: "Context run identifier returned by titen_compile.",
+  outcome: "Observed usefulness or safety outcome for recalled context.",
+  claim_id: "Optional claim identifier within the context run.",
+  reason_code: "Optional stable reason code for the feedback.",
+  client_mutation_id: "Caller-generated feedback identity for replay safety.",
+  state: "Bounded resumable checkpoint payload; never a semantic fact.",
+  ttl_seconds: "Lifetime in seconds before the record expires.",
+  resource_type: "Type of resource whose work ownership is being leased.",
+  resource_id: "Stable identifier of the leased resource.",
+  purpose: "Short reason for acquiring or renewing the lease.",
+  to_principal: "Authorized target principal that may accept the handoff.",
+  message: "Small handoff note needed by the recipient.",
+  checkpoint_id: "Optional checkpoint needed to resume the handoff.",
+};
+
+const CLAIMS_SCHEMA = {
+  type: "array",
+  minItems: 1,
+  description: ARG_DESCRIPTIONS.claims,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      kind: { type: "string", enum: [...CLAIM_KINDS], description: "Claim kind." },
+      statement: { type: "string", description: "Concise claim derived from the cited evidence." },
+      confidence: { type: "number", exclusiveMinimum: 0, maximum: 1, description: "Confidence from greater than 0 through 1." },
+      sources: {
+        type: "array",
+        minItems: 1,
+        description: "Observation evidence and its relationship to the claim.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            observation_id: { type: "string", description: "Observation identifier returned by titen_remember." },
+            relation: { type: "string", enum: [...CLAIM_RELATIONS], description: "How the observation relates to the claim." },
+          },
+          required: ["observation_id", "relation"],
+        },
+      },
+      trust: { type: "string", enum: [...TRUST_LEVELS], description: "Claim trust, never higher than its evidence." },
+      visibility: { type: "string", enum: [...VISIBILITIES], description: "Claim visibility, never wider than its evidence." },
+      observer_id: { type: "string", description: "Optional observer whose perspective the claim represents." },
+      valid_from: { type: "string", description: "ISO 8601 start of claim validity." },
+      valid_to: { type: "string", description: "ISO 8601 end of claim validity." },
+    },
+    required: ["kind", "statement", "sources"],
+  },
+};
+
 /**
  * Tool specs as data: `name!` marks a required argument, `name:i` an integer,
  * `name:?` a free-form value, and `name=a|b` an enum. One builder expands them
  * into JSON Schema so adding a tool is one line, not a nested literal.
  */
-/**
- * ponytail: the common agent path only, expressed as data. The ceiling is that
- * a tool absent here is unreachable over MCP even when its REST route exists —
- * which today means an MCP client can append evidence but cannot derive a
- * claim from it, so nothing it writes is retrievable. Upgrade path: add a
- * combined remember-fact tool plus a plain-text search tool (#88, #89).
- */
 const TOOL_SPECS: [name: string, description: string, args: string][] = [
+  ["titen_project_resolve", "Resolve a stable project reference to its Titen project id.",
+    "reference! create:b"],
   ["titen_remember", "Append an observation to memory.",
-    "subject_id! kind! content! source_type! source_ref! trust visibility workspace_id project_id agent_id run_id occurred_at idempotency_key"],
+    `subject_id! kind!=${OBSERVATION_KINDS.join("|")} content! source_type! source_ref! trust=${TRUST_LEVELS.join("|")} visibility=${VISIBILITIES.join("|")} workspace_id project_id agent_id run_id occurred_at idempotency_key`],
+  ["titen_consolidate", "Materialize claims from remembered observations.",
+    "subject_id! claims!:? project_id workspace_id idempotency_key"],
   ["titen_compile", "Compile context for a task.",
     "subject_id! task! max_tokens!:i project_id include_checkpoints:b"],
   ["titen_feedback", "Record feedback on a context run.",
@@ -74,7 +150,7 @@ const TOOLS = TOOL_SPECS.map(([name, description, args]) => {
     const isRequired = head!.includes("!");
     const [field, type] = head!.replace("!", "").split(":");
     if (isRequired) required.push(field!);
-    properties[field!] = values
+    const schema = values
       ? { type: "string", enum: values.split("|") }
       : type === "i"
         ? { type: "integer" }
@@ -83,11 +159,14 @@ const TOOLS = TOOL_SPECS.map(([name, description, args]) => {
         : type === "?"
           ? {}
           : { type: "string" };
+    properties[field!] = field === "claims"
+      ? CLAIMS_SCHEMA
+      : { ...schema, description: ARG_DESCRIPTIONS[field!] ?? field!.replaceAll("_", " ") };
   }
   return {
     name,
     description,
-    inputSchema: { type: "object", properties, required },
+    inputSchema: { type: "object", properties, required, additionalProperties: false },
     annotations: {
       readOnlyHint: READ_ONLY_TOOLS.has(name),
       destructiveHint: name === "titen_checkpoint_save",
@@ -143,8 +222,11 @@ async function callDomain(
   const domainCtx = domainContext(ctx, method, path, payload, idempotencyKey);
   domainCtx.params = params;
   const result = await handler(domainCtx);
-  return result.meta ? { data: result.data, meta: result.meta } : result.data;
+  return { data: result.data, ...(result.meta ? { meta: result.meta } : {}) };
 }
+
+const toolProjectResolve = (ctx: RequestContext, args: Record<string, unknown>) =>
+  callDomain(ctx, "POST", "/v1/projects/resolve", args, resolveProject);
 
 const toolRemember = (ctx: RequestContext, args: Record<string, unknown>) =>
   callDomain(ctx, "POST", "/v1/observations", {
@@ -153,6 +235,9 @@ const toolRemember = (ctx: RequestContext, args: Record<string, unknown>) =>
     source_type: undefined,
     source_ref: undefined,
   }, appendObservation);
+
+const toolConsolidate = (ctx: RequestContext, args: Record<string, unknown>) =>
+  callDomain(ctx, "POST", "/v1/consolidations", args, consolidate);
 
 const toolCompile = (ctx: RequestContext, args: Record<string, unknown>) =>
   callDomain(ctx, "POST", "/v1/context/compile", args, compileContext);
@@ -184,7 +269,9 @@ const toolHandoff = (ctx: RequestContext, args: Record<string, unknown>) =>
 // --- Dispatch ---
 
 const TOOL_HANDLERS: Record<string, (ctx: RequestContext, args: Record<string, unknown>) => Promise<unknown>> = {
+  titen_project_resolve: toolProjectResolve,
   titen_remember: toolRemember,
+  titen_consolidate: toolConsolidate,
   titen_compile: toolCompile,
   titen_feedback: toolFeedback,
   titen_checkpoint_save: toolCheckpointSave,

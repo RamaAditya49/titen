@@ -122,7 +122,7 @@ artifacts rather than one dishonest polyglot plugin.
 One source repository may generate several artifacts, but one polyglot native
 plugin cannot be honest across JSON bundles, TypeScript/npm extensions,
 OpenClaw's runtime API, and Hermes' Python API. Every future adapter must reuse
-the same seven MCP tools or REST operations and pass a host-specific install,
+the same nine MCP tools or REST operations and pass a host-specific install,
 authorization, lifecycle, and outage smoke.
 
 <!-- ponytail: all host packages ship without lifecycle hooks; add automatic recall or flush only after a measured host workflow needs it and a parity fixture covers failure behavior. -->
@@ -135,7 +135,7 @@ authorization, lifecycle, and outage smoke.
 shipped `integrations/openclaw/openclaw.json` fragment into native
 `mcp.servers` config. OpenClaw stable imports only stdio MCP declarations from
 compatible bundles, so `.clawhubignore` keeps the Claude HTTP declaration out
-of the registry artifact. Native Streamable HTTP config supplies the same seven
+of the registry artifact. Native Streamable HTTP config supplies the same nine
 tools without an in-process provider.
 
 **Hermes Agent.** The Python plugin registers the read-only skill and native
@@ -205,7 +205,9 @@ host configuration or the runtime's secret store.
         headers: { Authorization: "Bearer ${TITEN_API_KEY}" },
         toolFilter: {
           include: [
+            "titen_project_resolve",
             "titen_remember",
+            "titen_consolidate",
             "titen_compile",
             "titen_feedback",
             "titen_checkpoint_save",
@@ -233,7 +235,9 @@ mcp_servers:
       Authorization: "Bearer ${TITEN_API_KEY}"
     tools:
       include:
+        - titen_project_resolve
         - titen_remember
+        - titen_consolidate
         - titen_compile
         - titen_feedback
         - titen_checkpoint_save
@@ -252,7 +256,9 @@ remain deferred until a host-specific parity fixture exists.
 url = "http://127.0.0.1:8787/mcp"
 bearer_token_env_var = "TITEN_API_KEY"
 enabled_tools = [
+  "titen_project_resolve",
   "titen_remember",
+  "titen_consolidate",
   "titen_compile",
   "titen_feedback",
   "titen_checkpoint_save",
@@ -335,7 +341,7 @@ It should resolve project scope deterministically:
 2. read the Git origin without credentials or query parameters;
 3. normalize a hosted origin to lowercase `owner/repo` when unambiguous;
 4. otherwise use an operator-approved stable project slug;
-5. call the project-resolution operation under the authenticated organization;
+5. call `titen_project_resolve` under the authenticated organization;
 6. cache the returned opaque `project_id` for the current workspace;
 7. send that `project_id` on project-scoped memory operations.
 
@@ -407,6 +413,11 @@ It must not store:
 The adapter can buffer a few typed observations and send one bounded batch. It
 must flush immediately for a checkpoint, handoff, verified high-value result,
 or before the host session terminates.
+
+An observation is evidence, not yet a recallable claim. When a durable signal
+must be returned by `titen_compile`, the agent calls `titen_consolidate` with
+the observation ID and a bounded claim that preserves its scope, trust, and
+visibility.
 
 ### 4. Checkpoint and coordinate
 
@@ -622,13 +633,15 @@ infrastructure only when measured workloads cannot be met by indexed SQL joins.
 
 ## MCP tool surface
 
-Keep the default agent surface small and unambiguous. Six semantic families
-map to the seven wire tools that are actually shipped:
+Keep the default agent surface small and unambiguous. Eight semantic families
+map to the nine wire tools that are actually shipped:
 
 | Family       | Shipped wire tool(s)                                      | Use                                      |
 | ------------ | --------------------------------------------------------- | ---------------------------------------- |
+| project      | `titen_project_resolve`                                   | resolve stable project reference         |
 | context      | `titen_compile`                                           | compile bounded task context             |
 | remember     | `titen_remember`                                          | append one typed durable observation     |
+| consolidate  | `titen_consolidate`                                       | materialize evidence-linked claims       |
 | feedback     | `titen_feedback`                                          | record recall outcomes                   |
 | checkpoint   | `titen_checkpoint_save`, `titen_checkpoint_get`           | save or read resumable state             |
 | lease        | `titen_lease_acquire`                                     | acquire or renew bounded work ownership  |
@@ -637,9 +650,9 @@ map to the seven wire tools that are actually shipped:
 Administrative key, membership, retention, and webhook-subscription operations
 are not exposed to ordinary agent profiles by default.
 
-Memory Atlas is likewise not a seventh ordinary-agent MCP tool. Authorized
+Memory Atlas is not an ordinary-agent MCP tool. Authorized
 operator clients compile read-only views through
-`POST /v1/memory-views/compile`; agents continue to use the six focused
+`POST /v1/memory-views/compile`; agents continue to use the eight focused
 families above.
 Channel/release administration is also excluded. Publisher, approver, and
 gateway credentials use the narrower REST operations and capabilities defined

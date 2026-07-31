@@ -161,8 +161,8 @@ scope, lease, checkpoint, and context rules.
    metadata; never include hidden topology or counts.
 6. Render in an optional client. Renderer failure does not affect REST/MCP.
 
-The compiler is a read-only REST integration in the same repository, not a
-seventh ordinary-agent MCP tool. Layout, clusters, summaries, and caches are
+The compiler is a read-only REST integration in the same repository, not an
+ordinary-agent MCP tool. Layout, clusters, summaries, and caches are
 rebuildable and cannot become canonical memory.
 
 ## Dashboard path

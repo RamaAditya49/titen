@@ -8,11 +8,14 @@ import { TitenClient } from "titen-memory/sdk";
 const titen = new TitenClient({
   url: "http://127.0.0.1:8787",
   key: process.env.TITEN_API_KEY!,
+  timeoutMs: 20_000,
 });
 ```
 
 The constructor rejects a missing key, a non-HTTP(S) URL, or a non-function
-`fetch` before any network call. It never includes key material in an error.
+`fetch` before any network call. Requests time out after 20 seconds by default;
+pass `signal` in request options to compose caller cancellation with that bound.
+The client never includes key material in an error and never retries implicitly.
 
 ## SDK capability boundary
 
@@ -30,8 +33,9 @@ checked against the client prototype.
 | Operator view | `compileView` |
 | API keys | `createKey`, `listKeys`, `revokeKey` |
 
-Use `request()` for another JSON-envelope route and `requestRaw()` for a raw or
-streaming response such as JSONL export. Both attach the configured credential;
+Use `request()` for another JSON-envelope route, `requestWithMeta()` when the
+caller needs `request_id` or `replayed`, and `requestRaw()` for a raw or streaming
+response such as JSONL export. All attach the configured credential;
 passing an `Authorization` header is rejected rather than overriding it.
 
 ```typescript
@@ -128,6 +132,9 @@ const result = await titen.consolidate("user_rama", [
 The server returns `model_used: false` on this path. After ADR-0004 is
 implemented, optional asynchronous enrichment may propose additional claims,
 but it will not replace this immediate authoritative direct-claim workflow.
+
+`consolidate` keeps this positional form for compatibility. Object-style JavaScript
+misuse is rejected locally before a request is sent.
 
 ### 3. Compile context
 
@@ -237,13 +244,14 @@ try {
   await titen.observe({ ... });
 } catch (err) {
   if (err instanceof TitenError) {
-    console.error(err.status, err.code, err.message);
+    console.error(err.status, err.code, err.requestId, err.meta, err.message);
   }
 }
 ```
 
 Empty, HTML, text, or malformed error responses are normalized to
-status-preserving `TitenError` values without echoing a gateway body. A valid
+status-preserving `TitenError` values without echoing a gateway body. JSON error
+metadata and the body or header request ID remain available on the error. A valid
 empty success resolves to `undefined`; malformed JSON on a successful JSON
 endpoint uses the stable `INVALID_RESPONSE` code.
 
@@ -262,7 +270,7 @@ SDK. The endpoint is authenticated: pass the API key as a bearer token.
 
 The [host distribution guide](./agent-plugins.md) covers the shipped Codex,
 Claude Code/ZCode/OpenClaw, Cursor, Hermes, Pi, OpenCode, Windsurf, and TRAE
-artifacts. Every artifact reuses this same endpoint and seven-tool boundary.
+artifacts. Current repository artifacts reuse this endpoint and nine-tool boundary.
 
 ### Codex reference plugin
 
@@ -287,7 +295,9 @@ in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.titen]
 enabled_tools = [
+  "titen_project_resolve",
   "titen_remember",
+  "titen_consolidate",
   "titen_compile",
   "titen_feedback",
   "titen_checkpoint_save",
@@ -301,9 +311,9 @@ default_tools_approval_mode = "writes"
 Start a new Codex thread after installation and invoke `$titen-memory`. The
 plugin contains no endpoint, credential, hook, proxy, or duplicate memory logic.
 
-Tools: `titen_remember`, `titen_compile`, `titen_feedback`,
-`titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`,
-`titen_handoff`.
+Tools: `titen_project_resolve`, `titen_remember`, `titen_consolidate`,
+`titen_compile`, `titen_feedback`, `titen_checkpoint_save`,
+`titen_checkpoint_get`, `titen_lease_acquire`, `titen_handoff`.
 
 Protocol notes, verified against a real handshake:
 
