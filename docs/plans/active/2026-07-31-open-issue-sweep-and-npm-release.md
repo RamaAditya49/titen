@@ -73,6 +73,18 @@ evidence.
   one-head/one-winner assertions. Instrumentation is ready; the checkpoint
   recurrence remains unclassified, while only emulator transport instability
   is separately tracked in #157.
+- [ ] Add one shared embedding-policy helper for role-specific text transforms,
+  validation, and unit normalization; require explicit revision/profile/cosine
+  floor in Bun and Cloudflare configuration, with EmbeddingGemma bound to its
+  official query/document profile.
+- [ ] Gate vector hits by the configured absolute cosine floor before hydration
+  and relative ranking; fingerprint the exact profile/threshold in existing
+  semantic metadata and prove mismatch requires the documented explicit
+  projection reset/requeue rather than a new schema or provider abstraction.
+- [ ] Add dual-runtime hard-negative/empty-pack, role parity, sub-threshold
+  non-hydration, scope/provenance, malformed/zero-vector, configuration, and
+  reindex regressions; integrate the immutable calibration evidence branch and
+  run a second untouched holdout before publishing any bundled threshold.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -124,6 +136,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
 | #141 | Make omitted project scope select only unscoped claims; add explicit `cross_project` mode guarded by `context:compile:all`, report `project_mode` and the capability-backed broad reason, and make every distributed agent skill resolve a repository project before compile. |
 | #102 recurrence | Keep the atomic UPSERT and handoff fence; retain safe diagnostics for each unexpected D1 contention response, keep the issue open until isolated repeated evidence classifies the recurrence, and add no product retry without a reproducible database failure. |
+| #144, #155 | Use one explicit fingerprinted role-aware embedding policy and absolute cosine gate before the existing relative ranker; require operator calibration and never ship the inspected threshold as a universal default. |
 
 ## Acceptance evidence mapping
 
@@ -193,6 +206,15 @@ to its merged evidence or to the concrete decision recorded here.
   status/error diagnostics for each unexpected response and one durable head;
   the unclassified #102 recurrence remains distinct from #157 emulator
   transport failures.
+- AC-SWP-050: shared policy unit tests plus Bun HTTP, Workers AI, injected-
+  provider, fingerprint-mismatch, explicit-reindex, zero/non-finite-vector, and
+  configuration regressions proving exact query/document transforms and unit
+  normalization on both runtimes.
+- AC-SWP-051: dual-runtime hard-negative fixtures proving sub-threshold IDs are
+  not hydrated or exposed, above-threshold vector recall still works, FTS-only
+  and lexical recall remain unchanged, scope/provenance hold, and public output
+  contains no raw score or calibration setting; immutable calibration reports
+  distinguish inspected evidence from any untouched holdout.
 
 ## Security, migration, deployment, smoke, and rollback
 
@@ -208,6 +230,9 @@ operation or running the documented reindex path with the intended fingerprint.
 Migration 14 adds only two nullable dependency-failure timestamps to the
 singleton semantic metadata row. Delete-only completion or retirement cannot
 clear them; disabling semantic configuration remains the fail-closed rollback.
+Retrieval profile and cosine-floor changes reuse the existing preprocessing
+fingerprint field, add no canonical schema, and require the same explicit
+rebuild/requeue path before readiness can recover.
 
 Before merge, rollback is branch deletion. After merge and before npm publish,
 rollback is a reviewed revert. After npm publish, a bad immutable artifact must

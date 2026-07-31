@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../../src/core/app";
+import type { Db } from "../../src/core/db";
 import { migrate } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { createVectorizeStore } from "../../src/runtime/cloudflare/vectors";
@@ -292,6 +293,81 @@ test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
     lexicalOrder,
     "with no similarity the ranking must match lexical-only",
   );
+});
+
+test("the absolute cosine floor rejects a best bad neighbor before hydration", async () => {
+  const subject = "user_absolute_gate_144";
+  const observation = await withVectors().call("POST", "/v1/observations", {
+    key,
+    body: {
+      subject_id: subject,
+      kind: "tool_result",
+      content: "The unrelated archive stores violet telescope calibration notes.",
+      source: { type: "test", ref: "absolute-gate-144" },
+      trust: "verified",
+    },
+  });
+  assert.equal(observation.status, 201);
+  const consolidation = await withVectors().call("POST", "/v1/consolidations", {
+    key,
+    body: {
+      subject_id: subject,
+      claims: [{
+        kind: "semantic_fact",
+        statement: "Violet telescope calibration belongs in the archive.",
+        sources: [{
+          observation_id: observation.body.data.observation_id,
+          relation: "supports",
+        }],
+      }],
+    },
+  });
+  assert.equal(consolidation.status, 201);
+  const claimId = consolidation.body.data.claims[0].claim_id as string;
+  vectors.setScore(claimId, 0.099, {
+    org_id: orgId,
+    subject_id: subject,
+    project_id: "",
+  });
+
+  let vectorHydrations = 0;
+  const trackedDb: Db = {
+    all: (sql, params) => {
+      if (sql.includes("WHERE c.id IN")) vectorHydrations += 1;
+      return db.all(sql, params);
+    },
+    batch: (statements) => db.batch(statements),
+    exec: (sql) => db.exec(sql),
+  };
+  const client = clientVia(
+    createApp({ db: trackedDb, revision: "test", runtime: "bun-sqlite", vectors }),
+    origin,
+  );
+  const compile = () => client.call("POST", "/v1/context/compile", {
+    key,
+    body: { subject_id: subject, task: "...\u200d...", max_tokens: 900 },
+  });
+
+  const rejected = await compile();
+  assert.equal(rejected.status, 200);
+  assert.deepEqual(rejected.body.data.items, []);
+  assert.equal(rejected.body.meta.candidates, 0);
+  assert.equal(rejected.body.meta.degraded.vector, "used");
+  assert.equal(vectorHydrations, 0, "sub-threshold ids must not reach canonical SQL");
+  assert.doesNotMatch(
+    JSON.stringify(rejected.body),
+    /min_cosine|raw-unit-v1|0\.099/,
+  );
+
+  vectors.setScore(claimId, 0.1, {
+    org_id: orgId,
+    subject_id: subject,
+    project_id: "",
+  });
+  const accepted = await compile();
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.data.items[0].claim_id, claimId);
+  assert.equal(vectorHydrations, 1, "an eligible vector id is hydrated once");
 });
 
 test("narrow-band vector similarity is normalized before ranking", () => {

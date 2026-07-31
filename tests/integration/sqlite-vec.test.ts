@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../../src/core/app";
 import { migrate } from "../../src/core/migrations";
+import { embeddingPolicyFingerprint } from "../../src/core/vectors";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { createSqliteVecStore, createHttpEmbedder } from "../../src/runtime/bun/vectors";
 import { clientVia, provisionWith } from "../contract/harness";
@@ -184,8 +185,8 @@ test("the real store drives compilation through the shared core", async () => {
       model: "stub",
       revision: "v1",
       dimensions: DIMENSIONS,
-      metric: "l2",
-      preprocessing: "text-v1",
+      metric: "cosine",
+      preprocessing: embeddingPolicyFingerprint("raw-unit-v1", 0.1),
       index_schema: "claims-scope-v1",
     },
     embedder: createHttpEmbedder({

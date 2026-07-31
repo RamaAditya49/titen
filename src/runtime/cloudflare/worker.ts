@@ -18,6 +18,8 @@ export interface Env {
   TITEN_EMBED_MODEL?: string;
   TITEN_EMBED_DIMS?: string;
   TITEN_EMBED_REVISION?: string;
+  TITEN_EMBED_PROFILE?: string;
+  TITEN_EMBED_MIN_COSINE?: string;
   /** Secret JSON keyring; keep in a Worker secret, never vars or D1. */
   TITEN_SECRET_KEYS?: string;
   /** Test-only fixed resolution; production has no generic address-pinned fetch. */

@@ -29,6 +29,8 @@ export interface ServeOptions {
   embedModel?: string;
   embedDims?: number | string;
   embedRevision?: string;
+  embedProfile?: string;
+  embedMinCosine?: number | string;
   embedApiKey?: string;
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
@@ -72,6 +74,8 @@ export async function serve(options: ServeOptions) {
         embedModel: options.embedModel,
         embedDims: options.embedDims,
         embedRevision: options.embedRevision,
+        embedProfile: options.embedProfile,
+        embedMinCosine: options.embedMinCosine,
         embedApiKey: options.embedApiKey,
       });
   const semanticReadiness = migrationsReady

@@ -3,8 +3,8 @@ import { unavailable, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
 import {
   completeSemanticIndexWork,
+  embedForRetrieval,
   recordSemanticDependencyFailure,
-  validateEmbeddingVectors,
 } from "./vectors";
 
 /**
@@ -109,12 +109,10 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     // One embedding request for the batch, then one index write.
     let vectors;
     try {
-      vectors = validateEmbeddingVectors(
-        await ctx.app.vectors.embedder.embed(
-          eligible.map((entry) => entry.statement),
-        ),
-        eligible.length,
-        ctx.app.vectors.embedder.dimensions,
+      vectors = await embedForRetrieval(
+        ctx.app.vectors,
+        "document",
+        eligible.map((entry) => entry.statement),
       );
     } catch {
       await recordSemanticDependencyFailure(

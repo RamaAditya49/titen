@@ -63,6 +63,15 @@ status and safe error envelope of every loser, distinguish a product race from
 a Miniflare/runtime transient, and never hide an unexplained non-success behind
 an aggregate count.
 
+Issues #144 and #155 expose one retrieval-quality boundary. Titen currently
+sends the same raw text for index documents and queries, then rescales the best
+available vector candidate to `1` even when its absolute similarity is near
+zero. The EmbeddingGemma challenger proved that its official asymmetric prompts
+materially improve the locked fixture, but the inspected threshold is not a
+portable default. The runtime therefore needs one explicit, fingerprinted
+profile and revision plus an operator-calibrated absolute cosine floor before
+relative ranking; no model-independent threshold may be invented.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -118,6 +127,12 @@ documentation, and an install smoke against the immutable npm artifact.
 - Diagnose the reopened D1 checkpoint contention result from complete-suite
   evidence; keep the one-head invariant and make expected concurrent outcomes
   explicit without weakening the canonical integrity assertion.
+- Apply one shared role-aware embedding profile before every query/document
+  provider call, normalize validated vectors to unit length, and fingerprint
+  the exact versioned transform with the immutable model revision.
+- Require an explicit calibrated cosine floor, fingerprint it with the profile,
+  discard sub-threshold semantic hits before hydration/ranking, and keep
+  authorized lexical recall and successful empty packs unchanged.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -130,6 +145,8 @@ documentation, and an install smoke against the immutable npm artifact.
   accepted throughput, adopter, quality, or lifecycle requirement.
 - Network provider probes on `/readyz`, automatic reindex after an embedding
   fingerprint change, or implementation of planned extraction/enrichment.
+- A universal vector threshold, an implicit raw-text EmbeddingGemma profile, or
+  publication of the already inspected challenger threshold as a safe default.
 - Publishing the externally blocked ClawHub bundle unless the upstream
   inspector accepts the already validated package during this work.
 - Changing or cleaning the original dirty checkout.
@@ -264,6 +281,19 @@ documentation, and an install smoke against the immutable npm artifact.
   shall be retained in assertion-failure evidence, exact aggregate status
   counts shall remain asserted, exactly one durable head shall remain, and no
   unexplained non-success shall be hidden behind an aggregate count.
+- **AC-SWP-050 — Unwanted behavior:** If semantic retrieval is configured, then
+  Titen shall require an immutable model revision, a supported named/versioned
+  role-aware preprocessing profile, and an explicit finite cosine floor; the
+  shared core shall apply the document/query transforms exactly once, reject
+  zero/non-finite vectors, normalize them to unit length, and fingerprint the
+  profile plus threshold so a change requires explicit reindexing. An
+  EmbeddingGemma model shall not run under the raw profile.
+- **AC-SWP-051 — Unwanted behavior:** If every authorized vector hit is below
+  the configured absolute cosine floor, then Titen shall hydrate none of those
+  hits and shall never turn the best bad neighbor into positive relevance by
+  relative normalization. FTS-only behavior, lexical candidates, authorization,
+  provenance, and the successful empty-pack contract shall remain unchanged,
+  and public responses shall not expose the threshold or raw provider scores.
 
 ## Done conditions
 
@@ -283,3 +313,7 @@ is resolved only after both runtimes prove default unscoped-only retrieval,
 explicit capability-gated broad retrieval, and denial of foreign project,
 subject, principal, membership, and visibility substitutions across REST and
 MCP.
+Issues #144 and #155 are resolved only after both runtime adapters share the
+same role-aware profile and absolute-gate contract, fingerprint changes fail
+readiness until explicit reindex, deterministic hard-negative regressions pass,
+and any published calibrated default has separate untouched-holdout evidence.

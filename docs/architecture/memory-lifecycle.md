@@ -473,8 +473,9 @@ canonical SQL hydration and context compilation
 ```
 
 The backend does not understand text by itself. It stores vectors and searches
-for nearby vectors. The same compatible embedding model and preprocessing must
-be used for indexed records and queries.
+for nearby vectors. Indexed records and queries use the same immutable model but
+may require different role prompts under one fingerprinted profile. Both roles
+are unit-normalized before storage/query.
 
 ### Which features need a model?
 
@@ -596,8 +597,9 @@ instead of hiding the delay.
 
 ### Embedding fingerprint contract
 
-Current adapters carry a configured model identifier and dimensions. Bun HTTP
-and Cloudflare Workers AI share one validator for exact output cardinality,
+Current adapters carry an immutable model revision, dimensions, named
+query/document profile, and calibrated cosine floor. Bun HTTP and Cloudflare
+Workers AI share the role transforms, unit normalization, and one validator for exact output cardinality,
 ordered provider indices when present, dense dimensions, and finite numeric
 coordinates. Capability contract version 1 reports embedding separately from
 planned extraction/background enrichment, and the deprecated `model` field
@@ -606,10 +608,11 @@ mirrors embedding for `0.3.x` compatibility.
 Every semantic index is bound to a fingerprint containing:
 
 - provider and model identifier;
-- immutable revision when available;
+- immutable revision;
 - output dimensions;
 - distance metric;
-- preprocessing version, including normalization and text formatting;
+- preprocessing version, including role-aware text formatting, unit
+  normalization, and the operator-calibrated cosine floor;
 - Titen semantic-unit schema version.
 
 Startup compares the locally configured contract with migration-13 metadata
@@ -617,6 +620,11 @@ without a provider request. Titen does not pad or truncate mismatched vectors.
 Changing the fingerprint requires an explicit re-index and fails semantic
 readiness until the vector backend is rebuilt, metadata is reset, and claim
 index work is requeued.
+
+The compiler rejects vector hits below the fingerprinted floor before canonical
+SQL hydration. Relative ranking may order eligible hits; it cannot promote the
+best member of an irrelevant candidate set into evidence. Titen intentionally
+ships no model-independent threshold.
 
 Canonical export excludes embeddings by default. A destination rebuilds its
 semantic projection only with a declared, verified fingerprint. Changing

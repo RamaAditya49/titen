@@ -36,6 +36,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   projections, incompatible fingerprints, and locally observed indexing
   dependency failures; configured failures return a fixed local diagnostic
   without probing providers.
+- Semantic retrieval now discards sub-threshold cosine hits before canonical
+  hydration, so relative ranking cannot turn a best bad neighbor into useful
+  context. Bun and Cloudflare share the same validated unit-vector boundary.
 
 ### Changed
 
@@ -52,6 +55,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   explicit cross-project recall requires `cross_project: true` plus the separate
   `context:compile:all` capability and reports its effective scope and grant
   reason across REST, SDK, and MCP.
+- Semantic configuration now requires an immutable model revision, a named
+  role-aware preprocessing profile, and an operator-calibrated cosine floor in
+  the existing index fingerprint. EmbeddingGemma uses its official asymmetric
+  query/document prompts; Titen ships no universal threshold.
 
 ## [0.3.0] — 2026-07-31
 

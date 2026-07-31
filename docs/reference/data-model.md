@@ -373,9 +373,11 @@ Release vectors use release IDs/versions and minimum channel/audience metadata,
 not source claim IDs that a gateway could hydrate directly. Customer-private
 memory is never copied into the release vector corpus.
 
-Embedding provider, model, immutable revision when available, dimensions,
-metric, preprocessing version, and index-schema version form a fingerprint.
-Padding or truncating a mismatched vector is prohibited.
+Embedding provider, model, immutable revision, dimensions, metric, named
+query/document preprocessing plus unit-normalization version, calibrated cosine
+floor, and index-schema version form a fingerprint. Padding or truncating a
+mismatched vector is prohibited. A vector ID below the floor is discarded before
+canonical hydration.
 
 ### Memory Atlas projections
 
@@ -483,8 +485,8 @@ order even when timestamps are identical.
 ### `semantic_index_metadata`
 
 Migration 13 stores one immutable `claims` row containing credential-free
-provider identity, model, revision, dimensions, metric, preprocessing, index
-schema, and creation time. Migration 14 adds nullable
+provider identity, model, revision, dimensions, metric, preprocessing policy
+(profile plus cosine floor), index schema, and creation time. Migration 14 adds nullable
 `embedder_failure_at`/`vector_store_failure_at` fields containing no provider
 output to that singleton row. `/readyz` fails semantic readiness when configured
 values differ, indexable claims lack durable work, legacy completed index work
