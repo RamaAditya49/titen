@@ -1,31 +1,30 @@
 ---
 work_id: all-open-issues-release-hardening
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-30
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # All-open-issues release hardening
 
 ## Problem
 
-The public `0.1.2` surface and the terminal `0.2.0` snapshot exposed 37 issues
-covering authorization, data integrity, runtime recovery, adapters, operator
-workflow, client safety, packaging, and deployment truth. Several features are
-advertised beyond their verified security boundary. The next release must
-resolve the open set from one fixed cutoff without hiding incomplete work behind
-issue closure.
+The release-hardening window across the public `0.1.2` surface and terminal
+`0.2.0` snapshot eventually exposed 39 issues covering authorization, data
+integrity, runtime recovery, adapters, operator workflow, client safety,
+packaging, and deployment truth. Several features were advertised beyond their
+verified security boundary. The release must resolve the full observed set
+without hiding incomplete work behind issue closure.
 
 ## Issue cutoff and classification
 
-The release cutoff is every issue open immediately before the release tag,
-starting with #9, #11, #13, #15-#18, #20-#24, #31-#41, #48, #54-#56,
-#59-#60, #63-#67, and the late terminal snapshot #71-#73. New issues opened
-before tagging enter this spec through an updated issue matrix and acceptance
+The work scope is every issue in the original pre-release cutoff—#9, #11, #13,
+#15-#18, #20-#24, #31-#41, #48, #54-#56, #59-#60, and #63-#67—plus the late
+terminal arrivals #71-#73, #75, and #77. New issues opened before terminal
+completion enter this spec through an updated issue matrix and acceptance
 mapping.
 
 The current batch groups the root causes as follows:
@@ -37,6 +36,7 @@ The current batch groups the root causes as follows:
 - CLI, SDK, package, and contributor safety: #54-#56, #59-#60, #63-#64,
   #67, #72-#73;
 - deployment evidence and test reliability: #13, #15-#18.
+- validation and roadmap dispositions requiring no code: #75, #77.
 
 ## Scope
 
@@ -189,10 +189,10 @@ The current batch groups the root causes as follows:
   command whose clean checkout completes every Bun and workerd contract without
   a disposed Miniflare cascade.
 - **AC-RH-025 — Event-driven:** When implementation and all required evidence are
-  complete, maintainers shall merge the reviewed change, comment on and close
-  every cutoff issue with its specific reason and evidence, remove only
-  enumerated merged/obsolete branches, and publish the exact verified `0.2.0`
-  commit to npm and a matching GitHub release while Actions remains disabled.
+  complete, maintainers shall merge the reviewed changes, comment on and close
+  every issue with its specific reason and evidence, remove only enumerated
+  merged/obsolete branches, and publish the exact verified `0.2.0` and `0.2.1`
+  artifacts to npm and matching GitHub releases while Actions remains disabled.
 - **AC-RH-026 — Unwanted behavior:** If an MCP HTTP request carries an invalid
   cross-origin source or unsupported protocol revision, then Titen shall reject
   it before tool execution; otherwise its stateless endpoint shall expose the
@@ -216,7 +216,7 @@ open; branch cleanup preserves unique work; the final version/tag/GitHub/npm
 artifacts identify one commit; and this spec/plan pair moves to `done` with no
 unchecked work.
 
-## Progress evidence
+## Completion evidence
 
 - PR #68 merged the issue hardening as `3971e3a`; PR #69 prepared version
   `0.2.0` as `2bcfdab`; PR #70 corrected the live lifecycle verifier, leaving
@@ -242,7 +242,29 @@ unchecked work.
 - The official-source host integration matrix is documented in
   `docs/architecture/agent-integration.md`; speculative native adapters remain
   explicit, trigger-based entries in `PONYTAIL-DEBT.md`.
-- The terminal snapshot then exposed #71-#73. Issue #71 is already fixed in
-  `0.2.0`; #72 is a valid response-contract omission and #73 is a valid
-  contributor-documentation gap. They remain active until individually
-  reconciled and the necessary `0.2.1` artifact is public.
+- PR #74 merged the #72 response-contract and #73 contributor-documentation
+  correction as `426d48c7`; PR #76 merged the exact `0.2.1` release commit as
+  `a6c9edf4801d43f0f897af06d1bba7b8e3665b6a`. Independent focused and release
+  reviews reported no findings.
+- The corrective tree passed 71 Cloudflare D1, 90 Bun/vector/SDK, 63 integration,
+  dashboard-adapter, 10 browser, workflow, Worker dry-build, restricted HOME/XDG,
+  and six-stage packed-tarball gates. The deployed `rama-tuf` image
+  `61b70145edbce715b5878d7279c9f6aa3ff83671a85a2418309a598e40d8b603`
+  (`sha256:4e0fd3ce9064cce2432a451cba93dcfdef7060f2105f201629c51d20b713ebc4`)
+  served revision `a6c9edf` healthy with `NRestarts=0`; generated-principal SDK
+  handoff, persistence, and the full real-model live verifier passed.
+- Issues #71-#73 were individually reconciled; #75 was a successful verification
+  report with no remaining defect, and #77 was closed as not planned because it
+  combined already-delivered behavior, future product decisions, and explicitly
+  trigger-based Ponytail debt. Every closure has a specific explanatory comment.
+- Annotated tag `v0.2.1` peels to the exact release commit `a6c9edf`. npm
+  `latest` is `titen-memory@0.2.1` with SHA-1
+  `7b1fd4f9893a94153b303e191d4f7281e122524f`; clean registry SDK/CLI smokes
+  passed. The public, non-draft GitHub release is
+  `https://github.com/RamaAditya49/titen/releases/tag/v0.2.1`.
+- Before opening terminal-documentation PR #78, the final release snapshot had
+  zero open issues, zero open pull requests, and only remote `main`; #78 and its
+  `docs/complete-v0.2.1-release` head were the sole temporary finalization
+  exception. GitHub Actions is disabled and current `main` contains no workflow;
+  one failed run from the deleted historical `ci/issue-8-guardrail` branch
+  remains GitHub metadata and is not release evidence.

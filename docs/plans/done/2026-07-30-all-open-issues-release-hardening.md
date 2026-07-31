@@ -1,14 +1,13 @@
 ---
 work_id: all-open-issues-release-hardening
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-30
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
+spec: docs/specs/done/2026-07-30-all-open-issues-release-hardening.md
 ---
 # Plan
 
@@ -55,10 +54,10 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
   normal/custom-prefix pack verification, and installed-tarball CLI/SDK smoke.
 - [x] Request and execute the explicit operator window for the `rama-tuf` reboot;
   capture boot, service, health, data-preservation, journal, and full live evidence.
-- [ ] Commit the corrective diff with the required CADIS trailer, open, review,
+- [x] Commit the corrective diff with the required CADIS trailer, open, review,
   and merge the PR; enumerate exact branch/worktree cleanup targets and remove
   only merged or superseded ones.
-- [ ] Post a specific root-cause/fix/evidence comment to every cutoff issue before
+- [x] Post a specific root-cause/fix/evidence comment to every cutoff issue before
   closing it; leave no issue silently closed and re-snapshot for late arrivals.
 - [x] Prepare version `0.2.0` and changelog, verify the exact main commit, publish
   npm through the maintainer approval URL, create the matching GitHub release, and
@@ -67,9 +66,9 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 - [x] Reconcile #71 against the current lease contract, return `principal_id`
   from key creation with dual-runtime coverage for #72, and add the smallest
   sandbox HOME/XDG contributor guidance for #73.
-- [ ] Run focused and full regression gates, publish the exact verified `0.2.1`
+- [x] Run focused and full regression gates, publish the exact verified `0.2.1`
   patch to npm and GitHub, and smoke the public SDK/CLI artifact.
-- [ ] Record exact evidence, mark every item complete, and move this pair to
+- [x] Record exact evidence, mark every item complete, and move this pair to
   `docs/specs/done/` and `docs/plans/done/` in the terminal evidence commit.
 
 ## Acceptance evidence mapping
@@ -130,8 +129,10 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 
 ## Verification
 
-- Merged implementation/release commits: `3971e3a`, `2bcfdab`, and exact
-  release candidate `023fdd0fe2f78d9e67eb15ba66d35a4142e88b7a`.
+- Merged implementation/release commits: `3971e3a`, `2bcfdab`, exact `0.2.0`
+  release candidate `023fdd0fe2f78d9e67eb15ba66d35a4142e88b7a`, corrective
+  PR #74 commit `426d48c7`, and exact `0.2.1` release commit
+  `a6c9edf4801d43f0f897af06d1bba7b8e3665b6a` from PR #76.
 - Local gates: 71 D1, 90 Bun/vector/SDK, 63 integration, 10 browser, workflow
   checker/self-test, route docs, dashboard adapter, Worker dry-build, and the
   six-stage real-tarball verifier all passed.
@@ -140,21 +141,34 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
   with `NRestarts=0`, preserved 34 observations, 34 claims, 125 events and the
   recorded event ID, produced no warning-or-higher boot journal entry, and
   passed `scripts/verify-live.ts` with real `embeddinggemma` vectors.
-- Reconciliation progress: all original 34 cutoff issues were closed only after
-  individual explanatory comments. The late snapshot exposed #71-#73, which
-  remain subject to the corrective tasks above.
-  Remote branches contain only `main`; enumerated temporary worktrees and local
-  branches were removed without modifying the user's original dirty checkout.
-- Publication: tag `v0.2.0` resolves to `023fdd0`; npm `latest` resolves to
-  `0.2.0` with SHA-1 `fe6826cbdb3f0210fe3b4cf53ef51ec44ee04c55` and passed
-  clean registry SDK/CLI/README smokes; GitHub release
-  `https://github.com/RamaAditya49/titen/releases/tag/v0.2.0` is public.
-- Project policy remained intact: GitHub Actions stayed disabled and no
-  workflow was added as a release gate.
+- Reconciliation: every original and late issue, including #71-#73, #75, and
+  #77, was closed only after an individual explanatory comment. #75 required no
+  fix; #77 was closed as not planned with its delivered, future, and trigger-based
+  debt scopes separated. Before terminal-documentation PR #78 opened, the final
+  release snapshot had zero open issues and PRs; #78 was its sole temporary PR.
+- Publication: tag `v0.2.0` resolves to `023fdd0`, and its public npm/GitHub
+  artifacts remain available. Annotated tag `v0.2.1` peels to the exact release
+  commit `a6c9edf`; npm `latest` resolves to `0.2.1` with SHA-1
+  `7b1fd4f9893a94153b303e191d4f7281e122524f`; the registry SDK/CLI smoke passed;
+  and `https://github.com/RamaAditya49/titen/releases/tag/v0.2.1` is public,
+  non-draft, and not a prerelease.
+- Project policy remained intact: GitHub Actions is disabled, current `main` has
+  no workflow, and no workflow was used as a release gate. GitHub retains one
+  failed historical run from the deleted `ci/issue-8-guardrail` branch.
+- Before opening PR #78, remote branch cleanup left only `main`; its
+  `docs/complete-v0.2.1-release` head was the sole temporary branch exception.
+  Earlier enumerated topic branches were removed without modifying the user's
+  original dirty checkout.
 - Late focused gates: the key response and handoff path passed 71 D1, 90
   Bun/vector/SDK, and 63 integration tests. A clean temporary HOME/XDG setup
   reached Wrangler's 221.73 KiB / 48.87 KiB dry-build successfully; workflow,
   route-documentation, build, and diff checks passed.
+- Live corrective gate: image
+  `61b70145edbce715b5878d7279c9f6aa3ff83671a85a2418309a598e40d8b603`
+  (digest `sha256:4e0fd3ce9064cce2432a451cba93dcfdef7060f2105f201629c51d20b713ebc4`)
+  served revision `a6c9edf` healthy with schema 10 and `NRestarts=0`; generated
+  principal handoff, pre-existing event persistence, and the full real-model
+  verifier passed.
 
 ## Security, migration, deployment, and rollback
 
