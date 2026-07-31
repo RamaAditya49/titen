@@ -269,7 +269,10 @@ evidence remain unchanged.
 ### `POST /v1/context/:id/feedback`
 
 Record used/useful/irrelevant/incorrect/harmful outcomes for the context or
-individual items.
+individual items. Only the run actor or the intended recipient of a pending or
+accepted handoff may submit feedback. Titen re-authorizes the complete stored
+pack first; a removed membership or hidden item makes the request return the
+same `404` as an unknown context.
 
 ### `POST /v1/index/drain`
 
@@ -384,7 +387,9 @@ ordinary members cannot force-release an organization-scoped lease.
 
 Create a pending handoff to a known active principal. A supplied context must
 match the organization and subject, and every item must be currently visible to
-both sender and recipient. A supplied checkpoint must be an unexpired
+both sender and recipient. Missing claims, foreign claims, and claims whose
+subject or project differs from the context make the complete reference
+ineligible. A supplied checkpoint must be an unexpired
 sender-owned checkpoint for the same subject. Missing, foreign,
 cross-organization, inaccessible, and mismatched references return `404` before
 the foreign-key write.
@@ -409,7 +414,8 @@ Return authorized metadata-only domain events after an opaque cursor. It lets an
 orchestrator poll when inbound webhooks are unavailable; it is not a transcript
 or raw memory feed. Public cursors remain stable event IDs; the database maps
 them to a monotonic local sequence, so equal-timestamp pages and federation
-pulls do not order by random UUIDs or skip committed events.
+pulls do not order by random UUIDs or skip committed events. An exhausted page
+echoes its incoming cursor so a poller can continue from the same position.
 
 ### Federation routes
 
@@ -700,7 +706,9 @@ return `422 UNRESOLVED_REFERENCE` with only `record_type`, `field`, and
 ID collisions fail closed, every request is atomic, and re-import is idempotent.
 An exact self-authenticating redaction marker retains its original content hash
 but is not re-added to FTS or vector projections; non-current claims are likewise
-restored canonically with delete, rather than upsert, projection work.
+restored canonically with delete, rather than upsert, projection work. If purge
+wins after import preflight, the same atomic batch rejects a current claim while
+still allowing an explicit revoked tombstone on retry.
 
 Format v2 never trusts a foreign `actor_id` as local authority. Before records
 from another principal, add an explicit noncanonical control line:

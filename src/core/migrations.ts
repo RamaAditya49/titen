@@ -634,9 +634,14 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
                    AND NOT EXISTS (
                      SELECT 1
                        FROM context_run_items i
-                       JOIN claims c ON c.id = i.claim_id
-                      WHERE i.context_id = r.id AND c.org_id = h.org_id
+                       LEFT JOIN claims c ON c.id = i.claim_id
+                      WHERE i.context_id = r.id
                         AND (
+                          c.id IS NULL
+                          OR c.org_id <> h.org_id
+                          OR c.subject_id <> r.subject_id
+                          OR c.project_id IS NOT r.project_id
+                          OR
                           NOT (
                             c.visibility = 'organization'
                             OR (c.visibility = 'private' AND c.actor_id = h.from_principal)

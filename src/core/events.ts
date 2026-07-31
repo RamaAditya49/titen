@@ -176,7 +176,7 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
 
   // Keep the public cursor equal to the event ID for existing clients. The ID
   // now resolves to event_order.seq; it no longer supplies the ordering.
-  const cursor = events.length > 0 ? events[events.length - 1]!.id : null;
+  const cursor = events.length > 0 ? events[events.length - 1]!.id : after;
 
   return { data: { events, cursor } };
 }

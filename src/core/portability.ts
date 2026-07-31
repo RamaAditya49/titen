@@ -1,6 +1,7 @@
 import { assertTrustCeiling, hasScope, requireScope } from "./auth";
 import { auditStatement } from "./audit";
 import { authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
+import { purgedEvidenceGuardStatement } from "./claims";
 import { MAX_BOUND_PARAMS, chunk, type Stmt } from "./db";
 import { conflict, unresolvedReference, validationError } from "./errors";
 import { eventStatement } from "./events";
@@ -515,6 +516,12 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     const indexable = row.status === "active" || row.status === "disputed";
     inserted.claim += 1;
     inserted.claim_source += row.sources.length;
+    if (indexable) statements.push(purgedEvidenceGuardStatement(
+      principal.orgId,
+      row.id as string,
+      row.sources.map((source) => source.observation_id),
+      at,
+    ));
     statements.push({
       sql: `INSERT INTO claims
               (id, org_id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement,

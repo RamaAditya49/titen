@@ -292,6 +292,7 @@ export async function getContext(ctx: RequestContext): Promise<Result> {
     rows.map((row) => row.id),
   );
   const items = rows.map((row) => ({
+    untrusted: true,
     claim_id: row.id,
     claim: row.statement,
     kind: row.kind,
@@ -338,12 +339,9 @@ export async function recordFeedback(ctx: RequestContext): Promise<Result> {
   const claimId = optionalString(body, "claim_id", LIMITS.identifier);
   const mutationId = optionalString(body, "client_mutation_id", LIMITS.identifier);
 
-  const run = await first<{ id: string }>(
-    ctx.app.db,
-    `SELECT id FROM context_runs WHERE id = ? AND org_id = ?`,
-    [contextId, principal.orgId],
-  );
-  if (!run) throw notFound();
+  // Feedback inherits the stored pack's owner/delegate boundary and rechecks
+  // every item against current authorization before changing utility signals.
+  await getContext(ctx);
 
   if (claimId) {
     const item = await first<{ claim_id: string }>(

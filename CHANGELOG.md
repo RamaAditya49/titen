@@ -66,8 +66,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 - JSON depth, unsafe controls, malformed Unicode, non-sortable timestamps, and
   inverted validity windows now fail before canonical mutation. Each returned
-  memory item is marked untrusted, and evidence purge removes FTS and vector
-  projections without exposing a general MCP deletion tool.
+  memory item is marked untrusted, feedback is limited to the context actor or a
+  currently authorized intended delegate, and evidence purge removes FTS and
+  vector projections without exposing a general MCP deletion tool.
 - Whole-organization export now requires the separate `export:all` scope and
   writes a metadata-only audit record. Portable actor ownership survives only
   through explicit, preflighted source-to-destination mappings; importing on
@@ -84,13 +85,15 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   unbounded query work.
 - Checkpoint saves and handoff resolutions now have database-enforced single
   winners under D1 latency, with deterministic duplicate repair and safe
-  handoff foreign keys during migration.
+  handoff foreign keys during migration. Handoff preflight and migration also
+  reject incomplete, foreign, mismatched, or unauthorized context packs.
 - Idempotent retries now follow the acting principal across API-key rotation
   while retaining the original credential ID for audit and preserving
   cross-principal isolation.
 - Event polling and federation pulls now page by a database-assigned monotonic
   sequence without changing public event-ID cursors, preventing equal-timestamp
-  UUID ordering from skipping committed events.
+  UUID ordering from skipping committed events; exhausted polling preserves the
+  caller's cursor.
 - An explicitly scoped REST tombstone removes readable observation and
   dependent-claim text while retaining hashes, provenance, and audit history.
 - Validation errors distinguish missing values, identify nested field paths,
@@ -99,7 +102,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Versioned JSONL v2 restores workspaces, active memberships, team-scoped
   records, actor provenance, claim evidence, and supersession pointers. Export
   pages are UTF-8 byte-bounded so every emitted page fits the import boundary;
-  v1 imports remain supported.
+  v1 imports remain supported, and a purge racing current-claim import rolls the
+  whole import back while revoked tombstones remain portable.
 - `titen backup` refuses a missing source, verifies a non-empty current schema
   plus integrity and foreign keys, and atomically refreshes a fixed output path
   without exposing an internal stack. `titen schema` output is deterministic

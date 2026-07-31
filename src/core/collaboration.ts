@@ -348,28 +348,36 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
   if (!recipient) throw notFound();
 
   if (contextId) {
-    const context = await first<{ id: string }>(
+    const context = await first<{ id: string; project_id: string | null }>(
       ctx.app.db,
-      `SELECT id FROM context_runs
+      `SELECT id, project_id FROM context_runs
         WHERE id = ? AND org_id = ? AND subject_id = ?`,
       [contextId, orgId, subjectId],
     );
     if (!context) throw notFound();
-    const hidden = await first<{ count: number }>(
+    const items = await first<{ total: number; authorized: number }>(
       ctx.app.db,
-      `SELECT COUNT(*) AS count
+      `SELECT COUNT(*) AS total,
+              COUNT(CASE WHEN c.id IS NOT NULL
+                              AND c.org_id = ?
+                              AND c.subject_id = ?
+                              AND c.project_id IS ?
+                              AND ${recordAccessSql("c")}
+                              AND ${recordAccessSql("c")}
+                         THEN 1 END) AS authorized
          FROM context_run_items i
-         JOIN claims c ON c.id = i.claim_id
-        WHERE i.context_id = ? AND c.org_id = ?
-          AND (NOT ${recordAccessSql("c")} OR NOT ${recordAccessSql("c")})`,
+         LEFT JOIN claims c ON c.id = i.claim_id
+        WHERE i.context_id = ?`,
       [
-        contextId,
         orgId,
+        subjectId,
+        context.project_id,
         ...recordAccessParams(principalId),
         ...recordAccessParams(toPrincipal),
+        contextId,
       ],
     );
-    if (Number(hidden?.count ?? 0) > 0) throw notFound();
+    if (Number(items?.total ?? 0) !== Number(items?.authorized ?? 0)) throw notFound();
   }
 
   if (checkpointId) {

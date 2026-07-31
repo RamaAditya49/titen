@@ -730,7 +730,7 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "another organization cannot submit feedback for a foreign context run",
+    name: "only the context owner or intended delegate can submit feedback",
     async run(fx) {
       const owner = await fx.provision();
       await seedClaim(fx, owner.key);
@@ -742,6 +742,15 @@ export const CASES: Case[] = [
           max_tokens: 900,
         },
       });
+      expectOk(compiled);
+      const sibling = await fx.provision({ orgId: owner.orgId });
+      expectError(
+        await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+          key: sibling.key,
+          body: { outcome: "harmful" },
+        }),
+        404,
+      );
       const intruder = await fx.provision();
       expectError(
         await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
@@ -1966,6 +1975,106 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "handoff creation rejects missing, foreign, mismatched, and unauthorized context items",
+    async run(fx) {
+      const sender = await fx.provision({ scopes: ["*"] });
+      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const foreign = await fx.provision({ scopes: ["*"] });
+      const suffix = `${Date.now()}_${fx.runtime.replace(/[^a-z]/g, "")}`;
+      const subjectId = `handoff_corrupt_${suffix}`;
+      const projectExpected = `project_expected_${suffix}`;
+      const projectOther = `project_other_${suffix}`;
+      const claimForeign = `claim_foreign_${suffix}`;
+      const claimSubject = `claim_subject_${suffix}`;
+      const claimProject = `claim_project_${suffix}`;
+      const claimPrivate = `claim_private_${suffix}`;
+      const contexts = {
+        foreign: `ctx_foreign_${suffix}`,
+        subject: `ctx_subject_${suffix}`,
+        project: `ctx_project_${suffix}`,
+        private: `ctx_private_${suffix}`,
+        missing: `ctx_missing_${suffix}`,
+      };
+      const now = "2026-07-31T00:00:00.000Z";
+
+      await fx.query(
+        `INSERT INTO projects (id, org_id, reference, created_at)
+         VALUES (?, ?, ?, ?), (?, ?, ?, ?)`,
+        [
+          projectExpected, sender.orgId, `expected/${suffix}`, now,
+          projectOther, sender.orgId, `other/${suffix}`, now,
+        ],
+      );
+      await fx.query(
+        `INSERT INTO claims
+           (id, org_id, subject_id, project_id, actor_id, kind, statement,
+            confidence, trust, visibility, status, valid_from, created_at)
+         VALUES
+           (?, ?, ?, NULL, ?, 'procedural', 'Foreign item.', 0.8, 'verified', 'organization', 'active', ?, ?),
+           (?, ?, ?, NULL, ?, 'procedural', 'Wrong subject item.', 0.8, 'verified', 'organization', 'active', ?, ?),
+           (?, ?, ?, ?, ?, 'procedural', 'Wrong project item.', 0.8, 'verified', 'organization', 'active', ?, ?),
+           (?, ?, ?, NULL, ?, 'procedural', 'Private recipient item.', 0.8, 'verified', 'private', 'active', ?, ?)`,
+        [
+          claimForeign, foreign.orgId, subjectId, foreign.principalId, now, now,
+          claimSubject, sender.orgId, `${subjectId}_other`, sender.principalId, now, now,
+          claimProject, sender.orgId, subjectId, projectOther, sender.principalId, now, now,
+          claimPrivate, sender.orgId, subjectId, sender.principalId, now, now,
+        ],
+      );
+      await fx.query(
+        `INSERT INTO context_runs
+           (id, org_id, actor_id, subject_id, project_id, task_hash, max_tokens,
+            used_tokens, policy_snapshot, degraded, created_at)
+         VALUES
+           (?, ?, ?, ?, NULL, 'foreign', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, NULL, 'subject', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, ?, 'project', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, NULL, 'private', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, NULL, 'missing', 256, 1, 'policy', '{}', ?)`,
+        [
+          contexts.foreign, sender.orgId, sender.principalId, subjectId, now,
+          contexts.subject, sender.orgId, sender.principalId, subjectId, now,
+          contexts.project, sender.orgId, sender.principalId, subjectId, projectExpected, now,
+          contexts.private, sender.orgId, sender.principalId, subjectId, now,
+          contexts.missing, sender.orgId, sender.principalId, subjectId, now,
+        ],
+      );
+      await fx.query(
+        `INSERT INTO context_run_items (context_id, claim_id, position, score, score_components)
+         VALUES (?, ?, 0, 1, '{}'), (?, ?, 0, 1, '{}'),
+                (?, ?, 0, 1, '{}'), (?, ?, 0, 1, '{}')`,
+        [
+          contexts.foreign, claimForeign,
+          contexts.subject, claimSubject,
+          contexts.project, claimProject,
+          contexts.private, claimPrivate,
+        ],
+      );
+
+      for (const contextId of [contexts.foreign, contexts.subject, contexts.project, contexts.private])
+        expectError(await fx.call("POST", "/v1/handoffs", {
+          key: sender.key,
+          body: { to_principal: receiver.principalId, subject_id: subjectId, context_id: contextId },
+        }), 404);
+
+      // Legacy SQLite databases could contain an orphan created while foreign
+      // keys were disabled; D1 enforces this foreign key at write time.
+      if (fx.runtime === "bun-sqlite") {
+        await fx.query("PRAGMA foreign_keys = OFF");
+        await fx.query(
+          `INSERT INTO context_run_items (context_id, claim_id, position, score, score_components)
+           VALUES (?, ?, 0, 1, '{}')`,
+          [contexts.missing, `claim_missing_${suffix}`],
+        );
+        await fx.query("PRAGMA foreign_keys = ON");
+        expectError(await fx.call("POST", "/v1/handoffs", {
+          key: sender.key,
+          body: { to_principal: receiver.principalId, subject_id: subjectId, context_id: contexts.missing },
+        }), 404);
+      }
+    },
+  },
+  {
     name: "handoffs transfer work between principals",
     async run(fx) {
       const sender = await fx.provision({ scopes: ["*"] });
@@ -2152,6 +2261,7 @@ export const CASES: Case[] = [
       );
       expectOk(handedContext);
       assert.equal(handedContext.body.meta.delegated, true);
+      assert.equal(handedContext.body.data.items[0].untrusted, true);
       assert.equal(handedContext.body.data.items[0].claim_id, consolidated.body.data.claims[0].claim_id);
       expectError(await fx.call("GET", `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`, {
         key: sibling.key,
@@ -2159,6 +2269,14 @@ export const CASES: Case[] = [
       expectError(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
         key: sibling.key,
       }), 404);
+      expectError(await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+        key: sibling.key,
+        body: { outcome: "useful" },
+      }), 404);
+      expectOk(await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+        key: receiver.key,
+        body: { outcome: "useful", claim_id: consolidated.body.data.claims[0].claim_id },
+      }), 201);
 
       expectOk(await fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
         key: receiver.key,
@@ -2173,6 +2291,10 @@ export const CASES: Case[] = [
       }));
       expectError(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
         key: receiver.key,
+      }), 404);
+      expectError(await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+        key: receiver.key,
+        body: { outcome: "useful" },
       }), 404);
       expectOk(await fx.call("GET", `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`, {
         key: receiver.key,
@@ -2517,6 +2639,13 @@ export const CASES: Case[] = [
       expectOk(single);
       assert.equal(single.body.data.id, cursor);
       expectError(await fx.call("GET", `/v1/events/${cursor}`, { key: intruder.key }), 404);
+
+      const complete = await fx.call("GET", "/v1/events?limit=200", { key: owner.key });
+      const tail = complete.body.data.cursor as string;
+      const exhausted = await fx.call("GET", `/v1/events?after=${tail}`, { key: owner.key });
+      expectOk(exhausted);
+      assert.deepEqual(exhausted.body.data.events, []);
+      assert.equal(exhausted.body.data.cursor, tail, "an empty page must preserve its incoming cursor");
     },
   },
   {

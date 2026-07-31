@@ -53,6 +53,26 @@ interface SourceRow {
   content_hash: string;
 }
 
+/** Abort the enclosing batch if evidence was purged after preflight. */
+export function purgedEvidenceGuardStatement(
+  orgId: string,
+  claimId: string,
+  observationIds: string[],
+  at: string,
+): Stmt {
+  return {
+    sql: `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
+          SELECT ?, ?, 'supports', ?
+           WHERE EXISTS (
+             SELECT 1 FROM record_history h
+              WHERE h.org_id = ? AND h.record_type = 'observation'
+                AND h.change_kind = 'purge'
+                AND h.record_id IN (${observationIds.map(() => "?").join(", ")})
+           )`,
+    params: [claimId, observationIds[0]!, at, orgId, ...observationIds],
+  };
+}
+
 function parseSources(value: unknown, path: string): SourceInput[] {
   if (value === undefined) throw validationError(`Field "${path}" is required.`);
   if (!Array.isArray(value) || value.length === 0)
@@ -211,25 +231,12 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       const at = ctx.app.now().toISOString();
       const statements: Stmt[] = [];
       for (const claim of prepared) {
-        const guardSource = claim.sources[0]!;
-        statements.push({
-          sql: `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
-                SELECT ?, ?, ?, ?
-                 WHERE EXISTS (
-                   SELECT 1 FROM record_history h
-                    WHERE h.org_id = ? AND h.record_type = 'observation'
-                      AND h.change_kind = 'purge'
-                      AND h.record_id IN (${claim.sources.map(() => "?").join(", ")})
-                 )`,
-          params: [
-            claim.id,
-            guardSource.observationId,
-            guardSource.relation,
-            at,
-            principal.orgId,
-            ...claim.sources.map((source) => source.observationId),
-          ],
-        });
+        statements.push(purgedEvidenceGuardStatement(
+          principal.orgId,
+          claim.id,
+          claim.sources.map((source) => source.observationId),
+          at,
+        ));
         statements.push({
           sql: `INSERT INTO claims
                   (id, org_id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement,

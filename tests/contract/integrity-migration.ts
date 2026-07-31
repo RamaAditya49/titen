@@ -59,6 +59,12 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
               ('ctx_integrity_a', 'org_integrity_a', 'agent_integrity_a',
                'subject_integrity', 'hash_a', 256, 0, 'policy', '{}',
                '2026-07-31T00:00:00.000Z'),
+              ('ctx_integrity_foreign_item', 'org_integrity_a', 'agent_integrity_a',
+               'subject_integrity', 'hash_foreign_item', 256, 1, 'policy', '{}',
+               '2026-07-31T00:00:00.000Z'),
+              ('ctx_integrity_missing_item', 'org_integrity_a', 'agent_integrity_a',
+               'subject_integrity', 'hash_missing_item', 256, 1, 'policy', '{}',
+               '2026-07-31T00:00:00.000Z'),
               ('ctx_integrity_foreign', 'org_integrity_b', 'agent_integrity_b',
                'subject_integrity', 'hash_b', 256, 0, 'policy', '{}',
                '2026-07-31T00:00:00.000Z')`,
@@ -67,11 +73,15 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
       sql: `INSERT INTO claims
               (id, org_id, subject_id, actor_id, kind, statement, confidence,
                trust, visibility, status, valid_from, created_at)
-            VALUES ('claim_integrity_private', 'org_integrity_a',
-                    'subject_integrity', 'agent_integrity_secret', 'procedural',
-                    'Private migration marker.', 0.9, 'verified', 'private',
-                    'active', '2026-07-31T00:00:00.000Z',
-                    '2026-07-31T00:00:00.000Z')`,
+            VALUES
+              ('claim_integrity_private', 'org_integrity_a', 'subject_integrity',
+               'agent_integrity_secret', 'procedural', 'Private migration marker.',
+               0.9, 'verified', 'private', 'active',
+               '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z'),
+              ('claim_integrity_foreign', 'org_integrity_b', 'subject_integrity',
+               'agent_integrity_b', 'procedural', 'Foreign migration marker.',
+               0.9, 'verified', 'organization', 'active',
+               '2026-07-31T00:00:00.000Z', '2026-07-31T00:00:00.000Z')`,
     },
     {
       sql: `INSERT INTO context_runs
@@ -84,7 +94,9 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
     {
       sql: `INSERT INTO context_run_items
               (context_id, claim_id, position, score, score_components)
-            VALUES ('ctx_integrity_private', 'claim_integrity_private', 0, 1.0, '{}')`,
+            VALUES
+              ('ctx_integrity_private', 'claim_integrity_private', 0, 1.0, '{}'),
+              ('ctx_integrity_foreign_item', 'claim_integrity_foreign', 0, 1.0, '{}')`,
     },
     {
       sql: `INSERT INTO handoffs
@@ -102,6 +114,9 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
                'ckpt_integrity_missing', 'pending', '2026-07-31T00:00:00.000Z'),
               ('hoff_integrity_private', 'org_integrity_a', 'agent_integrity_secret',
                'agent_receiver', 'subject_integrity', 'ctx_integrity_private',
+               NULL, 'pending', '2026-07-31T00:00:00.000Z'),
+              ('hoff_integrity_foreign_item', 'org_integrity_a', 'agent_integrity_a',
+               'agent_receiver', 'subject_integrity', 'ctx_integrity_foreign_item',
                NULL, 'pending', '2026-07-31T00:00:00.000Z')`,
     },
     {
@@ -127,6 +142,35 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
     },
   ]);
 
+  // A v11 database could contain an orphan created while FK enforcement was
+  // disabled. Migration must retire its handoff pointer instead of overlooking
+  // the missing claim through an inner join.
+  let orphanSeeded = false;
+  await db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    await db.batch([
+      {
+        sql: `INSERT INTO context_run_items
+                (context_id, claim_id, position, score, score_components)
+              VALUES ('ctx_integrity_missing_item', 'claim_integrity_missing', 0, 1.0, '{}')`,
+      },
+      {
+        sql: `INSERT INTO handoffs
+                (id, org_id, from_principal, to_principal, subject_id, context_id,
+                 checkpoint_id, status, created_at)
+              VALUES ('hoff_integrity_missing_item', 'org_integrity_a',
+                      'agent_integrity_a', 'agent_receiver', 'subject_integrity',
+                      'ctx_integrity_missing_item', NULL, 'pending',
+                      '2026-07-31T00:00:00.000Z')`,
+      },
+    ]);
+    orphanSeeded = true;
+  } catch (error) {
+    if (!/FOREIGN KEY/i.test(String(error))) throw error;
+  } finally {
+    await db.exec("PRAGMA foreign_keys = ON");
+  }
+
   assert.equal(await migrate(db), SCHEMA_VERSION);
   assert.equal(SCHEMA_VERSION, 12);
   assert.deepEqual(await db.all(
@@ -139,6 +183,8 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
     { id: "hoff_integrity_cross_scope", context_id: null, checkpoint_id: null },
     { id: "hoff_integrity_dangling", context_id: null, checkpoint_id: null },
     { id: "hoff_integrity_duplicate", context_id: "ctx_integrity_a", checkpoint_id: "ckpt_integrity_new" },
+    { id: "hoff_integrity_foreign_item", context_id: null, checkpoint_id: null },
+    ...(orphanSeeded ? [{ id: "hoff_integrity_missing_item", context_id: null, checkpoint_id: null }] : []),
     { id: "hoff_integrity_private", context_id: null, checkpoint_id: null },
   ]);
   await assert.rejects(() => db.batch([{
