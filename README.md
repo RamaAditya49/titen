@@ -18,6 +18,7 @@
   <a href="#dashboard-preview">Dashboard</a> ·
   <a href="#memory-levels">Memory levels</a> ·
   <a href="#architecture">Architecture</a> ·
+  <a href="#agent-plugins">Agent plugins</a> ·
   <a href="#first-useful-slice">API slice</a> ·
   <a href="#documentation">Docs</a>
 </p>
@@ -121,24 +122,44 @@ The CLI needs **Bun**: it runs on `bun:sqlite`, so `npx titen-memory` only works
 with Bun on `PATH`. From a clone, the same commands are `pnpm titen bootstrap`
 and `pnpm titen serve` after `pnpm install`.
 
-### Codex plugin
+### Agent plugins
 
-Titen ships a repo-marketplace Codex plugin with a portable Agent Skill. Install
-the plugin, then connect it to your operator-selected self-hosted MCP endpoint:
+Titen ships the same portable Agent Skill and existing authenticated `/mcp`
+endpoint for Codex, Claude Code, ZCode, OpenClaw/ClawHub, Cursor, Hermes, Pi,
+OpenCode, Windsurf, and TRAE. Native marketplace/plugin formats are used where
+the host has one; other hosts receive their native MCP/skill configuration.
+
+Codex:
 
 ```bash
 codex plugin marketplace add RamaAditya49/titen --ref main \
   --sparse .agents/plugins --sparse plugins/titen-memory
 codex plugin add titen-memory@titen
-codex mcp add titen --url "${TITEN_URL%/}/mcp" \
+codex mcp add titen --url "$TITEN_MCP_URL" \
   --bearer-token-env-var TITEN_API_KEY
 ```
 
-Set `TITEN_URL` and `TITEN_API_KEY` outside the repository first. The plugin
-contains lifecycle/security instructions only; it deliberately contains no
-instance URL, credential, automatic transcript capture, or second MCP server.
-See the [agent guide](https://github.com/RamaAditya49/titen/blob/main/docs/agent-guide.md#mcp-integration)
-for the seven-tool allowlist and approval configuration.
+Claude Code (the same marketplace is importable by ZCode):
+
+```bash
+claude plugin marketplace add RamaAditya49/titen
+claude plugin install titen-memory@titen
+```
+
+OpenClaw installs the skill bundle from ClawHub and uses its native
+Streamable HTTP config for the connection:
+
+```bash
+openclaw plugins install clawhub:@ramaaditya49/titen-memory
+# Merge integrations/openclaw/openclaw.json into the OpenClaw config.
+openclaw mcp doctor titen --probe
+```
+
+Set the complete MCP endpoint in `TITEN_MCP_URL` and the agent-specific key in
+`TITEN_API_KEY` outside the repository first. No package contains an instance
+URL, credential, automatic transcript capture, lifecycle hook, or second MCP
+server. See the [complete host installation matrix](https://github.com/RamaAditya49/titen/blob/main/docs/agent-plugins.md)
+and [seven-tool security boundary](https://github.com/RamaAditya49/titen/blob/main/docs/agent-guide.md#mcp-integration).
 
 ### Agent SDK (any runtime)
 

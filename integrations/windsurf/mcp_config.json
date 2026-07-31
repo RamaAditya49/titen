@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "titen": {
+      "serverUrl": "${env:TITEN_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:TITEN_API_KEY}"
+      }
+    }
+  }
+}

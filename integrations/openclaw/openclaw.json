@@ -1,0 +1,25 @@
+{
+  "mcp": {
+    "servers": {
+      "titen": {
+        "url": "${TITEN_MCP_URL}",
+        "transport": "streamable-http",
+        "enabled": true,
+        "headers": {
+          "Authorization": "Bearer ${TITEN_API_KEY}"
+        },
+        "toolFilter": {
+          "include": [
+            "titen_compile",
+            "titen_remember",
+            "titen_feedback",
+            "titen_checkpoint_save",
+            "titen_checkpoint_get",
+            "titen_lease_acquire",
+            "titen_handoff"
+          ]
+        }
+      }
+    }
+  }
+}

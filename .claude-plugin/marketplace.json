@@ -1,0 +1,14 @@
+{
+  "name": "titen",
+  "owner": {
+    "name": "Titen contributors"
+  },
+  "description": "Evidence-grounded collaborative memory for coding agents.",
+  "plugins": [
+    {
+      "name": "titen-memory",
+      "source": "./plugins/claude/titen-memory",
+      "description": "Connect Claude Code, ZCode, or OpenClaw to an operator-selected Titen MCP server."
+    }
+  ]
+}

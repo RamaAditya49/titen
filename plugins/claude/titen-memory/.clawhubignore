@@ -1,0 +1,2 @@
+# ponytail: OpenClaw stable imports remote HTTP MCP through native mcp.servers config; remove this filter when bundle HTTP import ships.
+.mcp.json

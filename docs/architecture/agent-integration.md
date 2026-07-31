@@ -1,11 +1,12 @@
 # Agent integration and orchestration flow
 
-- Status: REST, stateless `/mcp`, portable Agent Skill, and Codex reference
-  plugin implemented; other host-native packages deferred
+- Status: REST, stateless `/mcp`, portable Agent Skill, native Codex/Claude/
+  Cursor/Hermes/Pi packages, and OpenClaw/OpenCode/Windsurf/TRAE host kits
+  implemented
 - Last researched and verified: 2026-07-31
 - Audience: agent integrators, operators, contributors, and orchestrator authors
-- Applies to: OpenClaw, Hermes Agent, Codex, Claude Code, and other MCP/HTTP
-  capable agents
+- Applies to: Codex, Claude Code, ZCode, OpenClaw, Cursor, Hermes Agent, Pi,
+  OpenCode, Windsurf, TRAE, and other MCP/HTTP-capable agents
 
 ## Direct answer
 
@@ -22,12 +23,16 @@ Pi/Other ─┘                                  ├─ canonical SQL + FTS
                                                └─ durable event outbox
 ```
 
-The shipped cross-host distribution unit for MCP-capable agents is the portable
-Agent Skill under `plugins/titen-memory/skills/titen-memory/` plus connection
-recipes for the existing remote `/mcp` endpoint. Codex receives it through the
-repository marketplace; other MCP-capable hosts may consume the same Agent
-Skills contract. Pi's REST/SDK instructions and extension remain deferred. A
-mature native adapter may additionally contain:
+The canonical cross-host distribution unit is the portable Agent Skill under
+`.agents/skills/titen-memory/` plus the existing remote `/mcp` endpoint. Exact
+copies are bundled where a host cache cannot reference the repository copy;
+the focused integration test rejects divergence. Codex, Claude/ZCode, Cursor,
+Hermes, and Pi receive their native packaging shape. OpenClaw receives a
+ClawHub skill bundle plus native remote-MCP config; OpenCode, Windsurf, and TRAE
+receive the native MCP/skill configuration their host supports. The complete
+install matrix is in [Agent plugins](../agent-plugins.md).
+
+A future lifecycle adapter may additionally contain:
 
 1. a Streamable HTTP MCP connection to Titen;
 2. a short instruction describing when to recall and remember;
@@ -38,11 +43,10 @@ mature native adapter may additionally contain:
 REST remains the universal fallback. The plugin, hook, SDK, and MCP tools all
 reuse the same authorization, validation, and domain operations.
 
-The v0.2 decision is therefore **not** to publish five native plugins. Codex has
-the thin reference plugin; Claude Code, OpenClaw, and Hermes can connect directly
-to `/mcp` and reuse the portable skill; Pi uses the REST/SDK fallback until a
-reviewed extension is justified. Native packages are distribution and lifecycle
-conveniences, not separate memory implementations.
+The distribution decision is to publish thin host artifacts without publishing
+host-specific memory implementations. Native packages are installation
+conveniences; authorization, scope, evidence, recall, and coordination policy
+remain in the one Titen service. No package currently adds lifecycle hooks.
 
 ## Endpoint correction
 
@@ -86,33 +90,34 @@ It does not receive ordinary memory-management or administrative MCP tools.
 The installation experience can differ while the memory behavior stays the
 same.
 
-| Runtime            | Primary connection                   | Deferred lifecycle shape        | Deferred native artifact       |
-| ------------------ | ------------------------------------ | ------------------------------- | ------------------------------ |
-| OpenClaw           | managed remote HTTP MCP server       | typed plugin hooks              | OpenClaw plugin/bundle         |
-| Hermes Agent       | remote HTTP MCP server               | plugin or shell hooks           | Hermes plugin plus config      |
-| Codex              | Streamable HTTP MCP in `config.toml` | trusted Codex command hooks     | Codex plugin                   |
-| Claude Code        | HTTP MCP in `.mcp.json`              | plugin hooks                    | Claude Code plugin             |
-| Pi                 | REST through the SDK                 | TypeScript extension events     | npm Pi package                 |
-| Generic MCP client | Streamable HTTP MCP                  | host-specific hook if available | config plus short instructions |
-| Agent without MCP  | REST through `titen` CLI/SDK         | host hook or explicit calls     | one small client package       |
-
-The initial implementation does not need all packages. Build the Titen HTTP/MCP
-contract and one thin reference adapter first. Add a host-specific package only
-after its lifecycle behavior has a contract test.
+| Runtime | Shipped distribution | Tool connection | Lifecycle automation |
+| --- | --- | --- | --- |
+| Codex | repo-marketplace plugin | user `config.toml` remote MCP | deferred |
+| Claude Code / ZCode | Claude marketplace bundle | bundled environment-backed HTTP MCP | deferred |
+| OpenClaw | ClawHub compatible bundle + config kit | native `mcp.servers` remote MCP | deferred |
+| Cursor | Cursor marketplace plugin | bundled environment-backed HTTP MCP | deferred |
+| Hermes Agent | Python skill plugin | native `mcp_servers` config | deferred |
+| Pi | skill-only Pi package | operator-selected MCP adapter | deferred |
+| OpenCode | Agent Skill + config kit | native remote MCP | deferred |
+| Windsurf | model-decision rule + config kit | native remote MCP | deferred |
+| TRAE | Agent Skill + UI recipe | native remote MCP UI | deferred |
+| Generic MCP client | Agent Skill | Streamable HTTP `/mcp` | host-specific |
+| Agent without MCP | short instructions | `TitenClient`/REST | explicit calls |
 
 ## Verified host matrix and packaging decision
 
-The following matrix uses current primary documentation. “Now” is the shortest
-supported path; the native shape is a later option, not a release dependency.
-
-| Host | Use now | Native artifact only when justified |
-| --- | --- | --- |
-| Claude Code | Remote HTTP MCP in `.mcp.json`; project configuration is approved by the user | `.claude-plugin/plugin.json`, `skills/`, `.mcp.json`, and optional `hooks/hooks.json` for versioned one-click distribution or measured lifecycle automation ([plugins](https://code.claude.com/docs/en/plugins-reference), [MCP](https://code.claude.com/docs/en/mcp), [hooks](https://code.claude.com/docs/en/hooks)) |
-| Codex | Repo-marketplace `titen-memory` plugin plus user-level `~/.codex/config.toml` with `bearer_token_env_var`, an explicit tool allowlist, and write approval | Add hooks only after lifecycle parity evidence; do not bundle `.mcp.json` while self-hosted URL values remain literal ([plugin packaging](https://developers.openai.com/plugins/build/plugins), [MCP configuration](https://learn.chatgpt.com/docs/extend/mcp), [hooks](https://learn.chatgpt.com/docs/hooks)) |
-| Pi | Explicit project instructions calling Titen REST/SDK; no shipped Pi skill because Pi has no built-in MCP client | An npm package declaring `pi.extensions` and `pi.skills`; extension code has full process access and must be reviewed and smoke-tested before install ([packages](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md), [extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md), [security model](https://github.com/earendil-works/pi#permissions--containerization)) |
-| OpenClaw | Save the Streamable HTTP server, restrict its tools, and run `openclaw mcp doctor --probe` | `openclaw.plugin.json` plus a TypeScript `definePluginEntry` only for typed runtime hooks; compatible Codex/Claude bundles do not make every foreign hook executable ([MCP](https://docs.openclaw.ai/cli/mcp), [native plugins](https://docs.openclaw.ai/plugins/building-plugins), [bundle boundary](https://docs.openclaw.ai/plugins/bundles), [hooks](https://docs.openclaw.ai/plugins/hooks)) |
-| Hermes Agent | Remote HTTP entry under `mcp_servers.titen` with environment-substituted URL/header and an include list | `plugin.yaml` plus Python `register(ctx)` only for host lifecycle behavior; third-party plugins remain disabled until explicitly enabled ([MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp), [plugins](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins), [hooks](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks/)) |
-| Generic | Streamable HTTP `/mcp`, or `TitenClient` where MCP is unavailable | No universal manifest exists; keep approval in the client and authorization in Titen ([transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports), [authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization), [Agent Skills](https://agentskills.io/specification)) |
+The matrix is grounded in current primary host documentation. Claude
+[marketplaces](https://code.claude.com/docs/en/plugin-marketplaces), Cursor's
+[plugin specification](https://github.com/cursor/plugins), OpenClaw's
+[bundle mapping](https://docs.openclaw.ai/plugins/bundles), Hermes
+[plugins](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins),
+Pi [packages](https://pi.dev/docs/latest/packages), OpenCode
+[MCP](https://opencode.ai/docs/mcp-servers), Windsurf
+[MCP](https://docs.windsurf.com/windsurf/cascade/mcp), ZCode
+[plugins](https://zcode.z.ai/en/docs/plugin), and TRAE's
+[skill support](https://www.trae.ai/changelog) each use a different packaging
+or configuration surface. The repository therefore ships several tiny
+artifacts rather than one dishonest polyglot plugin.
 
 One source repository may generate several artifacts, but one polyglot native
 plugin cannot be honest across JSON bundles, TypeScript/npm extensions,
@@ -120,27 +125,28 @@ OpenClaw's runtime API, and Hermes' Python API. Every future adapter must reuse
 the same seven MCP tools or REST operations and pass a host-specific install,
 authorization, lifecycle, and outage smoke.
 
-<!-- ponytail: the Codex reference plugin ships without lifecycle hooks; add automatic recall or flush only after a measured host workflow needs it and a parity fixture covers failure behavior. -->
-<!-- ponytail: Pi has no built-in MCP client; add a minimal npm Pi extension using native fetch or TitenClient only when Pi is an active adopter. -->
-<!-- ponytail: Claude, OpenClaw, and Hermes reuse the portable skill plus MCP recipes; publish a native artifact only when that host has a maintainer and install smoke fixture. -->
-<!-- ponytail: add public-directory metadata, MCP submission justifications, domain verification, screenshots, and listing assets only when a public Codex or ChatGPT submission is scheduled. -->
+<!-- ponytail: all host packages ship without lifecycle hooks; add automatic recall or flush only after a measured host workflow needs it and a parity fixture covers failure behavior. -->
+<!-- ponytail: Pi has no built-in MCP client; add a minimal Pi extension only when an operator-selected adapter is insufficient and a full process-authority review exists. -->
+<!-- ponytail: public Cursor, Windsurf, TRAE, ZCode, Hermes, Codex, or ChatGPT catalog submissions remain deferred; add vendor-specific listing assets only when a maintainer schedules that review. -->
 
 ### Runtime notes
 
-**OpenClaw.** Register Titen as an HTTP MCP server and expose only the Titen
-tools needed by the agent profile. A future native package may use typed plugin
-hooks for lifecycle control after it has an install and parity fixture.
+**OpenClaw.** Install the compatible skill bundle from ClawHub and merge the
+shipped `integrations/openclaw/openclaw.json` fragment into native
+`mcp.servers` config. OpenClaw stable imports only stdio MCP declarations from
+compatible bundles, so `.clawhubignore` keeps the Claude HTTP declaration out
+of the registry artifact. Native Streamable HTTP config supplies the same seven
+tools without an in-process provider.
 
-**Hermes Agent.** Register Titen in `mcp_servers`; Hermes displays the canonical
-wire tool names with an `mcp_titen_` server prefix, which the portable skill
-recognizes. A future native plugin may map `pre_llm_call`, `post_llm_call`, and
-session boundaries after it has an install and parity fixture; it must keep
-Titen context bounded and labeled as untrusted reference data.
+**Hermes Agent.** The Python plugin registers the read-only skill and native
+`mcp_servers` configuration owns the connection. Hermes displays canonical wire
+tool names with an `mcp_titen_` prefix, which the skill recognizes. It is not a
+Hermes memory-provider implementation.
 
 **Codex.** Install the skills-only reference plugin, then register the
 Streamable HTTP server in user-level `~/.codex/config.toml`, or project config
 only for a trusted repository. Codex currently treats a plugin `.mcp.json` URL
-literally, so Titen does not embed `${TITEN_URL}` or a localhost/public instance.
+literally, so Titen does not embed `TITEN_MCP_URL` or a localhost/public instance.
 Add a lifecycle hook only after automatic recall/flush has a parity fixture.
 
 ## Shipped Codex reference plugin
@@ -153,11 +159,11 @@ codex plugin marketplace add RamaAditya49/titen --ref main \
 codex plugin add titen-memory@titen
 ```
 
-Configure the operator-selected instance separately after setting `TITEN_URL`
-and `TITEN_API_KEY` in the host's secret-aware environment:
+Configure the operator-selected instance separately after setting
+`TITEN_MCP_URL` and `TITEN_API_KEY` in the host's secret-aware environment:
 
 ```bash
-codex mcp add titen --url "${TITEN_URL%/}/mcp" \
+codex mcp add titen --url "$TITEN_MCP_URL" \
   --bearer-token-env-var TITEN_API_KEY
 codex mcp get titen --json
 ```
@@ -166,15 +172,15 @@ The plugin contains only its manifest and portable skill. It chooses no URL,
 contains no credential, starts no process, and adds no lifecycle hook. The
 server remains the existing authenticated Titen deployment.
 
-**Claude Code.** Use the remote MCP connection and portable skill now. A future
-native package may bundle `.mcp.json`, the skill, and narrowly scoped hooks after
-it has an install and parity fixture.
+**Claude Code/ZCode.** Install the native Claude marketplace bundle. ZCode can
+import the same GitHub marketplace source.
 
-**Pi.** Use the SDK or native `fetch` from an explicit agent instruction first.
-If Pi becomes an active target, package one TypeScript extension and one skill in
-an npm package. Pi packages run with the user's process authority and do not gain
-a permission prompt merely because the project was trusted, so the extension
-must never auto-capture transcripts or credentials.
+**Cursor.** Install the native Cursor marketplace plugin. Its `mcp.json` uses
+Cursor's `${env:NAME}` interpolation, distinct from Claude's `${NAME}` syntax.
+
+**Pi.** Install the skill-only Pi package and connect Titen through the adapter
+selected by the operator. The package intentionally has no extension code with
+ambient process authority.
 
 **Other agents.** If they support MCP, they receive the same tools. Otherwise a
 tiny REST client implements the same operations. An `AGENTS.md`, `CLAUDE.md`,
@@ -194,7 +200,7 @@ host configuration or the runtime's secret store.
   mcp: {
     servers: {
       titen: {
-        url: "${TITEN_URL}/mcp",
+        url: "${TITEN_MCP_URL}",
         transport: "streamable-http",
         headers: { Authorization: "Bearer ${TITEN_API_KEY}" },
         toolFilter: {
@@ -222,7 +228,7 @@ tool allowlist. Lifecycle hooks remain deferred.
 ```yaml
 mcp_servers:
   titen:
-    url: "${TITEN_URL}/mcp"
+    url: "${TITEN_MCP_URL}"
     headers:
       Authorization: "Bearer ${TITEN_API_KEY}"
     tools:
@@ -277,9 +283,9 @@ not enter its manifest.
 }
 ```
 
-A future distributable plugin may bundle this MCP declaration, the portable
-skill, and reviewed hooks. The secret remains an environment value supplied by
-the installer/operator.
+The shipped Claude marketplace bundle includes this MCP declaration and the
+portable skill. The secret remains an environment value supplied by the
+installer/operator; lifecycle hooks remain deferred.
 
 ### Generic REST fallback
 

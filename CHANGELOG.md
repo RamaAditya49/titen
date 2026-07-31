@@ -17,6 +17,14 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- Native Claude/ZCode and Cursor marketplace bundles, a ClawHub/OpenClaw skill
+  bundle plus native MCP config, a Hermes skill plugin, a Pi skill package, and
+  OpenCode/Windsurf/TRAE host kits now package the same seven-tool Titen MCP
+  contract without duplicating the server or embedding an endpoint or
+  credential.
+
 ## [0.2.1] — 2026-07-31
 
 ### Fixed

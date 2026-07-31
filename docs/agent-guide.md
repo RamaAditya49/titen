@@ -252,6 +252,10 @@ endpoint uses the stable `INVALID_RESPONSE` code.
 Titen speaks MCP over HTTP at `/mcp`, so an agent host can use it without the
 SDK. The endpoint is authenticated: pass the API key as a bearer token.
 
+The [host distribution guide](./agent-plugins.md) covers the shipped Codex,
+Claude Code/ZCode/OpenClaw, Cursor, Hermes, Pi, OpenCode, Windsurf, and TRAE
+artifacts. Every artifact reuses this same endpoint and seven-tool boundary.
+
 ### Codex reference plugin
 
 The repository marketplace ships one skills-only reference plugin. Codex cannot
@@ -263,13 +267,14 @@ behalf:
 codex plugin marketplace add RamaAditya49/titen --ref main \
   --sparse .agents/plugins --sparse plugins/titen-memory
 codex plugin add titen-memory@titen
-codex mcp add titen --url "${TITEN_URL%/}/mcp" \
+codex mcp add titen --url "$TITEN_MCP_URL" \
   --bearer-token-env-var TITEN_API_KEY
 ```
 
-Set `TITEN_URL` and `TITEN_API_KEY` in the host's secret-aware environment
-before running the connection command. Then keep the ordinary-agent allowlist
-and write approval in `~/.codex/config.toml`:
+Set the complete `/mcp` endpoint in `TITEN_MCP_URL` and the key in
+`TITEN_API_KEY` in the host's secret-aware environment before running the
+connection command. Then keep the ordinary-agent allowlist and write approval
+in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.titen]
