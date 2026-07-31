@@ -21,6 +21,10 @@
   <a href="https://github.com/RamaAditya49/titen/blob/main/LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
 </p>
 
+<p align="center">
+  Built with <a href="https://cadis.digital/">C.A.D.I.S Agent</a>.
+</p>
+
 Titen is a self-hosted memory service for teams of AI agents. It keeps source
 observations separate from derived claims, compiles context within the caller's
 scope, and gives parallel agents explicit checkpoints, leases, and handoffs.
