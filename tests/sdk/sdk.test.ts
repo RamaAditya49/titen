@@ -443,6 +443,68 @@ test("empty and non-JSON responses never leak parser or gateway details", async 
   );
 });
 
+test("successful JSON responses require an object envelope", async () => {
+  const invalid: Array<[string, unknown]> = [
+    ["array", []],
+    ["null", null],
+    ["string", "ok"],
+    ["number", 1],
+    ["boolean", true],
+  ];
+  const calls: Array<[
+    string,
+    (client: TitenClient) => Promise<unknown>,
+  ]> = [
+    ["requestWithMeta", (client) => client.requestWithMeta("GET", "/healthz")],
+    ["health", (client) => client.health()],
+  ];
+
+  for (const [shape, value] of invalid) {
+    for (const [method, call] of calls) {
+      const requestId = `req-${shape}-${method}`;
+      const client = new TitenClient({
+        url: "http://example.test",
+        key: "test",
+        fetch: async () =>
+          Response.json(value, { headers: { "x-request-id": requestId } }),
+      });
+      await assert.rejects(
+        () => call(client),
+        (error: unknown) => {
+          assert.ok(error instanceof TitenError, `${method} accepted ${shape}`);
+          assert.equal(error.code, "INVALID_RESPONSE");
+          assert.equal(error.status, 200);
+          assert.equal(error.requestId, requestId);
+          assert.deepEqual(error.meta, { request_id: requestId });
+          return true;
+        },
+      );
+    }
+  }
+
+  const client = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () =>
+      Response.json(
+        {
+          data: { status: "ok", runtime: "test", revision: "valid" },
+          meta: { replayed: true },
+        },
+        { headers: { "x-request-id": "req-valid" } },
+      ),
+  });
+  assert.deepEqual(await client.requestWithMeta("GET", "/healthz"), {
+    data: { status: "ok", runtime: "test", revision: "valid" },
+    meta: { replayed: true, request_id: "req-valid" },
+  });
+  assert.deepEqual(await client.health(), {
+    status: "ok",
+    runtime: "test",
+    revision: "valid",
+  });
+});
+
 test("mutation idempotency reaches the server and preserves replay semantics", async () => {
   const idempotencyKey = `sdk-retry-${crypto.randomUUID()}`;
   const observation = {

@@ -497,9 +497,9 @@ export class TitenClient {
         "Response was not valid JSON.",
         responseRequestId(res),
       );
+    let json: unknown;
     try {
-      const json = JSON.parse(text) as { data?: T; meta?: unknown };
-      return { data: json.data as T, meta: responseMeta(res, json.meta) };
+      json = JSON.parse(text);
     } catch {
       throw new TitenError(
         res.status,
@@ -508,6 +508,15 @@ export class TitenClient {
         responseRequestId(res),
       );
     }
+    if (!isRecord(json))
+      throw new TitenError(
+        res.status,
+        "INVALID_RESPONSE",
+        "Response was not a valid object envelope.",
+        responseRequestId(res),
+        responseMeta(res),
+      );
+    return { data: json.data as T, meta: responseMeta(res, json.meta) };
   }
 
   /** Raw authenticated access for streaming/JSONL responses. */

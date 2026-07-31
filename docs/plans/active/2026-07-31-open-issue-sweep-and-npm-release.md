@@ -12,6 +12,10 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
 ---
 # Plan
 
+The terminal `0.3.0` closure is withdrawn. Keep this pair active until the
+reviewed `0.3.1` artifact has complete registry, tag, release, and issue
+evidence.
+
 - [x] Capture the immutable starting inventory: local WIP/stash, remote heads,
   open issues and pull requests, tags/releases, npm metadata, and Actions state.
 - [ ] Review and integrate or explicitly supersede every remote topic branch;
@@ -20,6 +24,9 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
   spec first if a verified issue requires scope outside its current boundaries.
 - [x] Land focused fixes from isolated worktrees with the smallest failing tests;
   re-run affected dual-runtime, authorization, migration, and data-loss paths.
+- [x] Reproduce issue #133, trace every typed SDK caller through
+  `requestWithMeta()`, add table-driven envelope-shape regressions, and reject
+  invalid successful JSON at that one shared boundary without retry machinery.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -34,6 +41,9 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
 - [ ] From a clean detached checkout of the release commit, run the irreversible
   prepublish gate, publish npm manually, push the annotated tag, generate the
   GitHub release from the changelog, and smoke a clean registry install.
+- [x] After the issue #133 fix passes focused and package gates, record it in the
+  changelog, set `package.json` to `0.3.1`, and verify the pnpm lockfile remains
+  valid and unchanged because it does not store the root package version.
 - [ ] Remove only merged temporary branches/worktrees, re-audit GitHub/npm and
   the preserved original checkout, then record the durable non-secret handoff.
 
@@ -62,6 +72,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #117 | Close not planned because manual npm publication and disabled GitHub Actions are an explicit project decision. |
 | #123 | Record and retain the single-process ceiling, then close worker pools/sharding until measured small-team demand breaches it. |
 | #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
+| #133 | Reject non-object 2xx JSON envelopes once in `requestWithMeta()`; cover every JSON top-level shape and typed callers, then publish the compatible correction as `0.3.1`. |
 
 ## Acceptance evidence mapping
 
@@ -85,6 +96,12 @@ to its merged evidence or to the concrete decision recorded here.
   MCP negotiation, npm version, and digest evidence.
 - AC-SWP-010: before/after status, branch pointer, diff hashes, untracked hashes,
   and stash object IDs for the original checkout.
+- AC-SWP-011: table-driven SDK tests for array, `null`, string, number, boolean,
+  and valid object responses through both `requestWithMeta()` and a typed
+  convenience method, including `TitenError` status/request-ID/metadata checks.
+- AC-SWP-012: changelog and package version diff, frozen-lockfile verification,
+  focused SDK and package gates, annotated-tag peel, npm/GitHub metadata, and
+  clean `0.3.1` registry smoke against the exact reviewed source.
 
 ## Security, migration, deployment, smoke, and rollback
 
