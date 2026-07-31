@@ -64,6 +64,8 @@ features explicitly listed as proposed are not routes.
 
 - Observation batch ingestion (`POST /v1/observations/batch`).
 - Channel CRUD (`/v1/channels`).
+- Automatic derivation/reflection has no public route. It is a planned
+  background capability; `POST /v1/consolidations` is not its queue endpoint.
 - The old `webhook-subscriptions`, `webhook-deliveries`, `knowledge-releases`,
   `audit/events`, and channel-scoped context paths are not aliases. Use the
   implemented inventory above.
@@ -180,10 +182,14 @@ invalid candidate does not force an adapter to resend accepted items.
 
 ### `POST /v1/consolidations`
 
-Materialize or reconcile claims for an authorized scope. Direct deterministic
-claims do not require a model. Automatic extraction is optional and bounded.
-Every claim needs supporting evidence from the same subject, project, and
-workspace, with no trust or visibility widening.
+Materialize caller-supplied claims for an authorized scope. The implemented
+handler validates and commits the submitted claims, returns `model_used: false`,
+and performs no automatic extraction or classification. Every claim needs
+supporting evidence from the same subject, project, and workspace, with no trust
+or visibility widening.
+
+ADR-0004 defines a future background derivation/reflection path. It will not
+silently add model latency or change this route's direct-claim semantics.
 
 ### Claim lifecycle routes
 
@@ -493,9 +499,23 @@ derived cache/vector or release-status maintenance job is stale.
 ## Health
 
 - `GET /healthz`: process liveness without sensitive details.
-- `GET /readyz`: migrations, canonical SQL, embedding fingerprint when enabled,
-  vector capability when enabled, outbox health, and release FTS plus
-  customer-assertion verifier readiness when channel serving is enabled.
+- `GET /readyz`: canonical SQL, migration integrity, signing-secret
+  decryptability, and the current FTS, vector, legacy `model`,
+  `background_repair`, and export/import capability states. It makes no
+  embedding-provider or vector-index network call and does not compare a
+  persisted embedding fingerprint.
+
+In the current readiness and context responses, `capabilities.model` and
+`meta.degraded.model` respectively refer to the configured embedder. They do not
+prove an extraction model exists. A future enrichment implementation must
+introduce explicit `embedding`, `extraction`, and `background_enrichment`
+capability/degradation fields with a versioned API change; clients must not
+infer them today.
+
+A persisted embedding/index fingerprint and mismatch readiness gate are also
+proposed. The current index-drain response reports only the configured model and
+dimensions; clients must not treat those two fields as a verified full
+fingerprint.
 
 `capabilities.background_repair` is canonical scheduler evidence. `enabled`
 means a configured scheduler recorded a successful pass within its bounded

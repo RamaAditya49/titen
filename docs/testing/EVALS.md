@@ -1,7 +1,7 @@
 # Evaluation specification
 
-Status: memory-service release-gate design. The static Astro dashboard has a
-local browser gate; service commands and measured baselines begin with P0.
+Status: memory-service release-gate contract. Deterministic service suites and
+selected live smokes exist; model-assisted enrichment remains a planned gate.
 
 ## Purpose
 
@@ -167,6 +167,65 @@ Added for v0.2 and extended for v0.3:
 - v0.3 Scope Preview grants no authority and Knowledge Release exposes no
   private evidence or verified-but-unreleased content.
 
+### 8. Model-assisted memory management
+
+Automatic enrichment cannot ship from a generic chat benchmark. Freeze and
+version derivation and reflection fixtures, gold propositions, schemas, prompts,
+and the scorer together.
+
+Derivation cases cover every runtime claim kind, no-memory/chitchat, tentative
+and third-party statements, correction, duplicate evidence, conflicting
+observations, exact identifiers, prompt injection, fabricated/foreign source
+IDs, and Indonesian/English/Javanese-in-Indonesian paraphrases. Reflection cases
+cover `distinct`, duplicate, conflict, qualification, explicit supersession,
+repeated pattern/procedure, disjoint validity, and insufficient evidence.
+
+Use language-neutral proposition slots rather than literal phrase matching.
+Score raw trials without retry; publish repaired-after-retry separately. Run a
+minimum 72 locked cases five times per candidate before default activation.
+Report raw local-schema conformance as a model-quality metric independently
+from commit safety. A malformed or unauthorized captured output must also be
+replayed through the real validator and persistence boundary to prove it cannot
+create semantic rows.
+
+Transaction fixtures assert that derivation enqueue is atomic with its source
+observation. Reflection fixtures assert that the same ordered premise versions,
+policy-snapshot fingerprint, and pipeline fingerprint create one job; a changed
+premise or policy snapshot creates a new job; and an unrelated canonical write
+creates no reflection job.
+
+Hard gates are:
+
+- zero accepted fabricated, inaccessible, or cross-scope source/premise IDs;
+- zero authority, trust, visibility, deletion, publication, or autonomous
+  dispute-resolution mutations from model output;
+- zero invalid semantic commits from malformed or policy-invalid output, with
+  an explicit retryable or terminal job result for every invalid response;
+- enrichment job results persist only an output hash and committed result IDs,
+  never a raw or normalized proposal payload;
+- 100% no-memory safety on injection, tentative, and unrelated third-party
+  fixtures;
+- at least 90% exact-case pass, 95% claim/source F1, 85% macro recall for every
+  kind/language subgroup, and 90% temporal/reflection accuracy;
+- at least 90% repeat decision stability;
+- identical normalized validator/job/claim outcomes when captured responses are
+  replayed through D1 and SQLite.
+
+Choose one smallest model only after it passes every hard gate and lies within a
+predeclared two-point non-inferiority margin. Add routing or escalation only
+when retained failures prove a second model materially fixes a stable subset.
+The [2026-07-31 pilot](../research/2026-07-31-memory-model-evaluation.md)
+eliminated Luna for the tested schema and supports Sol as a canary candidate;
+it did not pass this production gate.
+
+Embedding evaluation is separate: compare FTS-only, vector-only, and hybrid on
+exact, paraphrase, cross-language, hard-negative, and no-result queries. Report
+Recall@5, MRR@10, nDCG@10, no-result false positives, dimensions, batch order,
+repeatability, and batch 1/16/64 latency. Similarity never counts as permission
+to merge or classify memory. The 2026-07-31 embedding pilot is directional,
+not an activation gate: its fixture, gold, scorer, and raw-result manifest are
+not independently reproducible from repository evidence.
+
 ## Fixture format
 
 Fixtures will be versioned JSONL under `test/fixtures/evals/` when the harness is
@@ -211,6 +270,11 @@ evaluation corpus.
 | Temporal accuracy          | temporal cases selecting the currently applicable or requested historical claim / temporal cases |
 | Conflict exposure          | required unresolved conflicts surfaced / expected unresolved conflicts                           |
 | Abstention accuracy        | no-memory cases returning an empty context without fabricated claims / no-memory cases           |
+| Raw schema conformance      | raw model outputs accepted by the exact local schema / raw extraction outputs                     |
+| Invalid semantic commit rate | invalid captured model outputs that create a canonical semantic row / all invalid captured outputs |
+| Claim proposal F1          | language-neutral evidence-linked proposal matches across all derived claims                       |
+| Reflection action accuracy | exact action, premise IDs, and source IDs / reflection decisions                                   |
+| Decision stability         | cases with the same normalized safe decision across independent repeats                           |
 | Budget violation rate      | context packs exceeding `max_tokens` / compiled contexts                                         |
 | Scope leakage rate         | inaccessible records returned or existence-disclosed / adversarial scope attempts                |
 | Harmful-context rate       | selected items marked harmful by the fixture or downstream feedback / selected items             |
@@ -549,6 +613,12 @@ Titen's isolation, evidence, conflict, and collaboration fixtures.
 Flaky security or canonical-integrity tests fail the gate. They are not retried
 until green and averaged away.
 
+Automatic enrichment is an independent activation gate: the model-management
+hard gates above, provider-outage/lease/crash tests, captured-response parity,
+zero invalid semantic commits, an independently reproducible embedding corpus,
+and real synthetic-tenant smoke on Cloudflare, VPS, and a local computer must
+all pass. A pilot model win does not satisfy a release row by itself.
+
 ## Reproducibility record
 
 Every published result includes:
@@ -561,7 +631,7 @@ Every published result includes:
 - prompt/schema version, temperature, seed when supported, and run count;
 - FTS/vector candidate limits, fusion parameters, and context token budget;
 - median and tail latency with model time separated from local retrieval;
-- failures and degraded capabilities, not only successful runs.
+- failures and degraded capabilities, not only successful runs;
 - warmup policy, independent trial count, concurrency, client location, and
   cold/warm state;
 - operation span timings and whether model/network time is included;

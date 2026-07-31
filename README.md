@@ -30,7 +30,8 @@
 > [!NOTE]
 > The service and collaboration contracts are implemented and verified locally
 > on Bun/SQLite and workerd/D1. The dashboard is an interactive synthetic-data
-> prototype. See the [evidence-based maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
+> prototype. Automatic LLM derivation/reflection has a proposed architecture and
+> a dated exploratory pilot, but is not implemented. See the [evidence-based maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
 > for the exact boundary of each claim.
 
 When 2–10 agents share a project, they often repeat research, act on stale
@@ -205,6 +206,25 @@ An embedding model is optional for Titen as a whole and required only when
 semantic vector retrieval is enabled. Vectorize, `sqlite-vec`, and `pgvector`
 store and search vectors; they do not generate embeddings or decide truth.
 
+Embeddings answer “which existing claims are related?” An extraction LLM can
+propose “what durable claim, time, duplicate, or conflict does this evidence
+mean?” Titen's target flow keeps that LLM asynchronous and proposal-only:
+
+```text
+canonical observation + SQL job
+  → deterministic rules
+  → authorized FTS/embedding candidates
+  → structured model proposal
+  → deterministic schema/scope/evidence validator
+  → ADD-only claim/source commit
+```
+
+The current service stops before the model-proposal steps; direct claims are
+caller-supplied. In the exploratory [2026-07-31 pilot](https://github.com/RamaAditya49/titen/blob/main/docs/research/2026-07-31-memory-model-evaluation.md),
+the Sol route produced the strongest tested reflection result. That dated result
+does not define product semantics, select a production default, or prove a
+deployment gate; embedding remains retrieval-only.
+
 ## Memory levels
 
 The level model is Titen's product vocabulary, not an industry standard.
@@ -256,14 +276,14 @@ Titen keeps one shared TypeScript core and two thin runtime adapters. Personal,
 company, and enterprise deployments use the same engine; policy and topology
 decide which collaboration capabilities are enabled.
 
-| Capability             | Cloudflare     | VPS                    |
-| ---------------------- | -------------- | ---------------------- |
-| HTTP                   | Worker `fetch` | `Bun.serve`            |
-| Canonical store        | D1             | `bun:sqlite`           |
-| Lexical retrieval      | SQLite FTS5    | SQLite FTS5            |
-| Optional vectors       | Vectorize      | `sqlite-vec`           |
-| Consolidation schedule | Cron Trigger   | timer / systemd        |
-| Models                 | Workers AI     | OpenAI-compatible HTTP |
+| Capability | Cloudflare | VPS / local computer |
+| --- | --- | --- |
+| HTTP | Worker `fetch` | `Bun.serve` |
+| Canonical store | D1 | `bun:sqlite` |
+| Lexical retrieval | SQLite FTS5 | SQLite FTS5 |
+| Optional vectors | Vectorize | `sqlite-vec` |
+| Shipped background work | scheduled index/delivery handler in code; binding/trigger provisioning varies | startup + bounded timer |
+| Proposed model enrichment | Cron/manual drain + Workers AI or compatible HTTPS/VPC | startup/timer/manual drain + compatible local/remote HTTP |
 
 No graph database is required. Relationships, provenance, validity windows,
 and supersession fit in SQLite. A graph backend earns a place only when an eval
@@ -313,10 +333,12 @@ POST /v1/context/:id/feedback
 GET  /v1/claims/:id/evidence
 ```
 
-Consolidation runs deterministic rules first and calls a model only when it
-must extract or reconcile a claim. Context compilation applies hard tenant and
-subject scope before hybrid retrieval, then returns a bounded pack with
-citations and explicit uncertainty.
+`POST /v1/consolidations` currently validates caller-supplied claims and returns
+`model_used: false`; it does not auto-classify observations. The planned
+background derivation/reflection flow is specified in
+[ADR-0004](https://github.com/RamaAditya49/titen/blob/main/docs/decisions/0004-model-assisted-memory-enrichment.md).
+Context compilation applies hard tenant and subject scope before retrieval,
+then returns a bounded pack with citations and explicit uncertainty.
 
 <details>
 <summary><strong>Planned context-pack contract</strong></summary>

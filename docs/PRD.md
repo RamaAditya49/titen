@@ -3,7 +3,7 @@
 - Status: product baseline; see the evidence-based maturity matrix in [ROADMAP](./ROADMAP.md#maturity-matrix)
 - Product direction: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
-- Target runtimes: Cloudflare Workers and Bun on a VPS
+- Target runtimes: Cloudflare Workers and Bun on a VPS or local computer
 - Language/tooling: TypeScript, pnpm, Bun
 - License: Apache-2.0
 
@@ -20,6 +20,9 @@ knowledge snapshots without exposing canonical memory.
 
 Personal, company, and enterprise installations use one engine and one external
 contract. Titen is self-hostable and does not require a hosted Titen service.
+Optional model-assisted enrichment may later derive and reflect over memory in
+the background, but SQL evidence and deterministic operation remain sufficient
+for the minimum useful product.
 
 ## 2. Problem
 
@@ -79,6 +82,8 @@ evidence coverage of recalled claims, context usefulness, and time-to-resume.
   project identity.
 - Preserve disagreement between agents until evidence or authorized policy
   resolves it.
+- Turn unstructured evidence into atomic memories and identify duplicates,
+  changes, and conflicts without giving a model authority over source evidence.
 - Release a reviewed claim version to a specific CRM/chatbot audience without
   exposing internal evidence or another customer's memory.
 - Export canonical data and move between Cloudflare and VPS deployments.
@@ -215,10 +220,14 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 
 ### FR-9 — runtimes
 
-- The same contract tests MUST pass against Cloudflare and VPS adapters.
-- Cloudflare MUST use native bindings for D1, Vectorize, and Workers AI.
-- VPS MUST use Bun, `bun:sqlite`, and optional `sqlite-vec`.
-- An OpenAI-compatible HTTP model boundary MUST be sufficient on VPS.
+- The same contract tests MUST pass against Cloudflare and Bun adapters.
+- Cloudflare MUST use native D1 bindings; optional model/vector capabilities MAY
+  use Workers AI/Vectorize or an explicitly configured compatible HTTPS/VPC
+  provider.
+- VPS and local-computer profiles MUST use Bun, `bun:sqlite`, and optional
+  `sqlite-vec`.
+- An OpenAI-compatible HTTP model and embedding boundary MUST be sufficient on
+  Bun; neither capability is mandatory.
 
 ### FR-10 — channel knowledge release
 
@@ -282,6 +291,31 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Navigation and route discovery MUST NOT bypass authorization or reveal a
   foreign resource, hidden capability, record count, or private scope.
 
+### FR-13 — model-assisted memory management
+
+- Automatic derivation and reflection MUST be optional background capabilities;
+  canonical observation and direct-claim writes MUST NOT wait for a model.
+- Derivation MUST propose bounded atomic claims with runtime-valid kinds,
+  temporal fields, and exact source IDs. Reflection MUST operate only over a
+  bounded authorized claim cluster and cite every premise.
+- Organization, subject, scope, trust ceiling, visibility, lifecycle authority,
+  and release authority MUST come from authenticated canonical state, never
+  from model output.
+- Embeddings MAY retrieve same-scope duplicate and related-claim candidates but
+  MUST NOT classify memory, select truth, merge evidence, or resolve conflict.
+- A deterministic validator MUST reject malformed output, unknown or foreign
+  IDs, authority fields, unsafe lifecycle proposals, and output outside declared
+  bounds before any ADD-only commit.
+- Enrichment jobs MUST be durable, leased, fingerprinted, idempotent, bounded,
+  retryable after transient failure, and terminal after unsafe/malformed output.
+- Model, embedding, and background-enrichment readiness MUST be independently
+  observable. Pending enrichment MUST NOT be represented as claim-ready memory.
+- Cloudflare and Bun MUST share one job/validation contract; D1/Cron and
+  SQLite/timer are runtime triggers, not different memory semantics.
+- A model name or self-reported confidence MUST NOT define capability or trust.
+  Production activation requires a locked multilingual evaluation and real
+  Cloudflare, VPS, and local-computer smoke evidence.
+
 ## 8. Non-functional requirements
 
 ### Security
@@ -297,6 +331,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - SQL is canonical; vector and compiled indexes are recoverable projections.
 - Canonical mutations, history, and outbox entries commit atomically.
 - A vector outage degrades recall but does not lose writes.
+- An extraction outage leaves canonical writes and direct claims usable and
+  retains bounded retryable enrichment work.
 - Readiness fails closed on migration or embedding-dimension mismatch.
 
 ### Performance budgets
@@ -403,6 +439,9 @@ planned area in documentation is not implementation evidence.
   rate, and unauthorized-access test pass rate;
 - operations: p50/p95 latency, degraded recall rate, outbox age, CPU, memory,
   storage, and model cost;
+- memory management: schema-valid proposal rate, evidence-linked claim
+  precision/recall, kind/temporal/reflection accuracy, safe abstention,
+  repeat stability, enrichment lag, and zero accepted foreign/fabricated IDs;
 - integration: hook overhead, calls/bytes per completed task, semantic-ready and
   webhook lag, orchestration wake time, and dropped/duplicate mutation rate;
 - channel serving: unauthorized-release rate, cross-customer leakage,
@@ -431,7 +470,8 @@ planned area in documentation is not implementation evidence.
 ## 13. Open decisions
 
 - exact stable Bun, pnpm, TypeScript, and Wrangler versions at P0;
-- first extraction model after a structured-output mini-eval;
+- production extraction-model activation after the locked multilingual,
+  dual-runtime, and three-deployment evaluation gate;
 - additional host-native plugins after the Codex reference plugin, selected only
   with an active adopter and install/parity evidence;
 - identity-provider interface when enterprise work starts;

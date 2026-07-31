@@ -12,6 +12,8 @@ The optional operator projection boundary is defined in
 [ADR-0003](../decisions/0003-memory-atlas-authorized-projection.md).
 The progressive operator information architecture is defined in
 [DESIGN](../DESIGN.md).
+Proposed automatic memory management is defined in
+[ADR-0004](../decisions/0004-model-assisted-memory-enrichment.md).
 
 ## System shape
 
@@ -32,7 +34,8 @@ flowchart TB
     C --> K[Level 5 memory kernel]
     K --> S[Canonical SQL]
     K --> I[Optional vector index]
-    K --> M[Optional model gateway]
+    K --> EM[Optional embedding gateway]
+    K -. proposed .-> XM[Proposed extraction gateway]
     C --> E[Event outbox]
     R --> S
     R --> I
@@ -44,8 +47,10 @@ flowchart TB
     S --> SQ[SQLite]
     I --> V[Vectorize]
     I --> SV[sqlite-vec]
-    M --> WAI[Workers AI]
-    M --> OAI[OpenAI-compatible HTTP]
+    EM --> WAI[Workers AI]
+    EM --> OAI[OpenAI-compatible HTTP]
+    XM -. proposed .-> WAI
+    XM -. proposed .-> OAI
     E --> W[Optional signed webhooks]
     E --> F[Signed federation event exchange]
 ```
@@ -65,20 +70,23 @@ flowchart TB
 | Federation exchange | signed filtered event transport and cursors           | canonical remote recall |
 | SQL adapter        | canonical transactions, FTS, hydration, outbox         | semantic policy   |
 | Vector adapter     | rebuildable embedding index                            | canonical content |
-| Model gateway      | embeddings and optional structured extraction          | storage           |
+| Embedding gateway  | vectors for candidate retrieval                         | classification    |
+| Proposed extraction gateway | bounded derivation/reflection proposals        | authority/storage |
 | Runtime entrypoint | bindings, startup, background trigger                  | domain logic      |
 
 ## Runtime matrix
 
-| Capability | Cloudflare                           | VPS                             |
-| ---------- | ------------------------------------ | ------------------------------- |
-| HTTP       | Worker `fetch`                       | `Bun.serve`                     |
-| SQL        | D1                                   | `bun:sqlite`                    |
-| FTS        | D1 SQLite FTS5                       | SQLite FTS5                     |
-| Vector     | optional Vectorize                   | optional `sqlite-vec`           |
-| Models     | optional Workers AI                  | optional OpenAI-compatible HTTP |
-| Background | Cron Trigger and opportunistic drain | timer/systemd and startup drain |
-| Crypto     | Web Crypto                           | Web Crypto                      |
+| Capability | Cloudflare | VPS | Local computer |
+| --- | --- | --- | --- |
+| HTTP | Worker `fetch` | `Bun.serve` | `Bun.serve` on loopback |
+| SQL | D1 | `bun:sqlite` | `bun:sqlite` |
+| FTS | D1 SQLite FTS5 | SQLite FTS5 | SQLite FTS5 |
+| Vector | optional Vectorize | optional `sqlite-vec` | optional `sqlite-vec` |
+| Embedding adapter (implemented) | Workers AI | local or remote compatible HTTP | local or remote compatible HTTP |
+| Additional Cloudflare embedding provider (proposed) | compatible HTTPS/VPC | n/a | n/a |
+| Background maintenance | scheduled/manual index and delivery drain | startup/timer/manual index and delivery drain | startup/timer/manual index and delivery drain |
+| Model enrichment (proposed) | Cron/manual drain plus Workers AI or compatible HTTPS/VPC | startup/timer/manual drain plus compatible local or remote HTTP | startup/timer/manual drain plus compatible local or remote HTTP |
+| Crypto | Web Crypto | Web Crypto | Web Crypto |
 
 The core does not require `nodejs_compat` on Workers.
 
@@ -100,6 +108,11 @@ inferred from the preview. Signed federation event exchange is implemented;
 turning remote events into authorized, indexed, recallable canonical memory is
 planned.
 
+Automatic model-assisted derivation/reflection is also planned. Current
+maintenance drains claim indexing and delivery work only; it does not classify
+observations. `capabilities.model` in the current implementation describes the
+embedder and must not be read as extraction readiness.
+
 ## Write path
 
 1. Authenticate actor and derive organization/subject authority.
@@ -108,7 +121,9 @@ planned.
    indexing/event outbox in one SQL transaction.
 4. Return canonical success even when semantic indexing or webhook delivery is
    pending.
-5. Background workers drain enrichment, vector, and delivery work.
+5. Current background work drains indexing and delivery. After ADR-0004 is
+   implemented, a separate leased enrichment job may propose and validate
+   claims before enqueueing their index work.
 
 ## Context path
 
@@ -185,8 +200,11 @@ remain source-tool calls instead of stale knowledge releases.
 ## Failure boundaries
 
 - SQL failure aborts the canonical mutation.
-- Vector/model failure degrades semantic behavior and leaves repairable outbox
-  work.
+- Embedding/vector failure degrades semantic retrieval and leaves repairable
+  index work.
+- Under the proposed enrichment contract, extraction failure never rolls back
+  evidence; it leaves bounded enrichment work pending or terminally failed with
+  no semantic mutation.
 - Policy failure denies before retrieval.
 - Channel approval/policy failure denies before release activation or context;
   vector failure degrades only to authorized release FTS.
@@ -201,11 +219,8 @@ remain source-tool calls instead of stale knowledge releases.
 
 ## Dependency budget
 
-The current production dependency is Astro. Playwright and local font packages
-support browser verification and self-hosted typography. Memory Atlas uses
-native HTML, CSS, JavaScript, dialog, and SVG without a graph renderer.
-
-P0 service dependencies are not approved until its vertical spike. Use native
-`Request`, `Response`, Web Crypto, D1, `bun:sqlite`, `Bun.serve`, and `fetch`
-before adding validation, vector, framework, or provider SDK dependencies.
-`sqlite-vec` remains optional and may be added only if its VPS spike passes.
+Astro, Playwright, and local fonts support the optional dashboard. The memory
+service uses native `Request`, `Response`, Web Crypto, D1, `bun:sqlite`,
+`Bun.serve`, and `fetch`; optional `sqlite-vec` is already isolated to the Bun
+vector capability. The proposed model-assisted enrichment design adds no
+provider SDK, queue, Redis, graph database, or dependency-injection framework.

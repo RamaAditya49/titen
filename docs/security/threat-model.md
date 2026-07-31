@@ -131,6 +131,11 @@ Rules at every boundary:
 | TM-20 | channel/gateway query leaks internal, wrong-audience, or another customer's memory                           | gateway credential bound to channel/audience, short-lived signed customer assertion with issuer/audience/expiry/replay validation, subject-aware cache keys, release-only index, canonical hydration | anonymous/raw-subject, replayed assertion, and cross-channel/customer fixtures return no content or existence signal |
 | TM-21 | stale cache/vector hit continues serving a revoked, expired, replaced, or source-invalidated release         | canonical release and exact source-claim version/status/dispute/validity check after every candidate lookup; commit-time eligibility invalidation; rebuildable projections                           | revoked or source-invalidated release is absent from the next compile despite injected stale candidates              |
 | TM-22 | Memory Atlas traversal, cache, layout, or scope preview leaks hidden records/topology or grants authority     | authorize before expansion; authorize both edge endpoints; principal/policy-scoped cache; canonical hydration; no hidden counts; explicit preview capability; bounded depth/nodes/edges/time/bytes | foreign focus/edge and stale-cache fixtures reveal no node, label, edge, count, or timing-dependent expansion; preview grants no access |
+| TM-23 | mixed-tenant or mixed-visibility records enter one extraction/reflection batch                               | authorize and minimize the source set before serialization; bind job to organization/scope; rehydrate every cited ID                                                                                | foreign canary never enters provider request/output and no hidden existence is disclosed                             |
+| TM-24 | provider accepts JSON mode/schema but returns malformed, oversized, or authority-bearing output                | exact local schema/key/enum/size validation; output is untrusted; fail closed before semantic transaction                                                                                           | valid JSON with extra authority field and invalid enum creates no claim/action                                       |
+| TM-25 | model/prompt drift changes decisions without an auditable boundary                                             | immutable provider/model/prompt/schema/source-set fingerprint; locked evaluation and explicit rollout/reindex                                                                                       | fingerprint change cannot reuse a completed job or silently become production default                               |
+| TM-26 | remote model egress exposes more memory than required or leaks a credential                                    | minimum authorized source content, TLS/VPC endpoint policy, secret store, no redirects/logging, per-deployment processing disclosure                                                                | captured request contains only allowlisted fields; keys/prompts/raw output absent from logs/export                   |
+| TM-27 | duplicate drain, crash, or retry creates duplicate claims or unbounded spend                                   | persistent lease/expiry, unique job fingerprint, bounded timeout/attempt/backoff/concurrency, atomic result-plus-done transaction                                                                    | concurrent/expired-lease/crash fixtures create at most one semantic result and terminate within declared bounds      |
 
 ## Memory-poisoning controls by lifecycle
 
@@ -142,12 +147,16 @@ Rules at every boundary:
 - Require explicit authority for verified, procedural, or organization-visible
   claims.
 
-### Consolidate
+### Enrich and reflect
 
 - Keep source evidence immutable.
 - Preserve contradictions instead of allowing last-write-wins synthesis.
 - Version prompts/models and bound each batch.
 - Treat proposed lifecycle changes as validated data, never direct commands.
+- Authorize before provider serialization and use only supplied source/premise
+  IDs; embeddings shortlist candidates but never cross a scope boundary.
+- Keep extraction degradation separate from embedding degradation and preserve
+  retryable work without a retry storm.
 
 ### Recall
 
