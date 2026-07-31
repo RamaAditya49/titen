@@ -220,7 +220,8 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
     },
     ...(ctx.app.vectors ? [
       {
-        sql: `UPDATE index_outbox SET state = 'done'
+        sql: `UPDATE index_outbox
+                 SET state = 'done', lease_token = NULL, lease_expires_at = NULL
                WHERE org_id = ? AND record_type = 'observation' AND record_id = ?
                  AND operation = 'upsert' AND state = 'pending'`,
         params: [principal.orgId, observationId],
@@ -280,7 +281,8 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
     },
     ...(ctx.app.vectors ? [
       {
-        sql: `UPDATE index_outbox SET state = 'done'
+        sql: `UPDATE index_outbox
+                 SET state = 'done', lease_token = NULL, lease_expires_at = NULL
                WHERE org_id = ? AND record_type = 'claim' AND state = 'pending'
                  AND operation = 'upsert'
                  AND record_id IN (

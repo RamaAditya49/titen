@@ -111,6 +111,35 @@ evidence.
 - [x] Prove issue #166 on Node 22 and the default supported Node runtime, then
   inject one controlled child failure and verify nonzero exit plus removal of
   only that child's Miniflare persistence and workerd process.
+- [x] Add migration 16 with only nullable `index_outbox` owner and expiry
+  columns; claim due rows by conditional SQL before provider I/O and require the
+  owner token for completion, failure attempts, and dependency markers in both
+  manual and background drains.
+- [x] Add deterministic dual-runtime barriers for manual/manual and
+  manual/background overlap, stale-owner failure after takeover, genuine
+  failure/retry, delete-only work, and cross-organization non-recovery; retain
+  sanitized local readiness and run migration/schema gates.
+- [x] Fix #167 at the shared index-outbox boundary: preserve canonical
+  reconciliation before every external upsert and removal, leave fresh repair
+  independent of an expired token after stale or apply-then-throw results, and
+  return only ownership-confirmed index/remove/remaining counts.
+- [x] Add deterministic Bun/SQLite and Cloudflare/D1 purge barriers covering
+  post-embed/pre-upsert invalidation, manual/manual and manual/background
+  ordering, upsert/remove stale success/apply-then-throw/process-stop, lease
+  takeover, and restart convergence.
+- [x] Fix #169 by deriving due-row eligibility and each conditional claim's
+  full expiry from the database clock; do not use a request, process, or caller
+  wall clock as lease authority.
+- [x] Prove later manual and background claims receive a full lease after a
+  blocked delete/organization, including two independent forward/backward
+  caller epochs and zero contender provider calls on Bun/SQLite and
+  Cloudflare/D1.
+- [x] Convert all owned work for one record into one canonical reconcile row
+  before vector-store I/O; prove six repeated manual and background failures
+  retain one pending row and only one provider attempt per retry.
+- [x] Let a confirmed removal-only retry clear vector-store failure evidence
+  under the existing global unresolved-work guard without clearing embedder
+  evidence; make the focused repair fixture initialize its own metadata.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -161,10 +190,14 @@ to its merged evidence or to the concrete decision recorded here.
 | #138 | Distinguish intentional FTS-only operation from configured semantic failure; persist/compare the migration-13 index fingerprint, fail local readiness closed on incompatible or unavailable vector state, and expose separate embedding/extraction/background capability fields without implementing planned enrichment. |
 | #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
 | #141 | Make omitted project scope select only unscoped claims; add explicit `cross_project` mode guarded by `context:compile:all`, report `project_mode` and the capability-backed broad reason, and make every distributed agent skill resolve a repository project before compile. |
+| #142 | Close not planned: bounded operator inspection/lifecycle/purge already use Atlas and privileged REST/audit surfaces, while ADR-0003 explicitly rejects widening ordinary-agent MCP with operator projections. Reopen only for a concrete missing operator workflow with exact scope and authority. |
 | #102 recurrence | Keep the atomic UPSERT and handoff fence; retain safe diagnostics for each unexpected D1 contention response, keep the issue open until isolated repeated evidence classifies the recurrence, and add no product retry without a reproducible database failure. |
 | #144, #155 | Use one explicit fingerprinted role-aware embedding policy and absolute cosine gate before the existing relative ranker; require operator calibration and never ship the inspected threshold as a universal default. |
 | #157 | Serialize the manual local D1 lane with a host-wide owner lock, remove the hidden provisioning retry, preserve bounded run/case/workerd diagnostics, and keep the still-required real D1 smoke distinct from emulator evidence and #102. |
 | #166 | Remove the Node 22 file-parent timeout conflict; retain 20-second ordinary case/hook bounds and only the measured 60-second semantic-readiness exception, then prove controlled-failure cleanup without changing product behavior. |
+| #162 | Fence `index_outbox` work with one expiring SQL owner shared by manual and background drains; stale completion/failure becomes a no-op and no queue framework or dependency is added. |
+| #167 | Reduce owned work to one canonical repair before each external upsert/removal, retain it across stale or ambiguous outcomes without retry amplification, and count only ownership-confirmed work. |
+| #169 | Use database-authoritative eligibility and expiry at every conditional claim so earlier work or caller skew cannot create an expired or stranded owner. |
 
 ## Acceptance evidence mapping
 
@@ -258,6 +291,32 @@ to its merged evidence or to the concrete decision recorded here.
   and lexical recall remain unchanged, scope/provenance hold, and public output
   contains no raw score or calibration setting; immutable calibration reports
   distinguish inspected evidence from any untouched holdout.
+- AC-SWP-070: migration-16 schema inspection plus owner-token conditional claim,
+  completion, and failure assertions through the shared Bun/D1 contract.
+- AC-SWP-071: deterministic expired-owner takeover barrier proving the late
+  loser leaves row attempts and safe dependency timestamps unchanged, followed
+  by an idle local readiness check with zero provider calls.
+- AC-SWP-072: genuine owned embedder/vector failure and retry evidence plus
+  delete-only and cross-organization non-clear regressions.
+- AC-SWP-073: Bun/SQLite and Miniflare/D1 manual/manual and manual/background
+  overlap runs, sanitized persistence inspection, and bounded `/readyz`
+  assertions.
+- AC-SWP-074: shared post-embed/pre-upsert purge barrier proving the stale owner
+  reports zero indexed records, the revoked vector remains absent, and durable
+  delete work survives process restart until confirmed.
+- AC-SWP-075: Bun/SQLite and Miniflare/D1 upsert/remove stale-success,
+  apply-then-throw, process-stop, and manual/background takeover matrices,
+  ownership-confirmed response counts, cross-organization SQL inspection, and
+  secret/raw-data scans.
+- AC-SWP-076: dual-runtime blocked-delete and earlier-organization barriers,
+  exact lease-duration inspection, and zero contender provider calls.
+- AC-SWP-077: table-driven independent forward/backward caller epochs at manual
+  and background claim boundaries, database-clock expiry assertions, and
+  empty-ID no-op.
+- AC-SWP-078: six-failure manual and background probes with exact pending-row
+  counts and vector-store call counts, plus a focused isolated test run.
+- AC-SWP-079: dual-runtime removal-only failure/retry inspection proving the
+  queue drains, only vector-store evidence clears, and `/readyz` returns healthy.
 
 ## Security, migration, deployment, smoke, and rollback
 
@@ -276,6 +335,12 @@ clear them; disabling semantic configuration remains the fail-closed rollback.
 Retrieval profile and cosine-floor changes reuse the existing preprocessing
 fingerprint field, add no canonical schema, and require the same explicit
 rebuild/requeue path before readiness can recover.
+Migration 16 adds only nullable owner-token and lease-expiry columns to the
+rebuildable `index_outbox` and does not infer recovery or clear durable
+dependency markers. Rollback before publication is a reviewed revert;
+after migration, stop all index drains before starting an older binary, which
+ignores the additive columns. The pending rows remain canonical-SQL-derived and
+retryable, but mixed old/new index consumers are not a supported rollback mode.
 
 Before merge, rollback is branch deletion. After merge and before npm publish,
 rollback is a reviewed revert. After npm publish, a bad immutable artifact must

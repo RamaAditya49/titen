@@ -2,8 +2,13 @@ import { first } from "./db";
 import { unavailable, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
 import {
+  claimSemanticIndexWork,
+  compensateStaleSemanticIndexWrites,
   completeSemanticIndexWork,
+  completeSemanticIndexWrites,
   embedForRetrieval,
+  prepareSemanticIndexWrites,
+  preserveSemanticIndexReconciliation,
   recordSemanticDependencyFailure,
 } from "./vectors";
 
@@ -33,6 +38,7 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
   const limitParam = Number(ctx.url.searchParams.get("limit") ?? "50");
   if (!Number.isInteger(limitParam) || limitParam < 1 || limitParam > MAX_BATCH)
     throw validationError(`Query "limit" must be an integer between 1 and ${MAX_BATCH}.`);
+  const at = ctx.app.now().toISOString();
 
   // Only claims are searchable, so only claims need vectors. Other record types
   // are marked done so the queue cannot grow without bound.
@@ -44,15 +50,33 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
   }>(
     `SELECT id, record_type, record_id, operation FROM index_outbox
       WHERE org_id = ? AND state = 'pending'
-      ORDER BY created_at, id LIMIT ?`,
+        AND (lease_expires_at IS NULL OR lease_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ORDER BY CASE WHEN operation = 'delete' THEN 0 ELSE 1 END, created_at, id
+      LIMIT ?`,
     [principal.orgId, limitParam],
   );
-  if (pending.length === 0)
-    return { data: { drained: 0, indexed: 0, skipped: 0, remaining: 0 } };
+  if (pending.length === 0) {
+    const remaining = await first<{ count: number }>(
+      ctx.app.db,
+      `SELECT COUNT(*) AS count FROM index_outbox WHERE org_id = ? AND state = 'pending'`,
+      [principal.orgId],
+    );
+    return {
+      data: {
+        drained: 0,
+        indexed: 0,
+        removed: 0,
+        skipped: 0,
+        remaining: Number(remaining?.count ?? 0),
+      },
+    };
+  }
 
   const claimRows = pending.filter((row) => row.record_type === "claim" && row.operation !== "delete");
-  const removals = pending.filter((row) => row.operation === "delete");
-  const others = pending.filter((row) => row.record_type !== "claim" && row.operation !== "delete");
+  const removals = pending.filter(
+    (row) => row.record_type === "claim" && row.operation === "delete",
+  );
+  const others = pending.filter((row) => row.record_type !== "claim");
 
   // A claim may have been superseded or expired since it was queued; only
   // retrievable claims are worth an embedding call.
@@ -86,15 +110,36 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     else removals.push(row);
   }
 
-  if (removals.length > 0) {
+  const removalLease = await claimSemanticIndexWork(
+    ctx.app.db,
+    removals.map((row) => row.id),
+  );
+  const ownedRemovalIds = new Set(removalLease.ids);
+  const ownedRemovals = removals.filter((row) => ownedRemovalIds.has(row.id));
+  const preparedRemovals = await prepareSemanticIndexWrites(
+    ctx.app.db,
+    ownedRemovals.map((row) => ({ outboxId: row.id, recordId: row.record_id })),
+    removalLease.token,
+  );
+  let removed = 0;
+  if (preparedRemovals.length > 0) {
     try {
-      await ctx.app.vectors.store.remove([...new Set(removals.map((row) => row.record_id))]);
+      await ctx.app.vectors.store.remove([
+        ...new Set(preparedRemovals.map((write) => write.recordId)),
+      ]);
     } catch {
       await recordSemanticDependencyFailure(
         ctx.app.db,
         "vector_store",
-        ctx.app.now().toISOString(),
-        removals.map((row) => row.id),
+        removalLease.acquiredAt,
+        preparedRemovals.map((write) => write.outboxId),
+        removalLease.token,
+      );
+      await preserveSemanticIndexReconciliation(
+        ctx.app.db,
+        preparedRemovals,
+        principal.orgId,
+        removalLease.token,
       );
       throw unavailable("Indexing dependency is unavailable.", {
         dependency: "vector_store",
@@ -102,24 +147,45 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         pending: pending.length,
       });
     }
+    const confirmed = new Set(await completeSemanticIndexWrites(
+      ctx.app.db,
+      preparedRemovals,
+      "vector_store",
+      removalLease.token,
+    ));
+    const stale = preparedRemovals.filter(({ outboxId }) => !confirmed.has(outboxId));
+    await preserveSemanticIndexReconciliation(
+      ctx.app.db,
+      stale,
+      principal.orgId,
+      removalLease.token,
+    );
+    removed = confirmed.size;
   }
 
   let indexed = 0;
-  if (eligible.length > 0) {
+  const eligibleLease = await claimSemanticIndexWork(
+    ctx.app.db,
+    eligible.map((entry) => entry.outboxId),
+  );
+  const ownedEligibleIds = new Set(eligibleLease.ids);
+  const ownedEligible = eligible.filter((entry) => ownedEligibleIds.has(entry.outboxId));
+  if (ownedEligible.length > 0) {
     // One embedding request for the batch, then one index write.
     let vectors;
     try {
       vectors = await embedForRetrieval(
         ctx.app.vectors,
         "document",
-        eligible.map((entry) => entry.statement),
+        ownedEligible.map((entry) => entry.statement),
       );
     } catch {
       await recordSemanticDependencyFailure(
         ctx.app.db,
         "embedder",
-        ctx.app.now().toISOString(),
-        eligible.map((entry) => entry.outboxId),
+        eligibleLease.acquiredAt,
+        ownedEligible.map((entry) => entry.outboxId),
+        eligibleLease.token,
       );
       throw unavailable("Indexing dependency is unavailable.", {
         dependency: "embedder",
@@ -127,15 +193,27 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         pending: pending.length,
       });
     }
+    const prepared = await prepareSemanticIndexWrites(
+      ctx.app.db,
+      ownedEligible.map((entry) => ({
+        outboxId: entry.outboxId,
+        recordId: entry.claimId,
+      })),
+      eligibleLease.token,
+    );
+    const eligibleById = new Map(ownedEligible.map((entry, index) => [
+      entry.outboxId,
+      { entry, vector: vectors[index]! },
+    ]));
     try {
-      await ctx.app.vectors.store.upsert(
-        eligible.map((entry, index) => ({
-          id: entry.claimId,
-          vector: vectors[index]!,
+      if (prepared.length > 0) await ctx.app.vectors.store.upsert(
+        prepared.map((write) => ({
+          id: write.recordId,
+          vector: eligibleById.get(write.sourceOutboxId)!.vector,
           metadata: {
             org_id: principal.orgId,
-            subject_id: entry.subjectId,
-            project_id: entry.projectId ?? "",
+            subject_id: eligibleById.get(write.sourceOutboxId)!.entry.subjectId,
+            project_id: eligibleById.get(write.sourceOutboxId)!.entry.projectId ?? "",
           },
         })),
       );
@@ -143,8 +221,15 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
       await recordSemanticDependencyFailure(
         ctx.app.db,
         "vector_store",
-        ctx.app.now().toISOString(),
-        eligible.map((entry) => entry.outboxId),
+        eligibleLease.acquiredAt,
+        prepared.map((write) => write.outboxId),
+        eligibleLease.token,
+      );
+      await preserveSemanticIndexReconciliation(
+        ctx.app.db,
+        prepared,
+        principal.orgId,
+        eligibleLease.token,
       );
       throw unavailable("Indexing dependency is unavailable.", {
         dependency: "vector_store",
@@ -152,18 +237,47 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         pending: pending.length,
       });
     }
-    indexed = eligible.length;
+    const confirmed = new Set(await completeSemanticIndexWrites(
+      ctx.app.db,
+      prepared,
+      "all",
+      eligibleLease.token,
+    ));
+    const stale = prepared.filter(({ outboxId }) => !confirmed.has(outboxId));
+    if (stale.length > 0) {
+      try {
+        await compensateStaleSemanticIndexWrites(
+          ctx.app.db,
+          ctx.app.vectors.store,
+          stale,
+          principal.orgId,
+          eligibleLease.token,
+        );
+      } catch {
+        throw unavailable("Indexing dependency is unavailable.", {
+          dependency: "vector_store",
+          retryable: true,
+          pending: pending.length,
+        });
+      }
+    }
+    const staleRecords = new Set(stale.map(({ recordId }) => recordId));
+    indexed = prepared.filter(
+      ({ outboxId, recordId }) => confirmed.has(outboxId) && !staleRecords.has(recordId),
+    ).length;
   }
 
-  // Marked done only after the index write succeeded, so a failed batch is
-  // retried rather than silently dropped.
-  const done = [
-    ...eligible.map((entry) => entry.outboxId),
-    ...removals.map((row) => row.id),
-    ...others.map((row) => row.id),
-  ];
-  const at = ctx.app.now().toISOString();
-  await completeSemanticIndexWork(ctx.app.db, done, indexed > 0);
+  const otherLease = await claimSemanticIndexWork(
+    ctx.app.db,
+    others.map((row) => row.id),
+  );
+  const skipped = (await completeSemanticIndexWork(
+    ctx.app.db,
+    otherLease.ids,
+    false,
+    otherLease.token,
+  )).length;
+  const drained = indexed + removed + skipped;
 
   const remaining = await first<{ count: number }>(
     ctx.app.db,
@@ -173,10 +287,10 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
 
   return {
     data: {
-      drained: done.length,
+      drained,
       indexed,
-      removed: removals.length,
-      skipped: others.length,
+      removed,
+      skipped,
       remaining: Number(remaining?.count ?? 0),
       model: ctx.app.vectors.embedder.model,
       dimensions: ctx.app.vectors.embedder.dimensions,

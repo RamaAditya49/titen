@@ -981,6 +981,13 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          END`,
     ],
   },
+  {
+    version: 16,
+    statements: [
+      `ALTER TABLE index_outbox ADD COLUMN lease_token TEXT`,
+      `ALTER TABLE index_outbox ADD COLUMN lease_expires_at TEXT`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

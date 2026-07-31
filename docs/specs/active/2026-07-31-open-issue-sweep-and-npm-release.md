@@ -93,6 +93,35 @@ directory behind. The gate must put the 20-second bound on ordinary cases and
 hooks themselves, retain 60 seconds only for semantic readiness, and impose no
 shorter parent timeout.
 
+Issue #162 then demonstrated that two overlapping semantic-index drains can
+select the same unfenced outbox row. A late failure from the losing attempt can
+write durable outage evidence after another attempt has completed the row,
+leaving an idle deployment falsely unready. Index work needs one small durable
+ownership fence shared by manual and background drains before provider I/O.
+
+Issue #167 exposed the remaining external-side-effect race. An index owner can
+pause inside either an upsert or a removal, lose ownership to purge or lease
+takeover, and still mutate the vector store after the new owner completes. The
+same failure is possible when a provider applies a mutation and then throws.
+The SQL fence must therefore preserve canonical reconciliation across every
+external mutation, including an ambiguous result after the original owner token
+has expired, and count only side effects whose outbox ownership is still current.
+
+Issue #169 showed that ownership itself can be born expired when a drain reuses
+the timestamp captured before earlier provider work. A process-local bounded
+clock still disagrees with a fresh contender after wall-clock skew. Every
+conditional claim must therefore derive eligibility and expiry from the shared
+database clock so each new owner receives one full bounded lease regardless of
+the caller's wall-clock epoch.
+
+Independent retry review then exposed two adjacent lifecycle failures. Each
+failed vector-store retry creates a repair for every existing repair, so one
+record's pending queue doubles on every attempt. A successful removal-only
+retry drains its queue but leaves the vector-store outage marker set forever.
+Before provider I/O, owned work for one record must therefore become one durable
+canonical reconciliation row, and a confirmed removal must clear only
+vector-store failure evidence when no failed work remains.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -169,6 +198,23 @@ documentation, and an install smoke against the immutable npm artifact.
   host by bounding ordinary cases and hooks at 20 seconds, retaining the
   measured 60-second semantic-readiness bound, and always disposing the owning
   runtime and persistence after a controlled child failure.
+- Atomically claim due semantic-index outbox rows before provider I/O; require
+  the same current owner for completion, failure-attempt accounting, and
+  dependency-outage evidence in both manual and background drains.
+- Keep an ownership-fenced canonical reconciliation durable before every
+  external vector upsert or removal; after a stale or ambiguous result, leave a
+  fresh reconciliation independent of the expired owner token and converge
+  without treating the stale mutation as complete or adding provider I/O to a
+  canonical transaction.
+- Acquire each removal, upsert, retirement, and cross-organization batch lease
+  from the database clock inside the conditional SQL claim; earlier work or a
+  skewed caller clock shall consume none of the new owner's lease interval.
+- Collapse owned duplicate work for one semantic record into one write-ahead
+  canonical reconciliation before provider I/O, so repeated dependency failure
+  retains one retry row instead of amplifying the queue or provider calls.
+- Clear vector-store outage evidence after a confirmed removal-only recovery
+  only when no failed pending semantic work remains; never infer embedder
+  recovery from a removal.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -209,6 +255,8 @@ documentation, and an install smoke against the immutable npm artifact.
   polished website is not runtime evidence for the memory API.
 - Readiness must remain a bounded local check. Configuration and stored index
   metadata may be inspected, but `/readyz` must not call a model provider.
+- Index ownership is rebuildable execution bookkeeping, not canonical evidence;
+  it may use an expiring SQL lease but must not require a queue service.
 
 ## Acceptance criteria
 
@@ -356,6 +404,52 @@ documentation, and an install smoke against the immutable npm artifact.
   relative normalization. FTS-only behavior, lexical candidates, authorization,
   provenance, and the successful empty-pack contract shall remain unchanged,
   and public responses shall not expose the threshold or raw provider scores.
+- **AC-SWP-070 — Event-driven:** When a manual or background semantic-index
+  drain selects due outbox work, Titen shall atomically claim each row with an
+  opaque expiring owner before provider I/O and shall condition completion,
+  attempt accounting, and dependency-outage evidence on that same owner.
+- **AC-SWP-071 — Unwanted behavior:** If an outbox owner expires and another
+  attempt completes the row, then a late failure from the former owner shall
+  consume no attempt, write no semantic dependency marker, and leave an idle
+  `/readyz` response consistent with the absence of unresolved failed work.
+- **AC-SWP-072 — State-driven:** While genuinely failed semantic-index work
+  remains pending, delete-only work and success for another organization shall
+  not clear its outage evidence; a successful owned retry shall clear the
+  evidence only after embedding and vector mutation complete.
+- **AC-SWP-073 — Unwanted behavior:** If manual/manual or manual/background
+  drains overlap, then deterministic Bun/SQLite and Cloudflare/D1 barrier tests
+  shall prove owner fencing without storing provider output, raw errors,
+  prompts, memory content, or credentials and without adding provider I/O to
+  `/readyz`.
+- **AC-SWP-074 — Unwanted behavior:** If evidence purge invalidates an index
+  owner after embedding but before its vector upsert returns, then the stale
+  attempt shall not leave the purged claim in the vector store, mark its former
+  upsert done, or report it as indexed; durable canonical reconciliation shall
+  survive a restart at every barrier until absence is confirmed.
+- **AC-SWP-075 — Unwanted behavior:** If lease-expiry takeover or purge races
+  with a successful, failed, or apply-then-throw stale vector upsert or removal,
+  then manual/manual and manual/background drains on Bun/SQLite and
+  Cloudflare/D1 shall retain fresh repair work independent of the lost token,
+  converge from canonical SQL, report only ownership-confirmed `indexed`,
+  `removed`, and `remaining` values, and remain fail closed across organizations
+  without a new queue framework or dependency.
+- **AC-SWP-076 — Event-driven:** When a drain claims an outbox row after earlier
+  work has consumed time, Titen shall assign the full configured lease interval
+  from the database-authoritative acquisition, and an immediate manual or
+  background contender shall make zero provider calls for the row.
+- **AC-SWP-077 — Unwanted behavior:** If two manual or background drains observe
+  different backward or forward caller wall-clock epochs, then those epochs
+  shall not change SQL lease eligibility or expiry; the database clock shall
+  prevent immediate takeover and shall not strand retryable work beyond the
+  configured interval.
+- **AC-SWP-078 — Unwanted behavior:** If repeated manual or background drains
+  fail the vector-store mutation for one record, then the pending canonical
+  reconciliation count shall remain one after the first failure and provider
+  attempts shall grow linearly, never exponentially.
+- **AC-SWP-079 — Event-driven:** When a removal-only retry is confirmed and no
+  failed pending semantic work remains, Titen shall clear the vector-store
+  failure marker while preserving any embedder failure marker and shall return
+  ready without a provider probe.
 
 ## Done conditions
 
@@ -385,3 +479,14 @@ Issues #144 and #155 are resolved only after both runtime adapters share the
 same role-aware profile and absolute-gate contract, fingerprint changes fail
 readiness until explicit reindex, deterministic hard-negative regressions pass,
 and any published calibrated default has separate untouched-holdout evidence.
+Issue #162 is resolved only after both runtimes prove that manual and
+background drains share one expiring ownership fence and that a stale loser
+cannot mutate outbox attempts or semantic readiness evidence.
+Issue #167 is resolved only after both runtimes prove that an accepted purge
+cannot be undone by a stale external vector write, that crash/restart retains a
+durable repair path, and that response counts reflect only current ownership.
+Issue #169 is resolved only after both runtimes prove fresh full-duration leases
+for later manual and background work under delayed earlier work and bounded
+forward/backward clock skew. The same gate must prove one pending reconcile row
+under repeated manual and background vector-store failures and healthy
+readiness after removal-only recovery.

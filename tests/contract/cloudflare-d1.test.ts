@@ -15,9 +15,13 @@ import {
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
 } from "./integrity-migration";
-import { assertSemanticReadiness } from "./semantic-readiness";
 import { acquireD1Lane, D1RunDiagnostics } from "./d1-harness";
 import { assertEnrichmentContract } from "./enrichment";
+import {
+  assertSemanticIndexOwnership,
+  assertSemanticIndexWriteRepair,
+  assertSemanticReadiness,
+} from "./semantic-readiness";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -180,6 +184,14 @@ d1Test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   }
 });
 
+d1Test("D1 fences overlapping semantic index attempts", async () => {
+  await assertSemanticIndexOwnership(db, "cloudflare-d1");
+});
+
+d1Test("D1 repairs stale external semantic index writes", async () => {
+  await assertSemanticIndexWriteRepair(db, "cloudflare-d1");
+});
+
 d1Test("partial Worker semantic configuration fails readiness without leaking it", async () => {
   const partialPersist = mkdtempSync(join(tmpdir(), "titen-d1-partial-semantic-"));
   const partial = runtime({
@@ -249,7 +261,7 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
     );
     assert.deepEqual(
       integrity.map(({ name }) => name),
-      ["checkpoints_scope", "event_order", "semantic_index_metadata"],
+      ["checkpoints_scope", "enrichment_jobs", "event_order", "semantic_index_metadata"],
     );
     assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
     assert.deepEqual(
@@ -258,7 +270,19 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
         .map(({ name }) => name),
       ["embedder_failure_at", "vector_store_failure_at"],
     );
+    assert.deepEqual(
+      (await real.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
+        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at"),
+      [],
+    );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
+    assert.deepEqual(
+      (await real.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
+        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at")
+        .map(({ name }) => name)
+        .sort(),
+      ["lease_expires_at", "lease_token"],
+    );
   } finally {
     await dispose(fault);
     rmSync(faultPersist, { recursive: true, force: true });

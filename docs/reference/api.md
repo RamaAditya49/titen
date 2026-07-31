@@ -314,7 +314,20 @@ store. If embedding or vector-store upsert is unavailable, the response is
 `503 UNAVAILABLE`; safe metadata includes `dependency` (`embedder` or
 `vector_store`), `retryable: true`, and `pending`, the number of rows selected
 by the bounded request. No selected outbox row advances on either dependency
-failure, so the same batch can be retried after recovery.
+failure. Before either an upsert or removal, Titen persists canonical
+reconciliation alongside the source row. A stale or apply-then-throw result
+leaves fresh repair independent of the expired owner token, so a later drain
+restores the projection from canonical SQL.
+
+Manual and background drains share one expiring SQL owner per outbox row. A
+takeover after expiry may finish the row, but completion, attempt accounting,
+and safe dependency-outage evidence from the former owner become no-ops. Due-row
+eligibility and expiry come from the database clock inside each conditional
+claim, so earlier provider work, another organization, or a skewed caller clock
+cannot shorten or strand the lease. Every external mutation has durable
+canonical reconciliation before I/O; stale upserts are compensated, stale
+removals are re-indexed when still eligible, and `indexed`, `removed`, and
+`remaining` count only ownership-confirmed work.
 
 Both built-in embedding adapters require exactly one dense, configured-length
 vector per input and reject non-numeric or non-finite coordinates. Provider
@@ -649,9 +662,9 @@ Readiness performs bounded local configuration/path/schema/metadata checks only.
 makes no embedding-provider or vector-index network call. Before a dependency is
 used, `enabled` means locally initialized and fingerprint-compatible. A failed
 manual or background index attempt stores only a safe dependency timestamp in
-semantic metadata, increments affected outbox attempts, and makes readiness fail
-locally. Only a later complete embed/upsert clears the observed failure; delete
-or retirement work cannot report recovery.
+semantic metadata, increments only still-owned outbox attempts, and makes
+readiness fail locally. Only a later owned complete embed/upsert clears the
+observed failure; delete or retirement work cannot report recovery.
 
 `capabilities.background_repair` is canonical scheduler evidence. `enabled`
 means a configured scheduler recorded a successful pass within its bounded

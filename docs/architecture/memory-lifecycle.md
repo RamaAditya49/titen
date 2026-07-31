@@ -531,7 +531,12 @@ When semantic retrieval is enabled:
 
 Vectorize insert and upsert visibility is asynchronous. Titen therefore treats
 mutation acceptance as pending index work, uses an outbox and bounded repair,
-and never makes Vectorize the canonical record.
+and never makes Vectorize the canonical record. Before an external upsert, the
+same outbox records a leased delete repair. Successful ownership resolves both
+rows atomically; purge or takeover leaves repair durable and compensates any
+late external write before current canonical reconciliation resumes. Each SQL
+claim takes a fresh full-duration lease; earlier work in the same drain does not
+consume it.
 
 The adapter persists and compares the configured embedding/index fingerprint in
 D1 before exposing Vectorize. Readiness inspects only local binding shape and D1
@@ -666,6 +671,7 @@ only when a measured quality gain exceeds the simplest fusion path.
 | canonical SQL write fails                | abort the mutation; no partial success                   |
 | embedding provider fails                 | retain canonical write and FTS; leave index work pending |
 | vector write is pending                  | keep canonical claim/FTS available; no recent overlay exists today |
+| stale vector write finishes after purge/takeover | compensate it and retain canonical reconciliation work       |
 | vector query fails                       | return explicit degraded FTS result when policy permits  |
 | vector returns stale ID                  | reject during canonical hydration                        |
 | extraction returns invalid sources          | commit no proposed claims                             |
