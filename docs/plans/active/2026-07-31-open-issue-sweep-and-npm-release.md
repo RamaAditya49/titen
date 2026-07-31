@@ -16,13 +16,13 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
   open issues and pull requests, tags/releases, npm metadata, and Actions state.
 - [ ] Review and integrate or explicitly supersede every remote topic branch;
   validate its completed workflow artifacts and remove only a merged branch.
-- [ ] Build an issue resolution matrix, group shared root causes, and update this
+- [x] Build an issue resolution matrix, group shared root causes, and update this
   spec first if a verified issue requires scope outside its current boundaries.
-- [ ] Land focused fixes from isolated worktrees with the smallest failing tests;
+- [x] Land focused fixes from isolated worktrees with the smallest failing tests;
   re-run affected dual-runtime, authorization, migration, and data-loss paths.
-- [ ] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
+- [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
-- [ ] Run focused checks after each integration, then the complete local manual
+- [x] Run focused checks after each integration, then the complete local manual
   gate: route/workflow checks, API/integration/browser tests, package smoke,
   production dependency audit, secret scan, and `git diff --check`.
 - [ ] Resolve every starting GitHub issue with its merged evidence, exact

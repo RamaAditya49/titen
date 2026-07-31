@@ -116,7 +116,6 @@ TITEN_VEC_DB_PATH=/var/lib/titen/titen.db.vec
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
-TITEN_EMBED_API_KEY=<optional-bearer-secret>
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
