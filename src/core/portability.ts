@@ -6,7 +6,7 @@ import { conflict, unresolvedReference, validationError } from "./errors";
 import { eventStatement } from "./events";
 import { sha256Hex } from "./ids";
 import { MAX_BODY_BYTES, type RequestContext, type Result } from "./http";
-import { outboxStatement, redactedObservationContent } from "./observations";
+import { isRedactedObservation, outboxStatement, redactedObservationContent } from "./observations";
 import {
   CLAIM_KINDS,
   CLAIM_RELATIONS,
@@ -309,7 +309,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     const { row } = entry;
     const prepared: Prepared = {
       id: requireString(row, "id", LIMITS.identifier),
-      workspace_id: requireString(row, "workspace_id", LIMITS.identifier),
+      workspace_id: optionalText(row, "workspace_id", LIMITS.identifier),
       principal_id: importedActor(entry, actorMappings, usedActorMappings, principal.principalId, "membership", "principal_id"),
       principal_kind: requireEnum(row, "principal_kind", ["human", "agent", "service"] as const),
       role: requireEnum(row, "role", ["owner", "admin", "member", "reader"] as const),
@@ -629,7 +629,8 @@ async function assertWorkspaceReferences(
   observations: Map<string, Prepared>,
   claims: Map<string, PreparedClaim>,
 ): Promise<void> {
-  const membershipRefs = [...memberships.values()].map((row) => row.workspace_id as string);
+  const membershipRefs = [...memberships.values()].map((row) => row.workspace_id)
+    .filter((id): id is string => typeof id === "string");
   const observationRefs = [...observations.values()].map((row) => row.workspace_id)
     .filter((id): id is string => typeof id === "string");
   const claimRefs = [...claims.values()].map((row) => row.workspace_id)
@@ -723,7 +724,7 @@ async function loadEvidence(
   for (const group of chunk([...new Set(refs)], MAX_BOUND_PARAMS - 2)) {
     if (!group.length) continue;
     const rows = await ctx.app.db.all<Record<string, unknown>>(
-      `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.trust, o.visibility
+      `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.content, o.content_hash, o.trust, o.visibility
          FROM observations o WHERE o.org_id = ? AND o.id IN (${group.map(() => "?").join(", ")})
           AND ${administrative ? "1 = 1" : recordAccessSql("o")}`,
       administrative
@@ -741,6 +742,10 @@ function validateEvidenceDomains(claims: Map<string, PreparedClaim>, evidence: M
   const visibilityRank: Record<Visibility, number> = { private: 0, team: 1, organization: 2 };
   for (const claim of claims.values()) {
     const sources = claim.sources.map((source) => ({ ...source, row: evidence.get(source.observation_id)! }));
+    if ((claim.status === "active" || claim.status === "disputed") && sources.some(({ row }) =>
+      typeof row.content === "string" && typeof row.content_hash === "string"
+      && isRedactedObservation(row.content, row.content_hash)))
+      throw validationError("A current claim cannot use redacted evidence.");
     for (const source of sources) {
       if (source.row.subject_id !== claim.subject_id || source.row.project_id !== claim.project_id || source.row.workspace_id !== claim.workspace_id)
         throw validationError("Imported claim evidence must match its workspace, subject, and project.");
@@ -762,7 +767,7 @@ const workspaceShape = (row: Record<string, unknown>): Prepared => ({
   id: String(row.id), name: String(row.name), created_at: String(row.created_at),
 });
 const membershipShape = (row: Record<string, unknown>): Prepared => ({
-  id: String(row.id), workspace_id: String(row.workspace_id), principal_id: String(row.principal_id),
+  id: String(row.id), workspace_id: row.workspace_id as string | null, principal_id: String(row.principal_id),
   principal_kind: String(row.principal_kind), role: String(row.role), created_at: String(row.created_at),
 });
 const projectShape = (row: Record<string, unknown>): Prepared => ({ id: String(row.id), reference: String(row.reference), created_at: String(row.created_at) });

@@ -1325,6 +1325,11 @@ export const CASES: Case[] = [
           created_at: "2026-07-31T00:00:00.000Z",
         }],
       };
+      expectError(await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: [header, { ...redactedClaim, status: "active" }, redacted].map(JSON.stringify).join("\n") + "\n",
+      }), 400, "VALIDATION_ERROR");
+      assert.deepEqual(await counts(), { observations: 0, claims: 0 });
       expectOk(await fx.callRaw("POST", "/v1/import", {
         key: target.key,
         body: [header, redactedClaim, redacted].map(JSON.stringify).join("\n") + "\n",
@@ -1395,6 +1400,12 @@ export const CASES: Case[] = [
         expectOk(membership, 201);
         membershipIds.push(membership.body.data.membership_id as string);
       }
+      const organizationMembership = await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: { principal_id: sibling.principalId, principal_kind: "agent", role: "admin" },
+      });
+      expectOk(organizationMembership, 201);
+      membershipIds.push(organizationMembership.body.data.membership_id as string);
 
       const privateObservation = await fx.call("POST", "/v1/observations", {
         key: sibling.key,
@@ -1489,7 +1500,7 @@ export const CASES: Case[] = [
       });
       expectOk(imported);
       assert.equal(imported.body.data.inserted.workspace, 1);
-      assert.equal(imported.body.data.inserted.membership, 1);
+      assert.equal(imported.body.data.inserted.membership, 2);
       const restored = await fx.query<{
         actor_id: string;
         workspace_id: string | null;
@@ -1506,6 +1517,14 @@ export const CASES: Case[] = [
       assert.equal(restored[0]!.actor_id, "portability_restored_sibling");
       assert.equal(restored[1]!.workspace_id, migratedId.get(workspaceId));
       assert.equal(restored[1]!.superseded_by, migratedId.get(teamRecords[1]!.claimId));
+      assert.deepEqual(await fx.query(
+        `SELECT workspace_id, principal_id, role FROM memberships
+          WHERE org_id = ? ORDER BY role`,
+        [target.orgId],
+      ), [
+        { workspace_id: null, principal_id: "portability_restored_sibling", role: "admin" },
+        { workspace_id: migratedId.get(workspaceId), principal_id: "portability_restored_sibling", role: "member" },
+      ]);
 
       const crossOrg = await fx.callRaw("POST", "/v1/import", {
         key: target.key,
