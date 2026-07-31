@@ -64,8 +64,15 @@ organization from the npm package:
 ```bash
 bun add --global titen-memory@latest
 titen --version
+titen version --check
 titen bootstrap --org "My Org"
 ```
+
+`titen version --check` is the only networked version check. It reads the
+stable CLI and plugin release manifest from
+[`titen.dev`](https://titen.dev/version.json); Titen does not poll in the
+background or during server/MCP startup. Re-run the installer documented at
+[`titen.dev`](https://titen.dev/docs/install) when a CLI update is available.
 
 `npm install --global titen-memory@latest` and
 `pnpm add --global titen-memory@latest` expose the same command when Bun is on

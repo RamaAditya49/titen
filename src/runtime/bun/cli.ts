@@ -7,14 +7,17 @@ import { createSqliteDb, openDatabase } from "./sqlite";
 import { serve } from "./server";
 import { configureHttpExtraction } from "../../core/extraction";
 import { parseSecretCipher } from "../../core/secrets";
+import { TITEN_VERSION } from "../../core/version";
 import { createBunWebhookSecurity } from "./webhooks";
-import { chmodSync, existsSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { fetchStableRelease, stableVersionStatus } from "./release";
+import { chmodSync, existsSync, renameSync, rmSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 const USAGE = `titen — self-hosted memory service
 
 Usage:
   titen --version
+  titen version    [--check]
   titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
   titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--label owner] [--print-sql]
@@ -31,16 +34,13 @@ Notes:
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
 
-const VERSION = (JSON.parse(
-  readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
-) as { version: string }).version;
-
 function fail(message: string): never {
   console.error(`error: ${message}`);
   process.exit(1);
 }
 
 const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> = {
+  version: { values: [], booleans: ["check"] },
   serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
   bootstrap: { values: ["db", "org", "label"], booleans: ["print-sql"] },
@@ -56,7 +56,7 @@ const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> =
 
 function parseArgs(argv: string[]) {
   if (argv.length === 1 && argv[0] === "--version") {
-    console.log(VERSION);
+    console.log(TITEN_VERSION);
     process.exit(0);
   }
   // Help is conventionally read-only. Handle it before command validation so
@@ -141,6 +141,33 @@ const { flags, command, action } = parseArgs(process.argv.slice(2));
 const dbPath = text(flags.db, "titen.db");
 
 switch (command) {
+  case "version": {
+    if (!flags.check) {
+      console.log(TITEN_VERSION);
+      break;
+    }
+    let release: Awaited<ReturnType<typeof fetchStableRelease>>;
+    try {
+      release = await fetchStableRelease();
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "release check failed");
+    }
+    const status = stableVersionStatus(TITEN_VERSION, release.cliVersion);
+    const labels = {
+      current: "up to date",
+      behind: "update available",
+      ahead: "newer than stable",
+      prerelease: "prerelease build",
+    } as const;
+    console.log(`CLI installed: ${TITEN_VERSION}`);
+    console.log(`CLI stable:    ${release.cliVersion}`);
+    console.log(`CLI status:    ${labels[status]}`);
+    console.log(`Plugin stable: ${release.pluginVersion}`);
+    console.log(`Release notes: https://titen.dev/releases/${release.cliVersion}`);
+    console.log("Install/update: https://titen.dev/docs/install");
+    break;
+  }
+
   case "serve": {
     // Vector retrieval is configured by environment, not by flags: the values
     // are deployment facts (and one is a credential), so they belong in the unit

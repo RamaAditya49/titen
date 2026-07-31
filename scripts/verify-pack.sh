@@ -92,7 +92,7 @@ initialize="$(curl --max-time 5 -sf "http://127.0.0.1:$port/mcp" \
   -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"pack-verify","version":"0"}}}')"
 case "$initialize" in
-  *'"protocolVersion":"2025-11-25"'*'"name":"titen"'*) : ;;
+  *'"protocolVersion":"2025-11-25"'*'"name":"titen","version":"'"$version"'"'*) : ;;
   *) echo "FAIL: installed MCP initialize failed" >&2; exit 1 ;;
 esac
 notification_status="$(curl --max-time 5 -sS -o /dev/null -w '%{http_code}' \

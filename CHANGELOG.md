@@ -17,6 +17,18 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- `titen version --check` explicitly reads the stable CLI/plugin release
+  manifest from `titen.dev` and points users to the manual install guide without
+  background polling or remote command execution.
+
+### Fixed
+
+- MCP initialization now reports the package SemVer as `serverInfo.version`
+  instead of mislabeling a deployment revision such as `dev`, `test`, or a Git
+  SHA as the server implementation version.
+
 ## [0.4.0] — 2026-07-31
 
 ### Fixed

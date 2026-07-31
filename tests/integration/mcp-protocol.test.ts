@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { provisionWith } from "../contract/harness";
+import { TITEN_VERSION } from "../../src/core/version";
 
 /**
  * MCP protocol compliance, driven the way a client drives it.
@@ -78,6 +79,7 @@ test("initialize negotiates a protocol revision and names the server", async () 
   });
   assert.equal(current.body.result.protocolVersion, "2025-06-18", "a supported revision is echoed");
   assert.equal(current.body.result.serverInfo.name, "titen");
+  assert.equal(current.body.result.serverInfo.version, TITEN_VERSION);
   assert.ok(current.body.result.capabilities.tools, "tools capability must be declared");
 
   const latest = await rpc({

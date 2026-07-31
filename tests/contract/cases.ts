@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
 import { MAX_BODY_BYTES } from "../../src/core/http";
 import { signPayload } from "../../src/core/webhooks";
+import { TITEN_VERSION } from "../../src/core/version";
 import type { Fixture, Res } from "./harness";
 
 export interface Case {
@@ -2728,7 +2729,7 @@ export const CASES: Case[] = [
         key: agent.key,
         body: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
       });
-      assert.equal(init.body.result.serverInfo.version, "test");
+      assert.equal(init.body.result.serverInfo.version, TITEN_VERSION);
 
       const rememberBody = {
         subject_id: "user_mcp_parity",

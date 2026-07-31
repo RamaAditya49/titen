@@ -1,23 +1,41 @@
 import { afterAll, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { MIGRATIONS, SCHEMA_VERSION, schemaState } from "../../src/core/migrations";
+import { fetchStableRelease, stableVersionStatus } from "../../src/runtime/bun/release";
 
 const root = mkdtempSync(join(tmpdir(), "titen-cli-"));
 const cli = join(import.meta.dir, "../../src/runtime/bun/cli.ts");
 const version = (JSON.parse(readFileSync(join(import.meta.dir, "../../package.json"), "utf8")) as {
   version: string;
 }).version;
+const releasePreload = join(root, "release-preload.ts");
+writeFileSync(releasePreload, `
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  if (String(input) === "https://titen.dev/version.json" && process.env.TITEN_TEST_RELEASE)
+    return Promise.resolve(new Response(process.env.TITEN_TEST_RELEASE, { status: 200 }));
+  return nativeFetch(input, init);
+};
+`);
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-function run(name: string, args: string[]) {
+function run(name: string, args: string[], release?: unknown) {
   const cwd = join(root, name);
   mkdirSync(cwd, { recursive: true });
-  const result = Bun.spawnSync({ cmd: ["bun", cli, ...args], cwd });
+  const result = Bun.spawnSync({
+    cmd: release === undefined
+      ? ["bun", cli, ...args]
+      : ["bun", "--preload", releasePreload, cli, ...args],
+    cwd,
+    env: release === undefined
+      ? undefined
+      : { ...process.env, TITEN_TEST_RELEASE: JSON.stringify(release) },
+  });
   return {
     exitCode: result.exitCode,
     output: `${result.stdout.toString()}${result.stderr.toString()}`,
@@ -28,6 +46,7 @@ function run(name: string, args: string[]) {
 test("help is side-effect free for every documented command", () => {
   const cases = [
     ["top", ["--help"]],
+    ["version", ["version", "--help"]],
     ["serve", ["serve", "--help"]],
     ["migrate", ["migrate", "--help"]],
     ["bootstrap", ["bootstrap", "--help"]],
@@ -52,6 +71,67 @@ test("version is exact and side-effect free", () => {
   assert.equal(result.exitCode, 0);
   assert.equal(result.output, `${version}\n`);
   assert.deepEqual(result.files, []);
+
+  const command = run("version-command", ["version"]);
+  assert.equal(command.exitCode, 0);
+  assert.equal(command.output, `${version}\n`);
+  assert.deepEqual(command.files, []);
+});
+
+test("version check validates and reports the stable CLI and plugin release", async () => {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version)!;
+  const nextStable = `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+  const release = {
+    schema: 1,
+    channel: "stable",
+    cli: { version: nextStable },
+    plugin: { version: "0.2.0" },
+  };
+  const result = run("version-check", ["version", "--check"], release);
+  assert.equal(result.exitCode, 0, result.output);
+  assert.equal(result.output, [
+    `CLI installed: ${version}`,
+    `CLI stable:    ${nextStable}`,
+    "CLI status:    update available",
+    "Plugin stable: 0.2.0",
+    `Release notes: https://titen.dev/releases/${nextStable}`,
+    "Install/update: https://titen.dev/docs/install",
+    "",
+  ].join("\n"));
+  assert.deepEqual(result.files, []);
+
+  const invalid = run("version-check-invalid", ["version", "--check"], {
+    ...release,
+    channel: "preview",
+  });
+  assert.notEqual(invalid.exitCode, 0);
+  assert.match(invalid.output, /error: invalid stable release manifest/);
+  assert.deepEqual(invalid.files, []);
+
+  let requestInit: RequestInit | undefined;
+  assert.deepEqual(
+    await fetchStableRelease(async (_input, init) => {
+      requestInit = init;
+      return new Response(JSON.stringify(release));
+    }),
+    { cliVersion: nextStable, pluginVersion: "0.2.0" },
+  );
+  assert.equal(requestInit?.redirect, "error", "the fixed release URL must not follow redirects");
+
+  const rejected = [
+    [new Response("redirect", { status: 302 }), /release endpoint returned HTTP 302/],
+    [new Response("unavailable", { status: 503 }), /release endpoint returned HTTP 503/],
+    [new Response("{"), /release endpoint returned invalid JSON/],
+    [new Response(JSON.stringify({ ...release, schema: 2 })), /invalid stable release manifest/],
+    [new Response(JSON.stringify({ ...release, cli: { version: "v0.5.0" } })), /invalid stable release manifest/],
+    [new Response(JSON.stringify({ ...release, plugin: { version: "latest" } })), /invalid stable release manifest/],
+  ] as const;
+  for (const [response, message] of rejected)
+    await assert.rejects(fetchStableRelease(async () => response), message);
+
+  assert.equal(stableVersionStatus("0.5.0", "0.5.0"), "current");
+  assert.equal(stableVersionStatus("0.6.0", "0.5.0"), "ahead");
+  assert.equal(stableVersionStatus("0.6.0-rc.1", "0.5.0"), "prerelease");
 });
 
 test("malformed flags fail before side effects for every command", () => {

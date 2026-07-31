@@ -34,6 +34,28 @@ server tools: `titen_project_resolve`, `titen_compile`, `titen_remember`,
 `titen_consolidate`, `titen_feedback`, `titen_checkpoint_save`,
 `titen_checkpoint_get`, `titen_lease_acquire`, and `titen_handoff`.
 
+## Check and update
+
+Run `titen version --check` to compare the installed CLI with the stable CLI
+release and see the independently versioned stable plugin release. This is an
+explicit request to `https://titen.dev/version.json`; neither the CLI nor MCP
+checks in the background.
+
+Plugin updates remain owned by the host that installed them:
+
+| Host | Refresh path |
+| --- | --- |
+| Codex | `codex plugin marketplace upgrade titen`, then restart Codex |
+| Claude Code | `claude plugin update titen-memory@titen`, then restart Claude Code |
+| Cursor or ZCode | Use the plugin manager's update control, then restart the host |
+| OpenClaw/ClawHub | Update the installed `titen-memory` skill through ClawHub |
+| Hermes | `hermes plugins update titen-memory`, then restart Hermes |
+| Pi, OpenCode, Windsurf, or TRAE | Re-copy or reinstall the repository artifact using the installation path below |
+
+The CLI/server package and host plugins are separate artifacts and do not need
+matching version numbers. The MCP handshake reports the server package version;
+the deployment revision remains available through `/healthz` and `/readyz`.
+
 ## Codex
 
 ```bash

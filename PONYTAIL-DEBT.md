@@ -11,7 +11,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 | Location | Deliberate shortcut | Ceiling | Upgrade trigger |
 | --- | --- | --- | --- |
-| `docs/agent-plugins.md:106` | Keep the standalone ClawHub skill as the temporary public install surface | Installation requires a separate skill plus native MCP config merge | The upstream inspector sandbox recovers; publish the validated bundle from commit `1cc8823` and replace this path |
+| `docs/agent-plugins.md:128` | Keep the standalone ClawHub skill as the temporary public install surface | Installation requires a separate skill plus native MCP config merge | The upstream inspector sandbox recovers; publish the validated bundle from commit `1cc8823` and replace this path |
 | `docs/architecture/agent-integration.md:128` | Ship host packages without lifecycle hooks | No automatic recall or flush | A measured host workflow needs it and a parity fixture covers failure behavior |
 | `docs/architecture/agent-integration.md:129` | Use an operator-selected adapter for Pi instead of a custom extension | Pi has no built-in MCP client | The selected adapter is insufficient and a full process-authority review exists |
 | `docs/architecture/agent-integration.md:130` | Defer vendor-specific public catalog submissions | No vendor-specific listing assets | A maintainer schedules the relevant vendor review |

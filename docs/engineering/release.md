@@ -19,6 +19,13 @@ Publishing by hand also keeps the npm credential on one machine instead of in a
 repository secret. Adding a release workflow requires a new maintainer decision
 and an explicit cost budget.
 
+The same manual release updates the schema-1 stable manifest served at
+`https://titen.dev/version.json` after npm, the Git tag, and the GitHub Release
+agree. The manifest records CLI and plugin versions independently. It is the
+human/CLI discovery surface; npm `latest` remains the package installation
+authority, and host-native plugin managers remain the plugin installation
+authority.
+
 ## Versioning and channels
 
 **Titen stays on `0.x` until the API stops moving.** SemVer clause 4 is explicit:
@@ -92,8 +99,7 @@ reaches `latest`.
 
 ## What ships
 
-`package.json#files` is an allowlist. The `0.4.0` candidate packs 48 files /
-153,144 bytes:
+`package.json#files` is an allowlist:
 
 | Included | Why |
 | --- | --- |
