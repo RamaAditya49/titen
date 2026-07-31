@@ -1,12 +1,11 @@
 ---
 work_id: d1-release-gate-runtime
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # D1 release gate runtime
@@ -43,6 +42,9 @@ failed canonical-integrity run is retained rather than averaged away.
   owned runtime is disposed after the complete lane.
 - Require five predeclared complete serial passes and a real Cloudflare D1
   smoke before the npm release can proceed.
+- For the authorized remote smoke only, create uniquely named disposable D1
+  and Worker resources, use synthetic data and an ephemeral key, then delete
+  those exact resources after evidence is recorded.
 
 ## Out of scope
 
@@ -51,6 +53,7 @@ failed canonical-integrity run is retained rather than averaged away.
 - Raising the timeout for the complete D1 lane or its race cases.
 - GitHub Actions, a new test framework, or a cross-platform lock service.
 - Automatic derivation/reflection implementation or unrelated open issues.
+- A persistent Worker, custom route, production database, or live customer data.
 
 ## Constraints and risks
 
@@ -80,6 +83,10 @@ failed canonical-integrity run is retained rather than averaged away.
   execute under the repository's supported Node 22-or-newer runtime.
 - **AC-D1G-005 — State-driven:** While the npm candidate lacks a passing real
   Cloudflare D1 smoke, Titen shall not publish the release.
+- **AC-D1G-006 — Event-driven:** When the real D1 smoke runs, Titen shall apply
+  the release schema to uniquely named disposable resources, prove health,
+  readiness, authenticated write/read, one checkpoint head, and one handoff
+  winner under concurrency, and then delete only the enumerated D1 and Worker.
 
 ## Done conditions
 
@@ -87,3 +94,15 @@ All criteria have reproducible evidence, the full repository gate and package
 verifier pass, issue #157 records the old/new comparison, superseded PR #147 is
 closed without merging its stale release claims, and this pair moves to
 `docs/specs/done/` and `docs/plans/done/`.
+
+## Verification
+
+The final local gate passed the harness 9/9, Cloudflare/D1 98/98,
+Bun/vector/SDK 120/120, integration 164/164, dashboard adapter smoke, and
+browser 10/10 without retry. The disposable Cloudflare smoke applied schema 16,
+returned health/readiness 200 and unauthenticated 401, and proved one durable
+checkpoint head from twelve concurrent saves plus one durable handoff winner
+from twelve concurrent resolutions. Direct D1 inspection found one checkpoint
+row, one resolution row, and one terminal event. The exact Worker and D1
+database were deleted and verified absent; no route or persistent deployment
+remains. Issues #102 and #157 were closed with this evidence.

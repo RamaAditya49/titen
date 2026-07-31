@@ -1,14 +1,13 @@
 ---
 work_id: model-assisted-enrichment-0136
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: cancelled
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-model-assisted-enrichment-0136.md
+spec: docs/specs/done/2026-07-31-model-assisted-enrichment-0136.md
 ---
 # Plan
 
@@ -199,3 +198,12 @@ actual target plan. Cloudflare Cron/D1, VPS timer/SQLite, and loopback
 local-computer smoke must each prove enqueue, drain, recall, provider outage
 recovery, portable provenance, and truthful readiness against the locked
 fixtures before the feature pair can close.
+
+## Closure reason
+
+Cancelled at production activation. The opt-in ledger, provider boundary,
+validation, dual-runtime replay, and maintenance path are merged and remain
+disabled by default. The locked model gate selected no candidate, and the real
+Paid D1, VPS, and local-computer activation smokes did not run. Those unchecked
+items remain explicit; a future activation needs a new spec and fresh model and
+runtime evidence.

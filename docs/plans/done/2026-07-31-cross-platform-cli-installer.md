@@ -1,14 +1,13 @@
 ---
 work_id: cross-platform-cli-installer
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: superseded
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-cross-platform-cli-installer.md
+spec: docs/specs/done/2026-07-31-cross-platform-cli-installer.md
 ---
 # Plan
 
@@ -47,4 +46,16 @@ are never accepted or printed, and no cleanup command may target user data.
 
 ## Evidence
 
-Pending implementation.
+The branch's CLI changes already exist on `main`: the package executable points
+to the Bun CLI, `titen --version` is side-effect free, and the packed-artifact
+gate exercises a Bun-only `PATH`. `titen.dev` returns `200`, while the proposed
+`/install.sh` and `/install.ps1` endpoints are absent. Standard Bun, npm, and
+pnpm installation already covers the release without two additional remote
+scripts or a second repository deployment.
+
+## Closure reason
+
+Superseded by the package-manager path already shipped and documented. The
+custom website installers, Windows-host proof, and website deployment were not
+implemented or claimed. They require a separate request if package-manager
+installation proves insufficient.

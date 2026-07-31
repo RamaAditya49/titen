@@ -1,12 +1,11 @@
 ---
 work_id: cross-platform-cli-installer
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: superseded
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Cross-platform CLI installer

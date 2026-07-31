@@ -141,8 +141,11 @@ semantic_port="$(node --input-type=module -e '
   });
 ')"
 TITEN_EMBED_BASE_URL=http://127.0.0.1:9/v1 \
-TITEN_EMBED_MODEL=pack-verify \
+TITEN_EMBED_MODEL=embeddinggemma \
 TITEN_EMBED_DIMS=4 \
+TITEN_EMBED_REVISION=pack-verify \
+TITEN_EMBED_PROFILE=embeddinggemma-retrieval-v1 \
+TITEN_EMBED_MIN_COSINE=0.7 \
 ./node_modules/.bin/titen serve --db "$work/t.db" --port "$semantic_port" \
   >"$work/semantic-serve.log" 2>&1 &
 server=$!
@@ -175,6 +178,8 @@ TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
 TITEN_EMBED_MODEL=embeddinggemma \
 TITEN_EMBED_DIMS=768 \
 TITEN_EMBED_REVISION=local-pinned \
+TITEN_EMBED_PROFILE=embeddinggemma-retrieval-v1 \
+TITEN_EMBED_MIN_COSINE=0.7 \
 ./node_modules/.bin/titen serve --db "$work/vector-ready.db" --port "$vector_port" \
   >"$work/vector-ready.log" 2>&1 &
 server=$!

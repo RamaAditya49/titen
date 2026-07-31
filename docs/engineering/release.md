@@ -92,8 +92,8 @@ reaches `latest`.
 
 ## What ships
 
-`package.json#files` is an allowlist. The `0.3.1` candidate packs 45 files /
-109,253 bytes:
+`package.json#files` is an allowlist. The `0.4.0` candidate packs 48 files /
+153,144 bytes:
 
 | Included | Why |
 | --- | --- |
