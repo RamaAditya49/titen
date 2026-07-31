@@ -582,22 +582,31 @@ derived cache/vector or release-status maintenance job is stale.
 
 - `GET /healthz`: process liveness without sensitive details.
 - `GET /readyz`: canonical SQL, migration integrity, signing-secret
-  decryptability, and the current FTS, vector, legacy `model`,
-  `background_repair`, and export/import capability states. It makes no
-  embedding-provider or vector-index network call and does not compare a
-  persisted embedding fingerprint.
+  decryptability, and capability-contract version 1. Capability states include
+  FTS, vector, embedding, extraction, background enrichment,
+  `background_repair`, and export/import. `disabled`, `enabled`, and
+  `configured_error` distinguish intentional omission from broken opt-in
+  configuration.
 
-In the current readiness and context responses, `capabilities.model` and
-`meta.degraded.model` respectively refer to the configured embedder. They do not
-prove an extraction model exists. A future enrichment implementation must
-introduce explicit `embedding`, `extraction`, and `background_enrichment`
-capability/degradation fields with a versioned API change; clients must not
-infer them today.
+`capabilities.model` and `meta.degraded.model` are deprecated `0.3.x` aliases
+for embedding. `embedding`, `extraction`, and `background_enrichment` are
+separate fields; planned extraction/enrichment remain `disabled` until their
+own implementation and evidence ship.
 
-A persisted embedding/index fingerprint and mismatch readiness gate are also
-proposed. The current index-drain response reports only the configured model and
-dimensions; clients must not treat those two fields as a verified full
-fingerprint.
+When semantic retrieval is configured, readiness compares credential-free
+provider identity, model, revision, dimensions, metric, preprocessing version,
+and index-schema version with migration-13 metadata. Partial/invalid
+configuration, unavailable or aliased local vector storage, an untracked legacy
+index, missing historical requeue work, an empty projection after canonical-only
+restore, or fingerprint mismatch returns `503 NOT_READY`, marks the affected
+capability `configured_error`, and supplies one fixed
+`checks.semantic_index` diagnostic. The response does not expose the
+fingerprint, endpoint, database path, or provider error.
+
+Readiness performs bounded local configuration/path/schema/metadata checks only. It
+makes no embedding-provider or vector-index network call. `enabled` therefore
+means locally initialized and fingerprint-compatible, not that a remote provider
+was reachable; indexing and context degradation report runtime provider failure.
 
 `capabilities.background_repair` is canonical scheduler evidence. `enabled`
 means a configured scheduler recorded a successful pass within its bounded

@@ -33,6 +33,16 @@ semantic-index path. The same patch candidate must reject malformed embedding
 output at one shared boundary while retaining canonical SQL, FTS, and retryable
 index work.
 
+Issue #138 then demonstrated that a configured semantic deployment can report
+ready while silently falling back to FTS because invalid embedding settings,
+an unavailable vector backend, and an incompatible vector fingerprint are not
+distinguished from an intentionally unconfigured FTS-only deployment.
+
+Issue #140 requires the public npm path to prove both sides of that contract:
+the default tarball must stay dependency-light, while following the documented
+explicit `sqlite-vec@0.1.9` install must make the same packed artifact report a
+healthy local vector capability.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -62,6 +72,20 @@ documentation, and an install smoke against the immutable npm artifact.
   resulting `TitenError`, and publish the verified correction as `0.3.1`.
 - Validate Bun HTTP and Cloudflare Workers AI embedding output through one
   shared boundary before any vector query or mutation can consume it.
+- Make semantic readiness fail closed when embedding or vector operation is
+  requested but cannot be initialized safely; persist and compare the minimum
+  compatible index fingerprint while preserving intentional FTS-only startup.
+- Bind the Bun fingerprint to a credential-free digest of the normalized
+  embedding endpoint, refuse a vector file that aliases the canonical database,
+  and require explicit requeue before historical FTS-only claims can be called
+  semantically ready.
+- Expose separate versioned `embedding`, `extraction`, and
+  `background_enrichment` readiness fields, retain the ambiguous `model` field
+  only as a deprecated compatibility alias, and document the explicit Bun
+  vector dependency.
+- Exercise the packed npm artifact first without and then with the documented
+  vector dependency so the public quick start proves fail-closed and healthy
+  semantic initialization from a clean consumer tree.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -72,6 +96,8 @@ documentation, and an install smoke against the immutable npm artifact.
 - Multi-process SQLite, native host memory providers, automatic model-driven
   contradiction inference, or other architecture whose issue provides no
   accepted throughput, adopter, quality, or lifecycle requirement.
+- Network provider probes on `/readyz`, automatic reindex after an embedding
+  fingerprint change, or implementation of planned extraction/enrichment.
 - Publishing the externally blocked ClawHub bundle unless the upstream
   inspector accepts the already validated package during this work.
 - Changing or cleaning the original dirty checkout.
@@ -91,6 +117,8 @@ documentation, and an install smoke against the immutable npm artifact.
   new direct maintainer decision and budget.
 - The dashboard remains synthetic where current docs say it is synthetic. A
   polished website is not runtime evidence for the memory API.
+- Readiness must remain a bounded local check. Configuration and stored index
+  metadata may be inspected, but `/readyz` must not call a model provider.
 
 ## Acceptance criteria
 
@@ -152,6 +180,37 @@ documentation, and an install smoke against the immutable npm artifact.
   reject the output as a sanitized retryable embedder dependency failure, write
   no vector, leave selected index work pending, and keep authorized FTS recall
   available.
+- **AC-SWP-014 — Optional feature:** Where no embedding or vector capability is
+  configured, Titen shall keep `/readyz` ready with FTS `enabled` and semantic
+  capabilities explicitly `disabled`.
+- **AC-SWP-015 — Unwanted behavior:** If embedding configuration is partial or
+  invalid, a configured vector backend cannot initialize its extension,
+  database, or schema, the vector path aliases canonical SQL, historical active
+  claims lack reindex work, restored canonical metadata points at a newly
+  created empty vector projection, or the active index fingerprint is
+  incompatible with stored metadata, then Titen shall return `ready: false`,
+  mark the affected semantic capability `configured_error`, and expose only a
+  sanitized local diagnostic.
+- **AC-SWP-016 — Event-driven:** When a semantic index is first initialized,
+  Titen shall persist a fingerprint containing credential-free provider
+  endpoint identity, model, revision, dimensions, metric, preprocessing
+  version, and index-schema version; when a later configuration differs, Titen
+  shall require an explicit reindex before semantic readiness can recover.
+- **AC-SWP-017 — Ubiquitous:** Titen shall expose independently versioned
+  `embedding`, `extraction`, and `background_enrichment` capability fields,
+  shall retain `model` as a deprecated embedding compatibility alias for the
+  `0.3.x` contract, and shall not present planned extraction or enrichment as
+  enabled.
+- **AC-SWP-018 — Ubiquitous:** Titen shall determine `/readyz` from bounded
+  local configuration, path, schema, extension, fingerprint, and missing-work
+  existence checks without a provider network request or unbounded backfill.
+- **AC-SWP-019 — Event-driven:** When an operator configures Bun vector
+  retrieval for `0.3.x`, the deployment documentation shall require an
+  explicit optional peer `sqlite-vec@0.1.9` install and the packed-artifact
+  regression shall cover a clean FTS-only install, the configured
+  missing-dependency error, and healthy semantic initialization after following
+  that exact install command; focused tests shall also cover fingerprint
+  mismatch.
 
 ## Done conditions
 
@@ -164,4 +223,6 @@ smoke passes; the original dirty checkout is unchanged; and this spec and its
 paired plan move to `done` with terminal evidence. The post-release issue #133
 is resolved by the verified `0.3.1` patch rather than by altering the immutable
 `0.3.0` artifact. Issue #137 is resolved only after malformed-output regressions
-pass against the shared validator and both runtime paths.
+pass against the shared validator and both runtime paths. Issue #138 is resolved
+only after configured semantic failures and fingerprint mismatches fail local
+readiness closed while intentional FTS-only operation remains ready.

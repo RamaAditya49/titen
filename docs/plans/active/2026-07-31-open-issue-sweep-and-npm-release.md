@@ -31,6 +31,31 @@ evidence.
   shared output validator; reject malformed shape, cardinality, indices,
   density, dimensions, and values before vector query/upsert, then prove outbox
   retryability and FTS degradation behavior in both runtimes.
+- [x] Trace semantic configuration, vector initialization, index metadata,
+  readiness, and maintenance through both runtime adapters; add migration 13
+  for the minimal index fingerprint and fail configured semantic startup closed
+  without adding provider probes or abstractions.
+- [x] Bind Bun fingerprints to the normalized endpoint without storing topology,
+  reject canonical/vector path aliasing before extension mutation, and fail
+  readiness closed when historical indexable claims lack requeue work.
+- [x] Require the existing `vec_claims` object to be a `vec0` virtual table with
+  the configured dimensions and scope columns; reject plain or wrong-module
+  lookalikes before reporting vector readiness.
+- [x] Validate a supplied capability's fingerprint model/dimensions against its
+  attached embedder before persisting metadata or reporting readiness.
+- [x] Extend the explicit reindex commands to insert missing active/disputed
+  claim work, then prove the guard and recovery through both runtime contracts.
+- [x] Fail local readiness when restored canonical fingerprint metadata meets a
+  newly created empty Bun vector projection; document and test the required
+  projection reset/requeue after canonical-only restore.
+- [x] Add focused FTS-only, clean-install, configured-error, healthy semantic,
+  and fingerprint-mismatch regressions; document `sqlite-vec@0.1.9` and the
+  versioned capability/readiness contract.
+- [x] From the clean packed consumer used by the release verifier, install the
+  exact documented `sqlite-vec@0.1.9` extra and prove `/readyz` changes from the
+  missing-dependency failure to healthy vector/embedding capability state.
+- [x] Declare `sqlite-vec@0.1.9` as an optional peer, then prove package-manager
+  metadata does not pull it into the default production install.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -78,6 +103,8 @@ to its merged evidence or to the concrete decision recorded here.
 | #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
 | #133 | Reject non-object 2xx JSON envelopes once in `requestWithMeta()`; cover every JSON top-level shape and typed callers, then publish the compatible correction as `0.3.1`. |
 | #137 | Validate all untrusted embedding output once in shared code; require exact cardinality, ordered unique contiguous provider indices when present, dense configured dimensions, and finite numeric coordinates before either runtime can query or mutate a vector index. |
+| #138 | Distinguish intentional FTS-only operation from configured semantic failure; persist/compare the migration-13 index fingerprint, fail local readiness closed on incompatible or unavailable vector state, and expose separate embedding/extraction/background capability fields without implementing planned enrichment. |
+| #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
 
 ## Acceptance evidence mapping
 
@@ -111,6 +138,23 @@ to its merged evidence or to the concrete decision recorded here.
   Workers AI contract regressions for missing/extra/index/sparse/type/finite/
   dimension failures, no vector writes, unchanged pending outbox rows,
   sanitized `503` metadata, and successful authorized FTS-only compile.
+- AC-SWP-014: dual-runtime FTS-only readiness tests plus a clean production
+  install without `sqlite-vec` or semantic configuration.
+- AC-SWP-015: table-driven partial/invalid configuration, missing
+  extension/backend/schema, and fingerprint-mismatch readiness tests with
+  sanitized diagnostics.
+- AC-SWP-016: migration-13 schema inspection, first-initialization persistence,
+  exact fingerprint comparison, mismatch recovery only after an explicit
+  reindex, and dual-runtime contract evidence.
+- AC-SWP-017: API/reference schema assertions for independently versioned
+  embedding, extraction, and background-enrichment fields plus the deprecated
+  `model` compatibility alias.
+- AC-SWP-018: readiness-path inspection and tests proving no embedder/provider
+  call occurs while local configuration, migration, vector, and fingerprint
+  state are checked.
+- AC-SWP-019: README/VPS instructions naming `sqlite-vec@0.1.9`, clean packed
+  consumer smokes before and after installing it, and the focused semantic
+  readiness matrix.
 
 ## Security, migration, deployment, smoke, and rollback
 
@@ -118,6 +162,11 @@ Issue fixes may cross authentication, migrations, Cloudflare D1, Bun/SQLite,
 and canonical export/import boundaries. Each such fix must fail closed and run
 the same shared contract where applicable. No production service deploy is part
 of this release; npm and GitHub are the publication surfaces.
+
+Migration 13 adds only semantic index metadata; SQL remains canonical and
+vectors remain rebuildable. A semantic fingerprint mismatch is not repaired
+implicitly: rollback is disabling semantic configuration for explicit FTS-only
+operation or running the documented reindex path with the intended fingerprint.
 
 Before merge, rollback is branch deletion. After merge and before npm publish,
 rollback is a reviewed revert. After npm publish, a bad immutable artifact must

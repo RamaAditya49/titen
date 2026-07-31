@@ -6,6 +6,7 @@ import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_CIPHER, TEST_WEBHOOK_SECURITY, type Fixture } from "./harness";
+import { assertSemanticReadiness } from "./semantic-readiness";
 
 const directory = mkdtempSync(join(tmpdir(), "titen-bun-"));
 const dbPath = join(directory, "titen.db");
@@ -57,6 +58,10 @@ afterAll(async () => {
 
 test("batch writes are atomic on bun:sqlite", async () => {
   await assertBatchAtomicity(db);
+});
+
+test("bun:sqlite semantic readiness persists and compares its fingerprint locally", async () => {
+  await assertSemanticReadiness(db, "bun-sqlite");
 });
 
 for (const contractCase of CASES)

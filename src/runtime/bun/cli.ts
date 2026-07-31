@@ -136,7 +136,6 @@ switch (command) {
     // are deployment facts (and one is a credential), so they belong in the unit
     // file or the container environment rather than a shell history. Absent any
     // of them the service serves lexical retrieval and says so in readiness.
-    const embedDims = Number(process.env.TITEN_EMBED_DIMS ?? "0");
     const servePort = port(flags.port);
     const quiet = flags.quiet === true;
     let started: Awaited<ReturnType<typeof serve>>;
@@ -150,7 +149,8 @@ switch (command) {
         vecDbPath: process.env.TITEN_VEC_DB_PATH ?? `${dbPath}.vec`,
         embedBaseUrl: process.env.TITEN_EMBED_BASE_URL,
         embedModel: process.env.TITEN_EMBED_MODEL,
-        embedDims: Number.isInteger(embedDims) && embedDims > 0 ? embedDims : undefined,
+        embedDims: process.env.TITEN_EMBED_DIMS,
+        embedRevision: process.env.TITEN_EMBED_REVISION,
         embedApiKey: process.env.TITEN_EMBED_API_KEY,
         maintenanceIntervalMs:
           process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined

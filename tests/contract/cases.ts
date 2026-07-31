@@ -88,8 +88,12 @@ export const CASES: Case[] = [
       assert.equal(res.body.data.ready, true);
       assert.equal(res.body.data.schema.applied, res.body.data.schema.expected);
       assert.equal(res.body.data.checks.canonical_sql, "ok");
+      assert.equal(res.body.data.capabilities.version, 1);
       assert.equal(res.body.data.capabilities.fts, "enabled");
       assert.equal(res.body.data.capabilities.vector, "disabled");
+      assert.equal(res.body.data.capabilities.embedding, "disabled");
+      assert.equal(res.body.data.capabilities.extraction, "disabled");
+      assert.equal(res.body.data.capabilities.background_enrichment, "disabled");
       assert.equal(res.body.data.capabilities.model, "disabled");
       assert.equal(
         res.body.data.capabilities.background_repair,

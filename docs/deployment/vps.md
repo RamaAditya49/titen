@@ -116,6 +116,7 @@ TITEN_VEC_DB_PATH=/var/lib/titen/titen.db.vec
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
+TITEN_EMBED_REVISION=<immutable-provider-revision>
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
@@ -124,6 +125,11 @@ TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
 Embedding variables are optional. Observations and lexical context work without
 them. Put `TITEN_EMBED_API_KEY` only in the mode-`0600` service environment; it
 is required only when the configured embedder requires bearer authentication.
+Base URL, model, and dimensions form one opt-in tuple. Supplying only part of
+that tuple, or supplying API-key/revision settings without it, returns
+`configured_error` and makes `/readyz` fail. If no immutable revision is
+available, omit `TITEN_EMBED_REVISION`; Titen records `unspecified`, and adding a
+revision later intentionally requires a reindex.
 
 The ADR-0004 implementation will add a separate opt-in tuple such as
 `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and
@@ -164,6 +170,48 @@ VPS:
 bun add titen-memory sqlite-vec@0.1.9
 ```
 
+With no embedding tuple and no `sqlite-vec`, an SDK/default install remains a
+ready FTS-only deployment. Once the tuple is present, `sqlite-vec@0.1.9`, a
+writable vector database, and the expected `vec_claims` schema are required;
+failure is `503 NOT_READY`, never a silent fallback.
+
+### Explicit semantic reindex
+
+Migration 13 binds the claim-vector projection to provider, model, revision,
+dimensions, L2 metric, preprocessing `text-v1`, and index schema
+`claims-scope-v1`. A missing legacy fingerprint or any change fails readiness.
+Titen never rewrites this metadata or deletes vectors automatically.
+
+To adopt a new fingerprint, stop Titen, take a verified canonical backup, then
+reset only the rebuildable projection and requeue claim index work:
+
+```bash
+rm /var/lib/titen/titen.db.vec
+sqlite3 /var/lib/titen/titen.db <<'SQL'
+BEGIN IMMEDIATE;
+DELETE FROM semantic_index_metadata WHERE id = 'claims';
+UPDATE index_outbox SET state = 'pending', attempts = 0
+ WHERE record_type = 'claim';
+INSERT INTO index_outbox
+  (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id,
+       'upsert', 'pending', 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  FROM claims c
+ WHERE c.status IN ('active', 'disputed')
+   AND NOT EXISTS (
+     SELECT 1 FROM index_outbox o
+      WHERE o.record_type = 'claim' AND o.record_id = c.id
+        AND o.operation = 'upsert'
+   );
+COMMIT;
+SQL
+```
+
+Replace the vector path with the exact configured `TITEN_VEC_DB_PATH`; never
+remove the canonical database. Start Titen with the intended tuple, require
+`/readyz`, then let maintenance drain or call `POST /v1/index/drain`. Provider
+reachability is proved by that real drain/query evidence, not by readiness.
+
 ## Container install (verified)
 
 Optional. The service runs fine directly under Bun; this exists so a deployment
@@ -194,9 +242,10 @@ Two things that will bite otherwise:
 
 - **The base image must use glibc.** `sqlite-vec` ships a glibc-linked prebuilt
   binary; on Alpine it fails to load with `__memcpy_chk: symbol not found`. An
-  Alpine image still starts and serves, it just loses vector retrieval silently.
-  The current audited Debian image is about 239 MB. Treat this as measured
-  evidence, not a fixed resource limit.
+  Alpine image may still answer `/healthz`, but a configured semantic deployment
+  now fails `/readyz` with `vector_initialization_failed`. The current audited
+  Debian image is about 239 MB. Treat this as measured evidence, not a fixed
+  resource limit.
 - **Podman builds OCI images, which ignore `HEALTHCHECK`.** Use
   `podman build --format docker` if you want it honoured, or rely on an external
   probe against `/healthz`.
@@ -342,7 +391,11 @@ code.
   failure leaves an existing output untouched and prints no internal stack.
 - Do not copy a live WAL database file. Keep timestamped snapshots and an
   independently verified checksum outside the service state directory.
-- Vector indexes are rebuildable and do not block canonical restore.
+- Vector indexes are rebuildable and do not block canonical restore. The
+  canonical snapshot does not contain `TITEN_VEC_DB_PATH`; after restoring it
+  without the matching vector file, run the explicit semantic reindex above
+  before returning semantic traffic. Readiness rejects a newly created empty
+  projection paired with restored fingerprint metadata.
 - Before an upgrade, run
   `bunx titen-memory migrate --db /var/lib/titen/titen.db --dry-run`; it prints
   pending forward-only SQL without creating or changing the database. Take the

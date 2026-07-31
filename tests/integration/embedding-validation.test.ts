@@ -188,7 +188,19 @@ for (const adapter of adapters)
           db,
           revision: "embedding-validation",
           runtime: adapter.name,
-          vectors: { store, embedder },
+          vectors: {
+            store,
+            embedder,
+            fingerprint: {
+              provider: "test",
+              model: embedder.model,
+              revision: "test",
+              dimensions,
+              metric: "cosine",
+              preprocessing: "none",
+              index_schema: "claims-v1",
+            },
+          },
         }),
         "http://titen.test",
       );

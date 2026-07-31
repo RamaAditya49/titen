@@ -31,7 +31,14 @@ import {
   type RouteDef,
 } from "./http";
 import type { Db } from "./db";
-import type { VectorCapability } from "./vectors";
+import {
+  CAPABILITY_VERSION,
+  SEMANTIC_DISABLED,
+  prepareSemanticReadiness,
+  type CapabilityState,
+  type SemanticReadiness,
+  type VectorCapability,
+} from "./vectors";
 import { backgroundRepairState } from "./maintenance";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
@@ -45,6 +52,11 @@ export interface AppContext {
   runtime: string;
   /** Optional vector capability. Absent means FTS-only retrieval. */
   vectors?: VectorCapability;
+  semanticReadiness: SemanticReadiness;
+  modelCapabilities: {
+    extraction: CapabilityState;
+    backgroundEnrichment: CapabilityState;
+  };
   /** Scheduler intent; readiness still derives state from canonical evidence. */
   backgroundRepair: { configured: boolean; staleAfterMs: number };
   /** False only after a required startup migration failed. */
@@ -58,9 +70,14 @@ export interface AppContext {
 /** Capabilities are reported honestly based on what's configured. */
 export async function capabilities(app: AppContext) {
   return {
+    version: CAPABILITY_VERSION,
     fts: "enabled",
-    vector: app.vectors ? "enabled" : "disabled",
-    model: app.vectors?.embedder ? "enabled" : "disabled",
+    vector: app.semanticReadiness.vector,
+    embedding: app.semanticReadiness.embedding,
+    extraction: app.modelCapabilities.extraction,
+    background_enrichment: app.modelCapabilities.backgroundEnrichment,
+    /** @deprecated Use `embedding`; this alias remains for the 0.3.x API. */
+    model: app.semanticReadiness.embedding,
     background_repair: await backgroundRepairState({
       db: app.db,
       configured: app.backgroundRepair.configured,
@@ -239,6 +256,21 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   if (!ctx.app.secretStorageReady) ready = false;
 
   const caps = await capabilities(ctx.app);
+  checks.semantic_index = ctx.app.semanticReadiness.diagnostic ??
+    (ctx.app.semanticReadiness.vector === "enabled" ? "ok" : "disabled");
+  if (
+    ctx.app.semanticReadiness.diagnostic ||
+    ctx.app.semanticReadiness.embedding === "configured_error" ||
+    ctx.app.semanticReadiness.vector === "configured_error"
+  )
+    ready = false;
+  checks.extraction = ctx.app.modelCapabilities.extraction;
+  checks.background_enrichment = ctx.app.modelCapabilities.backgroundEnrichment;
+  if (
+    ctx.app.modelCapabilities.extraction === "configured_error" ||
+    ctx.app.modelCapabilities.backgroundEnrichment === "configured_error"
+  )
+    ready = false;
   const body = {
     ready,
     runtime: ctx.app.runtime,
@@ -274,6 +306,13 @@ export function createApp(context: {
   revision?: string;
   runtime: string;
   vectors?: VectorCapability;
+  semanticReadiness?: SemanticReadiness;
+  /** Runtime adapter already completed the local semantic readiness check. */
+  semanticPrepared?: boolean;
+  modelCapabilities?: {
+    extraction?: CapabilityState;
+    backgroundEnrichment?: CapabilityState;
+  };
   backgroundRepair?: { configured: boolean; staleAfterMs: number };
   migrationsReady?: boolean;
   secretStorageReady?: boolean;
@@ -282,17 +321,50 @@ export function createApp(context: {
   mcpOrigin?: string;
 }): (request: Request) => Promise<Response> {
   const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
+  const configuredVectors = context.vectors;
+  const initialSemanticReadiness = context.semanticReadiness ??
+    (configuredVectors
+      ? { embedding: "enabled", vector: "enabled" }
+      : SEMANTIC_DISABLED);
+  const semanticPrepared = context.semanticPrepared === true;
   const app: AppContext = {
     db: context.db,
     now: context.now ?? (() => new Date()),
     revision: context.revision ?? "dev",
     runtime: context.runtime,
-    vectors: context.vectors,
+    vectors:
+      semanticPrepared && initialSemanticReadiness.vector === "enabled"
+        ? configuredVectors
+        : undefined,
+    semanticReadiness: initialSemanticReadiness,
+    modelCapabilities: {
+      extraction: context.modelCapabilities?.extraction ?? "disabled",
+      backgroundEnrichment:
+        context.modelCapabilities?.backgroundEnrichment ?? "disabled",
+    },
     backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
     migrationsReady: context.migrationsReady ?? true,
     secretStorageReady: context.secretStorageReady ?? true,
     webhookSecurity: context.webhookSecurity,
     secretCipher: context.secretCipher,
+  };
+  let semanticPreparation: Promise<SemanticReadiness> | undefined;
+
+  const prepareSemantic = async () => {
+    if (semanticPrepared) return;
+    if (!app.migrationsReady) {
+      app.vectors = undefined;
+      return;
+    }
+    semanticPreparation ??= prepareSemanticReadiness(
+      app.db,
+      { vectors: configuredVectors, readiness: initialSemanticReadiness },
+      app.now().toISOString(),
+    );
+    app.semanticReadiness = await semanticPreparation;
+    app.vectors = app.semanticReadiness.vector === "enabled"
+      ? configuredVectors
+      : undefined;
   };
 
   return async function handle(request: Request): Promise<Response> {
@@ -322,6 +394,7 @@ export function createApp(context: {
         matched.route.path !== "/readyz"
       )
         throw unavailable("Required database migration has not completed.");
+      if (matched.route.path !== "/healthz") await prepareSemantic();
 
       let cachedBody: string | undefined;
       const rawBody = async () => {

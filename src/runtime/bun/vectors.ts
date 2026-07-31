@@ -1,19 +1,47 @@
 // @ts-ignore - bun:sqlite types ship with the Bun runtime, not with this package.
 import { Database } from "bun:sqlite";
+import { createHash } from "node:crypto";
+import { realpathSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import type {
   EmbeddingProvider,
-  VectorCapability,
+  EmbeddingFingerprint,
+  VectorInitialization,
   VectorStore,
 } from "../../core/vectors";
 import { validateEmbeddingResponse } from "../../core/vectors";
+
+function normalizedFilePath(path: string): string {
+  const absolute = resolve(path);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    try {
+      return join(realpathSync(dirname(absolute)), basename(absolute));
+    } catch {
+      return absolute;
+    }
+  }
+}
+
+function aliasesFile(first: string, second: string): boolean {
+  if (normalizedFilePath(first) === normalizedFilePath(second)) return true;
+  try {
+    const left = statSync(first);
+    const right = statSync(second);
+    return left.dev === right.dev && left.ino === right.ino;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * A sqlite-vec backed vector store.
  *
  * Vectors live in their own database file, never in the canonical one: an index
  * is rebuildable and must never be able to corrupt evidence. Returns null when
- * the extension is unavailable so the service degrades to FTS instead of
- * refusing to start.
+ * the extension, database, or expected schema is unavailable; configured
+ * semantic readiness then fails closed while canonical SQL remains intact.
  *
  * ponytail: cosine-style scoring derived from L2 distance as 1/(1+d). The
  * ceiling is that the score is monotonic but not a calibrated similarity, which
@@ -23,7 +51,9 @@ import { validateEmbeddingResponse } from "../../core/vectors";
 export function createSqliteVecStore(
   dbPath: string,
   dimensions: number,
-): VectorStore | null {
+): (VectorStore & { empty: boolean }) | null {
+  if (!Number.isInteger(dimensions) || dimensions < 1 || dimensions > 65_536)
+    return null;
   let db: Database;
   try {
     db = new Database(dbPath, { create: true });
@@ -31,6 +61,7 @@ export function createSqliteVecStore(
     return null;
   }
 
+  let empty = true;
   try {
     // The prebuilt extension ships per-platform; absence is expected, not fatal.
     //
@@ -54,8 +85,13 @@ export function createSqliteVecStore(
     const columns = db
       .query(`PRAGMA table_info(vec_claims)`)
       .all() as { name: string }[];
-    if (columns.length > 0 && !columns.some((column) => column.name === "subject_id"))
-      db.run(`DROP TABLE vec_claims`);
+    if (
+      columns.length > 0 &&
+      !["id", "embedding", "org_id", "subject_id", "project_id"].every((name) =>
+        columns.some((column) => column.name === name)
+      )
+    )
+      throw new Error("incompatible vector schema");
     db.run(
       `CREATE VIRTUAL TABLE IF NOT EXISTS vec_claims USING vec0(
          id TEXT PRIMARY KEY,
@@ -65,6 +101,17 @@ export function createSqliteVecStore(
          project_id TEXT
        )`,
     );
+    const table = db
+      .query(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vec_claims'`)
+      .get() as { sql: string } | null;
+    if (
+      !table ||
+      !/^CREATE VIRTUAL TABLE\s+[`"']?vec_claims[`"']?\s+USING\s+vec0\s*\(/i.test(table.sql) ||
+      !new RegExp(`embedding\\s+float\\[${dimensions}\\]`, "i").test(table.sql) ||
+      !/org_id\s+TEXT\s+partition\s+key/i.test(table.sql)
+    )
+      throw new Error("incompatible vector schema");
+    empty = !db.query(`SELECT 1 FROM vec_claims LIMIT 1`).get();
   } catch {
     db.close();
     return null;
@@ -74,6 +121,7 @@ export function createSqliteVecStore(
     Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength);
 
   return {
+    empty,
     async upsert(records) {
       if (records.length === 0) return;
       // vec0 does not honour INSERT OR REPLACE: it raises a uniqueness error
@@ -156,30 +204,109 @@ export function createHttpEmbedder(config: {
 }
 
 /**
- * Builds the capability only when both halves are present. Vector retrieval
- * needs a store and a model; either one missing means FTS-only, reported
- * honestly by readiness.
+ * Builds the capability only when both halves are valid. A completely absent
+ * tuple is FTS-only; partial or broken opt-in is a configured readiness error.
  */
 export function tryCreateVectors(config: {
+  canonicalDbPath?: string;
   vecDbPath?: string;
   embedBaseUrl?: string;
   embedModel?: string;
-  embedDims?: number;
+  embedDims?: number | string;
+  embedRevision?: string;
   embedApiKey?: string;
-}): VectorCapability | undefined {
-  if (!config.embedBaseUrl || !config.embedModel || !config.embedDims) return undefined;
-  const store = createSqliteVecStore(
-    config.vecDbPath ?? "titen-vec.db",
+}): VectorInitialization {
+  const requested = [
+    config.embedBaseUrl,
+    config.embedModel,
     config.embedDims,
+    config.embedRevision,
+    config.embedApiKey,
+  ].some((value) => value !== undefined);
+  if (!requested)
+    return { readiness: { embedding: "disabled", vector: "disabled" } };
+
+  const dimensions = Number(config.embedDims);
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(config.embedBaseUrl ?? "");
+  } catch {
+    return {
+      readiness: {
+        embedding: "configured_error",
+        vector: "configured_error",
+        diagnostic: "embedding_configuration_invalid",
+      },
+    };
+  }
+  if (
+    !config.embedModel?.trim() ||
+    config.embedModel.trim().length > 200 ||
+    !Number.isInteger(dimensions) ||
+    dimensions < 1 ||
+    dimensions > 65_536 ||
+    !["http:", "https:"].includes(baseUrl.protocol) ||
+    baseUrl.username ||
+    baseUrl.password ||
+    baseUrl.search ||
+    baseUrl.hash ||
+    baseUrl.href.length > 2_048 ||
+    (config.embedRevision !== undefined &&
+      (!config.embedRevision.trim() || config.embedRevision.trim().length > 200)) ||
+    (config.vecDbPath !== undefined && !config.vecDbPath.trim())
+  )
+    return {
+      readiness: {
+        embedding: "configured_error",
+        vector: "configured_error",
+        diagnostic: "embedding_configuration_invalid",
+      },
+    };
+
+  const vecDbPath = config.vecDbPath ?? "titen-vec.db";
+  if (config.canonicalDbPath && aliasesFile(config.canonicalDbPath, vecDbPath))
+    return {
+      readiness: {
+        embedding: "enabled",
+        vector: "configured_error",
+        diagnostic: "vector_storage_conflict",
+      },
+    };
+
+  const store = createSqliteVecStore(
+    vecDbPath,
+    dimensions,
   );
-  if (!store) return undefined;
+  if (!store)
+    return {
+      readiness: {
+        embedding: "enabled",
+        vector: "configured_error",
+        diagnostic: "vector_initialization_failed",
+      },
+    };
+  const endpoint = baseUrl.href.replace(/\/$/, "");
+  const fingerprint: EmbeddingFingerprint = {
+    provider: `openai-compatible:${createHash("sha256").update(endpoint).digest("hex")}`,
+    model: config.embedModel.trim(),
+    revision: config.embedRevision?.trim() ?? "unspecified",
+    dimensions,
+    metric: "l2",
+    preprocessing: "text-v1",
+    index_schema: "claims-scope-v1",
+  };
   return {
-    store,
-    embedder: createHttpEmbedder({
-      baseUrl: config.embedBaseUrl,
-      model: config.embedModel,
-      dimensions: config.embedDims,
-      apiKey: config.embedApiKey,
-    }),
+    readiness: { embedding: "enabled", vector: "enabled" },
+    vectors: {
+      store,
+      indexEmpty: store.empty,
+      fingerprint,
+      embedder: createHttpEmbedder({
+        baseUrl: endpoint,
+        model: config.embedModel.trim(),
+        dimensions,
+        apiKey: config.embedApiKey,
+      }),
+    },
   };
 }

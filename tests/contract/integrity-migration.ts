@@ -172,7 +172,11 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
   }
 
   assert.equal(await migrate(db), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 12);
+  assert.equal(SCHEMA_VERSION, 13);
+  assert.deepEqual(
+    await db.all(`SELECT name FROM sqlite_master WHERE name = 'semantic_index_metadata'`),
+    [{ name: "semantic_index_metadata" }],
+  );
   assert.deepEqual(await db.all(
     `SELECT id, state FROM checkpoints
       WHERE org_id = 'org_integrity_a' AND subject_id = 'subject_integrity'`,

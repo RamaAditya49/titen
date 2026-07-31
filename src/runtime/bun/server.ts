@@ -1,7 +1,10 @@
 import { createApp, parseMcpOrigin } from "../../core/app";
 import { migrate, schemaState } from "../../core/migrations";
 import { runMaintenance } from "../../core/maintenance";
-import type { VectorCapability } from "../../core/vectors";
+import {
+  prepareSemanticReadiness,
+  type VectorCapability,
+} from "../../core/vectors";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { tryCreateVectors } from "./vectors";
 import type { WebhookSecurity } from "../../core/webhook-security";
@@ -24,7 +27,8 @@ export interface ServeOptions {
   vecDbPath?: string;
   embedBaseUrl?: string;
   embedModel?: string;
-  embedDims?: number;
+  embedDims?: number | string;
+  embedRevision?: string;
   embedApiKey?: string;
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
@@ -56,15 +60,26 @@ export async function serve(options: ServeOptions) {
       secretStorageReady = false;
     }
   }
-  const vectors =
-    options.vectors ??
-    tryCreateVectors({
-    vecDbPath: options.vecDbPath,
-    embedBaseUrl: options.embedBaseUrl,
-    embedModel: options.embedModel,
-    embedDims: options.embedDims,
-    embedApiKey: options.embedApiKey,
-  });
+  const vectorInitialization = options.vectors
+    ? {
+        vectors: options.vectors,
+        readiness: { embedding: "enabled", vector: "enabled" } as const,
+      }
+    : tryCreateVectors({
+        canonicalDbPath: options.dbPath,
+        vecDbPath: options.vecDbPath,
+        embedBaseUrl: options.embedBaseUrl,
+        embedModel: options.embedModel,
+        embedDims: options.embedDims,
+        embedRevision: options.embedRevision,
+        embedApiKey: options.embedApiKey,
+      });
+  const semanticReadiness = migrationsReady
+    ? await prepareSemanticReadiness(db, vectorInitialization, new Date().toISOString())
+    : vectorInitialization.readiness;
+  const vectors = semanticReadiness.vector === "enabled"
+    ? vectorInitialization.vectors
+    : undefined;
   const intervalMs = options.maintenanceIntervalMs ?? 15_000;
   const backgroundRepair = intervalMs > 0 && migrationsReady && secretStorageReady;
   const app = createApp({
@@ -72,6 +87,8 @@ export async function serve(options: ServeOptions) {
     revision: options.revision ?? "dev",
     runtime: "bun-sqlite",
     vectors,
+    semanticReadiness,
+    semanticPrepared: true,
     backgroundRepair: {
       configured: backgroundRepair,
       staleAfterMs: Math.max(1_000, intervalMs * 3),

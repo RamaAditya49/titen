@@ -36,6 +36,12 @@ if [ -d node_modules/sqlite-vec ]; then
   echo "FAIL: SDK/default installs must not pull the optional vector extension" >&2
   exit 1
 fi
+node -e '
+  const manifest = require("./node_modules/titen-memory/package.json");
+  if (manifest.peerDependencies?.["sqlite-vec"] !== "0.1.9" ||
+      manifest.peerDependenciesMeta?.["sqlite-vec"]?.optional !== true)
+    throw new Error("sqlite-vec optional peer metadata is missing or unpinned");
+'
 for toolchain in astro wrangler playwright miniflare vite esbuild; do
   if [ -d "node_modules/$toolchain" ]; then
     echo "FAIL: $toolchain reached consumers; it belongs in devDependencies" >&2
@@ -81,7 +87,7 @@ for _ in $(seq 1 60); do
 done
 ready="$(curl --max-time 5 -sf "http://127.0.0.1:$port/readyz" || true)"
 case "$ready" in
-  *'"ready":true'*) : ;;
+  *'"ready":true'*'"version":1'*'"vector":"disabled"'*'"embedding":"disabled"'*) : ;;
   *) echo "FAIL: /readyz not ready: ${ready:-<no response>}" >&2; cat "$work/serve.log" >&2; exit 1 ;;
 esac
 initialize="$(curl --max-time 5 -sf "http://127.0.0.1:$port/mcp" \
@@ -126,6 +132,68 @@ titen_project_resolve
 titen_remember'
 [ "$tool_names" = "$expected_tools" ] \
   || { echo "FAIL: installed MCP tool list differs" >&2; exit 1; }
+kill "$server" 2>/dev/null || true
+
+# A production install intentionally omits sqlite-vec. Once semantic retrieval
+# is requested, that absence must fail readiness instead of masquerading as FTS.
+semantic_port="$(node --input-type=module -e '
+  import { createServer } from "node:net";
+  const server = createServer();
+  server.listen(0, "127.0.0.1", () => {
+    console.log(server.address().port);
+    server.close();
+  });
+')"
+TITEN_EMBED_BASE_URL=http://127.0.0.1:9/v1 \
+TITEN_EMBED_MODEL=pack-verify \
+TITEN_EMBED_DIMS=4 \
+./node_modules/.bin/titen serve --db "$work/t.db" --port "$semantic_port" \
+  >"$work/semantic-serve.log" 2>&1 &
+server=$!
+for _ in $(seq 1 60); do
+  curl --max-time 2 -sf "http://127.0.0.1:$semantic_port/healthz" >/dev/null 2>&1 && break
+  kill -0 "$server" 2>/dev/null \
+    || { echo "FAIL: configured installed server exited" >&2; cat "$work/semantic-serve.log" >&2; exit 1; }
+  sleep 0.25
+done
+semantic_ready="$(curl --max-time 5 -sS "http://127.0.0.1:$semantic_port/readyz")"
+case "$semantic_ready" in
+  *'"code":"NOT_READY"'*'"semantic_index":"vector_initialization_failed"'*'"vector":"configured_error"'*) : ;;
+  *) echo "FAIL: missing sqlite-vec did not fail semantic readiness: $semantic_ready" >&2; exit 1 ;;
+esac
+kill "$server" 2>/dev/null || true
+trap 'rm -rf "$work"' EXIT
+
+# Follow the public vector install command in this same clean consumer tree.
+# Readiness is local and must not contact the deliberately unreachable embedder.
+npm install sqlite-vec@0.1.9 >/dev/null
+vector_port="$(node --input-type=module -e '
+  import { createServer } from "node:net";
+  const server = createServer();
+  server.listen(0, "127.0.0.1", () => {
+    console.log(server.address().port);
+    server.close();
+  });
+')"
+TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
+TITEN_EMBED_MODEL=embeddinggemma \
+TITEN_EMBED_DIMS=768 \
+TITEN_EMBED_REVISION=local-pinned \
+./node_modules/.bin/titen serve --db "$work/vector-ready.db" --port "$vector_port" \
+  >"$work/vector-ready.log" 2>&1 &
+server=$!
+trap 'kill "$server" 2>/dev/null || true; rm -rf "$work"' EXIT
+for _ in $(seq 1 60); do
+  curl --max-time 2 -sf "http://127.0.0.1:$vector_port/healthz" >/dev/null 2>&1 && break
+  kill -0 "$server" 2>/dev/null \
+    || { echo "FAIL: vector-enabled installed server exited" >&2; cat "$work/vector-ready.log" >&2; exit 1; }
+  sleep 0.25
+done
+vector_ready="$(curl --max-time 5 -sf "http://127.0.0.1:$vector_port/readyz" || true)"
+case "$vector_ready" in
+  *'"ready":true'*'"vector":"enabled"'*'"embedding":"enabled"'*) : ;;
+  *) echo "FAIL: explicit sqlite-vec install was not vector-ready: ${vector_ready:-<no response>}" >&2; cat "$work/vector-ready.log" >&2; exit 1 ;;
+esac
 kill "$server" 2>/dev/null || true
 trap 'rm -rf "$work"' EXIT
 

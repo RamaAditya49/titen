@@ -200,6 +200,15 @@ export function fakeVectors(): VectorCapability & {
     embedCalls: () => calls,
     metadataFor: (id) => metadata.get(id),
     lastFilter: () => filter,
+    fingerprint: {
+      provider: "contract",
+      model: "contract-stub",
+      revision: "v1",
+      dimensions: 4,
+      metric: "cosine",
+      preprocessing: "text-v1",
+      index_schema: "claims-scope-v1",
+    },
     embedder: {
       dimensions: 4,
       model: "contract-stub",

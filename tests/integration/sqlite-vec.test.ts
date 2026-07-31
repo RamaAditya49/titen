@@ -179,6 +179,15 @@ test("the real store drives compilation through the shared core", async () => {
 
   const capability = {
     store: store!,
+    fingerprint: {
+      provider: "integration",
+      model: "stub",
+      revision: "v1",
+      dimensions: DIMENSIONS,
+      metric: "l2",
+      preprocessing: "text-v1",
+      index_schema: "claims-scope-v1",
+    },
     embedder: createHttpEmbedder({
       baseUrl: `http://127.0.0.1:${server.port}/v1`,
       model: "stub",
