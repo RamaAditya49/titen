@@ -1,7 +1,11 @@
 import { first } from "./db";
 import { unavailable, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
-import { validateEmbeddingVectors } from "./vectors";
+import {
+  completeSemanticIndexWork,
+  recordSemanticDependencyFailure,
+  validateEmbeddingVectors,
+} from "./vectors";
 
 /**
  * Drains the indexing outbox into the vector store.
@@ -86,6 +90,12 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     try {
       await ctx.app.vectors.store.remove([...new Set(removals.map((row) => row.record_id))]);
     } catch {
+      await recordSemanticDependencyFailure(
+        ctx.app.db,
+        "vector_store",
+        ctx.app.now().toISOString(),
+        removals.map((row) => row.id),
+      );
       throw unavailable("Indexing dependency is unavailable.", {
         dependency: "vector_store",
         retryable: true,
@@ -107,6 +117,12 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         ctx.app.vectors.embedder.dimensions,
       );
     } catch {
+      await recordSemanticDependencyFailure(
+        ctx.app.db,
+        "embedder",
+        ctx.app.now().toISOString(),
+        eligible.map((entry) => entry.outboxId),
+      );
       throw unavailable("Indexing dependency is unavailable.", {
         dependency: "embedder",
         retryable: true,
@@ -126,6 +142,12 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         })),
       );
     } catch {
+      await recordSemanticDependencyFailure(
+        ctx.app.db,
+        "vector_store",
+        ctx.app.now().toISOString(),
+        eligible.map((entry) => entry.outboxId),
+      );
       throw unavailable("Indexing dependency is unavailable.", {
         dependency: "vector_store",
         retryable: true,
@@ -143,15 +165,7 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     ...others.map((row) => row.id),
   ];
   const at = ctx.app.now().toISOString();
-  for (let index = 0; index < done.length; index += 50) {
-    const group = done.slice(index, index + 50);
-    await ctx.app.db.batch(
-      group.map((id) => ({
-        sql: `UPDATE index_outbox SET state = 'done', attempts = attempts + 1 WHERE id = ?`,
-        params: [id],
-      })),
-    );
-  }
+  await completeSemanticIndexWork(ctx.app.db, done, indexed > 0);
 
   const remaining = await first<{ count: number }>(
     ctx.app.db,

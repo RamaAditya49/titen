@@ -204,8 +204,16 @@ test("a D1 migration batch rolls back on fault and concurrent retries converge",
         WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata')
         ORDER BY name`,
     );
-    assert.deepEqual(integrity.map(({ name }) => name), ["checkpoints_scope", "event_order"]);
+    assert.deepEqual(
+      integrity.map(({ name }) => name),
+      ["checkpoints_scope", "event_order", "semantic_index_metadata"],
+    );
     assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
+    assert.deepEqual(
+      (await real.all<{ name: string }>("PRAGMA table_info(semantic_index_metadata)"))
+        .filter(({ name }) => name.endsWith("_failure_at")),
+      [],
+    );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
   } finally {
     await fault.dispose();

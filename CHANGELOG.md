@@ -33,8 +33,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Semantic readiness now distinguishes intentional FTS-only operation from
   partial configuration, unavailable vector initialization, legacy untracked
   vectors, missing requeue work, unsafe storage aliasing, empty restored
-  projections, and incompatible fingerprints; configured failures return a
-  fixed local diagnostic without probing providers.
+  projections, incompatible fingerprints, and locally observed indexing
+  dependency failures; configured failures return a fixed local diagnostic
+  without probing providers.
 
 ### Changed
 
@@ -42,7 +43,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   enrichment separately while retaining `model` as a deprecated `0.3.x`
   embedding alias. Migration 13 persists the claim-index provider, model,
   revision, dimensions, metric, preprocessing, and schema fingerprint and
-  requires an explicit reindex after incompatibility.
+  requires an explicit reindex after incompatibility. Migration 14 retains only
+  safe embedder/vector-store failure timestamps in semantic metadata until a
+  later complete embed/upsert proves recovery.
 - `sqlite-vec@0.1.9` is a pinned optional peer: default installs remain
   dependency-light while the documented vector install is machine-verifiable.
 - Context compilation now treats a missing `project_id` as unscoped-only;

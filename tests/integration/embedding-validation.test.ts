@@ -204,6 +204,15 @@ for (const adapter of consumers)
     const handle = openDatabase(join(directory, "titen.db"));
     const db = createSqliteDb(handle);
     const { embedder, close } = adapter.create({ data: [] });
+    let providerRecovered = false;
+    const recoverableEmbedder: EmbeddingProvider = {
+      dimensions: embedder.dimensions,
+      model: embedder.model,
+      embed: (texts) =>
+        providerRecovered
+          ? Promise.resolve(texts.map(() => new Float32Array(dense())))
+          : embedder.embed(texts),
+    };
     let vectorWrites = 0;
     let vectorQueries = 0;
     const store: VectorStore = {
@@ -222,10 +231,10 @@ for (const adapter of consumers)
       const provisioned = await provisionWith(db, { scopes: ["*"] });
       const vectors = {
         store,
-        embedder,
+        embedder: recoverableEmbedder,
         fingerprint: {
           provider: "test",
-          model: embedder.model,
+          model: recoverableEmbedder.model,
           revision: "test",
           dimensions,
           metric: "cosine",
@@ -309,6 +318,10 @@ for (const adapter of consumers)
       assert.deepEqual(background.errors, [`index:${provisioned.orgId.slice(0, 12)}`]);
       assert.equal(await pending(), before);
       assert.equal(vectorWrites, 0);
+      const notReady = await client.call("GET", "/readyz");
+      assert.equal(notReady.status, 503);
+      assert.equal(notReady.body.meta.capabilities.embedding, "configured_error");
+      assert.equal(notReady.body.meta.checks.semantic_index, "embedding_dependency_unavailable");
 
       const compiled = await client.call("POST", "/v1/context/compile", {
         key: provisioned.key,
@@ -321,6 +334,18 @@ for (const adapter of consumers)
       );
       assert.equal(vectorQueries, 0);
       assert.equal(vectorWrites, 0);
+
+      providerRecovered = true;
+      const recovered = await runMaintenance({
+        db,
+        vectors,
+        limit: 50,
+        now: new Date("2026-07-31T00:01:00.000Z"),
+        deliverWebhooks: false,
+      });
+      assert.ok(recovered.indexed > 0);
+      assert.deepEqual(recovered.errors, []);
+      assert.equal((await client.call("GET", "/readyz")).status, 200);
     } finally {
       await close();
       handle.close();

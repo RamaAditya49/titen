@@ -39,6 +39,10 @@ evidence.
   readiness, and maintenance through both runtime adapters; add migration 13
   for the minimal index fingerprint and fail configured semantic startup closed
   without adding provider probes or abstractions.
+- [x] Extend semantic metadata with independent safe embedder/vector-store
+  failure timestamps; increment attempts on affected pending work, make
+  `/readyz` fail locally after an observed outage, and clear both markers only
+  after a successful embed/upsert recovery on both SQL runtimes.
 - [x] Bind Bun fingerprints to the normalized endpoint without storing topology,
   reject canonical/vector path aliasing before extension mutation, and fail
   readiness closed when historical indexable claims lack requeue work.
@@ -146,13 +150,16 @@ to its merged evidence or to the concrete decision recorded here.
 - AC-SWP-013: table-driven adapter and normalized-core validator cases plus Bun
   HTTP, Cloudflare Workers AI, and injected-provider regressions for missing/
   extra/index/sparse/type/finite/dimension failures, no vector query or write,
-  unchanged pending outbox rows, sanitized `503` metadata, and successful
-  authorized FTS-only compile.
+  pending state/count preserved while only safe attempt/failure evidence changes,
+  sanitized `503` metadata, and successful authorized FTS-only compile.
 - AC-SWP-014: dual-runtime FTS-only readiness tests plus a clean production
   install without `sqlite-vec` or semantic configuration.
 - AC-SWP-015: table-driven partial/invalid configuration, missing
-  extension/backend/schema, and fingerprint-mismatch readiness tests with
-  sanitized diagnostics.
+  extension/backend/schema, fingerprint mismatch, independent and combined
+  observed dependency markers, cross-organization non-clear, delete-only
+  non-recovery, pre-v14 sanitized readiness, and manual/background recovery;
+  the marker lifecycle runs through the shared Bun/D1 contract without provider
+  I/O or sensitive diagnostics.
 - AC-SWP-016: migration-13 schema inspection, first-initialization persistence,
   exact fingerprint comparison, mismatch recovery only after an explicit
   reindex, and dual-runtime contract evidence.
@@ -188,6 +195,9 @@ Migration 13 adds only semantic index metadata; SQL remains canonical and
 vectors remain rebuildable. A semantic fingerprint mismatch is not repaired
 implicitly: rollback is disabling semantic configuration for explicit FTS-only
 operation or running the documented reindex path with the intended fingerprint.
+Migration 14 adds only two nullable dependency-failure timestamps to the
+singleton semantic metadata row. Delete-only completion or retirement cannot
+clear them; disabling semantic configuration remains the fail-closed rollback.
 
 Before merge, rollback is branch deletion. After merge and before npm publish,
 rollback is a reviewed revert. After npm publish, a bad immutable artifact must

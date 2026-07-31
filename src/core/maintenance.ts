@@ -1,6 +1,11 @@
 import type { Db } from "./db";
 import { processWebhooks } from "./webhooks";
-import { validateEmbeddingVectors, type VectorCapability } from "./vectors";
+import {
+  completeSemanticIndexWork,
+  recordSemanticDependencyFailure,
+  validateEmbeddingVectors,
+  type VectorCapability,
+} from "./vectors";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
 import { eventAccessSql } from "./events";
@@ -123,6 +128,7 @@ export async function indexPendingForOrg(
   orgId: string,
   vectors: VectorCapability,
   limit: number,
+  at: string,
 ): Promise<number> {
   const pending = await db.all<{ id: string; record_type: string; record_id: string; operation: string }>(
     `SELECT id, record_type, record_id, operation FROM index_outbox
@@ -175,38 +181,64 @@ export async function indexPendingForOrg(
     else removals.push({ outboxId: row.id, recordId: row.record_id });
   }
 
-  if (removals.length > 0)
-    await vectors.store.remove([...new Set(removals.map((entry) => entry.recordId))]);
+  if (removals.length > 0) {
+    try {
+      await vectors.store.remove([...new Set(removals.map((entry) => entry.recordId))]);
+    } catch (error) {
+      await recordSemanticDependencyFailure(
+        db,
+        "vector_store",
+        at,
+        removals.map((entry) => entry.outboxId),
+      );
+      throw error;
+    }
+  }
 
   let indexed = 0;
   if (eligible.length > 0) {
-    const embeddings = validateEmbeddingVectors(
-      await vectors.embedder.embed(eligible.map((entry) => entry.statement)),
-      eligible.length,
-      vectors.embedder.dimensions,
-    );
-    await vectors.store.upsert(
-      eligible.map((entry, index) => ({
-        id: entry.claimId,
-        vector: embeddings[index]!,
-        metadata: {
-          org_id: orgId,
-          subject_id: entry.subjectId,
-          project_id: entry.projectId ?? "",
-        },
-      })),
-    );
+    let embeddings: Float32Array[];
+    try {
+      embeddings = validateEmbeddingVectors(
+        await vectors.embedder.embed(eligible.map((entry) => entry.statement)),
+        eligible.length,
+        vectors.embedder.dimensions,
+      );
+    } catch (error) {
+      await recordSemanticDependencyFailure(
+        db,
+        "embedder",
+        at,
+        eligible.map((entry) => entry.outboxId),
+      );
+      throw error;
+    }
+    try {
+      await vectors.store.upsert(
+        eligible.map((entry, index) => ({
+          id: entry.claimId,
+          vector: embeddings[index]!,
+          metadata: {
+            org_id: orgId,
+            subject_id: entry.subjectId,
+            project_id: entry.projectId ?? "",
+          },
+        })),
+      );
+    } catch (error) {
+      await recordSemanticDependencyFailure(
+        db,
+        "vector_store",
+        at,
+        eligible.map((entry) => entry.outboxId),
+      );
+      throw error;
+    }
     indexed = eligible.length;
   }
 
   const done = [...eligible.map((entry) => entry.outboxId), ...removals.map((entry) => entry.outboxId), ...retire];
-  for (let index = 0; index < done.length; index += 50)
-    await db.batch(
-      done.slice(index, index + 50).map((id) => ({
-        sql: `UPDATE index_outbox SET state = 'done', attempts = attempts + 1 WHERE id = ?`,
-        params: [id],
-      })),
-    );
+  await completeSemanticIndexWork(db, done, indexed > 0);
 
   return indexed;
 }
@@ -322,6 +354,7 @@ export async function runMaintenance(options: {
             orgId,
             options.vectors,
             limit,
+            now.toISOString(),
           );
         } catch (error) {
           // Named by organization, without the message, which can carry content.

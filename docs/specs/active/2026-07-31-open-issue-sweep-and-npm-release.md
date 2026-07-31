@@ -38,7 +38,11 @@ work.
 Issue #138 then demonstrated that a configured semantic deployment can report
 ready while silently falling back to FTS because invalid embedding settings,
 an unavailable vector backend, and an incompatible vector fingerprint are not
-distinguished from an intentionally unconfigured FTS-only deployment.
+distinguished from an intentionally unconfigured FTS-only deployment. Review of
+the merged local-readiness fix further proved that a scheduler-observed embedder
+or vector-store failure is retained only as pending work and does not change
+`/readyz`; readiness must project that safe durable failure evidence without
+probing the provider.
 
 Issue #140 requires the public npm path to prove both sides of that contract:
 the default tarball must stay dependency-light, while following the documented
@@ -85,6 +89,9 @@ documentation, and an install smoke against the immutable npm artifact.
 - Make semantic readiness fail closed when embedding or vector operation is
   requested but cannot be initialized safely; persist and compare the minimum
   compatible index fingerprint while preserving intentional FTS-only startup.
+- Persist only the dependency kind and time after an indexing failure, project
+  it into local readiness, and clear it only after a later complete embed/upsert
+  succeeds; never store provider output or require a readiness network call.
 - Bind the Bun fingerprint to a credential-free digest of the normalized
   embedding endpoint, refuse a vector file that aliases the canonical database,
   and require explicit requeue before historical FTS-only claims can be called
@@ -204,9 +211,10 @@ documentation, and an install smoke against the immutable npm artifact.
   database, or schema, the vector path aliases canonical SQL, historical active
   claims lack reindex work, restored canonical metadata points at a newly
   created empty vector projection, or the active index fingerprint is
-  incompatible with stored metadata, then Titen shall return `ready: false`,
-  mark the affected semantic capability `configured_error`, and expose only a
-  sanitized local diagnostic.
+  incompatible with stored metadata, or indexing has durably observed an
+  embedder/vector-store failure not followed by a successful embed/upsert, then
+  Titen shall return `ready: false`, mark the affected semantic capability
+  `configured_error`, and expose only a sanitized local diagnostic.
 - **AC-SWP-016 — Event-driven:** When a semantic index is first initialized,
   Titen shall persist a fingerprint containing credential-free provider
   endpoint identity, model, revision, dimensions, metric, preprocessing

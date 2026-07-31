@@ -118,8 +118,10 @@ invalid dimension, or binding object without the required methods returns
 Migration 13 persists provider `workers-ai`, model, revision, dimensions,
 cosine metric, preprocessing `text-v1`, and index schema `claims-scope-v1` in
 D1. Readiness compares those local facts without calling Workers AI or
-Vectorize. `enabled` is therefore not provider-reachability evidence; a real
-index drain/query smoke supplies that evidence.
+Vectorize. Migration 14 retains only safe embedder/vector-store failure
+timestamps in semantic metadata, so `/readyz` fails without a provider probe
+until a later complete embed/upsert proves recovery. A real drain/query smoke
+supplies the initial reachability evidence and proves recovery.
 
 Changing any fingerprint field requires an explicit reindex. Provision a fresh
 compatible Vectorize index (or clear the rebuildable old projection), stop
