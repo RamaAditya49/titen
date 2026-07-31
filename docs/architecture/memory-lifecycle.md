@@ -1,6 +1,7 @@
 # Titen memory lifecycle protocol
 
-- Status: target design for P0 and later releases
+- Status: architecture with current behavior and proposed features explicitly
+  labelled
 - Audience: contributors, integrators, evaluators, and operators
 - Product: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
@@ -162,6 +163,8 @@ The canonical SQL transaction commits:
 - its append-only history event;
 - FTS projection;
 - direct claim and source link when supplied and valid;
+- one versioned enrichment job when automatic derivation is configured
+  (proposed; not present in the current physical schema);
 - indexing outbox work when semantic indexing is enabled;
 - metadata-only domain event outbox work for subscribed state transitions;
 - idempotency result for retry-safe writes.
@@ -179,16 +182,44 @@ validate → authorize → SQL transaction → canonical success
 Claims enter the system through two paths:
 
 1. **deterministic:** an authorized caller supplies a claim and evidence links;
-2. **consolidated:** bounded rules and, optionally, a model propose claims from
+2. **model-assisted target:** bounded background derivation proposes claims from
    eligible observations.
+
+Current implementation truth: `POST /v1/consolidations` implements only the
+first path and returns `model_used: false`. The indexing outbox does not extract
+claims and must not be described as an enrichment queue.
 
 Every proposed claim must pass schema, scope, evidence, trust, and temporal
 validation. A model cannot invent a source identifier, increase trust above its
 evidence, delete evidence, or resolve a dispute.
 
-The first implementation favors ADD-only derivation. A changed interpretation
+The proposed first implementation favors ADD-only derivation. A changed interpretation
 creates a new claim version or an explicit lifecycle transition instead of
 silently rewriting the old record.
+
+#### Proposed derivation and reflection lanes
+
+```text
+observation + enrichment job commit
+  → persistent bounded lease
+  → deterministic eligibility/exact duplicate rules
+  → authorized FTS/embedding candidate shortlist
+  → structured derivation proposal
+  → local schema/scope/source/trust/time validation
+  → ADD-only claim/source/history transaction
+
+bounded authorized claim cluster
+  → structured reflection proposal
+  → duplicate/conflict/pattern/procedure/supersession validation
+  → ADD/link proposal or explicit review; never delete or select truth
+```
+
+Derivation handles new evidence. Reflection is slower scheduled work over a
+bounded cluster. Both use a model only as a proposal generator. Model names are
+not product semantics: the exploratory 2026-07-31 pilot observed the strongest
+tested reflection result on the Sol route, but selected no production default
+and proved no runtime gate. See the
+[dated evaluation report](../research/2026-07-31-memory-model-evaluation.md).
 
 ### Stage 4 — preserve time and disagreement
 
@@ -460,7 +491,8 @@ be used for indexed records and queries.
 | Memory Atlas SQL lenses       | no              | no                | no             |
 | channel semantic retrieval    | yes             | no                | yes            |
 | semantic paraphrase retrieval | yes             | no                | yes            |
-| automatic claim extraction    | no              | optional          | no             |
+| automatic claim extraction (proposed) | no       | optional          | no             |
+| background memory reflection (proposed) | candidate lookup | required when enabled | candidate lookup |
 | semantic reranking            | optional        | optional reranker | optional       |
 | checkpoints, leases, handoffs | no              | no                | no             |
 
@@ -474,6 +506,7 @@ retrieval does not require enabling automatic memory extraction.
 | Core                   | D1 or SQLite          | structured filters + FTS5              | none                                   | mandatory baseline, offline/degraded operation     |
 | Cloudflare hybrid      | D1 + Vectorize        | FTS5 + dense vector fusion             | Workers AI or compatible embedding API | serverless semantic recall                         |
 | Lightweight VPS hybrid | SQLite + `sqlite-vec` | FTS5 + exact vector fusion             | local or remote compatible embedder    | personal and small-team deployment                 |
+| Proposed model-managed | D1 or SQLite          | FTS5 plus optional vector shortlist    | one evaluated extraction model         | asynchronous derivation and reflection             |
 | Scale profile          | Postgres + `pgvector` | Postgres FTS + exact/ANN vector fusion | compatible embedder                    | later high-volume or existing-Postgres deployments |
 
 The base VPS remains Bun plus SQLite. `pgvector` is not the default because it
@@ -488,15 +521,18 @@ When semantic retrieval is enabled:
 
 1. Workers AI or another embedding provider converts eligible text to vectors.
 2. D1 commits canonical records and an indexing outbox.
-3. Vectorize stores only opaque IDs, canonical `org_id`, `subject_id`, and
-   project-scope metadata, record version, and vector values.
-4. A query is embedded with the same fingerprint and sent to Vectorize with
-   those scope filters applied before top-k selection.
+3. Vectorize stores only opaque IDs, canonical `org_id`, `subject_id`,
+   project-scope metadata, and vector values.
+4. A query uses the configured embedder and sends the resulting vector to
+   Vectorize with those scope filters applied before top-k selection.
 5. Returned IDs are hydrated and authorized again from D1.
 
 Vectorize insert and upsert visibility is asynchronous. Titen therefore treats
 mutation acceptance as pending index work, uses an outbox and bounded repair,
 and never makes Vectorize the canonical record.
+
+The current adapter does not persist a complete embedding fingerprint or
+compare one during readiness; that remains the proposed contract below.
 
 ### Lightweight VPS path
 
@@ -539,7 +575,9 @@ Titen's primary semantic unit is the active claim version, not every raw chat
 turn.
 
 - Active claims are compact, typed, temporal, and linked to evidence.
-- Observations remain canonical and FTS-searchable.
+- Observations remain canonical and have an FTS projection, but the current
+  context compiler searches claims. Pending observations are not claim-ready
+  context until a direct or derived claim exists.
 - Evidence is retrieved through claim-source links or direct authorized search.
 - Checkpoints remain a separate state corpus and are never promoted by vector
   proximity alone.
@@ -551,13 +589,20 @@ turn.
 
 This reduces embedding calls, index size, duplicate conversational noise, and
 the chance that raw instructions dominate semantic similarity. The tradeoff is
-that an unconsolidated observation may only be available through FTS until a
-direct or consolidated claim exists. The evaluation suite must measure that
-delay instead of hiding it.
+that an observation is not context-eligible until a direct or derived claim
+exists. The proposed enrichment API must expose that pending state honestly
+instead of hiding the delay.
 
-### Embedding fingerprint
+### Proposed embedding fingerprint contract
 
-Every semantic index is bound to a fingerprint containing at least:
+Current adapters carry a configured model identifier and dimensions. The Bun
+HTTP embedder rejects returned vectors with the wrong length, while current
+readiness reports only the generic embedder/vector capability state. Titen does
+not yet persist or compare a complete index fingerprint, probe the provider at
+startup, or fail readiness on a fingerprint mismatch.
+
+The proposed contract binds every semantic index to a fingerprint containing at
+least:
 
 - provider and model identifier;
 - immutable revision when available;
@@ -567,20 +612,22 @@ Every semantic index is bound to a fingerprint containing at least:
 - text-format/template version;
 - Titen semantic-unit schema version.
 
-At startup and provisioning, Titen probes the configured model output and
-compares it with the index. It does not pad or truncate mismatched vectors.
-Changing the fingerprint creates an explicit re-index operation and fails
-semantic readiness until compatibility is restored.
+Once implemented, startup and provisioning probe the configured model output
+and compare the persisted contract with the index. Titen will not pad or
+truncate mismatched vectors. Changing the fingerprint will require an explicit
+re-index and will fail semantic readiness until compatibility is restored.
 
-Canonical export excludes embeddings by default. A destination rebuilds its
-semantic projection with its own declared fingerprint, so changing providers
-can change retrieval scores without changing evidence, claims, or record IDs.
+Canonical export excludes embeddings by default. A destination currently
+rebuilds its semantic projection with its configured embedder; under the
+proposed contract it also declares and verifies the complete fingerprint.
+Changing providers can change retrieval scores without changing evidence,
+claims, or record IDs.
 
-A multilingual model such as `@cf/baai/bge-m3` is a strong P0 candidate because
-Titen's first fixtures include Indonesian, Javanese terms in Indonesian
-sentences, and English. It is not a permanent default until the P0 spike records
-its real output shape, quality, latency, availability, and cost on both target
-runtimes.
+The dated pilot found that `embeddinggemma` retrieved all 24 small multilingual
+gold targets within top five, but that synthetic result is not a permanent
+default, production threshold, or implementation evidence for the fingerprint
+gate. A production evaluation must record the available provider/model revision,
+dimensions, preprocessing contract, and index configuration.
 
 ### Hybrid retrieval
 
@@ -608,11 +655,13 @@ only when a measured quality gain exceeds the simplest fusion path.
 | Failure                                  | Required behavior                                        |
 | ---------------------------------------- | -------------------------------------------------------- |
 | canonical SQL write fails                | abort the mutation; no partial success                   |
-| embedding provider fails                 | retain canonical write and FTS; queue repair             |
-| vector write is pending                  | report semantic pending; use FTS and bounded recent path |
+| embedding provider fails                 | retain canonical write and FTS; leave index work pending |
+| vector write is pending                  | keep canonical claim/FTS available; no recent overlay exists today |
 | vector query fails                       | return explicit degraded FTS result when policy permits  |
 | vector returns stale ID                  | reject during canonical hydration                        |
-| extraction model returns invalid sources | commit no proposed claims                                |
+| proposed extraction returns invalid sources | commit no proposed claims                             |
+| proposed extraction times out/rate-limits | retain leased work for bounded retry; expose degradation |
+| proposed enrichment lease expires         | reclaim idempotently; create no duplicate claim          |
 | context budget cannot fit an item        | omit it and report packing metadata                      |
 | feedback is malicious or out of scope    | reject without changing utility                          |
 | lease expires                            | make work available; keep checkpoint history             |
@@ -627,6 +676,7 @@ These are hypotheses until the evaluation suite measures them.
 | Problem                                      | Titen decision                                   | Expected benefit                                   | Tradeoff                                                 | Required evidence                                         |
 | -------------------------------------------- | ------------------------------------------------ | -------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------- |
 | raw history is noisy and expensive           | embed active claim versions, not every chat turn | fewer vectors, lower cost, denser semantic units   | fresh observations may be FTS-only before claim creation | recall and time-to-semantic-ready ablation                |
+| unstructured evidence needs interpretation    | bounded background model proposal plus validator | typed, evidence-linked memory without write latency | eventual enrichment and provider cost                    | locked schema/safety/quality and runtime parity gates     |
 | vector services fail independently           | SQL/FTS is canonical; vectors are rebuildable    | no lost memory and graceful degradation            | repair/outbox complexity                                 | failure-injection and rebuild test                        |
 | exact and semantic queries differ            | fuse FTS and optional vector ranks               | robust exact and paraphrase recall                 | two candidate paths                                      | FTS-only vs vector-only vs hybrid quality/latency         |
 | vector filters are not authority             | authorize before retrieval and hydrate afterward | tenant safety and stale-index rejection            | extra SQL read                                           | zero-leak adversarial suite and hydration latency         |
@@ -670,8 +720,9 @@ or returns worse useful context is a failed benchmark.
 
 - “Works without embeddings” means canonical writes, FTS recall, context
   compilation, feedback, and collaboration primitives remain functional.
-- “Semantic retrieval enabled” names the exact embedding fingerprint and vector
-  backend.
+- “Semantic retrieval enabled” currently names the configured model,
+  dimensions, and vector backend; after the proposed fingerprint gate ships, it
+  names the complete verified fingerprint.
 - “Faster” names the workload, comparison lane, dataset, p95/p99, quality floor,
   and raw results.
 - “More effective” requires downstream task or useful-context evidence.

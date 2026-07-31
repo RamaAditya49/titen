@@ -111,8 +111,9 @@ Behavior:
 - facts remain disputed until evidence or authorized resolution exists;
 - opinions stay observer-scoped;
 - decisions use explicit supersession;
-- checkpoints use version checks;
+- checkpoint heads use one atomic scope upsert;
 - leases reject or report active competing ownership.
+- handoff resolution uses one durable uniqueness fence.
 
 No LLM may silently declare consensus.
 
@@ -181,6 +182,8 @@ ownership, region, or network boundaries.
 Event-exchange constraints:
 
 - append events and advance per-scope cursors;
+- assign a local monotonic event sequence while preserving public event-ID
+  cursors;
 - filter by source policy before transmission;
 - preserve source node, actor, timestamps, and signatures/hashes;
 - never replicate credentials;

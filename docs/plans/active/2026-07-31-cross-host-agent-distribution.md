@@ -18,7 +18,7 @@ spec: docs/specs/active/2026-07-31-cross-host-agent-distribution.md
   package, and OpenClaw/OpenCode/Windsurf/TRAE kits by copying one canonical
   skill and pointing every host at the existing remote `/mcp` endpoint.
 - [x] Extend the focused integration test to validate manifests, marketplaces,
-  paths, skill equality, secret hygiene, interpolation syntax, and the seven-tool
+  paths, skill equality, secret hygiene, interpolation syntax, and the nine-tool
   boundary without adding a test dependency.
 - [x] Update README, agent guide, architecture, and Ponytail debt so shipped
   support and remaining hook/catalog limits are explicit.
@@ -63,13 +63,20 @@ required. The existing MCP and npm service remain independently usable.
 
 ## Current external publication evidence
 
+- The current nine-tool source passes the portable skill validator, plugin
+  validator, and focused agent-package parity tests. `titen_compile` remains
+  conservatively non-read-only because it records a context run, while
+  `titen_remember` remains non-idempotent by default because its idempotency key
+  is optional.
 - PRs #127 and #128 are merged; the package source is commit
   `1cc8823282c8b660126c17a38a26a8c5452571b6`.
-- The standalone `titen-memory@0.1.0` ClawHub skill is public, installs with a
-  byte-identical `SKILL.md`, and passes `clawhub skill verify` with clean static,
-  SkillSpector, and VirusTotal results.
-- The bundle plugin passes local Plugin Inspector with zero breakages and zero
-  warnings; its exact merged-source dry-run contains five files and 5,074 bytes.
+- The standalone `titen-memory@0.1.0` ClawHub skill is the verified earlier
+  seven-tool snapshot and passes `clawhub skill verify` with clean static,
+  SkillSpector, and VirusTotal results. The current nine-tool source has not
+  been published there.
+- The earlier bundle source passes local Plugin Inspector with zero breakages
+  and zero warnings. Validation and dry-run must be repeated for the current
+  nine-tool source before any live publication claim.
 - Live bundle publication is still blocked by the upstream ClawHub inspector
   sandbox incident `openclaw/clawhub#3327`. Keep the publication and terminal
   evidence items unchecked until the package itself is public and inspected.

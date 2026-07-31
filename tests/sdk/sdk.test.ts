@@ -85,7 +85,7 @@ test("the client drives the whole Level 5 loop", async () => {
   assert.match(context.context_id, /^ctx_/);
   assert.ok(context.budget.used_tokens <= 900);
   assert.match(context.instructions, /untrusted reference data/i);
-  const selected = context.items.find((item: any) => item.claim_id === claimId);
+  const selected = context.items.find((item) => item.claim_id === claimId);
   assert.ok(selected, "the client must receive the claim it just wrote");
 
   const feedback = await titen.feedback(context.context_id, {
@@ -179,7 +179,7 @@ test("key management round-trips and a scoped key is enforced", async () => {
     message: "Continue with the returned principal identity.",
   });
   const handoffs = await reader.listHandoffs("pending");
-  assert.ok(handoffs.handoffs.some((entry: any) => entry.handoff_id === handoff.handoff_id));
+  assert.ok(handoffs.handoffs.some((entry) => entry.handoff_id === handoff.handoff_id));
   const accepted = await reader.resolveHandoff(handoff.handoff_id, "accepted");
   assert.equal(accepted.status, "accepted");
 
@@ -235,6 +235,8 @@ test("constructor configuration fails early with stable field errors", () => {
     [{ url: "http://example.test", key: "" }, /key is required/],
     [{ url: "http://example.test", key: "k", fetch: null }, /fetch must be a function/],
     [{ url: "http://example.test", key: "secret-value", fetch: 0 }, /fetch must be a function/],
+    [{ url: "http://example.test", key: "k", timeoutMs: 0 }, /timeoutMs must be a positive/],
+    [{ url: "http://example.test", key: "k", timeoutMs: 1.5 }, /timeoutMs must be a positive/],
   ];
   for (const [config, message] of cases)
     assert.throws(
@@ -249,6 +251,132 @@ test("constructor configuration fails early with stable field errors", () => {
 
   assert.doesNotThrow(
     () => new TitenClient({ url: "https://example.test/", key: "k", fetch }),
+  );
+});
+
+test("requests compose caller cancellation with a timeout and never auto-retry", async () => {
+  let calls = 0;
+  const waitingFetch: typeof fetch = async (_input, init) => {
+    calls += 1;
+    const signal = init?.signal;
+    return new Promise<Response>((_resolve, reject) => {
+      const abort = () => reject(signal?.reason);
+      if (signal?.aborted) abort();
+      else signal?.addEventListener("abort", abort, { once: true });
+    });
+  };
+  const local = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: waitingFetch,
+    timeoutMs: 1_000,
+  });
+  const controller = new AbortController();
+  const reason = new Error("caller stopped");
+  const pending = local.request("GET", "/healthz", { signal: controller.signal });
+  controller.abort(reason);
+  await assert.rejects(() => pending, (error: unknown) => error === reason);
+  assert.equal(calls, 1);
+
+  calls = 0;
+  const timed = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: waitingFetch,
+    timeoutMs: 5,
+  });
+  await assert.rejects(
+    () => timed.health(),
+    (error: unknown) => error instanceof DOMException && error.name === "TimeoutError",
+  );
+  assert.equal(calls, 1, "a timeout must not retry the request");
+
+  let unavailableCalls = 0;
+  const unavailable = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => {
+      unavailableCalls += 1;
+      return Response.json(
+        { error: { code: "UNAVAILABLE", message: "Try later." } },
+        { status: 503 },
+      );
+    },
+  });
+  await assert.rejects(
+    () => unavailable.health(),
+    (error: unknown) => error instanceof TitenError && error.code === "UNAVAILABLE",
+  );
+  assert.equal(unavailableCalls, 1, "503 responses are returned without an SDK retry");
+});
+
+test("object-style consolidate misuse fails locally before fetch", async () => {
+  let called = false;
+  const local = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => {
+      called = true;
+      return Response.json({ data: {} });
+    },
+  });
+  const consolidate = local.consolidate.bind(local) as unknown as (
+    value: unknown,
+  ) => Promise<unknown>;
+  await assert.rejects(
+    () => consolidate({ subject_id: "subject", claims: [] }),
+    /consolidate\(\) takes \(subject_id, claims\)/,
+  );
+  assert.equal(called, false);
+});
+
+test("TitenError preserves safe metadata and request ids", async () => {
+  const local = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => Response.json(
+      {
+        error: {
+          code: "UNAVAILABLE",
+          message: "Dependency unavailable.",
+          meta: { retryable: true, operation: "index_drain" },
+        },
+        meta: { request_id: "req_body", dependency: "embedder", retryable: true },
+      },
+      { status: 503, headers: { "x-request-id": "req_header" } },
+    ),
+  });
+  await assert.rejects(
+    () => local.health(),
+    (error: unknown) => {
+      assert.ok(error instanceof TitenError);
+      assert.equal(error.requestId, "req_body");
+      assert.deepEqual(error.meta, {
+        request_id: "req_body",
+        dependency: "embedder",
+        retryable: true,
+        operation: "index_drain",
+      });
+      return true;
+    },
+  );
+
+  const headerOnly = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => Response.json(
+      { error: { code: "FORBIDDEN", message: "No." } },
+      { status: 403, headers: { "x-request-id": "req_header_only" } },
+    ),
+  });
+  await assert.rejects(
+    () => headerOnly.health(),
+    (error: unknown) => {
+      assert.ok(error instanceof TitenError);
+      assert.equal(error.requestId, "req_header_only");
+      assert.deepEqual(error.meta, { request_id: "req_header_only" });
+      return true;
+    },
   );
 });
 
@@ -323,9 +451,20 @@ test("mutation idempotency reaches the server and preserves replay semantics", a
     content: "Retry-safe SDK observation.",
     source: { type: "tool", ref: "sdk-retry" },
   };
-  const first = await titen.observe(observation, { idempotencyKey });
-  const replay = await titen.observe(observation, { idempotencyKey });
-  assert.equal(replay.observation_id, first.observation_id);
+  const first = await titen.requestWithMeta<{ observation_id: string }>(
+    "POST",
+    "/v1/observations",
+    { json: observation, idempotencyKey },
+  );
+  const replay = await titen.requestWithMeta<{ observation_id: string }>(
+    "POST",
+    "/v1/observations",
+    { json: observation, idempotencyKey },
+  );
+  assert.equal(replay.data.observation_id, first.data.observation_id);
+  assert.equal(first.meta.replayed, false);
+  assert.equal(replay.meta.replayed, true);
+  assert.match(first.meta.request_id as string, /^req_/);
 
   await assert.rejects(
     () =>
@@ -339,7 +478,7 @@ test("mutation idempotency reaches the server and preserves replay semantics", a
 });
 
 test("generic JSON and raw access preserve auth without allowing overrides", async () => {
-  const events = await titen.request<any>("GET", "/v1/events?limit=1");
+  const events = await titen.request<{ events: unknown[] }>("GET", "/v1/events?limit=1");
   assert.ok(Array.isArray(events.events));
 
   const exported = await titen.requestRaw(

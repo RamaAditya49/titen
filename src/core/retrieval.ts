@@ -17,35 +17,41 @@ export interface FtsQueryPlan {
   termsDropped: number;
 }
 
-/**
- * ponytail: term selection by shape (digits, then punctuation, then length)
- * instead of corpus statistics, and no stopword list. The ceiling is that a
- * natural-language task is mostly function words, so a single common term can
- * drive the whole match set, and terms past `LIMITS.queryTerms` are dropped by
- * character length rather than by how much they discriminate. Upgrade path:
- * rank terms by inverse document frequency read from `claims_fts`, subtracting
- * a stopword set, and fall back to the unfiltered list when filtering empties
- * the query (#84).
- */
+const STOPWORDS = new Set(`
+  a about all an and are as at be been but by can could did do does for from had
+  has have how i if in into is it its me my of on one or our please should that
+  the their them then there these they this those to us was we were what when
+  where which who why will with would you your
+  ada adalah akan apa atau bagaimana dalam dan dari dengan di ini itu kami kamu
+  kapan ke kita mana oleh pada saya sebagai siapa sudah tentang tidak untuk yang
+`.trim().split(/\s+/u));
+
 function termSignal(term: string): number {
-  return (/[0-9]/u.test(term) ? 10_000 : 0)
-    + (/[_'-]/u.test(term) ? 5_000 : 0)
-    + Math.min(term.length, 1_000);
+  return (/[0-9]/u.test(term) ? 2 : 0) + (/[_'-]/u.test(term) ? 1 : 0);
 }
 
 export function planFtsQuery(task: string, maxTerms = LIMITS.queryTerms): FtsQueryPlan {
-  const matches = task.toLowerCase().matchAll(/[\p{L}\p{N}][\p{L}\p{N}_'-]*/gu);
+  const normalized = task
+    .replaceAll(/\p{Cf}/gu, "")
+    .normalize("NFC")
+    .toLowerCase()
+    .normalize("NFC");
+  const matches = normalized.matchAll(/[\p{L}\p{N}][\p{L}\p{M}\p{N}_'-]*/gu);
   const terms = [...new Set([...matches].map((match) => match[0]))].filter(
     (term) => term.length > 1,
   );
   if (terms.length === 0) return { match: null, termsUsed: 0, termsDropped: 0 };
-  const selected = terms
-    .sort((left, right) => {
-      const bySignal = termSignal(right) - termSignal(left);
-      if (bySignal !== 0) return bySignal;
-      return left < right ? -1 : left > right ? 1 : 0;
-    })
-    .slice(0, maxTerms);
+  const contentTerms = terms.filter((term) => !STOPWORDS.has(term));
+  const ordered = (contentTerms.length > 0 ? contentTerms : terms)
+    .sort((left, right) => termSignal(right) - termSignal(left));
+  const headCount = Math.ceil(maxTerms / 2);
+  const tailCount = maxTerms - headCount;
+  const selected = ordered.length <= maxTerms
+    ? ordered
+    : [
+        ...ordered.slice(0, headCount),
+        ...(tailCount > 0 ? ordered.slice(-tailCount) : []),
+      ];
   return {
     match: selected
     .map((term) => `"${term.replaceAll('"', '""')}"`)
@@ -162,7 +168,27 @@ export async function retrieveClaimCandidates(
 ): Promise<ClaimCandidate[]> {
   const limit = scope.limit ?? LIMITS.candidates;
   return db.all<ClaimCandidate>(
-    `SELECT c.id,
+    `WITH candidate_ids AS (
+       SELECT claims_fts.claim_id,
+              bm25(claims_fts, 1.0, 0.0, 0.0, 0.0) AS lexical_bm25
+         FROM claims_fts
+         JOIN claims c ON c.id = claims_fts.claim_id
+        WHERE claims_fts MATCH (
+                'org_scope : "' || lower(hex(?)) || '0" AND '
+                || 'subject_scope : "' || lower(hex(?)) || '0" AND '
+                || 'statement : (' || ? || ')'
+              )
+          AND c.org_id = ?
+          AND c.subject_id = ?
+          AND (? IS NULL OR c.project_id = ?)
+          AND c.status IN ('active', 'disputed')
+          AND c.valid_from <= ?
+          AND (c.valid_to IS NULL OR c.valid_to > ?)
+          AND ${recordAccessSql("c")}
+        ORDER BY bm25(claims_fts, 1.0, 0.0, 0.0, 0.0)
+        LIMIT ?
+     )
+     SELECT c.id,
             c.kind,
             c.statement,
             c.confidence,
@@ -173,7 +199,7 @@ export async function retrieveClaimCandidates(
             c.valid_from,
             c.valid_to,
             c.created_at,
-            bm25(claims_fts) AS bm25,
+            candidate_ids.lexical_bm25 AS bm25,
             CASE
               WHEN c.status = 'disputed' THEN 1
               WHEN EXISTS (
@@ -187,19 +213,12 @@ export async function retrieveClaimCandidates(
             (SELECT COUNT(*) FROM context_feedback f
               WHERE f.claim_id = c.id AND f.outcome IN ('irrelevant', 'incorrect', 'harmful')) AS feedback_negative,
             (SELECT COUNT(*) FROM context_feedback f WHERE f.claim_id = c.id) AS feedback_total
-       FROM claims_fts
-       JOIN claims c ON c.id = claims_fts.claim_id
-      WHERE claims_fts MATCH ?
-        AND c.org_id = ?
-        AND c.subject_id = ?
-        AND (? IS NULL OR c.project_id = ?)
-        AND c.status IN ('active', 'disputed')
-        AND c.valid_from <= ?
-        AND (c.valid_to IS NULL OR c.valid_to > ?)
-        AND ${recordAccessSql("c")}
-      ORDER BY bm25(claims_fts)
-      LIMIT ?`,
+       FROM candidate_ids
+       JOIN claims c ON c.id = candidate_ids.claim_id
+      ORDER BY candidate_ids.lexical_bm25`,
     [
+      principal.orgId,
+      scope.subjectId,
       match,
       principal.orgId,
       scope.subjectId,

@@ -1,7 +1,9 @@
 # Data model reference
 
-Status: logical schema for implementation entry. P0 migrations will make the
-physical column names and indexes executable.
+Status: logical target schema. Current migrations implement the canonical
+kernel, `index_outbox`, and delivery state; model-assisted `enrichment_jobs`,
+their worker lease/fingerprint semantics, and vector `submitted/ready` states
+remain proposed. Collaboration leases described below are implemented.
 
 ## Authority and precedence
 
@@ -177,10 +179,12 @@ Required fields:
 - optional `observer_id` and required `subject_id`;
 - `kind`, `content`, `confidence`, `trust`, and `visibility`;
 - `valid_from`, optional `valid_to`, `status`, and current `version`;
-- `created_at`, `created_by`, and latest lifecycle time.
+- `created_at`, `created_by`, and latest lifecycle time;
+- nullable derivation method and pipeline fingerprint for generated claims;
+  provider/model/prompt/schema metadata is recorded without raw prompt/output.
 
 Kinds: `semantic_fact`, `episodic_event`, `preference`,
-`procedural_guidance`, `decision`, and `relationship`.
+`procedural`, `decision`, and `relationship`.
 
 Statuses: `active`, `disputed`, `superseded`, `expired`, and `revoked`.
 
@@ -313,33 +317,39 @@ evidence, trust, visibility, or authorization.
 
 ## Execution and collaboration state
 
-### `checkpoints` and `checkpoint_versions`
+### `checkpoints`
 
-`checkpoints` stores the current head: owner, responsible principal, work key,
-scope, visibility, status, current version, TTL, last activity, and optional
-result observation IDs. The bounded state payload lives in append-only
-`checkpoint_versions` with actor and time.
+The implemented v0.2 table stores one bounded current head for each
+organization, subject, agent, and kind, with optional run ID, state hash, TTL,
+expiry, creation time, and update time. A unique scope index plus one SQL upsert
+prevents duplicate heads. There is no shipped `checkpoint_versions` table yet.
 
-Checkpoint updates use compare-and-swap on the expected version. Expired
-checkpoints are excluded from context by default but retained according to
-policy.
+An unexpired head is private to its agent unless a pending or accepted handoff
+references that exact checkpoint for its intended recipient. Expired heads are
+not readable through the API.
 
 ### `leases`
 
-Added in v0.2. Required fields: organization/scope, work key, holder, status,
-acquired/renewed/expiry times, idempotency key, and linked checkpoint.
+The implemented v0.2 table stores organization, resource type and ID, holder,
+purpose, TTL, expiry, creation time, and optional release time. A partial unique
+index permits at most one unreleased row per organization/resource pair;
+acquisition, expiry reclaim, and same-holder renewal are atomic.
 
-At most one unexpired active lease exists for a normalized work key in an
-authorized scope. Acquisition and renewal are atomic.
+Unreleased rows are listed through a bounded organization-scoped cursor. An
+active organization-level `owner` or `admin` membership may force-release a
+lease; no new administrator model is inferred from an API key label.
 
 ### `handoffs`
 
-Added in v0.2. Required fields: sender, intended recipient/team, checkpoint,
-expected next action, visible evidence references, status, version, and
-lifecycle timestamps.
+The implemented v0.2 table stores organization, sender, intended principal,
+subject, optional context/checkpoint references, optional message, status, and
+lifecycle timestamps. Context and checkpoint references use composite
+organization-safe foreign keys and API preflight also verifies ownership,
+subject, expiry, and sender/recipient visibility.
 
-Statuses: `offered`, `accepted`, `declined`, `completed`, and `cancelled`.
-Responsibility changes only on acceptance.
+Statuses are `pending`, `accepted`, `rejected`, and the reserved `expired`.
+`handoff_resolutions` supplies one unique fence per handoff so only one
+concurrent acceptance/rejection and its event can commit.
 
 ## Derived projections and reliability
 
@@ -380,7 +390,36 @@ re-authorized, including both endpoints of an edge, before response assembly.
 Cache failure falls back to a bounded canonical compile or an explicit
 unavailable/degraded response; it never widens scope.
 
-### `vector_outbox`
+### Target: `enrichment_jobs`
+
+Durable optional derivation/reflection work. Required fields include
+organization and authorized scope, work kind, bounded source/premise IDs and
+versions, pipeline fingerprint, status, lease token and expiry, attempts, next
+attempt, bounded error class, bounded input/output hashes, committed result row
+IDs, and timestamps.
+
+The lanes have separate creation and idempotency contracts:
+
+- a derivation job is inserted in the same transaction as its eligible
+  canonical observation and is unique over work kind, observation ID/version,
+  and pipeline fingerprint;
+- a reflection scheduler reads a bounded authorized snapshot, then inserts the
+  job in its own transaction. Its identity is unique over work kind, the
+  snapshot fingerprint derived from ordered premise IDs/immutable versions and
+  the policy-snapshot fingerprint, and the pipeline fingerprint. It is not part
+  of an unrelated canonical mutation.
+
+Network calls happen outside a SQL transaction. The model proposal exists only
+in worker memory. A successful validator commits ADD-only
+claim/source/history/link/index work, records the output hash and committed
+result row IDs, and marks the job `done` in one transaction. Neither raw nor
+normalized proposal payload is persisted. Unsafe or malformed output makes no
+semantic write.
+
+This table is not implemented. The current `index_outbox` only schedules vector
+indexing; observation rows do not imply extraction work.
+
+### Target vector outbox contract
 
 A durable repair record written in the same transaction as the canonical
 mutation. Required fields: record type/ID, operation, target version, embedding
@@ -389,6 +428,10 @@ updated time.
 
 An outbox row is complete only when the derived index matches the target
 canonical version or the deletion is confirmed.
+
+The current physical `index_outbox` has a smaller `pending/done/failed` shape
+and marks an accepted upsert complete. It must not be presented as the target
+leased/fingerprinted readiness contract until a migration and parity tests ship.
 
 ### `event_outbox`
 
@@ -420,14 +463,27 @@ does not mutate the source record.
 ### `idempotency_records`
 
 Maps organization, actor, operation, and idempotency key to a normalized request
-hash plus stable response reference. Reusing the key with another payload is a
-conflict, not a second mutation.
+hash plus stable response reference. The implemented primary scope is
+organization, principal, and key hash, so key rotation preserves a retry while
+another principal stays isolated. The credential `key_id` that first committed
+the record remains as audit metadata. Reusing the key with another route or
+payload is a conflict, not a second mutation.
+
+### `event_order`
+
+Public event IDs remain stable UUID-based replay keys. A local autoincrementing
+sequence is assigned by an insert trigger and drives event and federation
+paging. Pre-migration equal-timestamp events are backfilled deterministically by
+timestamp and ID; every event committed after migration follows database write
+order even when timestamps are identical.
 
 ### `schema_meta`
 
-Stores migration version, export schema version, and active embedding
-fingerprint. `/readyz` fails on incompatible migration state or enabled vector
-fingerprint mismatch.
+Stores migration/export versions and, when implemented, separate embedding and
+extraction pipeline fingerprints. Current `/readyz` fails on an incompatible
+migration. The proposed extension also fails semantic readiness on an enabled
+vector fingerprint mismatch and reports extraction degradation independently
+from semantic retrieval.
 
 ### `audit_events`
 
@@ -465,7 +521,8 @@ supporting observation.
 
 One canonical transaction contains:
 
-- observation plus its record event, FTS, and outbox records;
+- observation plus its record event, FTS, index/event outbox, and optional
+  derivation job;
 - claim head plus version and validated source links;
 - claim lifecycle head plus new version and projection invalidation;
 - checkpoint head plus version;
@@ -474,6 +531,10 @@ One canonical transaction contains:
   and projection/event invalidation;
 - domain event outbox rows for subscribed state transitions;
 - idempotency result associated with the mutation.
+
+Reflection snapshot selection and job insertion use a separate idempotent
+scheduler transaction; an arbitrary canonical mutation does not imply a
+reflection job.
 
 Model, remote vector, and webhook calls do not hold a SQL transaction open. A
 canonical commit may return with explicit semantic degradation and repairable
@@ -485,21 +546,26 @@ outbox work.
   cleanup completes.
 - Evidence history is not autonomously deleted.
 - Expiry and retrieval eligibility are separate from physical purge.
-- Export excludes keys, vectors, ephemeral context content, and secrets by
-  default.
-- Export excludes Memory Atlas cache, layout, cluster, and community data;
-  destinations rebuild views from canonical records.
-- Channel/release rows and history are portable, but imported releases are
-  suspended until destination gateway, policy, and customer-assertion key
-  references are explicitly rebound and verified.
+- Portable JSONL v2 contains workspaces, active memberships, projects,
+  observations, and claims with their evidence links and supersession pointers.
+  This is the canonical memory/team migration surface, not a physical backup.
+- Portable JSONL excludes credentials, secrets, external integration bindings,
+  checkpoints, leases, handoffs, context runs and feedback, audit/event/history
+  rows, index outboxes, FTS projections, vectors, and Memory Atlas derived data.
+  Rebuildable views are regenerated; use a database snapshot when excluded
+  operational or learning state must survive disaster recovery.
+- Proposed channel/release portability must keep imported releases suspended
+  until destination gateway, policy, and customer-assertion key references are
+  explicitly rebound and verified.
 - Legal hold and physical purge arrive with v0.3 policy; their migration must
   preserve existing tombstones and provenance.
 - Revoking or expiring a release removes channel eligibility before derived
   cache/vector cleanup and preserves the released snapshot/history.
 
-## Required indexes
+## Required and proposed indexes
 
-Exact names wait for migrations, but P0 must cover:
+Exact names wait for their migrations. Existing tables and each proposed table
+when it ships must cover:
 
 - organization plus subject/project/agent/run scope and recency;
 - active claim eligibility by scope, visibility, status, and validity;
@@ -507,6 +573,10 @@ Exact names wait for migrations, but P0 must cover:
 - context run/item and feedback lookup;
 - credential hash/status lookup;
 - vector outbox due work;
+- **proposed with `enrichment_jobs`:** organization/status/next-attempt/lease
+  due-work lookup;
+- **proposed with `enrichment_jobs`:** unique derivation identity and unique
+  reflection snapshot identity as defined above;
 - project reference uniqueness within an organization/source namespace;
 - normalized tag uniqueness and record-tag lookup;
 - event outbox and webhook delivery due work;
@@ -519,7 +589,7 @@ smallest targeted composite indexes only after the authorized fixture and query
 plans expose a measured need. Every by-ID query still includes
 `organization_id`; an index is not an authorization control.
 
-## P0 decisions still open
+## Target decisions still open
 
 - exact ID generator and timestamp representation;
 - whether FTS indexes claims only or both claims and observations;

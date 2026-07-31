@@ -26,13 +26,12 @@ importers:
       miniflare:
         specifier: 4.20260722.1
         version: 4.20260722.1
-      wrangler:
-        specifier: 4.115.0
-        version: 4.115.0
-    optionalDependencies:
       sqlite-vec:
         specifier: 0.1.9
         version: 0.1.9
+      wrangler:
+        specifier: 4.115.0
+        version: 4.115.0
 
 packages:
 
@@ -3166,7 +3165,6 @@ snapshots:
       sqlite-vec-linux-arm64: 0.1.9
       sqlite-vec-linux-x64: 0.1.9
       sqlite-vec-windows-x64: 0.1.9
-    optional: true
 
   stringify-entities@4.0.4:
     dependencies:

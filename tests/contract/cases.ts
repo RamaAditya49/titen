@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
+import { MAX_BODY_BYTES } from "../../src/core/http";
 import { signPayload } from "../../src/core/webhooks";
 import type { Fixture, Res } from "./harness";
 
@@ -221,7 +222,7 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "an observation commits its canonical row, history, FTS row, and outbox entry together",
+    name: "an observation commits canonical evidence without unused vector work",
     async run(fx) {
       const agent = await fx.provision();
       const res = await fx.call("POST", "/v1/observations", {
@@ -242,7 +243,8 @@ export const CASES: Case[] = [
          UNION ALL SELECT 'outbox', COUNT(*) FROM index_outbox WHERE record_id = ?`,
         [id, id, id, id],
       );
-      for (const row of counts) assert.equal(Number(row.count), 1, `${row.label} row missing`);
+      for (const row of counts)
+        assert.equal(Number(row.count), row.label === "outbox" ? 0 : 1, `${row.label} row mismatch`);
     },
   },
   {
@@ -728,7 +730,7 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "another organization cannot submit feedback for a foreign context run",
+    name: "only the context owner or intended delegate can submit feedback",
     async run(fx) {
       const owner = await fx.provision();
       await seedClaim(fx, owner.key);
@@ -740,6 +742,15 @@ export const CASES: Case[] = [
           max_tokens: 900,
         },
       });
+      expectOk(compiled);
+      const sibling = await fx.provision({ orgId: owner.orgId });
+      expectError(
+        await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+          key: sibling.key,
+          body: { outcome: "harmful" },
+        }),
+        404,
+      );
       const intruder = await fx.provision();
       expectError(
         await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
@@ -922,6 +933,62 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "lexical limiting ranks a late best match before candidate and token budgets",
+    async run(fx) {
+      const agent = await fx.provision();
+      const obs = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({
+          subject_id: "user_late_rank",
+          content: "Shared evidence for a bounded lexical scale regression.",
+        }),
+      });
+      expectOk(obs, 201);
+      const observationId = obs.body.data.observation_id as string;
+
+      // Insert 200 weaker matches first so limiting by row order would exclude
+      // the final, more relevant claim before BM25 and token packing can see it.
+      for (let batch = 0; batch < 4; batch += 1) {
+        const claims = Array.from({ length: 50 }, (_unused, index) => ({
+          kind: "procedural",
+          statement: `Generic release note ${batch}-${index} with unrelated filler.`,
+          sources: [{ observation_id: observationId, relation: "supports" }],
+        }));
+        expectOk(await fx.call("POST", "/v1/consolidations", {
+          key: agent.key,
+          body: { subject_id: "user_late_rank", claims },
+        }), 201);
+      }
+
+      const target = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_late_rank",
+          claims: [{
+            kind: "procedural",
+            statement: "Quartz rollback smoke is required before release.",
+            sources: [{ observation_id: observationId, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(target, 201);
+      const targetId = target.body.data.claims[0].claim_id as string;
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: "user_late_rank",
+          task: "quartz rollback smoke release",
+          max_tokens: 300,
+        },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.meta.candidates, 200);
+      assert.equal(compiled.body.data.items[0]?.claim_id, targetId);
+      assert.deepEqual(compiled.body.data.items[0]?.evidence_ids, [observationId]);
+    },
+  },
+  {
     name: "a managed key cannot exceed the credential that created it",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"], maxTrust: "policy_approved" });
@@ -1026,10 +1093,10 @@ export const CASES: Case[] = [
       const observationLines = String(observations.body).trim().split("\n");
       const header = JSON.parse(observationLines[0]!);
       assert.equal(header.type, "titen.export.header");
-      assert.equal(header.format_version, 1);
+      assert.equal(header.format_version, 2);
       assert.equal(header.complete, true);
-      assert.deepEqual(header.dependency_order, ["projects", "observations", "claims"]);
-      assert.deepEqual(header.depends_on, ["projects"]);
+      assert.deepEqual(header.dependency_order, ["workspaces", "memberships", "projects", "observations", "claims"]);
+      assert.deepEqual(header.depends_on, ["workspaces", "memberships", "projects"]);
       assert.equal(observationLines.length, 2);
       assert.ok(!String(observations.body).includes("titen_sk_"), "export must carry no key");
 
@@ -1072,8 +1139,20 @@ export const CASES: Case[] = [
         .replaceAll(seeded.observationId, migratedObservationId)
         .replaceAll(seeded.claimId, migratedClaimId);
       const target = await fx.provision({ scopes: ["*"] });
-      const imported = await fx.callRaw("POST", "/v1/import", { key: target.key, body: migrated });
+      const actorMap = JSON.stringify({
+        type: "titen.import.actor_map",
+        source_org_id: owner.orgId,
+        source_actor_id: owner.principalId,
+        destination_actor_id: target.principalId,
+      });
+      const imported = await fx.callRaw("POST", "/v1/import", { key: target.key, body: `${actorMap}\n${migrated}` });
       expectOk(imported);
+      const importedOutbox = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM index_outbox
+          WHERE org_id = ? AND record_id IN (?, ?)`,
+        [target.orgId, migratedObservationId, migratedClaimId],
+      );
+      assert.equal(Number(importedOutbox[0]!.count), 0, "no-vector import must not queue index work");
       const compiled = await fx.call("POST", "/v1/context/compile", {
         key: target.key,
         body: { subject_id: "user_rama", task, max_tokens: 900 },
@@ -1091,7 +1170,7 @@ export const CASES: Case[] = [
       // Importing an id owned elsewhere fails loudly instead of silently.
       const collision = await fx.callRaw("POST", "/v1/import", {
         key: target.key,
-        body: `${observationLines.join("\n")}\n`,
+        body: `${actorMap}\n${observationLines.join("\n")}\n`,
       });
       expectError(collision, 409, "CONFLICT");
     },
@@ -1160,6 +1239,339 @@ export const CASES: Case[] = [
       );
       assert.ok(!JSON.stringify(failedClaim.body).includes(missingObservationId), "diagnostic must not disclose referenced ids");
       assert.deepEqual(await canonicalCounts(), beforeFailure, "failed source preflight must not partially mutate");
+    },
+  },
+  {
+    name: "v2 import preflights temporal bounds and preserves redacted evidence markers",
+    async run(fx) {
+      const target = await fx.provision({ principalId: "portability_temporal_owner", scopes: ["*"] });
+      const header = {
+        type: "titen.export.header",
+        format_version: 2,
+        record_type: "observations",
+        org_id: target.orgId,
+      };
+      const baseObservation = {
+        type: "observation",
+        id: "obs_temporal_import_base_00000000",
+        subject_id: "user_temporal_import",
+        project_id: null,
+        workspace_id: null,
+        agent_id: null,
+        run_id: null,
+        actor_id: target.principalId,
+        kind: "imported_source",
+        content: "Temporal import evidence.",
+        source_type: "import",
+        source_ref: null,
+        trust: "asserted",
+        visibility: "private",
+        occurred_at: null,
+        ingested_at: "2026-07-31T00:00:00.000Z",
+      };
+      const counts = async () => (await fx.query<{ observations: number; claims: number }>(
+        `SELECT (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims`,
+        [target.orgId, target.orgId],
+      ))[0]!;
+
+      for (const [field, value, suffix] of [
+        ["ingested_at", "+010000-01-01T00:00:00.000Z", "extended"],
+        ["ingested_at", "999-01-01T00:00:00.000Z", "short"],
+      ] as const) {
+        const row = { ...baseObservation, id: `${baseObservation.id}_${suffix}`, [field]: value };
+        const failed = await fx.callRaw("POST", "/v1/import", {
+          key: target.key,
+          body: `${JSON.stringify(header)}\n${JSON.stringify(row)}\n`,
+        });
+        expectError(failed, 400, "VALIDATION_ERROR");
+        assert.deepEqual(await counts(), { observations: 0, claims: 0 });
+      }
+
+      const invalidClaim = {
+        type: "claim",
+        id: "claim_invalid_interval_0000000000",
+        subject_id: baseObservation.subject_id,
+        project_id: null,
+        workspace_id: null,
+        observer_id: null,
+        actor_id: target.principalId,
+        kind: "procedural",
+        statement: "This invalid interval must never commit.",
+        confidence: 0.8,
+        trust: "asserted",
+        visibility: "private",
+        status: "active",
+        version: 1,
+        valid_from: "2030-01-01T00:00:00.000Z",
+        valid_to: "2020-01-01T00:00:00.000Z",
+        created_at: "2026-07-31T00:00:00.000Z",
+        superseded_by: null,
+        sources: [{
+          observation_id: baseObservation.id,
+          relation: "supports",
+          created_at: "2026-07-31T00:00:00.000Z",
+        }],
+      };
+      const invalidInterval = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: [header, baseObservation, invalidClaim].map(JSON.stringify).join("\n") + "\n",
+      });
+      expectError(invalidInterval, 400, "VALIDATION_ERROR");
+      assert.deepEqual(await counts(), { observations: 0, claims: 0 });
+
+      const originalHash = "a".repeat(64);
+      const redacted = {
+        ...baseObservation,
+        id: "obs_redacted_import_000000000000",
+        content: `[redacted sha256:${originalHash}]`,
+        content_hash: originalHash,
+      };
+      const redactedClaim = {
+        ...invalidClaim,
+        id: "claim_redacted_import_0000000000",
+        statement: "[redacted: purged evidence]",
+        status: "revoked",
+        version: 2,
+        valid_from: "2026-07-31T00:00:00.000Z",
+        valid_to: null,
+        sources: [{
+          observation_id: redacted.id,
+          relation: "supports",
+          created_at: "2026-07-31T00:00:00.000Z",
+        }],
+      };
+      expectError(await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: [header, { ...redactedClaim, status: "active" }, redacted].map(JSON.stringify).join("\n") + "\n",
+      }), 400, "VALIDATION_ERROR");
+      assert.deepEqual(await counts(), { observations: 0, claims: 0 });
+      expectOk(await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: [header, redactedClaim, redacted].map(JSON.stringify).join("\n") + "\n",
+      }));
+      const stored = await fx.query<{ content: string; content_hash: string }>(
+        `SELECT content, content_hash FROM observations WHERE id = ? AND org_id = ?`,
+        [redacted.id, target.orgId],
+      );
+      assert.deepEqual(stored, [{ content: redacted.content, content_hash: originalHash }]);
+      const projections = await fx.query<{
+        observation_fts: number;
+        claim_fts: number;
+        observation_operation: string | null;
+        claim_operation: string | null;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations_fts WHERE observation_id = ?) AS observation_fts,
+           (SELECT COUNT(*) FROM claims_fts WHERE claim_id = ?) AS claim_fts,
+           (SELECT operation FROM index_outbox WHERE record_type = 'observation' AND record_id = ? LIMIT 1) AS observation_operation,
+           (SELECT operation FROM index_outbox WHERE record_type = 'claim' AND record_id = ? LIMIT 1) AS claim_operation`,
+        [redacted.id, redactedClaim.id, redacted.id, redactedClaim.id],
+      );
+      assert.deepEqual(projections, [{
+        observation_fts: 0,
+        claim_fts: 0,
+        observation_operation: null,
+        claim_operation: null,
+      }]);
+
+      const spoofed = {
+        ...redacted,
+        id: "obs_redacted_spoof_0000000000000",
+        content: `[redacted sha256:${"b".repeat(64)}]`,
+      };
+      expectError(await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: `${JSON.stringify(header)}\n${JSON.stringify(spoofed)}\n`,
+      }), 400, "VALIDATION_ERROR");
+      assert.deepEqual(await counts(), { observations: 1, claims: 1 });
+    },
+  },
+  {
+    name: "v2 portability maps actors and restores team supersession without widening ordinary export",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "portability_source_owner", scopes: ["*"] });
+      const sibling = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "portability_source_sibling",
+        scopes: ["*"],
+      });
+      const outsider = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "portability_outsider",
+        scopes: ["export:read"],
+      });
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: owner.key,
+        body: { name: "portable-team" },
+      });
+      expectOk(workspace, 201);
+      const workspaceId = workspace.body.data.workspace_id as string;
+      const membershipIds: string[] = [];
+      for (const principalId of [sibling.principalId]) {
+        const membership = await fx.call("POST", "/v1/memberships", {
+          key: owner.key,
+          body: { workspace_id: workspaceId, principal_id: principalId, principal_kind: "agent", role: "member" },
+        });
+        expectOk(membership, 201);
+        membershipIds.push(membership.body.data.membership_id as string);
+      }
+      const organizationMembership = await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: { principal_id: sibling.principalId, principal_kind: "agent", role: "admin" },
+      });
+      expectOk(organizationMembership, 201);
+      membershipIds.push(organizationMembership.body.data.membership_id as string);
+
+      const privateObservation = await fx.call("POST", "/v1/observations", {
+        key: sibling.key,
+        body: observation({ content: "Portable private actor marker.", visibility: "private" }),
+      });
+      expectOk(privateObservation, 201);
+      const teamRecords: { observationId: string; claimId: string }[] = [];
+      for (const statement of ["Portable team procedure v1.", "Portable team procedure v2."]) {
+        const observed = await fx.call("POST", "/v1/observations", {
+          key: sibling.key,
+          body: observation({ workspace_id: workspaceId, visibility: "team", content: statement }),
+        });
+        expectOk(observed, 201);
+        const consolidated = await fx.call("POST", "/v1/consolidations", {
+          key: sibling.key,
+          body: {
+            subject_id: "user_rama",
+            workspace_id: workspaceId,
+            claims: [claim(observed.body.data.observation_id, { visibility: "team", statement })],
+          },
+        });
+        expectOk(consolidated, 201);
+        teamRecords.push({
+          observationId: observed.body.data.observation_id,
+          claimId: consolidated.body.data.claims[0].claim_id,
+        });
+      }
+      expectOk(await fx.call("POST", `/v1/claims/${teamRecords[0]!.claimId}/supersede`, {
+        key: sibling.key,
+        body: { superseded_by: teamRecords[1]!.claimId, expected_version: 1 },
+      }));
+
+      for (const type of ["workspaces", "memberships"] as const) {
+        const hidden = await fx.call("GET", `/v1/export?type=${type}`, { key: outsider.key });
+        assert.equal(hidden.status, 200);
+        const header = typeof hidden.body === "string"
+          ? JSON.parse(hidden.body.trim().split("\n")[0]!)
+          : hidden.body;
+        assert.equal(header.count, 0);
+        assert.ok(!JSON.stringify(hidden.body).includes(workspaceId));
+      }
+      expectError(
+        await fx.call("GET", "/v1/export?type=workspaces&all=true", { key: outsider.key }),
+        403,
+      );
+      const ownerExport = await fx.call("GET", "/v1/export?type=observations", { key: owner.key });
+      assert.ok(!String(ownerExport.body).includes(privateObservation.body.data.observation_id));
+
+      const streams: string[] = [];
+      for (const type of ["workspaces", "memberships", "projects", "observations", "claims"] as const) {
+        const exported = await fx.call("GET", `/v1/export?type=${type}&all=true`, { key: owner.key });
+        assert.equal(exported.status, 200);
+        streams.push(typeof exported.body === "string" ? exported.body : `${JSON.stringify(exported.body)}\n`);
+      }
+      const audits = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM audit_log WHERE org_id = ? AND action = 'portability.export_all'`,
+        [owner.orgId],
+      );
+      assert.equal(Number(audits[0]!.count), 5);
+
+      const target = await fx.provision({ principalId: "portability_restore_owner", scopes: ["*"] });
+      const ids = [
+        workspaceId,
+        ...membershipIds,
+        privateObservation.body.data.observation_id as string,
+        ...teamRecords.flatMap((record) => [record.observationId, record.claimId]),
+      ];
+      let migrated = streams.join("");
+      const migratedId = new Map(ids.map((id) => [id, `${id}_restored`]));
+      for (const [source, destination] of migratedId) migrated = migrated.replaceAll(source, destination);
+      const siblingMap = JSON.stringify({
+        type: "titen.import.actor_map",
+        source_org_id: owner.orgId,
+        source_actor_id: sibling.principalId,
+        destination_actor_id: "portability_restored_sibling",
+      });
+
+      const missingMap = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: migrated,
+      });
+      expectError(missingMap, 422, "UNRESOLVED_REFERENCE");
+      assert.equal(missingMap.body.meta.dependency_type, "actor_mapping");
+      assert.deepEqual(
+        await fx.query("SELECT id FROM workspaces WHERE org_id = ?", [target.orgId]),
+        [],
+      );
+
+      const imported = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: `${siblingMap}\n${migrated}`,
+      });
+      expectOk(imported);
+      assert.equal(imported.body.data.inserted.workspace, 1);
+      assert.equal(imported.body.data.inserted.membership, 2);
+      const restored = await fx.query<{
+        actor_id: string;
+        workspace_id: string | null;
+        superseded_by: string | null;
+      }>(
+        `SELECT actor_id, workspace_id, NULL AS superseded_by FROM observations WHERE id = ? AND org_id = ?
+         UNION ALL
+         SELECT actor_id, workspace_id, superseded_by FROM claims WHERE id = ? AND org_id = ?`,
+        [
+          migratedId.get(privateObservation.body.data.observation_id as string)!, target.orgId,
+          migratedId.get(teamRecords[0]!.claimId)!, target.orgId,
+        ],
+      );
+      assert.equal(restored[0]!.actor_id, "portability_restored_sibling");
+      assert.equal(restored[1]!.workspace_id, migratedId.get(workspaceId));
+      assert.equal(restored[1]!.superseded_by, migratedId.get(teamRecords[1]!.claimId));
+      assert.deepEqual(await fx.query(
+        `SELECT workspace_id, principal_id, role FROM memberships
+          WHERE org_id = ? ORDER BY role`,
+        [target.orgId],
+      ), [
+        { workspace_id: null, principal_id: "portability_restored_sibling", role: "admin" },
+        { workspace_id: migratedId.get(workspaceId), principal_id: "portability_restored_sibling", role: "member" },
+      ]);
+
+      const crossOrg = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: streams[0]!,
+      });
+      expectError(crossOrg, 409, "CONFLICT");
+    },
+  },
+  {
+    name: "every export page stays within the UTF-8 import boundary",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "byte_safe_owner", scopes: ["*"] });
+      for (let index = 0; index < 20; index += 1) {
+        const appended = await fx.call("POST", "/v1/observations", {
+          key: owner.key,
+          body: observation({
+            subject_id: "byte_safe_subject",
+            content: `${"🙂".repeat(15_000)}-${index}`,
+          }),
+        });
+        expectOk(appended, 201);
+      }
+      const exported = await fx.call("GET", "/v1/export?type=observations&limit=2000", { key: owner.key });
+      assert.equal(exported.status, 200);
+      const bytes = new TextEncoder().encode(String(exported.body)).byteLength;
+      assert.ok(bytes <= MAX_BODY_BYTES, `export emitted ${bytes} bytes`);
+      const header = JSON.parse(String(exported.body).trim().split("\n")[0]!);
+      assert.ok(header.count < 20);
+      assert.equal(header.complete, false);
+      assert.ok(header.next_cursor);
+      expectOk(await fx.callRaw("POST", "/v1/import", { key: owner.key, body: String(exported.body) }));
     },
   },
   // --- v0.1: Temporal supersession ---
@@ -1278,7 +1690,8 @@ export const CASES: Case[] = [
   {
     name: "a checkpoint saves, retrieves, updates, and deletes resumable state",
     async run(fx) {
-      const agent = await fx.provision();
+      const agent = await fx.provision({ scopes: ["*"] });
+      const recipient = await fx.provision({ orgId: agent.orgId, scopes: ["*"] });
 
       // Save
       const saved = await fx.call("POST", "/v1/checkpoints", {
@@ -1316,6 +1729,16 @@ export const CASES: Case[] = [
       assert.equal(updated.body.data.checkpoint_id, saved.body.data.checkpoint_id);
       assert.equal(updated.body.data.updated, true);
 
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: agent.key,
+        body: {
+          to_principal: recipient.principalId,
+          subject_id: "user_rama",
+          checkpoint_id: saved.body.data.checkpoint_id,
+        },
+      });
+      expectOk(handoff, 201);
+
       // Delete
       const deleted = await fx.call("DELETE", `/v1/checkpoints/${saved.body.data.checkpoint_id}`, {
         key: agent.key,
@@ -1330,6 +1753,9 @@ export const CASES: Case[] = [
         }),
         404,
       );
+      const received = await fx.call("GET", "/v1/handoffs", { key: recipient.key });
+      expectOk(received);
+      assert.equal(received.body.data.handoffs[0].checkpoint_id, null);
     },
   },
   {
@@ -1436,6 +1862,16 @@ export const CASES: Case[] = [
       const removed = await fx.call("DELETE", `/v1/memberships/${added.body.data.membership_id}`, { key: owner.key });
       expectOk(removed);
       assert.ok(removed.body.data.removed_at);
+
+      expectError(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          workspace_id: "ws_missing",
+          principal_id: "agent_helper",
+          principal_kind: "agent",
+          role: "member",
+        },
+      }), 404);
     },
   },
   {
@@ -1471,6 +1907,185 @@ export const CASES: Case[] = [
         body: { resource_type: "subject", resource_id: "user_rama", purpose: "review", ttl_seconds: 300 },
       });
       expectOk(lease2, 201);
+    },
+  },
+  {
+    name: "lease introspection is bounded and only organization owners or admins force release",
+    async run(fx) {
+      const holder = await fx.provision({ scopes: ["*"] });
+      const admin = await fx.provision({ orgId: holder.orgId, scopes: ["*"] });
+      const member = await fx.provision({ orgId: holder.orgId, scopes: ["*"] });
+      const outsider = await fx.provision({ scopes: ["*"] });
+
+      for (const [agent, role] of [[admin, "admin"], [member, "member"]] as const) {
+        expectOk(await fx.call("POST", "/v1/memberships", {
+          key: holder.key,
+          body: {
+            principal_id: agent.principalId,
+            principal_kind: "agent",
+            role,
+          },
+        }), 201);
+      }
+
+      const lease = await fx.call("POST", "/v1/leases", {
+        key: holder.key,
+        body: {
+          resource_type: "subject",
+          resource_id: `recover-${Date.now()}`,
+          purpose: "recover crashed agent",
+          ttl_seconds: 600,
+        },
+      });
+      expectOk(lease, 201);
+
+      const listed = await fx.call("GET", "/v1/leases?limit=10", { key: admin.key });
+      expectOk(listed);
+      assert.ok(listed.body.data.leases.some((entry: any) => (
+        entry.lease_id === lease.body.data.lease_id && entry.holder_id === holder.principalId
+      )));
+      const foreign = await fx.call("GET", "/v1/leases?limit=200", { key: outsider.key });
+      expectOk(foreign);
+      assert.equal(foreign.body.data.leases.length, 0);
+      expectError(await fx.call("GET", "/v1/leases?limit=201", { key: admin.key }), 400);
+      expectError(await fx.call("POST", `/v1/leases/${lease.body.data.lease_id}/force-release`, {
+        key: member.key,
+        body: {},
+      }), 404);
+
+      const forced = await fx.call("POST", `/v1/leases/${lease.body.data.lease_id}/force-release`, {
+        key: admin.key,
+        body: {},
+      });
+      expectOk(forced);
+      assert.equal(forced.body.data.forced, true);
+
+      await fx.query(
+        `WITH RECURSIVE n(value) AS (
+           VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 205
+         )
+         INSERT INTO leases
+           (id, org_id, resource_type, resource_id, holder_id, purpose,
+            ttl_seconds, expires_at, created_at)
+         SELECT 'lease_inventory_' || printf('%03d', value), ?, 'subject',
+                'inventory_' || printf('%03d', value), ?, 'inventory', 600,
+                '2099-01-01T00:00:00.000Z',
+                '2026-07-31T00:00:00.' || printf('%03d', value) || 'Z'
+           FROM n`,
+        [holder.orgId, holder.principalId],
+      );
+      const bounded = await fx.call("GET", "/v1/leases?limit=200", { key: admin.key });
+      expectOk(bounded);
+      assert.equal(bounded.body.data.leases.length, 200);
+      assert.ok(bounded.body.data.cursor);
+      const tail = await fx.call(
+        "GET",
+        `/v1/leases?limit=200&after=${bounded.body.data.cursor}`,
+        { key: admin.key },
+      );
+      expectOk(tail);
+      assert.equal(tail.body.data.leases.length, 5);
+      assert.equal(tail.body.data.cursor, null);
+    },
+  },
+  {
+    name: "handoff creation rejects missing, foreign, mismatched, and unauthorized context items",
+    async run(fx) {
+      const sender = await fx.provision({ scopes: ["*"] });
+      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const foreign = await fx.provision({ scopes: ["*"] });
+      const suffix = `${Date.now()}_${fx.runtime.replace(/[^a-z]/g, "")}`;
+      const subjectId = `handoff_corrupt_${suffix}`;
+      const projectExpected = `project_expected_${suffix}`;
+      const projectOther = `project_other_${suffix}`;
+      const claimForeign = `claim_foreign_${suffix}`;
+      const claimSubject = `claim_subject_${suffix}`;
+      const claimProject = `claim_project_${suffix}`;
+      const claimPrivate = `claim_private_${suffix}`;
+      const contexts = {
+        foreign: `ctx_foreign_${suffix}`,
+        subject: `ctx_subject_${suffix}`,
+        project: `ctx_project_${suffix}`,
+        private: `ctx_private_${suffix}`,
+        missing: `ctx_missing_${suffix}`,
+      };
+      const now = "2026-07-31T00:00:00.000Z";
+
+      await fx.query(
+        `INSERT INTO projects (id, org_id, reference, created_at)
+         VALUES (?, ?, ?, ?), (?, ?, ?, ?)`,
+        [
+          projectExpected, sender.orgId, `expected/${suffix}`, now,
+          projectOther, sender.orgId, `other/${suffix}`, now,
+        ],
+      );
+      await fx.query(
+        `INSERT INTO claims
+           (id, org_id, subject_id, project_id, actor_id, kind, statement,
+            confidence, trust, visibility, status, valid_from, created_at)
+         VALUES
+           (?, ?, ?, NULL, ?, 'procedural', 'Foreign item.', 0.8, 'verified', 'organization', 'active', ?, ?),
+           (?, ?, ?, NULL, ?, 'procedural', 'Wrong subject item.', 0.8, 'verified', 'organization', 'active', ?, ?),
+           (?, ?, ?, ?, ?, 'procedural', 'Wrong project item.', 0.8, 'verified', 'organization', 'active', ?, ?),
+           (?, ?, ?, NULL, ?, 'procedural', 'Private recipient item.', 0.8, 'verified', 'private', 'active', ?, ?)`,
+        [
+          claimForeign, foreign.orgId, subjectId, foreign.principalId, now, now,
+          claimSubject, sender.orgId, `${subjectId}_other`, sender.principalId, now, now,
+          claimProject, sender.orgId, subjectId, projectOther, sender.principalId, now, now,
+          claimPrivate, sender.orgId, subjectId, sender.principalId, now, now,
+        ],
+      );
+      await fx.query(
+        `INSERT INTO context_runs
+           (id, org_id, actor_id, subject_id, project_id, task_hash, max_tokens,
+            used_tokens, policy_snapshot, degraded, created_at)
+         VALUES
+           (?, ?, ?, ?, NULL, 'foreign', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, NULL, 'subject', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, ?, 'project', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, NULL, 'private', 256, 1, 'policy', '{}', ?),
+           (?, ?, ?, ?, NULL, 'missing', 256, 1, 'policy', '{}', ?)`,
+        [
+          contexts.foreign, sender.orgId, sender.principalId, subjectId, now,
+          contexts.subject, sender.orgId, sender.principalId, subjectId, now,
+          contexts.project, sender.orgId, sender.principalId, subjectId, projectExpected, now,
+          contexts.private, sender.orgId, sender.principalId, subjectId, now,
+          contexts.missing, sender.orgId, sender.principalId, subjectId, now,
+        ],
+      );
+      await fx.query(
+        `INSERT INTO context_run_items (context_id, claim_id, position, score, score_components)
+         VALUES (?, ?, 0, 1, '{}'), (?, ?, 0, 1, '{}'),
+                (?, ?, 0, 1, '{}'), (?, ?, 0, 1, '{}')`,
+        [
+          contexts.foreign, claimForeign,
+          contexts.subject, claimSubject,
+          contexts.project, claimProject,
+          contexts.private, claimPrivate,
+        ],
+      );
+
+      for (const contextId of [contexts.foreign, contexts.subject, contexts.project, contexts.private])
+        expectError(await fx.call("POST", "/v1/handoffs", {
+          key: sender.key,
+          body: { to_principal: receiver.principalId, subject_id: subjectId, context_id: contextId },
+        }), 404);
+
+      // Legacy SQLite databases could contain an orphan created while foreign
+      // keys were disabled; D1 enforces this foreign key at write time.
+      if (fx.runtime === "bun-sqlite") {
+        await fx.query("PRAGMA foreign_keys = OFF");
+        await fx.query(
+          `INSERT INTO context_run_items (context_id, claim_id, position, score, score_components)
+           VALUES (?, ?, 0, 1, '{}')`,
+          [contexts.missing, `claim_missing_${suffix}`],
+        );
+        await fx.query("PRAGMA foreign_keys = ON");
+        expectError(await fx.call("POST", "/v1/handoffs", {
+          key: sender.key,
+          body: { to_principal: receiver.principalId, subject_id: subjectId, context_id: contexts.missing },
+        }), 404);
+      }
     },
   },
   {
@@ -1514,6 +2129,192 @@ export const CASES: Case[] = [
       assert.equal(resolved.body.data.status, "accepted");
     },
   },
+  {
+    name: "handoffs delegate only validated checkpoint and authorized context references",
+    async run(fx) {
+      const sender = await fx.provision({ scopes: ["*"] });
+      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const sibling = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const foreign = await fx.provision({ scopes: ["*"] });
+      const subjectId = `handoff-scope-${Date.now()}`;
+
+      expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: { to_principal: "agent_missing", subject_id: subjectId },
+      }), 404);
+
+      const privateSubject = `${subjectId}-private`;
+      await seedClaim(fx, sender.key, {
+        observation: {
+          subject_id: privateSubject,
+          content: "Private handoff marker must remain sender-only.",
+        },
+        claim: { statement: "Private handoff marker remains sender-only." },
+      });
+      const privateContext = await fx.call("POST", "/v1/context/compile", {
+        key: sender.key,
+        body: { subject_id: privateSubject, task: "private handoff marker", max_tokens: 600 },
+      });
+      expectOk(privateContext);
+      assert.equal(privateContext.body.data.items.length, 1);
+      expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: {
+          to_principal: receiver.principalId,
+          subject_id: privateSubject,
+          context_id: privateContext.body.data.context_id,
+        },
+      }), 404);
+
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: sender.key,
+        body: { name: `handoff-team-${Date.now()}` },
+      });
+      expectOk(workspace, 201);
+      const workspaceId = workspace.body.data.workspace_id as string;
+      const memberships: Record<string, string> = {};
+      for (const agent of [sender, receiver]) {
+        const membership = await fx.call("POST", "/v1/memberships", {
+          key: sender.key,
+          body: {
+            workspace_id: workspaceId,
+            principal_id: agent.principalId,
+            principal_kind: "agent",
+            role: "member",
+          },
+        });
+        expectOk(membership, 201);
+        memberships[agent.principalId] = membership.body.data.membership_id;
+      }
+
+      const observed = await fx.call("POST", "/v1/observations", {
+        key: sender.key,
+        body: observation({
+          subject_id: subjectId,
+          workspace_id: workspaceId,
+          visibility: "team",
+          content: "The handed deployment context is visible to this workspace.",
+        }),
+      });
+      expectOk(observed, 201);
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: sender.key,
+        body: {
+          subject_id: subjectId,
+          workspace_id: workspaceId,
+          claims: [claim(observed.body.data.observation_id, {
+            visibility: "team",
+            statement: "The receiver may resume the handed deployment context.",
+          })],
+        },
+      });
+      expectOk(consolidated, 201);
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: sender.key,
+        body: { subject_id: subjectId, task: "resume handed deployment context", max_tokens: 900 },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.data.items.length, 1);
+
+      const checkpoint = await fx.call("POST", "/v1/checkpoints", {
+        key: sender.key,
+        body: {
+          subject_id: subjectId,
+          kind: "task_state",
+          state: { step: "verify" },
+          ttl_seconds: 600,
+        },
+      });
+      expectOk(checkpoint, 201);
+
+      for (const invalid of [
+        { context_id: "ctx_missing" },
+        { checkpoint_id: "ckpt_missing" },
+        { context_id: compiled.body.data.context_id, subject_id: "wrong-subject" },
+        { checkpoint_id: checkpoint.body.data.checkpoint_id, subject_id: "wrong-subject" },
+      ]) expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: { to_principal: receiver.principalId, subject_id: subjectId, ...invalid },
+      }), 404);
+
+      expectError(await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: {
+          to_principal: receiver.principalId,
+          subject_id: subjectId,
+          context_id: (await fx.call("POST", "/v1/context/compile", {
+            key: foreign.key,
+            body: { subject_id: subjectId, task: "foreign empty context", max_tokens: 256 },
+          })).body.data.context_id,
+        },
+      }), 404);
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: {
+          to_principal: receiver.principalId,
+          subject_id: subjectId,
+          context_id: compiled.body.data.context_id,
+          checkpoint_id: checkpoint.body.data.checkpoint_id,
+          message: "Resume from the exact stored state.",
+        },
+      });
+      expectOk(handoff, 201);
+
+      const handedCheckpoint = await fx.call(
+        "GET",
+        `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`,
+        { key: receiver.key },
+      );
+      expectOk(handedCheckpoint);
+      assert.deepEqual(handedCheckpoint.body.data.state, { step: "verify" });
+      const handedContext = await fx.call(
+        "GET",
+        `/v1/context/${compiled.body.data.context_id}`,
+        { key: receiver.key },
+      );
+      expectOk(handedContext);
+      assert.equal(handedContext.body.meta.delegated, true);
+      assert.equal(handedContext.body.data.items[0].untrusted, true);
+      assert.equal(handedContext.body.data.items[0].claim_id, consolidated.body.data.claims[0].claim_id);
+      expectError(await fx.call("GET", `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`, {
+        key: sibling.key,
+      }), 404);
+      expectError(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
+        key: sibling.key,
+      }), 404);
+      expectError(await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+        key: sibling.key,
+        body: { outcome: "useful" },
+      }), 404);
+      expectOk(await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+        key: receiver.key,
+        body: { outcome: "useful", claim_id: consolidated.body.data.claims[0].claim_id },
+      }), 201);
+
+      expectOk(await fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
+        key: receiver.key,
+        body: { status: "accepted" },
+      }));
+      expectOk(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
+        key: receiver.key,
+      }));
+
+      expectOk(await fx.call("DELETE", `/v1/memberships/${memberships[receiver.principalId]}`, {
+        key: sender.key,
+      }));
+      expectError(await fx.call("GET", `/v1/context/${compiled.body.data.context_id}`, {
+        key: receiver.key,
+      }), 404);
+      expectError(await fx.call("POST", `/v1/context/${compiled.body.data.context_id}/feedback`, {
+        key: receiver.key,
+        body: { outcome: "useful" },
+      }), 404);
+      expectOk(await fx.call("GET", `/v1/checkpoints/${checkpoint.body.data.checkpoint_id}`, {
+        key: receiver.key,
+      }));
+    },
+  },
   // --- v0.2: MCP and Events ---
   {
     name: "MCP replies with a bare JSON-RPC body on both runtimes",
@@ -1535,9 +2336,11 @@ export const CASES: Case[] = [
         key: agent.key,
         body: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
       });
-      assert.equal(tools.body.result.tools.length >= 7, true);
+      assert.equal(tools.body.result.tools.length, 9);
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_remember"));
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_consolidate"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_compile"));
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_project_resolve"));
 
       // A notification must be accepted without a body on either runtime.
       const notified = await fx.call("POST", "/mcp", {
@@ -1548,9 +2351,23 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "MCP titen_remember and titen_compile tools work end-to-end",
+    name: "MCP resolves, remembers, consolidates, and recalls on both runtimes",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });
+
+      const project = await fx.call("POST", "/mcp", {
+        key: agent.key,
+        body: {
+          jsonrpc: "2.0", id: 2, method: "tools/call",
+          params: {
+            name: "titen_project_resolve",
+            arguments: { reference: "github.com/RamaAditya49/titen", create: true },
+          },
+        },
+      });
+      const projectPayload = JSON.parse(project.body.result.content[0].text);
+      assert.equal(projectPayload.data.reference, "ramaaditya49/titen");
+      assert.match(projectPayload.data.project_id, /^project_/);
 
       // Remember
       const remember = await fx.call("POST", "/mcp", {
@@ -1566,6 +2383,7 @@ export const CASES: Case[] = [
               source_type: "test",
               source_ref: "mcp#1",
               trust: "verified",
+              project_id: projectPayload.data.project_id,
             },
           },
         },
@@ -1573,21 +2391,52 @@ export const CASES: Case[] = [
       assert.equal(remember.status, 200);
       assert.equal(remember.body.jsonrpc, "2.0");
       assert.ok(remember.body.result.content[0].text.includes("obs_"));
+      const observationId = JSON.parse(remember.body.result.content[0].text).data.observation_id;
+
+      const consolidate = await fx.call("POST", "/mcp", {
+        key: agent.key,
+        body: {
+          jsonrpc: "2.0", id: 4, method: "tools/call",
+          params: {
+            name: "titen_consolidate",
+            arguments: {
+              subject_id: "user_mcp",
+              project_id: projectPayload.data.project_id,
+              claims: [{
+                kind: "procedural",
+                statement: "MCP integration evidence is retrievable after explicit consolidation.",
+                sources: [{ observation_id: observationId, relation: "supports" }],
+              }],
+            },
+          },
+        },
+      });
+      const consolidationPayload = JSON.parse(consolidate.body.result.content[0].text);
+      assert.equal(consolidate.body.result.isError, undefined);
+      const claimId = consolidationPayload.data.claims[0].claim_id;
+      assert.match(claimId, /^claim_/);
 
       // Compile
       const compile = await fx.call("POST", "/mcp", {
         key: agent.key,
         body: {
-          jsonrpc: "2.0", id: 4, method: "tools/call",
+          jsonrpc: "2.0", id: 5, method: "tools/call",
           params: {
             name: "titen_compile",
-            arguments: { subject_id: "user_mcp", task: "MCP tool integration test", max_tokens: 900 },
+            arguments: {
+              subject_id: "user_mcp",
+              project_id: projectPayload.data.project_id,
+              task: "retrievable explicit consolidation evidence",
+              max_tokens: 900,
+            },
           },
         },
       });
       assert.equal(compile.status, 200);
       assert.equal(compile.body.jsonrpc, "2.0");
-      assert.ok(compile.body.result.content[0].text);
+      const compiledPayload = JSON.parse(compile.body.result.content[0].text);
+      assert.equal(compiledPayload.data.items[0].claim_id, claimId);
+      assert.ok(compiledPayload.data.items.length > 0, "MCP recall must return the claim it created");
     },
   },
   {
@@ -1644,7 +2493,7 @@ export const CASES: Case[] = [
            (SELECT COUNT(*) FROM events WHERE resource_type = 'observation' AND resource_id = ?) AS events`,
         [observationId, observationId, observationId],
       );
-      assert.deepEqual(sideEffects[0], { histories: 1, outbox: 1, events: 1 });
+      assert.deepEqual(sideEffects[0], { histories: 1, outbox: 0, events: 1 });
 
       const consolidated = await fx.call("POST", "/v1/consolidations", {
         key: agent.key,
@@ -1804,6 +2653,86 @@ export const CASES: Case[] = [
       expectOk(single);
       assert.equal(single.body.data.id, cursor);
       expectError(await fx.call("GET", `/v1/events/${cursor}`, { key: intruder.key }), 404);
+
+      const complete = await fx.call("GET", "/v1/events?limit=200", { key: owner.key });
+      const tail = complete.body.data.cursor as string;
+      const exhausted = await fx.call("GET", `/v1/events?after=${tail}`, { key: owner.key });
+      expectOk(exhausted);
+      assert.deepEqual(exhausted.body.data.events, []);
+      assert.equal(exhausted.body.data.cursor, tail, "an empty page must preserve its incoming cursor");
+    },
+  },
+  {
+    name: "same-timestamp event and federation pages follow database sequence without skips",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const timestamp = "2026-07-31T12:00:00.000Z";
+      for (const id of ["evt_same_z", "evt_same_a", "evt_same_m"])
+        await fx.query(
+          `INSERT INTO events
+             (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+           VALUES (?, ?, 'same.timestamp', ?, 'probe', ?, '{}', ?)`,
+          [id, owner.orgId, owner.principalId, id, timestamp],
+        );
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 3; page += 1) {
+        const result = await fx.call(
+          "GET",
+          `/v1/events?limit=1${cursor ? `&after=${cursor}` : ""}`,
+          { key: owner.key },
+        );
+        expectOk(result);
+        assert.equal(result.body.data.events.length, 1);
+        seen.push(result.body.data.events[0].id);
+        cursor = result.body.data.cursor;
+      }
+      assert.deepEqual(seen, ["evt_same_z", "evt_same_a", "evt_same_m"]);
+      const legacy = await fx.call("GET", "/v1/events?after=evt_same_z&limit=1", {
+        key: owner.key,
+      });
+      expectOk(legacy);
+      assert.equal(legacy.body.data.events[0].id, "evt_same_a");
+
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: `same-ms-${Date.now()}`,
+          endpoint: `https://same-ms-${Date.now()}.example.test`,
+          shared_secret: "same-millisecond-secret",
+          direction: "pull",
+        },
+      });
+      expectOk(peer, 201);
+      await fx.query(
+        `WITH RECURSIVE n(value) AS (
+           VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 205
+         )
+         INSERT INTO events
+           (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+         SELECT 'evt_federation_' || printf('%03d', 206 - value), ?,
+                'same.timestamp', ?, 'probe',
+                'evt_federation_' || printf('%03d', 206 - value), '{}', ?
+           FROM n`,
+        [owner.orgId, owner.principalId, timestamp],
+      );
+      const first = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peer.body.data.peer_id },
+      });
+      expectOk(first);
+      assert.equal(first.body.data.events.length, 200);
+      const second = await fx.call("POST", "/v1/federation/pull", {
+        key: owner.key,
+        body: { peer_id: peer.body.data.peer_id },
+      });
+      expectOk(second);
+      assert.equal(second.body.data.events.length, 8);
+      const all = [...first.body.data.events, ...second.body.data.events];
+      assert.equal(new Set(all.map((event: any) => event.id)).size, 208);
+      assert.deepEqual(all.slice(0, 3).map((event: any) => event.id), seen);
+      assert.equal(all.at(-1).id, "evt_federation_001");
     },
   },
   {
@@ -1856,6 +2785,134 @@ export const CASES: Case[] = [
       const foreign = await fx.call("GET", "/v1/audit", { key: intruder.key });
       expectOk(foreign);
       assert.equal(foreign.body.data.entries.length, 0);
+    },
+  },
+  {
+    name: "high-value operations write content-free authenticated audits",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const canaries = {
+        forwarded: "203.0.113.44",
+        key: "audit-secret-key-label",
+        member: "audit-target-principal",
+        handoff: "audit handoff message must not be copied",
+        webhook: "audit-webhook-private-path",
+        federation: "audit-federation-private-name",
+      };
+
+      const createdKey = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        headers: { "x-forwarded-for": canaries.forwarded },
+        body: { label: canaries.key, scopes: ["context:compile"] },
+      });
+      expectOk(createdKey, 201);
+      expectOk(await fx.call("DELETE", `/v1/keys/${createdKey.body.data.key_id}`, { key: owner.key }));
+
+      const exported = await fx.call("GET", "/v1/export?type=projects", { key: owner.key });
+      assert.equal(exported.status, 200);
+      expectOk(await fx.callRaw("POST", "/v1/import", {
+        key: owner.key,
+        body: `${JSON.stringify({
+          type: "titen.export.header",
+          format_version: 1,
+          record_type: "projects",
+        })}\n`,
+      }));
+
+      const membership = await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          principal_id: canaries.member,
+          principal_kind: "agent",
+          role: "member",
+        },
+      });
+      expectOk(membership, 201);
+      expectOk(await fx.call(
+        "DELETE",
+        `/v1/memberships/${membership.body.data.membership_id}`,
+        { key: owner.key },
+      ));
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: owner.key,
+        body: {
+          to_principal: owner.principalId,
+          subject_id: "audit-subject",
+          message: canaries.handoff,
+        },
+      });
+      expectOk(handoff, 201);
+      expectOk(await fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
+        key: owner.key,
+        body: { status: "accepted" },
+      }));
+
+      const webhook = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          url: `https://hooks.example.com/${canaries.webhook}`,
+          secret: "audit-webhook-secret-value",
+          events: ["claim.materialized"],
+        },
+      });
+      expectOk(webhook, 201);
+      expectOk(await fx.call("DELETE", `/v1/webhooks/${webhook.body.data.webhook_id}`, {
+        key: owner.key,
+      }));
+
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: canaries.federation,
+          endpoint: "https://peer.example.test/private-audit-path",
+          shared_secret: "audit-federation-secret-value",
+          direction: "push",
+        },
+      });
+      expectOk(peer, 201);
+      expectOk(await fx.call("POST", `/v1/federation/peers/${peer.body.data.peer_id}/suspend`, {
+        key: owner.key,
+        body: {},
+      }));
+
+      const rows = await fx.query<{
+        actor_id: string;
+        action: string;
+        resource_type: string;
+        resource_id: string | null;
+        detail: string | null;
+        ip_hint: string | null;
+      }>(
+        `SELECT actor_id, action, resource_type, resource_id, detail, ip_hint
+           FROM audit_log WHERE org_id = ? ORDER BY action`,
+        [owner.orgId],
+      );
+      assert.deepEqual(rows.map((row) => row.action), [
+        "federation.peer.register",
+        "federation.peer.suspend",
+        "handoff.create",
+        "handoff.resolve",
+        "key.create",
+        "key.revoke",
+        "membership.add",
+        "membership.remove",
+        "records.export",
+        "records.import",
+        "webhook.delete",
+        "webhook.register",
+      ]);
+      for (const row of rows) {
+        assert.equal(row.actor_id, owner.principalId);
+        assert.equal(row.detail, null);
+        assert.equal(row.ip_hint, null);
+        assert.ok(row.resource_type);
+      }
+      const serialized = JSON.stringify(rows);
+      for (const value of Object.values(canaries))
+        assert.ok(!serialized.includes(value), `audit copied content: ${value}`);
+      assert.ok(!serialized.includes("audit-webhook-secret-value"));
+      assert.ok(!serialized.includes("audit-federation-secret-value"));
     },
   },
   {
@@ -2609,25 +3666,93 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "idempotency binds credential and full request identity",
+    name: "concurrent checkpoint saves retain one head and handoff resolution has one winner",
+    async run(fx) {
+      const sender = await fx.provision({ scopes: ["*"] });
+      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const subjectId = `integrity-race-${Date.now()}`;
+      const saves = await Promise.all(Array.from({ length: 12 }, (_, index) =>
+        fx.call("POST", "/v1/checkpoints", {
+          key: sender.key,
+          body: {
+            subject_id: subjectId,
+            kind: "task_state",
+            state: { complete_submission: index },
+            ttl_seconds: 600,
+          },
+        })));
+      assert.equal(saves.filter((result) => result.status === 201).length, 1);
+      assert.equal(saves.filter((result) => result.status === 200).length, 11);
+      assert.equal(new Set(saves.map((result) => result.body.data.checkpoint_id)).size, 1);
+      const heads = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM checkpoints
+          WHERE org_id = ? AND subject_id = ? AND agent_id = ? AND kind = 'task_state'`,
+        [sender.orgId, subjectId, sender.principalId],
+      );
+      assert.equal(Number(heads[0]!.count), 1);
+      const current = await fx.call("GET", `/v1/checkpoints?subject_id=${subjectId}&kind=task_state`, {
+        key: sender.key,
+      });
+      expectOk(current);
+      assert.ok(Number.isInteger(current.body.data.state.complete_submission));
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: sender.key,
+        body: { to_principal: receiver.principalId, subject_id: subjectId },
+      });
+      expectOk(handoff, 201);
+      const resolutions = await Promise.all(Array.from({ length: 12 }, (_, index) =>
+        fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
+          key: receiver.key,
+          body: { status: index % 2 === 0 ? "accepted" : "rejected" },
+        })));
+      assert.equal(resolutions.filter((result) => result.status === 200).length, 1);
+      assert.ok(resolutions.every((result) => [200, 404, 409].includes(result.status)));
+      const durable = await fx.query<{ resolutions: number; events: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM handoff_resolutions WHERE handoff_id = ?) AS resolutions,
+           (SELECT COUNT(*) FROM events
+             WHERE resource_type = 'handoff' AND resource_id = ?
+               AND kind IN ('handoff.accepted', 'handoff.rejected')) AS events`,
+        [handoff.body.data.handoff_id, handoff.body.data.handoff_id],
+      );
+      assert.deepEqual(durable[0], { resolutions: 1, events: 1 });
+    },
+  },
+  {
+    name: "idempotency survives key rotation while separating principals and request identity",
     async run(fx) {
       const firstAgent = await fx.provision({ scopes: ["*"] });
+      const rotatedAgent = await fx.provision({
+        orgId: firstAgent.orgId,
+        principalId: firstAgent.principalId,
+        scopes: ["*"],
+      });
       const secondAgent = await fx.provision({ orgId: firstAgent.orgId, scopes: ["*"] });
       const key = "shared-client-key";
       const firstBody = observation({ subject_id: "idem-owner", content: "canonical replay body" });
       const first = await fx.call("POST", "/v1/observations", { key: firstAgent.key, headers: { "idempotency-key": key }, body: firstBody });
       expectOk(first, 201);
+      await fx.revoke(firstAgent.keyId);
       const canonicalReplay = await fx.call("POST", "/v1/observations", {
-        key: firstAgent.key,
+        key: rotatedAgent.key,
         headers: { "idempotency-key": key },
         body: { trust: firstBody.trust, source: firstBody.source, content: firstBody.content, kind: firstBody.kind, subject_id: firstBody.subject_id },
       });
       expectOk(canonicalReplay);
       assert.equal(canonicalReplay.body.meta.replayed, true);
+      assert.equal(canonicalReplay.body.data.observation_id, first.body.data.observation_id);
+      const audit = await fx.query<{ key_id: string; principal_id: string }>(
+        `SELECT key_id, principal_id FROM idempotency_v3
+          WHERE org_id = ? AND principal_id = ?`,
+        [firstAgent.orgId, firstAgent.principalId],
+      );
+      assert.deepEqual(audit, [{ key_id: firstAgent.keyId, principal_id: firstAgent.principalId }]);
       const otherCredential = await fx.call("POST", "/v1/observations", { key: secondAgent.key, headers: { "idempotency-key": key }, body: firstBody });
       expectOk(otherCredential, 201);
+      assert.notEqual(otherCredential.body.data.observation_id, first.body.data.observation_id);
       const crossRoute = await fx.call("POST", "/v1/consolidations", {
-        key: firstAgent.key,
+        key: rotatedAgent.key,
         headers: { "idempotency-key": key },
         body: { subject_id: "idem-owner", claims: [claim(first.body.data.observation_id)] },
       });
@@ -2689,6 +3814,137 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "Porter recall and Unicode query normalization are runtime-identical",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const testing = await seedClaim(fx, agent.key, {
+        claim: { statement: "Tests live next to the source file they cover." },
+      });
+      const istanbul = await seedClaim(fx, agent.key, {
+        claim: { statement: "The Turkish İstanbul plan is current." },
+      });
+      const quartz = await seedClaim(fx, agent.key, {
+        claim: { statement: "Quartz rotation protects the signing material." },
+      });
+
+      for (const [task, claimId] of [
+        ["testing conventions", testing.claimId],
+        ["İstanbul", istanbul.claimId],
+        ["q\u200du\u200da\u200dr\u200dt\u200dz", quartz.claimId],
+      ]) {
+        const compiled = await fx.call("POST", "/v1/context/compile", {
+          key: agent.key,
+          body: { subject_id: "user_rama", task, max_tokens: 900 },
+        });
+        expectOk(compiled);
+        assert.ok(compiled.body.data.items.some((item: any) => item.claim_id === claimId));
+      }
+
+      const noTerms = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_rama", task: "...\u200d...", max_tokens: 900 },
+      });
+      expectOk(noTerms);
+      assert.equal(noTerms.body.meta.degraded.lexical, "no_terms");
+      assert.equal(noTerms.body.meta.query_terms_used, 0);
+    },
+  },
+  {
+    name: "natural query planning removes stopword noise and retains old and new",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      await seedClaim(fx, agent.key, { claim: { statement: "to" } });
+      const noise = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_rama", task: "ship to prod safely", max_tokens: 900 },
+      });
+      expectOk(noise);
+      assert.deepEqual(noise.body.data.items, []);
+      assert.equal(noise.body.meta.query_terms_used, 3);
+      assert.equal(noise.body.meta.dropped_query_terms, 1);
+
+      const oldClaim = await seedClaim(fx, agent.key, { claim: { statement: "old" } });
+      const newClaim = await seedClaim(fx, agent.key, { claim: { statement: "new" } });
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          task: "Could you please remind me what our team decided about whether we should keep using the old formatter or move to a new one for all of the frontend repositories",
+          max_tokens: 900,
+        },
+      });
+      expectOk(compiled);
+      const ids = new Set(compiled.body.data.items.map((item: any) => item.claim_id));
+      assert.ok(ids.has(oldClaim.claimId));
+      assert.ok(ids.has(newClaim.claimId));
+      assert.ok(compiled.body.meta.query_terms_used <= 16);
+      assert.ok(compiled.body.meta.dropped_query_terms > 0);
+    },
+  },
+  {
+    name: "a large budget fills past three same-kind claims without duplicate statements",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const obs = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({
+          subject_id: "user_budgetfill",
+          content: "Budgetfill marker evidence supports all procedural variants.",
+        }),
+      });
+      expectOk(obs, 201);
+      const statements = [
+        ...Array.from({ length: 5 }, (_unused, index) =>
+          `Budgetfill marker procedure ${index} remains active.`),
+        "Budgetfill marker duplicate remains active.",
+        "Budgetfill marker duplicate remains active.",
+      ];
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_budgetfill",
+          claims: statements.map((statement) =>
+            claim(obs.body.data.observation_id, { statement, kind: "procedural" })),
+        },
+      });
+      expectOk(consolidated, 201);
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_budgetfill", task: "budgetfill marker", max_tokens: 32_000 },
+      });
+      expectOk(compiled);
+      const returned = compiled.body.data.items.map((item: any) => item.claim as string);
+      assert.ok(returned.length > 3);
+      assert.equal(returned.length, 6);
+      assert.equal(new Set(returned).size, returned.length);
+    },
+  },
+  {
+    name: "lexical candidates stay inside the requested subject before ranking",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      await seedClaim(fx, agent.key, {
+        observation: { subject_id: "subject_foreign" },
+        claim: { statement: "Scopeproof marker belongs to the foreign subject." },
+      });
+      const target = await seedClaim(fx, agent.key, {
+        observation: { subject_id: "subject_target" },
+        claim: { statement: "Scopeproof marker belongs to the target subject." },
+      });
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "subject_target", task: "scopeproof marker", max_tokens: 900 },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.meta.candidates, 1);
+      assert.deepEqual(
+        compiled.body.data.items.map((item: any) => item.claim_id),
+        [target.claimId],
+      );
+    },
+  },
+  {
     name: "lexical planning preserves an exact marker after sixteen query terms",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });
@@ -2704,6 +3960,233 @@ export const CASES: Case[] = [
       assert.ok(moved.body.data.items.some((item: any) => item.claim_id === seeded.claimId));
       assert.equal(moved.body.meta.query_terms_used, compiled.body.meta.query_terms_used);
       assert.equal(moved.body.meta.dropped_query_terms, compiled.body.meta.dropped_query_terms);
+    },
+  },
+  {
+    name: "JSON depth is rejected before checkpoint and idempotency serialization",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      let nested: unknown = 1;
+      for (let depth = 0; depth < 65; depth += 1) nested = [nested];
+
+      const checkpoint = await fx.call("POST", "/v1/checkpoints", {
+        key: agent.key,
+        body: { subject_id: "deep-json", kind: "cursor", state: nested, ttl_seconds: 600 },
+      });
+      expectError(checkpoint, 400, "VALIDATION_ERROR");
+      assert.match(checkpoint.body.error.message, /maximum JSON depth/);
+
+      const observed = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        headers: { "idempotency-key": "deep-json" },
+        body: observation({ pad: nested }),
+      });
+      expectError(observed, 400, "VALIDATION_ERROR");
+      const counts = await fx.query<{ observations: number; checkpoints: number }>(
+        `SELECT (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM checkpoints WHERE org_id = ?) AS checkpoints`,
+        [agent.orgId, agent.orgId],
+      );
+      assert.deepEqual(counts.map((row) => [Number(row.observations), Number(row.checkpoints)]), [[0, 0]]);
+    },
+  },
+  {
+    name: "validation distinguishes missing values and locates nested claim fields",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const missing = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "paths", task: "missing budget" },
+      });
+      expectError(missing, 400, "VALIDATION_ERROR");
+      assert.equal(missing.body.error.message, 'Field "max_tokens" is required.');
+
+      const wrong = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "paths", task: "wrong budget", max_tokens: "900" },
+      });
+      expectError(wrong, 400, "VALIDATION_ERROR");
+      assert.equal(wrong.body.error.message, 'Field "max_tokens" must be an integer.');
+
+      const observed = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({ subject_id: "paths" }),
+      });
+      expectOk(observed, 201);
+      const nested = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "paths",
+          claims: [
+            claim(observed.body.data.observation_id),
+            claim(observed.body.data.observation_id, {
+              sources: [{ observation_id: observed.body.data.observation_id, relation: "endorses" }],
+            }),
+          ],
+        },
+      });
+      expectError(nested, 400, "VALIDATION_ERROR");
+      assert.match(nested.body.error.message, /claims\[1\]\.sources\[0\]\.relation/);
+
+      const missingEvidence = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "paths",
+          claims: [claim("obs_missing")],
+        },
+      });
+      expectError(missingEvidence, 404, "NOT_FOUND");
+      assert.equal(missingEvidence.body.meta.field, "claims[0].sources[0].observation_id");
+    },
+  },
+  {
+    name: "unsafe text and non-sortable temporal claims fail before mutation",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      for (const content of ["nul\u0000byte", "ansi\u001b[31m", "bidi\u202esecret", "lone\ud800"]) {
+        const rejected = await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({ subject_id: "safe-text", content }),
+        });
+        expectError(rejected, 400, "VALIDATION_ERROR");
+      }
+      const safe = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({ subject_id: "safe-text", content: "line one\nline two\tvalue" }),
+      });
+      expectOk(safe, 201);
+
+      for (const dates of [
+        { valid_from: "+010000-01-01T00:00:00.000Z" },
+        { valid_from: "2030-01-01T00:00:00.000Z", valid_to: "2020-01-01T00:00:00.000Z" },
+      ]) {
+        const rejected = await fx.call("POST", "/v1/consolidations", {
+          key: agent.key,
+          body: {
+            subject_id: "safe-text",
+            claims: [claim(safe.body.data.observation_id, dates)],
+          },
+        });
+        expectError(rejected, 400, "VALIDATION_ERROR");
+      }
+      const claims = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM claims WHERE org_id = ?`,
+        [agent.orgId],
+      );
+      assert.equal(Number(claims[0]!.count), 0);
+    },
+  },
+  {
+    name: "observation purge is scoped, audited, idempotent, and removes readable projections",
+    async run(fx) {
+      const operator = await fx.provision({ scopes: ["*"] });
+      const limited = await fx.provision({ orgId: operator.orgId, scopes: ["evidence:read"] });
+      const foreign = await fx.provision({ scopes: ["observations:purge"] });
+      const canary = "PURGE_SECRET_CANARY_7319";
+      const seeded = await seedClaim(fx, operator.key, {
+        observation: { subject_id: "purge-subject", content: canary },
+        claim: { statement: `${canary} must never remain readable.` },
+      });
+      const queuedBeforePurge = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM index_outbox WHERE record_id IN (?, ?)`,
+        [seeded.observationId, seeded.claimId],
+      );
+      assert.equal(Number(queuedBeforePurge[0]!.count), 0, "no-vector writes must not queue index work");
+
+      expectError(
+        await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: limited.key }),
+        403,
+        "FORBIDDEN",
+      );
+      expectError(
+        await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: foreign.key }),
+        404,
+        "NOT_FOUND",
+      );
+
+      const before = await fx.call("POST", "/v1/context/compile", {
+        key: operator.key,
+        body: {
+          subject_id: "purge-subject",
+          task: "purge secret canary",
+          max_tokens: 900,
+          include_checkpoints: true,
+        },
+      });
+      expectOk(before);
+      assert.equal(before.body.meta.degraded.checkpoints, "unavailable");
+      assert.equal(before.body.data.items[0].untrusted, true);
+      const beforeEvidence = await fx.call("GET", `/v1/claims/${seeded.claimId}/evidence`, { key: operator.key });
+      expectOk(beforeEvidence);
+      assert.equal(beforeEvidence.body.data.claim.untrusted, true);
+      assert.equal(beforeEvidence.body.data.evidence.supporting[0].untrusted, true);
+
+      const purged = await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: operator.key });
+      expectOk(purged);
+      assert.equal(purged.body.data.already_purged, false);
+      assert.equal(purged.body.data.dependent_claims_redacted, 1);
+
+      const canonical = await fx.query<{
+        content: string; content_hash: string; statement: string; status: string; version: number;
+        observation_fts: number; claim_fts: number; observation_delete: number; claim_delete: number;
+        purge_history: number; claim_history: number; audits: number; events: number;
+      }>(
+        `SELECT o.content, o.content_hash, c.statement, c.status, c.version,
+                (SELECT COUNT(*) FROM observations_fts WHERE observation_id = o.id) AS observation_fts,
+                (SELECT COUNT(*) FROM claims_fts WHERE claim_id = c.id) AS claim_fts,
+                (SELECT COUNT(*) FROM index_outbox WHERE record_id = o.id AND operation = 'delete' AND state = 'pending') AS observation_delete,
+                (SELECT COUNT(*) FROM index_outbox WHERE record_id = c.id AND operation = 'delete' AND state = 'pending') AS claim_delete,
+                (SELECT COUNT(*) FROM record_history WHERE record_id = o.id AND change_kind = 'purge') AS purge_history,
+                (SELECT COUNT(*) FROM record_history WHERE record_id = c.id AND change_kind = 'evidence_purged') AS claim_history,
+                (SELECT COUNT(*) FROM audit_log WHERE org_id = o.org_id AND resource_id = o.id AND action = 'observation.purge') AS audits,
+                (SELECT COUNT(*) FROM events WHERE org_id = o.org_id AND resource_id = o.id AND kind = 'observation.purged') AS events
+           FROM observations o JOIN claim_sources s ON s.observation_id = o.id JOIN claims c ON c.id = s.claim_id
+          WHERE o.id = ? AND c.id = ?`,
+        [seeded.observationId, seeded.claimId],
+      );
+      assert.equal(canonical.length, 1);
+      const row = canonical[0]!;
+      assert.equal(row.content, `[redacted sha256:${row.content_hash}]`);
+      assert.equal(row.statement, "[redacted: purged evidence]");
+      assert.equal(row.status, "revoked");
+      assert.equal(Number(row.version), 2);
+      for (const count of [row.observation_fts, row.claim_fts]) assert.equal(Number(count), 0);
+      for (const count of [row.observation_delete, row.claim_delete]) assert.equal(Number(count), 0);
+      for (const count of [row.purge_history, row.claim_history, row.audits, row.events])
+        assert.equal(Number(count), 1);
+
+      const after = await fx.call("POST", "/v1/context/compile", {
+        key: operator.key,
+        body: { subject_id: "purge-subject", task: "purge secret canary", max_tokens: 900 },
+      });
+      expectOk(after);
+      assert.deepEqual(after.body.data.items, []);
+      const redactedEvidence = await fx.call("GET", `/v1/claims/${seeded.claimId}/evidence`, { key: operator.key });
+      expectOk(redactedEvidence);
+      assert.ok(!JSON.stringify(redactedEvidence.body).includes(canary));
+
+      const reuse = await fx.call("POST", "/v1/consolidations", {
+        key: operator.key,
+        body: { subject_id: "purge-subject", claims: [claim(seeded.observationId)] },
+      });
+      expectError(reuse, 404, "NOT_FOUND");
+      assert.equal(reuse.body.meta.field, "claims[0].sources[0].observation_id");
+
+      const repeated = await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: operator.key });
+      expectOk(repeated);
+      assert.equal(repeated.body.data.already_purged, true);
+      const proofs = await fx.query<{ audits: number; history: number }>(
+        `SELECT (SELECT COUNT(*) FROM audit_log WHERE org_id = ? AND resource_id = ? AND action = 'observation.purge') AS audits,
+                (SELECT COUNT(*) FROM record_history WHERE org_id = ? AND record_id = ? AND change_kind = 'purge') AS history`,
+        [operator.orgId, seeded.observationId, operator.orgId, seeded.observationId],
+      );
+      assert.deepEqual(proofs.map((proof) => [Number(proof.audits), Number(proof.history)]), [[1, 1]]);
+      const pendingDeletes = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM index_outbox
+          WHERE state = 'pending' AND operation = 'delete' AND record_id IN (?, ?)`,
+        [seeded.observationId, seeded.claimId],
+      );
+      assert.equal(Number(pendingDeletes[0]!.count), 0, "no-vector purge must not queue deletes");
     },
   },
 ];

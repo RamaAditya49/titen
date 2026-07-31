@@ -8,6 +8,11 @@
 # and musl cannot load it (it fails on __memcpy_chk). An Alpine image still runs
 # the service, it just silently loses vector retrieval, which is worse than being
 # a little larger.
+FROM docker.io/oven/bun:1.3 AS vector-deps
+
+WORKDIR /vector
+RUN bun add --no-save sqlite-vec@0.1.9
+
 FROM docker.io/oven/bun:1.3
 
 WORKDIR /app
@@ -15,9 +20,12 @@ WORKDIR /app
 # Dependencies first, so a source edit does not reinstall them.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# sqlite-vec ships a per-platform prebuilt binary and is optional: a platform
-# without one degrades to FTS rather than failing to start.
+# Keep the base install production-only. The published package leaves sqlite-vec
+# opt-in so SDK users do not download native code; the isolated stage brings
+# only sqlite-vec and its platform binary into this vector-capable image.
 RUN bun install --production --no-save 2>/dev/null || bun install --production
+COPY --from=vector-deps /vector/node_modules ./node_modules
+RUN bun -e 'require.resolve("sqlite-vec")'
 
 COPY src ./src
 COPY scripts ./scripts

@@ -12,15 +12,6 @@ export const RANK_WEIGHTS = {
 /** Feedback only moves ranking once enough signals exist (FRD CTX-002). */
 export const UTILITY_MIN_SIGNALS = 3;
 export const RECENCY_HALF_LIFE_DAYS = 90;
-/**
- * ponytail: a fixed per-kind quota instead of budget-aware diversity. The
- * ceiling is that a compiled pack can never exceed six kinds times this
- * number of items however large `max_tokens` is, so a subject whose memory
- * is concentrated in one kind cannot buy recall with budget. Upgrade path:
- * derive the quota from the remaining budget, or apply it only below a
- * relevance floor so a strong match is never displaced (#85).
- */
-export const MAX_ITEMS_PER_KIND = 3;
 
 export interface RankInput {
   id: string;
@@ -172,23 +163,33 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
 }
 
 /**
- * Greedy packing under a hard budget. An item that does not fit is skipped
- * whole; content is never truncated into misleading text (FRD CTX-001).
+ * Two deterministic passes cover each available kind, then fill by rank under
+ * the hard budget. Content is never truncated into misleading text (FRD CTX-001).
  */
 export function packUnderBudget<T>(
-  entries: { value: T; kind: string; tokens: number }[],
+  entries: { value: T; kind: string; tokens: number; dedupeKey?: string }[],
   budget: number,
 ): { selected: T[]; usedTokens: number } {
   const selected: T[] = [];
-  const perKind = new Map<string, number>();
+  const kinds = new Set<string>();
+  const dedupeKeys = new Set<string>();
+  const taken = new Set<number>();
   let usedTokens = 0;
-  for (const entry of entries) {
-    const kindCount = perKind.get(entry.kind) ?? 0;
-    if (kindCount >= MAX_ITEMS_PER_KIND) continue;
-    if (usedTokens + entry.tokens > budget) continue;
+
+  const take = (entry: (typeof entries)[number], index: number): boolean => {
+    if (taken.has(index) || (entry.dedupeKey && dedupeKeys.has(entry.dedupeKey))) return false;
+    if (usedTokens + entry.tokens > budget) return false;
     selected.push(entry.value);
     usedTokens += entry.tokens;
-    perKind.set(entry.kind, kindCount + 1);
+    kinds.add(entry.kind);
+    if (entry.dedupeKey) dedupeKeys.add(entry.dedupeKey);
+    taken.add(index);
+    return true;
+  };
+
+  for (const [index, entry] of entries.entries()) {
+    if (!kinds.has(entry.kind)) take(entry, index);
   }
+  for (const [index, entry] of entries.entries()) take(entry, index);
   return { selected, usedTokens };
 }

@@ -12,28 +12,45 @@ trap 'rm -rf "$work"' EXIT
 echo "==> packing"
 tarball="$work/$(npm pack --pack-destination "$work" --silent | tail -1)"
 
-echo "==> 1/6 packaged README"
+echo "==> 1/7 packaged README"
 if tar -xOf "$tarball" package/README.md | grep -Eq '(href|src)="\./|\]\(\./'; then
   echo "FAIL: packaged README contains repository-relative references" >&2
   exit 1
 fi
+
+echo "==> 2/7 packaged security policy"
+tar -xOf "$tarball" package/SECURITY.md >/dev/null \
+  || { echo "FAIL: SECURITY.md is missing from the package" >&2; exit 1; }
+tar -xOf "$tarball" package/README.md | grep -q 'TITEN_SECRET_KEYS' \
+  || { echo "FAIL: packaged README omits secret-key configuration" >&2; exit 1; }
 
 echo "==> installing $(basename "$tarball") into a clean tree"
 cd "$work"
 npm init -y >/dev/null
 npm install "$tarball" >/dev/null
 
-echo "==> 2/6 dependency tree"
+echo "==> 3/7 dependency tree"
 installed="$(ls node_modules | grep -v '^\.' | sort | tr '\n' ' ')"
 echo "    $installed"
+if [ -d node_modules/sqlite-vec ]; then
+  echo "FAIL: SDK/default installs must not pull the optional vector extension" >&2
+  exit 1
+fi
 for toolchain in astro wrangler playwright miniflare vite esbuild; do
   if [ -d "node_modules/$toolchain" ]; then
     echo "FAIL: $toolchain reached consumers; it belongs in devDependencies" >&2
     exit 1
   fi
 done
+node_bin="$(command -v node)"
+mkdir "$work/empty-path"
+missing_bun="$(PATH="$work/empty-path" "$node_bin" node_modules/titen-memory/src/runtime/bun/bin.mjs --help 2>&1 || true)"
+printf '%s\n' "$missing_bun" | grep -q 'Titen CLI requires Bun (it uses bun:sqlite).' \
+  || { echo "FAIL: installed CLI did not explain its Bun requirement" >&2; exit 1; }
+printf '%s\n' "$missing_bun" | grep -q 'https://bun.sh/docs/installation' \
+  || { echo "FAIL: installed CLI omitted Bun installation guidance" >&2; exit 1; }
 
-echo "==> 3/6 titen bootstrap"
+echo "==> 4/7 titen bootstrap"
 bootstrap="$(./node_modules/.bin/titen bootstrap --db "$work/t.db" --org 'Pack Verify')"
 printf '%s\n' "$bootstrap" | grep -q '^api_key: titen_' \
   || { echo "FAIL: bootstrap printed no API key" >&2; exit 1; }
@@ -42,7 +59,7 @@ api_key="$(printf '%s\n' "$bootstrap" | sed -n 's/^api_key: //p')"
 umask 077
 printf 'header = "authorization: Bearer %s"\n' "$api_key" >"$work/curl-auth"
 
-echo "==> 4/6 titen serve + MCP"
+echo "==> 5/7 titen serve + MCP"
 # The verifier may run beside other Titen processes. Ask the OS for a free port
 # instead of mistaking an unrelated fixed-port server for this candidate.
 port="$(node --input-type=module -e '
@@ -101,16 +118,18 @@ tool_names="$(printf '%s' "$tools" | node --input-type=module -e '
 expected_tools='titen_checkpoint_get
 titen_checkpoint_save
 titen_compile
+titen_consolidate
 titen_feedback
 titen_handoff
 titen_lease_acquire
+titen_project_resolve
 titen_remember'
 [ "$tool_names" = "$expected_tools" ] \
   || { echo "FAIL: installed MCP tool list differs" >&2; exit 1; }
 kill "$server" 2>/dev/null || true
 trap 'rm -rf "$work"' EXIT
 
-echo "==> 5/6 SDK on plain node"
+echo "==> 6/7 SDK on plain node"
 node --input-type=module -e '
   const { createRequire } = await import("node:module");
   const { TitenClient } = await import("titen-memory");
@@ -118,14 +137,15 @@ node --input-type=module -e '
   if (typeof TitenClient !== "function" || typeof sub.TitenClient !== "function")
     throw new Error("SDK did not export TitenClient");
   if (typeof TitenClient.prototype.request !== "function" ||
-      typeof TitenClient.prototype.requestRaw !== "function")
+      typeof TitenClient.prototype.requestRaw !== "function" ||
+      typeof TitenClient.prototype.requestWithMeta !== "function")
     throw new Error("SDK did not ship generic JSON/raw access");
   // An "exports" map hides every subpath it does not list, including this one.
   // Bundlers and tooling read it, so the omission only surfaces downstream.
   createRequire(process.cwd() + "/").resolve("titen-memory/package.json");
 ' || { echo "FAIL: node cannot import the SDK" >&2; exit 1; }
 
-echo "==> 6/6 custom global prefix"
+echo "==> 7/7 custom global prefix"
 prefix="$work/npm-prefix"
 npm install --global --prefix "$prefix" "$tarball" >/dev/null
 "$prefix/bin/titen" --help | grep -q '^titen — self-hosted memory service' \

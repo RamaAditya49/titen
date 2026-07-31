@@ -8,6 +8,7 @@ import { backgroundRepairState, runMaintenance } from "../../src/core/maintenanc
 import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
+import { assertPopulatedV11IntegrityMigration } from "../contract/integrity-migration";
 
 const directories: string[] = [];
 const temporary = () => {
@@ -46,11 +47,16 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
     assert.equal(Number(version[0]!.version), SCHEMA_VERSION - 1);
+    const integrity = await db.all<{ name: string; sql: string }>(
+      `SELECT name, sql FROM sqlite_master
+        WHERE name IN ('checkpoints_scope', 'event_order') ORDER BY name`,
+    );
     assert.deepEqual(
-      await db.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state'"),
-      [],
+      integrity.map(({ name }) => name),
+      ["checkpoints_scope"],
       `migration must roll back after statement ${failureAfter + 1}`,
     );
+    assert.doesNotMatch(integrity[0]!.sql, /UNIQUE/);
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
   }
@@ -76,7 +82,7 @@ test("migration retires unowned federation peers and releases their endpoint", a
        applied_at TEXT NOT NULL
      )`,
   );
-  for (const migration of MIGRATIONS.slice(0, -1)) {
+  for (const migration of MIGRATIONS.filter(({ version }) => version < 10)) {
     await db.batch([
       ...migration.statements.map((sql) => ({ sql })),
       {
@@ -108,6 +114,13 @@ test("migration retires unowned federation peers and releases their endpoint", a
             (id, org_id, principal_id, name, endpoint, shared_secret_hash, direction, status, created_at)
           VALUES ('fpeer_replacement', 'org_legacy', 'agent_owner', 'Replacement', 'https://peer.example.test', 'hash', 'pull', 'active', '2026-07-30T00:00:01.000Z')`,
   }]);
+  database.close();
+});
+
+test("a populated schema-v11 SQLite database repairs collaboration integrity", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await assertPopulatedV11IntegrityMigration(db);
   database.close();
 });
 
@@ -150,6 +163,7 @@ test("the explicit WAL checkpoint policy stays bounded and survives restart", as
   const path = join(temporary(), "titen.db");
   const database = openDatabase(path);
   assert.equal(database.query("PRAGMA wal_autocheckpoint").get()?.wal_autocheckpoint, 1_000);
+  assert.equal(database.query("PRAGMA synchronous").get()?.synchronous, 2);
   database.run("CREATE TABLE writes (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
   const insert = database.query("INSERT INTO writes(value) VALUES (?)");
   const writeBatch = database.transaction((start: number) => {

@@ -1,12 +1,12 @@
 import { authenticate, requireScope } from "./auth";
 import { saveCheckpoint, getCheckpoint, deleteCheckpoint } from "./checkpoints";
 import { claimEvidence } from "./evidence";
-import { compileContext, recordFeedback } from "./context";
+import { compileContext, getContext, recordFeedback } from "./context";
 import { consolidate } from "./claims";
 import { createKey, listKeys, revokeKey } from "./keys";
 import { exportRecords, importRecords } from "./portability";
 import { expireClaim, revokeClaim, supersedeClaim } from "./lifecycle";
-import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, releaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
+import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, listLeases, releaseLease, forceReleaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
 import { listEvents, getEvent } from "./events";
 import { drainIndex } from "./indexing";
 import { handleMcp } from "./mcp";
@@ -14,10 +14,11 @@ import { compileView } from "./atlas";
 import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
-import { appendObservation } from "./observations";
+import { appendObservation, purgeObservation } from "./observations";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
 import { ApiError, forbidden, unavailable, validationError } from "./errors";
+import { assertJsonDepth } from "./validate";
 import {
   MAX_BODY_BYTES,
   compileRoutes,
@@ -94,6 +95,12 @@ export const ROUTES: RouteDef[] = [
     handler: appendObservation,
   },
   {
+    method: "DELETE",
+    path: "/v1/observations/:id",
+    scope: "observations:purge",
+    handler: purgeObservation,
+  },
+  {
     method: "POST",
     path: "/v1/consolidations",
     scope: "claims:write",
@@ -104,6 +111,12 @@ export const ROUTES: RouteDef[] = [
     path: "/v1/context/compile",
     scope: "context:compile",
     handler: compileContext,
+  },
+  {
+    method: "GET",
+    path: "/v1/context/:id",
+    scope: "handoffs:read",
+    handler: getContext,
   },
   {
     method: "POST",
@@ -148,6 +161,12 @@ export const ROUTES: RouteDef[] = [
     handler: getCheckpoint,
   },
   {
+    method: "GET",
+    path: "/v1/checkpoints/:id",
+    scope: "checkpoints:read",
+    handler: getCheckpoint,
+  },
+  {
     method: "DELETE",
     path: "/v1/checkpoints/:id",
     scope: "checkpoints:write",
@@ -164,7 +183,9 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/memberships", scope: "memberships:read", handler: listMembers },
   { method: "DELETE", path: "/v1/memberships/:id", scope: "memberships:write", handler: removeMember },
   { method: "POST", path: "/v1/leases", scope: "leases:write", handler: acquireLease },
+  { method: "GET", path: "/v1/leases", scope: "leases:read", handler: listLeases },
   { method: "DELETE", path: "/v1/leases/:id", scope: "leases:write", handler: releaseLease },
+  { method: "POST", path: "/v1/leases/:id/force-release", scope: "leases:write", handler: forceReleaseLease },
   { method: "POST", path: "/v1/handoffs", scope: "handoffs:write", handler: createHandoff },
   { method: "POST", path: "/v1/handoffs/:id/resolve", scope: "handoffs:write", handler: resolveHandoff },
   { method: "GET", path: "/v1/handoffs", scope: "handoffs:read", handler: listHandoffs },
@@ -309,7 +330,7 @@ export function createApp(context: {
         if (declared > MAX_BODY_BYTES)
           throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
         const text = await request.text();
-        if (text.length > MAX_BODY_BYTES)
+        if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES)
           throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
         cachedBody = text;
         return text;
@@ -325,11 +346,14 @@ export function createApp(context: {
         json: async <T>() => {
           const text = await rawBody();
           if (text.trim() === "") throw validationError("Request body is required.");
+          let parsed: T;
           try {
-            return JSON.parse(text) as T;
+            parsed = JSON.parse(text) as T;
           } catch {
             throw validationError("Request body must be valid JSON.");
           }
+          assertJsonDepth(parsed);
+          return parsed;
         },
       };
 

@@ -32,8 +32,8 @@ export const forbidden = (message = "Operation is not permitted.") =>
  * Foreign or unauthorized records must not disclose their existence, so every
  * cross-scope denial funnels through one indistinguishable response.
  */
-export const notFound = () =>
-  new ApiError(404, "NOT_FOUND", "Resource was not found.");
+export const notFound = (meta?: Record<string, unknown>) =>
+  new ApiError(404, "NOT_FOUND", "Resource was not found.", meta);
 
 export const conflict = (message: string) =>
   new ApiError(409, "CONFLICT", message);

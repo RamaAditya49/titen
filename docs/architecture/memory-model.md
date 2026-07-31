@@ -6,6 +6,8 @@ The complete evidence-to-context flow and embedding/vector decision are defined
 in the [memory lifecycle protocol](./memory-lifecycle.md).
 Agent attribution, project resolution, tags, hooks, and orchestration are
 defined in the [agent integration flow](./agent-integration.md).
+Optional automatic derivation/reflection and its authority boundary are defined
+in [ADR-0004](../decisions/0004-model-assisted-memory-enrichment.md).
 
 ## Core distinction
 
@@ -50,14 +52,14 @@ Observations are never instructions merely because they are stored.
 A claim is a compact memory derived from observations or supplied explicitly by
 an authorized caller.
 
-Claim kinds begin with:
+The exact external/runtime claim kinds are:
 
-- semantic fact;
-- episodic event;
-- preference;
-- procedural guidance;
-- decision;
-- relationship.
+- `semantic_fact`;
+- `episodic_event`;
+- `preference`;
+- `procedural`;
+- `decision`;
+- `relationship`.
 
 Every claim carries:
 
@@ -70,6 +72,12 @@ Every claim carries:
 
 Contradictory claims are not automatically merged. A resolution creates an
 auditable status transition and cites evidence or policy authority.
+
+A model may propose a claim only through the planned asynchronous enrichment
+path. It does not choose organization, scope, subject authority, trust,
+visibility, status, deletion, or publication. Accepted generated claims retain
+their pipeline fingerprint and exact source links; malformed or foreign-source
+output creates no claim.
 
 ## Claim source
 
@@ -243,8 +251,10 @@ These timestamps must not be collapsed into one generic date.
 3. Vector payloads contain opaque IDs and minimal indexed scope metadata.
 4. Deleted/revoked canonical rows cannot be revived by stale vector hits.
 5. Embedding model, dimensions, metric, and normalization form a fingerprint.
-6. Export excludes credentials and vectors by default.
-7. Release indexes and caches are projections; active canonical release rows
+6. Extraction provider/model, prompt, schema, and source-set versions form a
+   separate pipeline fingerprint; they do not change evidence authority.
+7. Export excludes credentials and vectors by default.
+8. Release indexes and caches are projections; active canonical release rows
    decide channel eligibility on every hydration.
-8. Memory Atlas projections and caches are principal/policy scoped,
+9. Memory Atlas projections and caches are principal/policy scoped,
    non-canonical, and safe to discard or rebuild.

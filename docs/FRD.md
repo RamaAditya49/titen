@@ -1,6 +1,7 @@
 # Titen functional requirements document
 
-- Status: feature baseline; static synthetic dashboard implemented, memory service planned
+- Status: feature baseline; memory service verified locally, automatic
+  model-assisted enrichment planned
 - Product: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers/D1 and Bun/SQLite
@@ -58,12 +59,15 @@ The minimum useful path must work without an LLM or vector database.
 | Release | Required feature set                                                                                                                                                                                  | Gate                                                                               |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | P0      | dual-runtime contract, health, scoped authentication/project resolution, observations, direct claims, context compilation, feedback, FTS-only retrieval                                               | the same fixture passes on Worker/D1 and Bun/SQLite                                |
-| v0.1    | complete Level 5 kernel, optional consolidation, temporal/conflict lifecycle, evidence inspection, private checkpoints, API-key lifecycle, export/import                                              | one agent can remember, verify, resume, and move its data safely                   |
+| v0.1    | complete Level 5 kernel, caller-supplied consolidation, temporal/conflict lifecycle, evidence inspection, private checkpoints, API-key lifecycle, export/import                                      | one agent can remember, verify, resume, and move its data safely                   |
 | v0.2    | identities and memberships, visibility, shared checkpoints, leases, handoffs, observer-specific claims, audit, stateless MCP, events/webhooks, read-only Memory Atlas, progressive dashboard boundary | two agents collaborate and operators diagnose memory without private-data leakage  |
 | v0.3    | roles and policy, approvals, channel knowledge releases, retention/legal hold, identity boundary, audit/recovery, governance Atlas lenses                                                             | company and enterprise policy, release, channel-isolation, and recovery tests pass |
 | v1      | signed federation event exchange                                                                                                                                                                      | authorized scopes exchange signed events without losing provenance or conflicts    |
 
 No feature in a later release is required to implement an earlier gate.
+Automatic model-assisted derivation/reflection is a separately gated planned
+capability; the implemented `v0.1` route accepts caller-supplied claims and does
+not prove automatic extraction.
 
 ## 4. Actors and authority
 
@@ -153,24 +157,35 @@ Acceptance:
 
 **Release:** P0
 
-Required behavior:
+Implemented P0 behavior:
 
 - `GET /healthz` reports process liveness without sensitive details;
-- `GET /readyz` checks migrations and canonical SQL availability;
-- readiness reports FTS, model, vector, background-repair, and export/import
-  capabilities as enabled, disabled, degraded, or unavailable;
+- `GET /readyz` checks migrations, canonical SQL, and signing-secret
+  decryptability;
+- readiness reports FTS, vector, the embedder under the legacy `model` name,
+  background-repair freshness, and export/import capability;
+- readiness performs no provider or vector-index network probe and does not
+  persist or compare a full embedding fingerprint;
+- responses include a non-secret request ID and deployed revision/build value.
+
+Proposed readiness extensions (unimplemented):
+
+- replace the ambiguous `model` field with separate embedding, extraction, and
+  background-enrichment capability/degradation states;
 - when channel serving is enabled, readiness also checks release FTS schema and
   configured customer-assertion issuer/key references without exposing them;
-- a configured embedding fingerprint mismatch fails readiness;
-- a transient optional vector/model outage is visible as degraded while
-  canonical FTS-only operation remains available;
-- responses include a non-secret request ID and deployed revision/build value.
+- persist an embedding/index compatibility fingerprint and fail semantic
+  readiness when it mismatches the configured index;
+- a transient optional embedding/vector/extraction outage is visible under its
+  own capability while canonical FTS-only operation remains available.
 
 Acceptance:
 
 - a missing canonical database or pending incompatible migration fails ready;
 - a disabled vector capability does not prevent observation and FTS context;
-- health output contains no key, content, prompt, embedding, or private ID.
+- health output contains no key, content, prompt, embedding, or private ID;
+- the proposed fingerprint gate needs dual-runtime contract evidence before it
+  may be described as implemented.
 
 ### FND-003 — Scoped credential verification
 
@@ -255,8 +270,8 @@ Required behavior:
   `valid_from`, optional `valid_to`, and status;
 - every ordinary claim has at least one authorized claim-source link;
 - a source relation is `supports`, `contradicts`, or `qualifies`;
-- supported initial kinds are semantic fact, episodic event, preference,
-  procedural guidance, decision, and relationship;
+- supported initial kinds are `semantic_fact`, `episodic_event`, `preference`,
+  `procedural`, `decision`, and `relationship`;
 - claim creation cannot raise trust above its evidence or caller authority;
 - version history and source links are retained when status changes.
 
@@ -266,34 +281,56 @@ Acceptance:
 - a source from another unauthorized scope is rejected without disclosure;
 - creating a direct claim performs no model call.
 
-### MEM-003 — Consolidate and reconcile memory
+### MEM-003 — Derive and reflect over memory
 
-**Release:** v0.1
+**Release:** Future
 
-Consolidation converts eligible observations into claims or proposes lifecycle
-changes. Direct deterministic rules run before optional model extraction.
+**Status:** Proposed; no enrichment job, extraction provider, or proposal
+validator is present in the current runtime.
 
-Required behavior:
+The implemented `POST /v1/consolidations` path validates claims supplied by an
+authorized caller and performs no model call. The proposed automatic capability
+uses separate asynchronous derivation and reflection jobs; it does not change
+that route's acknowledgement semantics.
 
-- accept an authorized, bounded scope and batch;
-- skip observations already processed for the same consolidation version;
-- use structured model output when a model is enabled;
-- validate every proposed claim and source link before committing it;
+Proposed required behavior:
+
+- atomically enqueue one versioned derivation job with an accepted observation
+  when automatic enrichment is enabled;
+- skip work already completed for the same source set and pipeline fingerprint;
+- lease work persistently with bounded attempts, timeout, backoff, concurrency,
+  and output size;
+- run deterministic eligibility and exact-duplicate rules before any model call;
+- accept only bounded structured model proposals using supplied source/premise
+  IDs and runtime claim/action enums;
+- validate every proposed claim, action, and source link before committing it;
 - preserve contradictory claims and mark disputes instead of overwriting;
-- run deterministic kind, subject, and tag rules before optional model
-  proposals;
-- keep model-proposed subject/tag links inactive until validation permits them;
-- record extraction model/prompt version metadata without storing secrets;
-- bound input records, tokens, output records, runtime, and retry count;
-- return pending/degraded status when optional model work is unavailable;
+- derive organization, subject, scope, maximum visibility, and trust ceiling
+  from authentication and canonical evidence, not from a proposal;
+- record provider/model, prompt, schema, and source-set fingerprints without
+  storing credentials, raw prompts, or raw model output in operational logs;
+  retain bounded input/output digests and committed result row IDs for audit;
+  keep the proposal only in worker memory during validation so the job does not
+  duplicate private claim content;
+- expose extraction and background-enrichment pending/degraded state separately
+  from embedding/vector state;
+- use embeddings only to shortlist authorized duplicate or related claims;
+- run reflection only over bounded authorized clusters and treat duplicate,
+  conflict, pattern, procedure, and supersession outputs as proposals;
 - never autonomously delete canonical evidence.
 
-Acceptance:
+Proposed acceptance gate:
 
-- replaying the same consolidation is idempotent;
+- replaying the same direct consolidation or enrichment job is idempotent;
 - malformed/model-hallucinated source IDs create no claims;
-- disabling the model leaves direct observation and deterministic claim paths
-  functional.
+- model output cannot widen scope/trust/visibility, publish memory, or resolve a
+  dispute;
+- disabling enrichment leaves observations, direct claims, FTS, context, and
+  claim lifecycle paths functional;
+- a valid no-memory decision marks its job complete without creating a claim or
+  retry loop;
+- the same captured provider responses produce equivalent validated results on
+  D1 and SQLite.
 
 ### MEM-004 — Claim lifecycle and conflict resolution
 
@@ -353,17 +390,27 @@ Required behavior:
 - hydrate canonical SQL rows and reject missing, stale, revoked, or expired IDs;
 - expose normalized score components without promising a stable raw provider
   score;
-- bound candidate counts, hydration, overlays, and loops;
-- store the embedding model, dimensions, distance metric, and normalization as a
-  fingerprint;
+- bound candidate counts and canonical hydration;
 - repair vector mutations from a durable outbox.
+
+Current implementation note: adapters carry the configured embedding model and
+dimensions, and the Bun HTTP embedder rejects a returned vector with the wrong
+length. Titen does not yet persist or compare a complete index fingerprint.
+
+Proposed compatibility requirements:
+
+- persist provider/model, dimensions, distance metric, normalization,
+  preprocessing/template, and semantic-unit schema as a versioned fingerprint;
+- compare that fingerprint with the configured index before declaring semantic
+  readiness or running indexing/querying.
 
 Acceptance:
 
 - FTS-only mode returns relevant results without a model/vector service;
 - vector outage cannot lose writes or bypass authorization;
-- a dimension/fingerprint mismatch is detected before indexing/querying;
-- stale vector records never return canonical content.
+- stale vector records never return canonical content;
+- the proposed fingerprint mismatch gate passes on both runtime adapters before
+  it is reported as shipped.
 
 ### CTX-001 — Compile a bounded context pack
 
@@ -488,7 +535,8 @@ Required behavior:
 - support validation/dry-run before mutation;
 - make import idempotent and reject unknown incompatible versions;
 - require explicit authorized destination scope mapping;
-- rebuild FTS/vector projections using the destination embedding fingerprint;
+- rebuild FTS and enqueue optional vector re-indexing using the destination's
+  configured embedder; the complete destination fingerprint gate is proposed;
 - preserve conflicts and history rather than last-write-wins replacement;
 - when v0.3 channel schemas are enabled, export channel/release snapshots and
   lifecycle history but no gateway credential or assertion-verification secret;
@@ -999,7 +1047,8 @@ Required behavior:
 - create canonical backups without depending on vector projections;
 - restore into a new D1/SQLite destination before cutover;
 - verify integrity, migrations, scopes, provenance, FTS, and outbox;
-- rebuild optional vectors with the destination fingerprint;
+- rebuild optional vectors with the destination's configured embedder and, once
+  implemented, its verified fingerprint;
 - document and test rollback/recovery procedures on both runtimes.
 
 Acceptance:
@@ -1052,7 +1101,8 @@ until measured concurrent/offline mutation cases prove they are necessary.
 | active competing lease                        | `409` with non-sensitive lease metadata                                                |
 | duplicate idempotency key, same payload       | return original result                                                                 |
 | duplicate idempotency key, different payload  | `409`                                                                                  |
-| model/vector unavailable                      | canonical path succeeds where possible and reports degraded capability                 |
+| embedding/vector unavailable                  | canonical path succeeds where possible and reports semantic degradation                |
+| proposed extraction/background enrichment unavailable | canonical path succeeds; retain bounded work and report extraction degradation |
 | webhook destination unavailable               | canonical path succeeds; delivery retries or terminates visibly                        |
 | release is pending/revoked/expired/ineligible | omit or return non-disclosing `404`; never fall back to source claim                   |
 | stale release claim version                   | `409`; require a new reviewed release snapshot                                         |
@@ -1192,6 +1242,7 @@ release claim.
 | FR-10 channel release     | GOV-001, GOV-002, REL-001, AUD-001, EVT-001                          |
 | FR-11 Memory Atlas        | OBS-001, MEM-005, AUD-001, GOV-001, REL-001                          |
 | FR-12 dashboard IA        | UI-001, FND-002, IAM-001, IAM-002, AUD-001, EVT-001, OBS-001         |
+| FR-13 proposed model memory | MEM-003, MEM-004, MEM-005, RET-001, FND-001, FND-002               |
 
 ## 18. Explicit non-features
 

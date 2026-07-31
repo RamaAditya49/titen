@@ -1,17 +1,20 @@
 import { afterAll, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
+import { SCHEMA_VERSION, schemaState } from "../../src/core/migrations";
 
 const root = mkdtempSync(join(tmpdir(), "titen-cli-"));
 const cli = join(import.meta.dir, "../../src/runtime/bun/cli.ts");
+const shim = join(import.meta.dir, "../../src/runtime/bun/bin.mjs");
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 function run(name: string, args: string[]) {
   const cwd = join(root, name);
-  mkdirSync(cwd);
+  mkdirSync(cwd, { recursive: true });
   const result = Bun.spawnSync({ cmd: ["bun", cli, ...args], cwd });
   return {
     exitCode: result.exitCode,
@@ -42,6 +45,22 @@ test("help is side-effect free for every documented command", () => {
   }
 });
 
+test("the installed Node shim explains a missing Bun runtime", () => {
+  const node = Bun.which("node");
+  assert.ok(node, "Node is required by the package engine contract");
+  const emptyPath = join(root, "empty-path");
+  mkdirSync(emptyPath, { recursive: true });
+  const result = Bun.spawnSync({
+    cmd: [node, shim, "--help"],
+    env: { ...process.env, PATH: emptyPath },
+  });
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+  assert.equal(result.exitCode, 127);
+  assert.match(output, /Titen CLI requires Bun \(it uses bun:sqlite\)\./);
+  assert.match(output, /https:\/\/bun\.sh\/docs\/installation/);
+  assert.doesNotMatch(output, /node_modules|\n\s+at /);
+});
+
 test("malformed flags fail before side effects for every command", () => {
   const cases = [
     ["serve", ["serve", "--port", "nope"]],
@@ -70,4 +89,141 @@ test("port zero, non-decimal integers, and values outside the TCP range are reje
     assert.match(result.output, /--port must be an integer between 1 and 65535/);
     assert.deepEqual(result.files, []);
   }
+});
+
+test("backup refuses a missing source and atomically refreshes a fixed target", async () => {
+  const missing = run("backup-missing", ["backup", "--db", "missing.db", "--out", "latest.db"]);
+  assert.notEqual(missing.exitCode, 0);
+  assert.match(missing.output, /error: database does not exist/);
+  assert.doesNotMatch(missing.output, /SQLiteError|\n\s+at /);
+  assert.deepEqual(missing.files, []);
+
+  assert.equal(run("backup-repeat", ["bootstrap", "--db", "source.db", "--org", "First"]).exitCode, 0);
+  const first = run("backup-repeat", ["backup", "--db", "source.db", "--out", "latest.db"]);
+  assert.equal(first.exitCode, 0, first.output);
+  assert.match(first.output, /backup verified:/);
+  assert.equal(statSync(join(root, "backup-repeat", "latest.db")).mode & 0o777, 0o600);
+
+  const sourcePath = join(root, "backup-repeat", "source.db");
+  const source = openDatabase(sourcePath, { create: false });
+  try {
+    source.run(
+      "INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)",
+      SCHEMA_VERSION + 1,
+      "2026-07-31T00:00:00.000Z",
+    );
+  } finally {
+    source.close();
+  }
+  const failedRefresh = run("backup-repeat", ["backup", "--db", "source.db", "--out", "latest.db"]);
+  assert.notEqual(failedRefresh.exitCode, 0);
+  assert.match(failedRefresh.output, /error: backup failed: schema verification failed/);
+  assert.doesNotMatch(failedRefresh.output, /SQLiteError|\n\s+at /);
+  const preserved = openDatabase(join(root, "backup-repeat", "latest.db"), { create: false });
+  try {
+    assert.equal((preserved.query("SELECT COUNT(*) AS count FROM organizations").get() as { count: number }).count, 1);
+  } finally {
+    preserved.close();
+  }
+  const repaired = openDatabase(sourcePath, { create: false });
+  try {
+    repaired.run("DELETE FROM titen_migrations WHERE version = ?", SCHEMA_VERSION + 1);
+  } finally {
+    repaired.close();
+  }
+
+  assert.equal(run("backup-repeat", ["bootstrap", "--db", "source.db", "--org", "Second"]).exitCode, 0);
+  const second = run("backup-repeat", ["backup", "--db", "source.db", "--out", "latest.db"]);
+  assert.equal(second.exitCode, 0, second.output);
+  assert.doesNotMatch(second.output, /SQLiteError|\n\s+at /);
+
+  const copy = openDatabase(join(root, "backup-repeat", "latest.db"), { create: false });
+  try {
+    assert.equal((copy.query("SELECT COUNT(*) AS count FROM organizations").get() as { count: number }).count, 2);
+    assert.deepEqual(await schemaState(createSqliteDb(copy)), {
+      applied: SCHEMA_VERSION,
+      expected: SCHEMA_VERSION,
+      verified: true,
+    });
+    assert.equal((copy.query("PRAGMA integrity_check").get() as { integrity_check: string }).integrity_check, "ok");
+  } finally {
+    copy.close();
+  }
+  assert.ok(!readdirSync(join(root, "backup-repeat")).some((name) => name.includes(".tmp-")));
+});
+
+test("migrate dry-run is read-only and schema output is deterministic", () => {
+  const fresh = run("dry-run-fresh", ["migrate", "--db", "missing.db", "--dry-run"]);
+  assert.equal(fresh.exitCode, 0, fresh.output);
+  assert.match(fresh.output, /-- migration 1/);
+  assert.match(fresh.output, new RegExp(`-- ${SCHEMA_VERSION} migration\\(s\\) pending; database unchanged`));
+  assert.deepEqual(fresh.files, []);
+
+  assert.equal(run("dry-run-current", ["bootstrap", "--db", "current.db"]).exitCode, 0);
+  const before = statSync(join(root, "dry-run-current", "current.db"));
+  const current = run("dry-run-current", ["migrate", "--db", "current.db", "--dry-run"]);
+  const after = statSync(join(root, "dry-run-current", "current.db"));
+  assert.equal(current.exitCode, 0, current.output);
+  assert.match(current.output, /-- 0 migration\(s\) pending; database unchanged/);
+  assert.equal(after.size, before.size);
+  assert.equal(after.mtimeMs, before.mtimeMs);
+
+  const first = run("schema-deterministic", ["schema"]);
+  const second = run("schema-deterministic", ["schema"]);
+  assert.equal(first.output, second.output);
+  assert.match(first.output, /INSERT OR IGNORE INTO titen_migrations/);
+  assert.match(first.output, /1970-01-01T00:00:00\.000Z/);
+});
+
+test("serve reports a port collision without a stack trace", async () => {
+  const blocker = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () => new Response("busy"),
+  });
+  try {
+    const result = run("busy-port", ["serve", "--port", String(blocker.port)]);
+    assert.notEqual(result.exitCode, 0);
+    assert.equal(result.output, `error: port ${blocker.port} is already in use\n`);
+    assert.doesNotMatch(result.output, /node_modules|src\/runtime|\bat\s/);
+  } finally {
+    await blocker.stop(true);
+  }
+});
+
+test("serve --quiet accepts requests without startup or access output", async () => {
+  const reservation = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () => new Response("reserved"),
+  });
+  const port = reservation.port;
+  await reservation.stop(true);
+
+  const cwd = join(root, "quiet-serve");
+  mkdirSync(cwd);
+  const process = Bun.spawn({
+    cmd: ["bun", cli, "serve", "--port", String(port), "--quiet"],
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  try {
+    let response: Response | undefined;
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      try {
+        response = await fetch(`http://127.0.0.1:${port}/healthz`);
+        if (response.ok) break;
+      } catch {
+        await Bun.sleep(25);
+      }
+    }
+    assert.equal(response?.status, 200, "quiet server never became healthy");
+  } finally {
+    process.kill("SIGTERM");
+    await process.exited;
+  }
+  const output = `${await new Response(process.stdout).text()}${await new Response(process.stderr).text()}`;
+  assert.equal(output, "");
 });

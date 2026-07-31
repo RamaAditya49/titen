@@ -11,13 +11,16 @@ features explicitly listed as proposed are not routes.
 - `DELETE /v1/keys/:id`
 - `DELETE /v1/leases/:id`
 - `DELETE /v1/memberships/:id`
+- `DELETE /v1/observations/:id`
 - `DELETE /v1/webhooks/:id`
 - `GET /healthz`
 - `GET /readyz`
 - `GET /v1/audit`
 - `GET /v1/audit/export`
 - `GET /v1/checkpoints`
+- `GET /v1/checkpoints/:id`
 - `GET /v1/claims/:id/evidence`
+- `GET /v1/context/:id`
 - `GET /v1/events`
 - `GET /v1/events/:id`
 - `GET /v1/export`
@@ -26,6 +29,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/federation/peers/:id/filters`
 - `GET /v1/handoffs`
 - `GET /v1/keys`
+- `GET /v1/leases`
 - `GET /v1/memberships`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
@@ -49,6 +53,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/index/drain`
 - `POST /v1/keys`
 - `POST /v1/leases`
+- `POST /v1/leases/:id/force-release`
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
@@ -64,6 +69,8 @@ features explicitly listed as proposed are not routes.
 
 - Observation batch ingestion (`POST /v1/observations/batch`).
 - Channel CRUD (`/v1/channels`).
+- Automatic derivation/reflection has no public route. It is a planned
+  background capability; `POST /v1/consolidations` is not its queue endpoint.
 - The old `webhook-subscriptions`, `webhook-deliveries`, `knowledge-releases`,
   `audit/events`, and channel-scoped context paths are not aliases. Use the
   implemented inventory above.
@@ -101,9 +108,14 @@ terminal `failed` after five attempts. The drain response includes
 - JSON requests use `application/json`.
 - External field names use `snake_case`.
 - Requests may include `Idempotency-Key` on mutations.
-- An idempotency key is bound to its credential plus canonical method, concrete
-  path, normalized query, and JSON body; reuse for a different request is `409`.
+- An idempotency key is bound to the acting principal plus canonical method,
+  concrete path, normalized query, and JSON body. Rotation to another key for
+  the same principal replays the original response; the originating `key_id`
+  remains stored for audit. Reuse for a different request is `409`, and another
+  principal has an independent key space.
 - Tenant/organization authority never comes from a request body.
+- JSON bodies may nest at most 64 object/array levels. Free text rejects unsafe
+  terminal and bidirectional controls while retaining tab and line feed.
 
 Success envelope:
 
@@ -170,6 +182,20 @@ Visibility defaults to `private`. `team` requires `workspace_id` and an active
 non-reader membership; this predicate is applied before retrieval, export,
 events, Atlas limits/counts, and webhook delivery.
 
+### `DELETE /v1/observations/:id`
+
+An operator credential with the explicit `observations:purge` scope can
+irreversibly tombstone readable evidence in its organization. The atomic write
+retains the observation ID, original content hash, source metadata, and history;
+removes FTS content; queues a vector delete; redacts and revokes dependent
+claims; and appends a content-free audit/event record. Foreign IDs return the
+same `404` as missing IDs. Ordinary agent and MCP keys should never receive this
+scope, and no MCP forget tool exists.
+
+The tombstone marker binds the retained SHA-256 and remains portable. A restore
+from a backup made before the purge can reintroduce the readable content, so an
+erasure runbook must identify and expire or replace affected backups separately.
+
 ### Proposed: `POST /v1/observations/batch`
 
 Append a bounded batch using the same item schema and authorization path as the
@@ -180,10 +206,14 @@ invalid candidate does not force an adapter to resend accepted items.
 
 ### `POST /v1/consolidations`
 
-Materialize or reconcile claims for an authorized scope. Direct deterministic
-claims do not require a model. Automatic extraction is optional and bounded.
-Every claim needs supporting evidence from the same subject, project, and
-workspace, with no trust or visibility widening.
+Materialize caller-supplied claims for an authorized scope. The implemented
+handler validates and commits the submitted claims, returns `model_used: false`,
+and performs no automatic extraction or classification. Every claim needs
+supporting evidence from the same subject, project, and workspace, with no trust
+or visibility widening.
+
+ADR-0004 defines a future background derivation/reflection path. It will not
+silently add model latency or change this route's direct-claim semantics.
 
 ### Claim lifecycle routes
 
@@ -205,8 +235,10 @@ Compile a task-specific context pack.
 }
 ```
 
-The response includes selected claims, evidence IDs, trust, temporal validity,
-conflicts, score components, token usage, and a `context_id`.
+`max_tokens` accepts 128 through 32,000. The response includes selected claims,
+evidence IDs, trust, temporal validity, conflicts, score components, token usage,
+and a `context_id`. Each item carries `untrusted: true`; this is structured
+provenance for the caller, not an instruction-enforcement claim.
 
 Ranking is auditable and deterministic. Lexical BM25 and vector similarity are
 each min-max normalized inside the authorized candidate set; relevance is the
@@ -219,10 +251,28 @@ signal is assigned `1` for each matched candidate; absent lexical or vector
 signals, including vector similarity `0`, are `0`. Confidence is therefore an
 explicit weighted factor, not a hidden multiplier.
 
+Lexical planning removes Unicode format characters, preserves combining marks,
+normalizes to NFC, and drops a bounded English/Indonesian function-word set;
+an all-function-word task falls back to its original terms. Porter stemming
+handles common word forms. The FTS MATCH includes encoded organization and
+subject scope before BM25, then canonical SQL repeats every authorization and
+lifecycle check. `meta.degraded.lexical` is `no_terms` when normalization leaves
+no searchable term and `used` otherwise. The existing `remove_diacritics 2`
+tradeoff remains: diacritic-only distinctions fold together, while separate
+letters such as `ł` and `ß` do not.
+
+Packing selects one fitting claim per available kind before filling the
+remaining token budget in deterministic rank order. Byte-identical active claim
+statements appear at most once in a context pack; canonical claims and their
+evidence remain unchanged.
+
 ### `POST /v1/context/:id/feedback`
 
 Record used/useful/irrelevant/incorrect/harmful outcomes for the context or
-individual items.
+individual items. Only the run actor or the intended recipient of a pending or
+accepted handoff may submit feedback. Titen re-authorizes the complete stored
+pack first; a removed membership or hidden item makes the request return the
+same `404` as an unknown context.
 
 ### `POST /v1/index/drain`
 
@@ -313,27 +363,59 @@ These ship after the Level 5 kernel gate.
 
 ### `POST /v1/checkpoints`
 
-Create or version resumable task state with explicit TTL.
+Create or replace resumable task state with explicit TTL. One current head is
+stored for each organization, subject, agent, and kind; concurrent saves use a
+single database upsert and cannot create duplicate heads.
+
+`GET /v1/checkpoints` reads the caller's current head by subject, agent, and
+kind. `GET /v1/checkpoints/:id` also lets the intended recipient read the exact
+unexpired checkpoint referenced by a pending or accepted handoff. Other
+same-organization principals receive the same `404` as a missing record.
 
 ### `POST /v1/leases`
 
-Acquire or renew an idempotent, expiring claim to a bounded work item.
+Acquire or renew an expiring claim to a bounded work item. `GET /v1/leases`
+requires `leases:read`, returns only unreleased leases in the authenticated
+organization, accepts `limit` from 1 through 200 plus an opaque `after` cursor,
+and labels rows `active` or `expired` without exposing another organization.
+
+`POST /v1/leases/:id/force-release` requires `leases:write` plus an active
+organization-level membership with role `owner` or `admin`. Workspace roles and
+ordinary members cannot force-release an organization-scoped lease.
 
 ### `POST /v1/handoffs`
 
-Offer, accept, decline, or complete a handoff referencing a checkpoint and
-evidence.
+Create a pending handoff to a known active principal. A supplied context must
+match the organization and subject, and every item must be currently visible to
+both sender and recipient. Missing claims, foreign claims, and claims whose
+subject or project differs from the context make the complete reference
+ineligible. A supplied checkpoint must be an unexpired
+sender-owned checkpoint for the same subject. Missing, foreign,
+cross-organization, inaccessible, and mismatched references return `404` before
+the foreign-key write.
+
+`POST /v1/handoffs/:id/resolve` accepts `accepted` or `rejected` from the exact
+recipient. A database fence commits only one terminal resolution and event
+under concurrent calls.
+
+`GET /v1/context/:id` requires `handoffs:read`. It returns an actor-owned run or
+the exact run delegated to the intended recipient by a pending or accepted
+handoff. Every context item is re-authorized at read time; if any item is no
+longer visible, the whole pack fails closed with `404`.
 
 ### `GET /v1/handoffs`
 
-List authorized handoffs by status, recipient/team, project, and cursor. This is
-the default pull path for ephemeral agents that cannot receive webhooks.
+List pending handoffs addressed to the authenticated principal. This is the
+default pull path for ephemeral agents that cannot receive webhooks.
 
 ### `GET /v1/events`
 
 Return authorized metadata-only domain events after an opaque cursor. It lets an
 orchestrator poll when inbound webhooks are unavailable; it is not a transcript
-or raw memory feed.
+or raw memory feed. Public cursors remain stable event IDs; the database maps
+them to a monotonic local sequence, so equal-timestamp pages and federation
+pulls do not order by random UUIDs or skip committed events. An exhausted page
+echoes its incoming cursor so a poller can continue from the same position.
 
 ### Federation routes
 
@@ -493,9 +575,23 @@ derived cache/vector or release-status maintenance job is stale.
 ## Health
 
 - `GET /healthz`: process liveness without sensitive details.
-- `GET /readyz`: migrations, canonical SQL, embedding fingerprint when enabled,
-  vector capability when enabled, outbox health, and release FTS plus
-  customer-assertion verifier readiness when channel serving is enabled.
+- `GET /readyz`: canonical SQL, migration integrity, signing-secret
+  decryptability, and the current FTS, vector, legacy `model`,
+  `background_repair`, and export/import capability states. It makes no
+  embedding-provider or vector-index network call and does not compare a
+  persisted embedding fingerprint.
+
+In the current readiness and context responses, `capabilities.model` and
+`meta.degraded.model` respectively refer to the configured embedder. They do not
+prove an extraction model exists. A future enrichment implementation must
+introduce explicit `embedding`, `extraction`, and `background_enrichment`
+capability/degradation fields with a versioned API change; clients must not
+infer them today.
+
+A persisted embedding/index fingerprint and mismatch readiness gate are also
+proposed. The current index-drain response reports only the configured model and
+dimensions; clients must not treat those two fields as a verified full
+fingerprint.
 
 `capabilities.background_repair` is canonical scheduler evidence. `enabled`
 means a configured scheduler recorded a successful pass within its bounded
@@ -512,10 +608,12 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes seven wire tools in six ordinary-agent
+The implemented `/mcp` endpoint exposes nine wire tools in eight ordinary-agent
 families:
 
+- `titen_project_resolve`;
 - `titen_remember`;
+- `titen_consolidate`;
 - `titen_compile`;
 - `titen_feedback`;
 - `titen_checkpoint_save`;
@@ -530,7 +628,10 @@ the MCP client loses no canonical state. Only `titen_checkpoint_get` is
 read-only. `titen_compile` persists a context run, and every other tool is also
 write-capable, so hosts can apply their native approval policy correctly. Server
 metadata uses the running build revision rather than a separately maintained MCP
-version.
+version. Every successful tool's text content serializes one stable
+`{ "data": ..., "meta"?: ... }` envelope. Tool schemas publish enforced enums,
+property descriptions, and `additionalProperties: false`; annotations remain
+conservative when a tool can mutate or is idempotent only with an optional key.
 
 The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
 `GET /mcp` therefore returns `405`. A present `Origin` must match the request URL
@@ -571,18 +672,60 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Compatibility
 
-- v1 export format is versioned independently from the HTTP API.
+- Export format v2 is versioned independently from HTTP API v1. Import still
+  accepts v1 files; because v1 carried no transferable actor authority, their
+  observations and claims are owned by the authenticated importing principal.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
   complete Mem0 API compatibility.
 
 ## Portability and backup restore
 
-`GET /v1/export?type=projects|observations|claims` returns canonical NDJSON. Each
-header includes deterministic `dependency_order` (`projects`, `observations`,
-`claims`) and `depends_on`. Backups should retain all three streams and their
-headers. `POST /v1/import` preflights the complete request before mutation,
-accepts canonical records independent of NDJSON line order, and writes in
-canonical dependency order. Missing parents return `422 UNRESOLVED_REFERENCE`
-with only `record_type`, `field`, and `dependency_type`; no foreign record or
-content is disclosed. Re-import is idempotent.
+`GET /v1/export?type=workspaces|memberships|projects|observations|claims`
+returns one canonical NDJSON stream. Retain all five streams and headers for a
+logical migration. Headers declare format v2, source organization, scope,
+deterministic dependency order, count, completion state, and the next opaque
+cursor. Pages contain at most 2,000 records and are cut on UTF-8 byte length so
+the complete response remains within the import request limit. Follow
+`next_cursor` until it is `null`; IDs are stable pagination cursors, not a
+change feed.
+
+Ordinary export is principal-scoped: private records belong to the caller,
+team records require active membership, workspace export includes only joined
+workspaces, and membership export includes only the caller. `all=true` requires
+the separate `export:all` scope, exports the whole authenticated organization,
+and appends a metadata-only audit entry for each page. It never crosses the
+organization derived from the API key.
+
+`POST /v1/import` preflights the complete request before mutation, accepts
+canonical records independent of NDJSON line order, and writes in dependency
+order. Workspaces and active memberships restore team authority before team
+records; claims preserve source links and `superseded_by`. Missing parents
+return `422 UNRESOLVED_REFERENCE` with only `record_type`, `field`, and
+`dependency_type`; no foreign record or content is disclosed. Cross-organization
+ID collisions fail closed, every request is atomic, and re-import is idempotent.
+An exact self-authenticating redaction marker retains its original content hash
+but is not re-added to FTS or vector projections; non-current claims are likewise
+restored canonically with delete, rather than upsert, projection work. If purge
+wins after import preflight, the same atomic batch rejects a current claim while
+still allowing an explicit revoked tombstone on retry.
+
+Format v2 never trusts a foreign `actor_id` as local authority. Before records
+from another principal, add an explicit noncanonical control line:
+
+```json
+{"type":"titen.import.actor_map","source_org_id":"org_source","source_actor_id":"agent_source","destination_actor_id":"agent_destination"}
+```
+
+Mapping to the authenticated importer needs no extra scope. Mapping to another
+destination principal additionally requires `keys:manage`; missing, conflicting,
+foreign, or unused mappings fail before mutation. Canonical records retain the
+mapped actor, while import history records the authenticated importer. That
+administrative scope may restore team records on behalf of mapped members;
+without it, the importer must be an active non-reader in each workspace.
+
+Logical JSONL is not a full deployment snapshot. It deliberately excludes API
+keys, encrypted integration bindings, checkpoints, leases, context runs and
+feedback, audit/event/history rows, and rebuildable indexes or vectors. Use
+`titen backup` for complete Bun/SQLite disaster recovery and a provider-native
+database snapshot for Cloudflare rollback.

@@ -1,10 +1,10 @@
 import { assertTrustCeiling, type Principal } from "./auth";
-import type { Db, Stmt } from "./db";
+import { first, type Db, type Stmt } from "./db";
 import { notFound, validationError } from "./errors";
 import { eventStatement } from "./events";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
-import { historyStatement, outboxStatement } from "./observations";
+import { historyStatement, isRedactedObservation, outboxStatement } from "./observations";
 import { requireProject } from "./projects";
 import {
   authorizeRecordWorkspace,
@@ -19,6 +19,7 @@ import {
   TRUST_LEVELS,
   TRUST_RANK,
   VISIBILITIES,
+  assertTimestampOrder,
   isRecord,
   optionalEnum,
   optionalString,
@@ -37,6 +38,7 @@ const VISIBILITY_RANK: Record<Visibility, number> = { private: 0, team: 1, organ
 interface SourceInput {
   observationId: string;
   relation: (typeof CLAIM_RELATIONS)[number];
+  field: string;
 }
 
 interface SourceRow {
@@ -47,18 +49,43 @@ interface SourceRow {
   trust: Trust;
   visibility: Visibility;
   actor_id: string;
+  content: string;
+  content_hash: string;
 }
 
-function parseSources(value: unknown): SourceInput[] {
+/** Abort the enclosing batch if evidence was purged after preflight. */
+export function purgedEvidenceGuardStatement(
+  orgId: string,
+  claimId: string,
+  observationIds: string[],
+  at: string,
+): Stmt {
+  return {
+    sql: `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
+          SELECT ?, ?, 'supports', ?
+           WHERE EXISTS (
+             SELECT 1 FROM record_history h
+              WHERE h.org_id = ? AND h.record_type = 'observation'
+                AND h.change_kind = 'purge'
+                AND h.record_id IN (${observationIds.map(() => "?").join(", ")})
+           )`,
+    params: [claimId, observationIds[0]!, at, orgId, ...observationIds],
+  };
+}
+
+function parseSources(value: unknown, path: string): SourceInput[] {
+  if (value === undefined) throw validationError(`Field "${path}" is required.`);
   if (!Array.isArray(value) || value.length === 0)
-    throw validationError('Each claim needs a non-empty "sources" array.');
+    throw validationError(`Field "${path}" must be a non-empty array.`);
   if (value.length > LIMITS.sourcesPerClaim)
-    throw validationError(`A claim may not exceed ${LIMITS.sourcesPerClaim} sources.`);
-  return value.map((entry) => {
-    if (!isRecord(entry)) throw validationError("Each claim source must be an object.");
+    throw validationError(`Field "${path}" may not exceed ${LIMITS.sourcesPerClaim} items.`);
+  return value.map((entry, index) => {
+    const sourcePath = `${path}[${index}]`;
+    if (!isRecord(entry)) throw validationError(`Field "${sourcePath}" must be an object.`);
     return {
-      observationId: requireString(entry, "observation_id", LIMITS.identifier),
-      relation: requireEnum(entry, "relation", CLAIM_RELATIONS),
+      observationId: requireString(entry, "observation_id", LIMITS.identifier, `${sourcePath}.observation_id`),
+      relation: requireEnum(entry, "relation", CLAIM_RELATIONS, `${sourcePath}.relation`),
+      field: `${sourcePath}.observation_id`,
     };
   });
 }
@@ -75,17 +102,18 @@ async function loadSources(
 ): Promise<Map<string, SourceRow>> {
   const ids = [...new Set(sources.map((source) => source.observationId))];
   const rows = await db.all<SourceRow>(
-    `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.trust, o.visibility, o.actor_id
+    `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.trust, o.visibility, o.actor_id,
+            o.content, o.content_hash
        FROM observations o
       WHERE o.org_id = ? AND o.id IN (${ids.map(() => "?").join(", ")})
         AND ${recordAccessSql("o")}`,
     [principal.orgId, ...ids, ...recordAccessParams(principal.principalId)],
   );
   const byId = new Map(rows.map((row) => [row.id, row]));
-  for (const id of ids) {
-    const row = byId.get(id);
-    if (!row) throw notFound();
-  }
+  for (const source of sources)
+    if (!byId.has(source.observationId)
+      || isRedactedObservation(byId.get(source.observationId)!.content, byId.get(source.observationId)!.content_hash))
+      throw notFound({ field: source.field });
   return byId;
 }
 
@@ -101,6 +129,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
   );
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   const claims = body.claims;
+  if (claims === undefined) throw validationError('Field "claims" is required.');
   if (!Array.isArray(claims) || claims.length === 0)
     throw validationError('Field "claims" must be a non-empty array.');
   if (claims.length > LIMITS.claimsPerConsolidation)
@@ -120,14 +149,15 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     sources: SourceInput[];
   }[] = [];
 
-  for (const entry of claims) {
-    const claim = requireObject(entry);
-    const kind = requireEnum(claim, "kind", CLAIM_KINDS);
-    const statement = requireString(claim, "statement", LIMITS.statement);
+  for (const [index, entry] of claims.entries()) {
+    const path = `claims[${index}]`;
+    const claim = requireObject(entry, path);
+    const kind = requireEnum(claim, "kind", CLAIM_KINDS, `${path}.kind`);
+    const statement = requireString(claim, "statement", LIMITS.statement, `${path}.statement`);
     const confidenceValue = claim.confidence ?? 0.8;
     if (typeof confidenceValue !== "number" || !(confidenceValue > 0) || confidenceValue > 1)
-      throw validationError('Field "confidence" must be greater than 0 and at most 1.');
-    const sources = parseSources(claim.sources);
+      throw validationError(`Field "${path}.confidence" must be greater than 0 and at most 1.`);
+    const sources = parseSources(claim.sources, `${path}.sources`);
     const rows = await loadSources(ctx.app.db, principal, sources);
     for (const source of sources) {
       const row = rows.get(source.observationId)!;
@@ -147,7 +177,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       const candidate = rows.get(source.observationId)!.trust;
       return TRUST_RANK[candidate] > TRUST_RANK[highest] ? candidate : highest;
     }, "unverified");
-    const trust = optionalEnum(claim, "trust", TRUST_LEVELS, evidenceTrust);
+    const trust = optionalEnum(claim, "trust", TRUST_LEVELS, evidenceTrust, `${path}.trust`);
     if (TRUST_RANK[trust] > TRUST_RANK[evidenceTrust])
       throw validationError("Claim trust may not exceed the trust of its supporting evidence.");
     assertTrustCeiling(principal, trust);
@@ -157,7 +187,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       const candidate = rows.get(source.observationId)!.visibility;
       return VISIBILITY_RANK[candidate] < VISIBILITY_RANK[narrow] ? candidate : narrow;
     }, "organization");
-    const visibility = optionalEnum(claim, "visibility", VISIBILITIES, narrowest);
+    const visibility = optionalEnum(claim, "visibility", VISIBILITIES, narrowest, `${path}.visibility`);
     if (VISIBILITY_RANK[visibility] > VISIBILITY_RANK[narrowest])
       throw validationError("Claim visibility may not exceed the visibility of its evidence.");
     await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
@@ -169,6 +199,10 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       seen.add(key);
     }
 
+    const validFrom = optionalTimestamp(claim, "valid_from", `${path}.valid_from`) ?? ctx.app.now().toISOString();
+    const validTo = optionalTimestamp(claim, "valid_to", `${path}.valid_to`);
+    assertTimestampOrder(validFrom, validTo, `${path}.valid_from`, `${path}.valid_to`);
+
     prepared.push({
       id: newId("claim"),
       kind,
@@ -178,24 +212,31 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       visibility,
       // Contradicting evidence is preserved as a dispute, never resolved here.
       status: sources.some((source) => source.relation === "contradicts") ? "disputed" : "active",
-      observerId: optionalString(claim, "observer_id", LIMITS.identifier),
-      validFrom: optionalTimestamp(claim, "valid_from") ?? ctx.app.now().toISOString(),
-      validTo: optionalTimestamp(claim, "valid_to"),
+      observerId: optionalString(claim, "observer_id", LIMITS.identifier, `${path}.observer_id`),
+      validFrom,
+      validTo,
       sources,
     });
   }
 
-  const result = await commitIdempotent(
-    ctx.app.db,
-    principal,
-    ctx.request,
-    idempotencyKey(ctx.request),
-    raw,
-    ctx.app.now(),
-    async () => {
+  try {
+    const result = await commitIdempotent(
+      ctx.app.db,
+      principal,
+      ctx.request,
+      idempotencyKey(ctx.request),
+      raw,
+      ctx.app.now(),
+      async () => {
       const at = ctx.app.now().toISOString();
       const statements: Stmt[] = [];
       for (const claim of prepared) {
+        statements.push(purgedEvidenceGuardStatement(
+          principal.orgId,
+          claim.id,
+          claim.sources.map((source) => source.observationId),
+          at,
+        ));
         statements.push({
           sql: `INSERT INTO claims
                   (id, org_id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement,
@@ -221,8 +262,10 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
           ],
         });
         statements.push({
-          sql: `INSERT INTO claims_fts (statement, claim_id) VALUES (?, ?)`,
-          params: [claim.statement, claim.id],
+          sql: `INSERT INTO claims_fts
+                  (statement, claim_id, org_scope, subject_scope)
+                VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
+          params: [claim.statement, claim.id, principal.orgId, subjectId],
         });
         for (const source of claim.sources)
           statements.push({
@@ -242,7 +285,8 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
             at,
           ),
         );
-        statements.push(outboxStatement(principal.orgId, "claim", claim.id, "upsert", at));
+        if (ctx.app.vectors)
+          statements.push(outboxStatement(principal.orgId, "claim", claim.id, "upsert", at));
         statements.push(
           eventStatement(
             principal.orgId,
@@ -283,12 +327,29 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
         },
         statements,
       };
-    },
-  );
+      },
+    );
 
-  return {
-    status: result.replayed ? 200 : result.status,
-    data: result.data,
-    meta: { replayed: result.replayed, model: "disabled" },
-  };
+    return {
+      status: result.replayed ? 200 : result.status,
+      data: result.data,
+      meta: { replayed: result.replayed, model: "disabled" },
+    };
+  } catch (error) {
+    if (error instanceof Error && /FOREIGN KEY/i.test(error.message)) {
+      for (const claim of prepared) {
+        for (const source of claim.sources) {
+          const purged = await first<{ found: number }>(
+            ctx.app.db,
+            `SELECT 1 AS found FROM record_history
+              WHERE org_id = ? AND record_type = 'observation'
+                AND record_id = ? AND change_kind = 'purge' LIMIT 1`,
+            [principal.orgId, source.observationId],
+          );
+          if (purged) throw notFound({ field: source.field });
+        }
+      }
+    }
+    throw error;
+  }
 }

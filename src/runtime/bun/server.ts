@@ -83,31 +83,39 @@ export async function serve(options: ServeOptions) {
     mcpOrigin,
   });
 
-  // @ts-ignore - Bun global is provided by the runtime.
   // ponytail: one process, one database handle, synchronous bun:sqlite calls on
   // the main thread. The ceiling is that throughput is set by a single core and
   // does not improve with client concurrency; the SQLite writer lock is never
-  // the constraint, the event loop is. Upgrade path: move database work to a
-  // worker pool, or serve read-heavy routes from additional processes over
-  // SO_REUSEPORT with one designated writer (#123).
-  const server = Bun.serve({
-    port: options.port,
-    hostname: options.hostname,
-    async fetch(request: Request) {
-      const started = Date.now();
-      const response = await app(request);
-      if (!options.quiet) {
-        const url = new URL(request.url);
-        // Path and status only: never query values, bodies, or credentials.
-        console.log(
-          `${request.method} ${url.pathname} ${response.status} ${Date.now() - started}ms ${
-            response.headers.get("x-request-id") ?? "-"
-          }`,
-        );
-      }
-      return response;
-    },
-  });
+  // the constraint, the event loop is. Upgrade only when an equivalent-quality,
+  // durability-preserving small-team workload misses its accepted latency or
+  // throughput objective; then profile before choosing workers or read replicas
+  // (#123).
+  // @ts-ignore - Bun global is provided by the runtime.
+  let server: ReturnType<typeof Bun.serve>;
+  try {
+    // @ts-ignore - Bun global is provided by the runtime.
+    server = Bun.serve({
+      port: options.port,
+      hostname: options.hostname,
+      async fetch(request: Request) {
+        const started = Date.now();
+        const response = await app(request);
+        if (!options.quiet) {
+          const url = new URL(request.url);
+          // Path and status only: never query values, bodies, or credentials.
+          console.log(
+            `${request.method} ${url.pathname} ${response.status} ${Date.now() - started}ms ${
+              response.headers.get("x-request-id") ?? "-"
+            }`,
+          );
+        }
+        return response;
+      },
+    });
+  } catch (error) {
+    database.close();
+    throw error;
+  }
 
   let stopped = false;
 

@@ -15,7 +15,7 @@ matches it.
   memory work. A host may display a transport prefix: Claude/Codex commonly use
   `mcp__titen__<canonical-name>`, Hermes uses
   `mcp_titen_<canonical-name>`, and OpenClaw uses
-  `titen__<canonical-name>`. The prefix does not change the seven-tool contract.
+  `titen__<canonical-name>`. The prefix does not change the nine-tool contract.
 - If neither canonical nor recognized-prefixed tools are available, continue the
   user's primary task without memory when safe and point the operator to Titen's
   agent guide. Never ask for or print an API key in chat, source control, a
@@ -23,6 +23,9 @@ matches it.
 - Use the canonical `subject_id` and optional `project_id` supplied by the
   operator or authorized workflow. Never guess an opaque ID from memory content
   or use an absolute local path as a portable project identity.
+- Call `titen_project_resolve` when only a stable project reference such as
+  lowercase `owner/repo` is available. Set `create` only when the operator has
+  authorized project creation.
 
 ## Start or resume work
 
@@ -42,6 +45,9 @@ needs a targeted policy or incident check. Do not recall before every tool call.
 - Use `titen_remember` only for a stable user preference, accepted decision,
   verified tool result, production observation, reusable procedure, or explicit
   correction that will help future work.
+- Call `titen_consolidate` with that observation ID and a bounded claim when the
+  signal must become retrievable. Never invent evidence IDs or widen its scope,
+  trust, or visibility.
 - Choose the narrowest visibility and truthful trust level. Model output is not
   `verified` without external evidence.
 - Supply stable source metadata and a retry-safe idempotency key for mutations.
@@ -65,8 +71,8 @@ never be reported as durable memory.
 
 ## Tool boundary
 
-Ordinary agents use exactly: `titen_compile`, `titen_remember`,
-`titen_feedback`, `titen_checkpoint_save`, `titen_checkpoint_get`,
-`titen_lease_acquire`, and `titen_handoff`. Do not seek administrative key,
-membership, retention, webhook, Memory Atlas, or release-governance tools
-through this skill.
+Ordinary agents use exactly: `titen_project_resolve`, `titen_compile`,
+`titen_remember`, `titen_consolidate`, `titen_feedback`,
+`titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`, and
+`titen_handoff`. Do not seek administrative key, membership, retention,
+webhook, Memory Atlas, or release-governance tools through this skill.

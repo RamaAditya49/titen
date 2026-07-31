@@ -27,23 +27,22 @@ context without a documentation-site dependency.
 | [Cloudflare](./deployment/cloudflare.md)                           | Worker, D1, Vectorize, and scheduled processing                               |
 | [VPS](./deployment/vps.md)                                         | Bun, SQLite, optional sqlite-vec, and service hardening                       |
 | [Agent-memory landscape](./research/competitive-landscape.md)      | Mem0, Honcho, Karpathy, and Titen's falsifiable position                      |
+| [Memory model evaluation](./research/2026-07-31-memory-model-evaluation.md) | Live Luna/Terra/Sol and embedding pilot, limitations, and rollout evidence |
 | [Brand guide](./BRAND.md)                                          | Kawung mark, palette, typography, mascot, and usage rules                     |
 | [ADR-0001](./decisions/0001-level-6-product-level-5-kernel.md)     | Why Level 6 is built on a Level 5 kernel                                      |
 | [ADR-0002](./decisions/0002-channel-release-not-public-memory.md)  | Why customer-facing knowledge uses approved channel releases                  |
 | [ADR-0003](./decisions/0003-memory-atlas-authorized-projection.md) | Why visual memory is a bounded derived projection in the same repository      |
+| [ADR-0004](./decisions/0004-model-assisted-memory-enrichment.md)   | Why automatic derivation/reflection uses bounded SQL background jobs          |
 
 ## Current implementation status
 
 | Surface                            | Current state                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Astro dashboard                    | Implemented and tested at `/dashboard/` against a frozen synthetic fixture      |
-| Memory service and live REST/MCP   | Planned; no authenticated memory API, canonical store, or model/index pipeline  |
-| Cloudflare and VPS memory runtimes | Target architecture; neither has passed the P0 dual-runtime service smoke       |
-| Product release gates              | P0 through v1 describe capability acceptance, not the dashboard package version |
-
-The `0.3.1` package version identifies the static dashboard implementation. It
-does not mean that the roadmap's v0.3 memory-service, governance, or live Atlas
-capabilities have shipped.
+| Astro dashboard | Implemented and tested at `/dashboard/` against a frozen synthetic fixture |
+| Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
+| Optional embedding/indexing | Implemented on Bun and in Cloudflare adapter code; deployment evidence varies |
+| Automatic LLM derivation/reflection | Planned; ADR and dated pilot exist, runtime/job/provider path does not |
+| Live deployment | One recorded Bun/container embedding smoke; no equivalent live Cloudflare/VPS/local enrichment smoke |
 
 ## Documentation rules
 

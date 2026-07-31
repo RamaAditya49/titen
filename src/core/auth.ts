@@ -10,6 +10,7 @@ export const SCOPES = [
   "projects:resolve",
   "projects:create",
   "observations:write",
+  "observations:purge",
   "claims:write",
   "context:compile",
   "feedback:write",
@@ -20,6 +21,7 @@ export const SCOPES = [
   "workspaces:write",
   "memberships:read",
   "memberships:write",
+  "leases:read",
   "leases:write",
   "handoffs:read",
   "handoffs:write",
@@ -35,6 +37,7 @@ export const SCOPES = [
   "index:write",
   "keys:manage",
   "export:read",
+  "export:all",
   "import:write",
 ] as const;
 export type Scope = (typeof SCOPES)[number];

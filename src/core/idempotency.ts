@@ -75,8 +75,8 @@ export async function commitIdempotent(
   const stored = await loadStored(db, principal, identity, keyHash);
   if (stored && stored.expires_at > nowIso) return replay(stored, identity, requestHash);
 
-  // Old rows lack credential and expiry dimensions. Never replay them across a
-  // credential boundary; force a fresh key instead.
+  // Old rows lack principal and expiry dimensions. Never replay them across an
+  // identity boundary; force a fresh key instead.
   const legacy = await first<{ present: number }>(
     db,
     `SELECT 1 AS present FROM idempotency WHERE org_id = ? AND key_hash = ? LIMIT 1`,
@@ -88,17 +88,19 @@ export async function commitIdempotent(
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString();
   const statements: Stmt[] = [
     {
-      sql: `DELETE FROM idempotency_v2
-             WHERE org_id = ? AND key_id = ? AND key_hash = ? AND expires_at <= ?`,
-      params: [principal.orgId, principal.keyId, keyHash, nowIso],
+      sql: `DELETE FROM idempotency_v3
+             WHERE org_id = ? AND principal_id = ? AND key_hash = ? AND expires_at <= ?`,
+      params: [principal.orgId, principal.principalId, keyHash, nowIso],
     },
     ...write.statements,
     {
-      sql: `INSERT INTO idempotency_v2
-              (org_id, key_id, request_identity, key_hash, request_hash, status, response, created_at, expires_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO idempotency_v3
+              (org_id, principal_id, key_id, request_identity, key_hash,
+               request_hash, status, response, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
         principal.orgId,
+        principal.principalId,
         principal.keyId,
         identity,
         keyHash,
@@ -128,9 +130,9 @@ async function loadStored(
 ): Promise<StoredRow | undefined> {
   return first<StoredRow>(
     db,
-    `SELECT request_identity, request_hash, status, response, expires_at FROM idempotency_v2
-      WHERE org_id = ? AND key_id = ? AND key_hash = ?`,
-    [principal.orgId, principal.keyId, keyHash],
+    `SELECT request_identity, request_hash, status, response, expires_at FROM idempotency_v3
+      WHERE org_id = ? AND principal_id = ? AND key_hash = ?`,
+    [principal.orgId, principal.principalId, keyHash],
   );
 }
 

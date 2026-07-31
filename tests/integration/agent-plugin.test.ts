@@ -11,9 +11,11 @@ const ordinaryTools = [
   "titen_checkpoint_get",
   "titen_checkpoint_save",
   "titen_compile",
+  "titen_consolidate",
   "titen_feedback",
   "titen_handoff",
   "titen_lease_acquire",
+  "titen_project_resolve",
   "titen_remember",
 ].sort();
 
@@ -66,7 +68,7 @@ test("the repo marketplace installs one valid skills-only Titen plugin", () => {
   assert.doesNotMatch(docs, /titen-memory@personal/);
 });
 
-test("the portable skill keeps the seven-tool and security boundaries", () => {
+test("the portable skill keeps the nine-tool and security boundaries", () => {
   const skillPath = join(pluginRoot, "skills/titen-memory/SKILL.md");
   const skill = readFileSync(skillPath, "utf8");
   assert.match(skill, /^---\nname: titen-memory\ndescription: .+\n---/);
@@ -77,6 +79,8 @@ test("the portable skill keeps the seven-tool and security boundaries", () => {
   assert.match(skill, /Hermes uses\n  `mcp_titen_<canonical-name>`/);
   assert.match(skill, /OpenClaw uses\n  `titen__<canonical-name>`/);
   assert.match(skill, /typed durable signals/);
+  assert.match(skill, /Call `titen_project_resolve` when only a stable project reference/);
+  assert.match(skill, /Call `titen_consolidate` with that observation ID/);
   assert.match(skill, /Never store credentials or other secrets, raw transcripts or private\nconversations/);
   assert.match(skill, /chain of thought, prompts, embeddings, or routine command output/);
   assert.match(skill, /failed write must\nnever be reported as durable memory/);

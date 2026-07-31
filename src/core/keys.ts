@@ -1,4 +1,5 @@
 import { createApiKey, hasScope, SCOPES, type Principal } from "./auth";
+import { auditStatement } from "./audit";
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
 import { newId } from "./ids";
@@ -46,6 +47,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   );
   const principalId = optionalString(body, "principal_id", LIMITS.identifier) ?? newId("agent");
 
+  const now = ctx.app.now();
   const created = await createApiKey(
     {
       orgId: principal.orgId,
@@ -55,9 +57,14 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       scopes,
       maxTrust,
     },
-    ctx.app.now(),
+    now,
   );
-  await ctx.app.db.batch([created.statement]);
+  await ctx.app.db.batch([
+    created.statement,
+    auditStatement(
+      principal.orgId, principal.principalId, "key.create", "api_key", now.toISOString(), created.id,
+    ),
+  ]);
 
   return {
     status: 201,
@@ -115,6 +122,7 @@ export async function revokeKey(ctx: RequestContext): Promise<Result> {
         sql: `UPDATE api_keys SET revoked_at = ? WHERE id = ? AND org_id = ? AND revoked_at IS NULL`,
         params: [at, keyId, principal.orgId],
       },
+      auditStatement(principal.orgId, principal.principalId, "key.revoke", "api_key", at, keyId),
     ]);
   return { data: { key_id: keyId, revoked_at: row.revoked_at ?? at, revoked: true } };
 }
