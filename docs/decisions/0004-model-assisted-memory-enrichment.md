@@ -1,14 +1,15 @@
 # ADR-0004: Model-assisted memory enrichment uses two bounded background lanes
 
-- Status: accepted as target architecture; runtime implementation not shipped
+- Status: accepted and implemented opt-in; production activation gated
 - Date: 2026-07-31
 - Decision owners: Titen maintainers
 
 ## Context
 
 Titen's verified service stores canonical observations, accepts direct
-caller-supplied claims, indexes claims, and compiles context. It does not yet
-automatically classify observations or reflect over related claims.
+caller-supplied claims, indexes claims, and compiles context. It classifies
+observations or reflects over related claims only when an operator enables the
+separately configured background capability.
 
 Embeddings can retrieve similar candidates, but similarity cannot determine a
 claim kind, temporal validity, evidence support, conflict, trust, visibility,
@@ -21,7 +22,7 @@ of truth or separate Cloudflare and Bun semantics.
 
 ## Decision
 
-Titen will implement optional model-assisted enrichment as two bounded
+Titen implements optional model-assisted enrichment as two bounded
 background lanes backed by durable SQL jobs:
 
 1. **Derivation** turns one accepted observation into zero or more atomic,
@@ -143,13 +144,14 @@ queue delivery is at least once.
 
 ## Rollout gate
 
-Implementation requires a new paired active spec and plan, a versioned
+Production activation requires a paired spec and plan, a versioned
 language-neutral gold corpus, local validator tests, concurrent lease/crash
 recovery tests, zero invalid semantic commits from malformed or unauthorized
 output, zero fabricated/cross-scope accepted IDs, locked model and embedding
 fingerprints, a reproducible embedding corpus, and real smoke tests on
-Cloudflare, VPS, and a local computer. Automatic memory management remains
-unshipped until those gates close.
+Cloudflare Paid D1, VPS, and a local computer. The runtime path is shipped but
+remains disabled by default and must not be presented as production-active until
+those gates close.
 
 ## Related
 

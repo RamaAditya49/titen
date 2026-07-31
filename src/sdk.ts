@@ -270,6 +270,14 @@ export interface EvidenceResult {
     valid_from: string;
     valid_to: string | null;
     created_at: string;
+    enrichment: {
+      job_id: string;
+      lane: "derivation" | "reflection";
+      model_id: string;
+      model_fingerprint: string;
+      prompt_fingerprint: string;
+      schema_fingerprint: string;
+    } | null;
   };
   evidence: {
     supporting: EvidenceObservation[];

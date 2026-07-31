@@ -73,7 +73,7 @@ Every claim carries:
 Contradictory claims are not automatically merged. A resolution creates an
 auditable status transition and cites evidence or policy authority.
 
-A model may propose a claim only through the planned asynchronous enrichment
+A model may propose a claim only through the opt-in asynchronous enrichment
 path. It does not choose organization, scope, subject authority, trust,
 visibility, status, deletion, or publication. Accepted generated claims retain
 their pipeline fingerprint and exact source links; malformed or foreign-source

@@ -24,6 +24,7 @@ interface ClaimRow {
   valid_from: string;
   valid_to: string | null;
   created_at: string;
+  enrichment_job_id: string | null;
 }
 
 interface SourceRow {
@@ -51,7 +52,8 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
   const claim = await first<ClaimRow>(
     ctx.app.db,
     `SELECT id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement, confidence,
-            trust, visibility, status, version, valid_from, valid_to, created_at
+            trust, visibility, status, version, valid_from, valid_to, created_at,
+            enrichment_job_id
        FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
     [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
   );
@@ -66,6 +68,22 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
       ORDER BY s.relation, o.ingested_at, o.id`,
     [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
   );
+  const enrichment = claim.enrichment_job_id
+    ? await first<{
+        id: string;
+        lane: string;
+        model_id: string;
+        model_fingerprint: string;
+        prompt_fingerprint: string;
+        schema_fingerprint: string;
+      }>(
+        ctx.app.db,
+        `SELECT id, lane, model_id, model_fingerprint, prompt_fingerprint,
+                schema_fingerprint
+           FROM enrichment_jobs WHERE id = ? AND org_id = ? AND state = 'done'`,
+        [claim.enrichment_job_id, principal.orgId],
+      )
+    : undefined;
 
   const buckets: Record<string, unknown[]> = { supporting: [], contradicting: [], qualifying: [] };
   const bucketName = {
@@ -107,6 +125,16 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
         valid_from: claim.valid_from,
         valid_to: claim.valid_to,
         created_at: claim.created_at,
+        enrichment: enrichment
+          ? {
+              job_id: enrichment.id,
+              lane: enrichment.lane,
+              model_id: enrichment.model_id,
+              model_fingerprint: enrichment.model_fingerprint,
+              prompt_fingerprint: enrichment.prompt_fingerprint,
+              schema_fingerprint: enrichment.schema_fingerprint,
+            }
+          : null,
       },
       evidence: buckets,
       instructions: EVIDENCE_INSTRUCTIONS,

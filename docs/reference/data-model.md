@@ -1,11 +1,11 @@
 # Data model reference
 
-Status: logical target schema. Current migrations implement the canonical
-kernel, `index_outbox`, and delivery state; model-assisted `enrichment_jobs`,
-their worker lease/fingerprint semantics, and vector `submitted/ready` states
-remain proposed. Migrations 13–14 implement the singleton semantic-index
-fingerprint and safe observed-failure marker; collaboration leases described
-below are implemented.
+Status: logical schema with implementation notes. Current migrations implement
+the canonical kernel, `index_outbox`, delivery state, and the optional
+model-assisted enrichment ledger. Migrations 13–14 add the singleton semantic-
+index fingerprint and safe observed-failure marker; migration 15 adds bounded
+derivation/reflection jobs, commits, claim links, scheduler cursors, and
+generated-claim identity. Vector `submitted/ready` states remain proposed.
 
 ## Authority and precedence
 
@@ -41,9 +41,12 @@ organization
 │                     └── membership ── principal
 ├── subject ── subject_reference
 ├── observation ──< claim_source >── claim ── claim_version
+│        │                              └── claim_link
 │        └────────────── record_event ───────────┘
 │                                         └── context_item ── context_run
 │                                                            └── feedback
+├── enrichment_job ── enrichment_commit
+├── enrichment_schedule_cursor
 ├── tag ── record_tag ── observation / claim / checkpoint
 ├── channel ── knowledge_release ── claim_version
 ├── checkpoint ── checkpoint_version ── lease
@@ -394,7 +397,7 @@ re-authorized, including both endpoints of an edge, before response assembly.
 Cache failure falls back to a bounded canonical compile or an explicit
 unavailable/degraded response; it never widens scope.
 
-### Target: `enrichment_jobs`
+### `enrichment_jobs`, `enrichment_commits`, and `claim_links`
 
 Durable optional derivation/reflection work. Required fields include
 organization and authorized scope, work kind, bounded source/premise IDs and
@@ -414,14 +417,21 @@ The lanes have separate creation and idempotency contracts:
   of an unrelated canonical mutation.
 
 Network calls happen outside a SQL transaction. The model proposal exists only
-in worker memory. A successful validator commits ADD-only
-claim/source/history/link/index work, records the output hash and committed
-result row IDs, and marks the job `done` in one transaction. Neither raw nor
-normalized proposal payload is persisted. Unsafe or malformed output makes no
-semantic write.
+in worker memory. A successful validator records an `enrichment_commits` row,
+commits ADD-only claim/source/history work or non-authoritative `claim_links`,
+records the output hash and committed result IDs, and marks the job `done` in
+one transaction. Neither raw nor normalized proposal payload is persisted.
+Unsafe or malformed output makes no semantic write.
 
-This table is not implemented. The current `index_outbox` only schedules vector
-indexing; observation rows do not imply extraction work.
+Migration 15 implements this ledger plus `enrichment_schedule_cursors`.
+Generated derivation claims carry the originating job ID and a same-authority
+semantic `enrichment_key`. A current key is unique within organization and
+actor authority. When one claim reaches the bounded evidence-source limit, its
+key is rotated once to an archived key and the stable semantic key may seed the
+next bounded generation; database triggers fence provenance and further key
+mutation. Direct claims do not carry enrichment key state. Eligible locally
+accepted observations may enqueue derivation work, while logical imports are
+provenance restoration and never become implicit model input.
 
 ### Target vector outbox contract
 
@@ -585,9 +595,9 @@ when it ships must cover:
 - context run/item and feedback lookup;
 - credential hash/status lookup;
 - vector outbox due work;
-- **proposed with `enrichment_jobs`:** organization/status/next-attempt/lease
+- `enrichment_jobs`: organization/status/next-attempt/lease
   due-work lookup;
-- **proposed with `enrichment_jobs`:** unique derivation identity and unique
+- `enrichment_jobs`: unique derivation identity and unique
   reflection snapshot identity as defined above;
 - project reference uniqueness within an organization/source namespace;
 - normalized tag uniqueness and record-tag lookup;

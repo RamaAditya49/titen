@@ -4,7 +4,9 @@ import { notFound, validationError } from "./errors";
 import { eventStatement } from "./events";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
-import { historyStatement, isRedactedObservation, outboxStatement } from "./observations";
+import { isRedactedObservation } from "./observations";
+import { historyStatement, outboxStatement, purgedEvidenceGuardStatement } from "./writes";
+export { purgedEvidenceGuardStatement } from "./writes";
 import { requireProject } from "./projects";
 import {
   authorizeRecordWorkspace,
@@ -51,26 +53,6 @@ interface SourceRow {
   actor_id: string;
   content: string;
   content_hash: string;
-}
-
-/** Abort the enclosing batch if evidence was purged after preflight. */
-export function purgedEvidenceGuardStatement(
-  orgId: string,
-  claimId: string,
-  observationIds: string[],
-  at: string,
-): Stmt {
-  return {
-    sql: `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
-          SELECT ?, ?, 'supports', ?
-           WHERE EXISTS (
-             SELECT 1 FROM record_history h
-              WHERE h.org_id = ? AND h.record_type = 'observation'
-                AND h.change_kind = 'purge'
-                AND h.record_id IN (${observationIds.map(() => "?").join(", ")})
-           )`,
-    params: [claimId, observationIds[0]!, at, orgId, ...observationIds],
-  };
 }
 
 function parseSources(value: unknown, path: string): SourceInput[] {

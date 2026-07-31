@@ -43,6 +43,8 @@ import {
 import { backgroundRepairState } from "./maintenance";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
+import { snapshotExtractionCapability, type ExtractionCapability } from "./extraction";
+import { drainEnrichmentRoute } from "./enrichment";
 
 export interface AppContext {
   db: Db;
@@ -58,6 +60,8 @@ export interface AppContext {
     extraction: CapabilityState;
     backgroundEnrichment: CapabilityState;
   };
+  /** Optional untrusted proposal boundary. Canonical writes never await it. */
+  extraction?: ExtractionCapability;
   /** Scheduler intent; readiness still derives state from canonical evidence. */
   backgroundRepair: { configured: boolean; staleAfterMs: number };
   /** False only after a required startup migration failed. */
@@ -232,12 +236,18 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/webhooks/:id/deliveries", scope: "webhooks:read", handler: listDeliveries },
   { method: "POST", path: "/v1/webhooks/deliver", scope: "webhooks:write", handler: drainWebhooks },
   { method: "POST", path: "/v1/index/drain", scope: "index:write", handler: drainIndex },
+  {
+    method: "POST",
+    path: "/v1/enrichment/drain",
+    scope: "enrichment:write",
+    handler: drainEnrichmentRoute,
+  },
 ];
 
 export const ROUTE_INVENTORY: RouteInventoryEntry[] = ROUTES.map(({ method, path, scope }) => ({ method, path, scope: scope ?? null }));
 
 async function readiness(ctx: RequestContext): Promise<Result> {
-  const checks: Record<string, string> = {};
+  const checks: Record<string, unknown> = {};
   let ready = true;
   let canonicalReady = true;
   try {
@@ -288,6 +298,33 @@ async function readiness(ctx: RequestContext): Promise<Result> {
     ready = false;
   checks.extraction = ctx.app.modelCapabilities.extraction;
   checks.background_enrichment = ctx.app.modelCapabilities.backgroundEnrichment;
+  if (canonicalReady && schemaReady && ctx.app.migrationsReady) {
+    try {
+      const [jobs] = await ctx.app.db.all<{
+        failed: number;
+        backlog: number;
+      }>(
+        `SELECT
+           EXISTS(SELECT 1 FROM enrichment_jobs WHERE state = 'failed') AS failed,
+           EXISTS(SELECT 1 FROM enrichment_jobs
+                   WHERE state IN ('pending', 'leased')) AS backlog`,
+      );
+      checks.enrichment_jobs = {
+        state: ctx.app.modelCapabilities.extraction === "configured_error"
+          ? "configured_error"
+          : Number(jobs?.failed ?? 0) > 0
+            ? "terminal_error"
+            : Number(jobs?.backlog ?? 0) > 0
+              ? "backlog"
+              : ctx.app.modelCapabilities.extraction === "enabled"
+                ? "idle"
+                : "disabled",
+      };
+    } catch {
+      checks.enrichment_jobs = { state: "unavailable" };
+      ready = false;
+    }
+  }
   if (
     ctx.app.modelCapabilities.extraction === "configured_error" ||
     ctx.app.modelCapabilities.backgroundEnrichment === "configured_error"
@@ -335,6 +372,7 @@ export function createApp(context: {
     extraction?: CapabilityState;
     backgroundEnrichment?: CapabilityState;
   };
+  extraction?: ExtractionCapability;
   backgroundRepair?: { configured: boolean; staleAfterMs: number };
   migrationsReady?: boolean;
   secretStorageReady?: boolean;
@@ -349,6 +387,21 @@ export function createApp(context: {
       ? { embedding: "enabled", vector: "enabled" }
       : SEMANTIC_DISABLED);
   const semanticPrepared = context.semanticPrepared === true;
+  const suppliedExtraction = context.extraction;
+  const extractionSnapshot = snapshotExtractionCapability(suppliedExtraction);
+  const validExtraction = suppliedExtraction === undefined || extractionSnapshot !== undefined;
+  const requestedExtractionState = context.modelCapabilities?.extraction;
+  const extractionState = !validExtraction
+      || (requestedExtractionState === "enabled" && !suppliedExtraction)
+    ? "configured_error"
+    : requestedExtractionState ?? (suppliedExtraction ? "enabled" : "disabled");
+  const extraction = extractionState === "enabled" && extractionSnapshot
+    ? extractionSnapshot
+    : undefined;
+  const requestedBackgroundState = context.modelCapabilities?.backgroundEnrichment ?? "disabled";
+  const backgroundEnrichmentState = requestedBackgroundState === "enabled" && !extraction
+    ? "configured_error"
+    : requestedBackgroundState;
   const app: AppContext = {
     db: context.db,
     now: context.now ?? (() => new Date()),
@@ -360,10 +413,10 @@ export function createApp(context: {
         : undefined,
     semanticReadiness: initialSemanticReadiness,
     modelCapabilities: {
-      extraction: context.modelCapabilities?.extraction ?? "disabled",
-      backgroundEnrichment:
-        context.modelCapabilities?.backgroundEnrichment ?? "disabled",
+      extraction: extractionState,
+      backgroundEnrichment: backgroundEnrichmentState,
     },
+    extraction,
     backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
     migrationsReady: context.migrationsReady ?? true,
     secretStorageReady: context.secretStorageReady ?? true,

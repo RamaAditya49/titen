@@ -1,6 +1,76 @@
 import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
 import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
+import { observedSemanticReadiness } from "../../src/core/vectors";
+
+/** A schema upgrade cannot manufacture semantic dependency recovery. */
+export async function assertPopulatedV14SemanticOutageMigration(db: Db): Promise<void> {
+  await db.exec(
+    `CREATE TABLE titen_migrations (
+       version INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL
+     )`,
+  );
+  for (const migration of MIGRATIONS.filter(({ version }) => version <= 14)) {
+    await db.batch([
+      ...migration.statements.map((sql) => ({ sql })),
+      {
+        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+        params: [migration.version, "2026-07-31T00:00:00.000Z"],
+      },
+    ]);
+  }
+  await db.batch([
+    {
+      sql: `INSERT INTO organizations (id, name, created_at)
+            VALUES ('org_semantic_outage', 'Semantic outage', '2026-07-31T00:00:00.000Z')`,
+    },
+    {
+      sql: `INSERT INTO semantic_index_metadata
+              (id, provider, model, revision, dimensions, metric, preprocessing,
+               index_schema, created_at, embedder_failure_at,
+               vector_store_failure_at)
+            VALUES ('claims', 'contract', 'contract-stub', 'v1', 4, 'cosine',
+                    'text-v1', 'claims-scope-v1', '2026-07-31T00:00:00.000Z',
+                    '2026-07-31T00:01:00.000Z', NULL)`,
+    },
+    {
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts,
+               created_at)
+            VALUES
+              ('idx_outage_failed', 'org_semantic_outage', 'claim',
+               'claim_outage', 'upsert', 'done', 1,
+               '2026-07-31T00:00:00.000Z'),
+              ('idx_outage_delete', 'org_semantic_outage', 'claim',
+               'claim_outage', 'delete', 'pending', 0,
+               '2026-07-31T00:02:00.000Z')`,
+    },
+  ]);
+
+  assert.equal(await migrate(db), SCHEMA_VERSION);
+  assert.deepEqual(await db.all(
+    `SELECT embedder_failure_at, vector_store_failure_at
+       FROM semantic_index_metadata WHERE id = 'claims'`,
+  ), [{
+    embedder_failure_at: "2026-07-31T00:01:00.000Z",
+    vector_store_failure_at: null,
+  }]);
+  assert.deepEqual(await db.all(
+    `SELECT operation, state, attempts FROM index_outbox ORDER BY id`,
+  ), [
+    { operation: "delete", state: "pending", attempts: 0 },
+    { operation: "upsert", state: "done", attempts: 1 },
+  ]);
+  assert.deepEqual(await observedSemanticReadiness(db, {
+    embedding: "enabled",
+    vector: "enabled",
+  }), {
+    embedding: "configured_error",
+    vector: "enabled",
+    diagnostic: "embedding_dependency_unavailable",
+  });
+}
 
 /** Runs the same populated-v11 integrity upgrade against either SQL adapter. */
 export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void> {
@@ -172,7 +242,7 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
   }
 
   assert.equal(await migrate(db), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 14);
+  assert.equal(SCHEMA_VERSION, 15);
   assert.deepEqual(
     await db.all(`SELECT name FROM sqlite_master WHERE name = 'semantic_index_metadata'`),
     [{ name: "semantic_index_metadata" }],

@@ -60,7 +60,7 @@ deployment or restore, gate traffic on `/readyz`, not `/healthz`.
 
 ## Locally verified behavior
 
-- 2026-07-31 dry-build upload: 223.06 KiB / 49.49 KiB gzip.
+- 2026-07-31 dry-build upload: 446.21 KiB / 95.07 KiB gzip.
 - The shared contract suite passes through workerd/Miniflare with real D1.
 - Data survives isolate disposal and fresh cold start.
 - No Vectorize, Workers AI, Cron, KV, R2, Queue, DO, or `nodejs_compat` required.
@@ -95,15 +95,17 @@ whether the Worker applies pending migrations on cold start.
 
 ## Optional capability truth
 
-The Worker contains vector adapters and a `scheduled()` maintenance handler,
-but checked-in `wrangler.jsonc` configures only D1. It has no AI, Vectorize, or
-Cron binding, so those capabilities are not active by default or live-verified.
+The Worker contains vector and extraction adapters plus a `scheduled()`
+maintenance handler, but checked-in `wrangler.jsonc` configures only D1. It has
+no AI, Vectorize, extraction secret, or Cron binding, so those capabilities are
+not active by default or live-verified.
 
 - **Vectorize** — rebuildable semantic index for vector retrieval.
-- **Workers AI** — embedding adapter support; automatic extraction is not
-  implemented.
-- **Cron Trigger** — handler support for bounded indexing/delivery maintenance;
-  trigger provisioning is operator work.
+- **Workers AI** — embedding adapter support.
+- **OpenAI-compatible extraction** — bounded derivation/reflection adapter via
+  `TITEN_EXTRACT_BASE_URL`, model, immutable fingerprint, and optional secret.
+- **Cron Trigger** — handler support for bounded indexing, enrichment, and
+  delivery maintenance; trigger provisioning is operator work.
 - **Channel serving** — CRM/chatbot gateway via scoped service credential.
 - **Memory Atlas** — read-only browser client against authenticated REST.
 
@@ -141,19 +143,23 @@ Bind the intended index, deploy, require `/readyz`, and drain the pending claim
 work before declaring semantic retrieval operational. Never reset canonical
 claims or observations for a reindex.
 
-ADR-0004's model-assisted target adds a separate leased D1 enrichment job. A
-Cron Trigger drains it in bounded passes and is the durability guarantee.
-Workers AI or an allowlisted authenticated HTTPS/VPC OpenAI-compatible endpoint
-may implement the same proposal contract. Local schema and ID validation remains
-mandatory for either provider.
+Model-assisted memory uses a separate leased D1 enrichment job. A provisioned
+Cron Trigger drains one job per bounded pass and is the background durability
+guarantee; `POST /v1/enrichment/drain?limit=1` is the authorized manual path.
+Set `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and a 64-hex
+`TITEN_EXTRACT_MODEL_FINGERPRINT`; store `TITEN_EXTRACT_API_KEY` as a Worker
+secret. `TITEN_D1_PLAN=paid` is required, and background execution additionally
+requires `TITEN_ENRICHMENT_BACKGROUND=1` plus an actual Cron Trigger. Local
+schema and ID validation remains mandatory for every provider response.
 
 Cloudflare Queue is not required. Add it only as an opaque job-ID wake-up path
 after measured backlog age or semantic-ready latency exceeds the accepted
 objective; D1 remains authoritative and Cron remains the reconciler.
 
-Do not advertise the model-assisted scheduled profile on the Workers Free plan
-without a real smoke. Current Free Cron CPU and D1 query limits are too narrow
-to infer support from a local test; refresh official limits before provisioning.
+The model-assisted scheduled profile is unsupported on Workers Free. Paid
+activation is still blocked until a real max-bound D1 smoke proves the declared
+900-query/100-parameter wrapper on the target account; local Miniflare and the
+30-statement maximum fixture are necessary but not production evidence.
 
 ## Secrets
 
@@ -195,6 +201,10 @@ according to the deployment runbook, redeploy the compatible Worker, then smoke
 - Observation and context compile work without Vectorize.
 - Cache-busted production response reports the deployed revision.
 - Rollback artifact and migration compatibility known before release.
+- Extraction remains disabled unless the full opt-in tuple, Paid plan marker,
+  locked evaluation, and real D1/VPS/local smokes are present.
+- Run these gates manually from a controlled local checkout. GitHub Actions is
+  intentionally not enabled so the repository incurs no hosted automation cost.
 
 Current Cloudflare limits and pricing remain research evidence in the root
 [blueprint](../../blueprint.md) and must be refreshed before production.

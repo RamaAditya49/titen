@@ -197,12 +197,14 @@ One Web-Standards TypeScript core serves both runtimes:
 | Canonical SQL | `bun:sqlite` | D1 |
 | Lexical retrieval | SQLite FTS5 | D1 FTS5 |
 | Optional vectors | `sqlite-vec` | Vectorize (planned live) |
-| Automatic model enrichment | Proposed: compatible HTTP | Proposed: Workers AI or compatible HTTP |
+| Automatic model enrichment | Implemented, opt-in compatible HTTP | Implemented, opt-in compatible HTTP |
 | Background work | Startup and bounded timer | Scheduled handler; trigger provisioning varies |
 
-The model row defines a runtime integration boundary, not a shipped extractor.
-Automatic model-assisted claim derivation and reflection are not implemented;
-callers submit evidence-linked claims explicitly.
+Automatic model-assisted claim derivation and reflection are implemented as an
+opt-in capability with durable jobs, bounded validation, and separate
+readiness. They are not production-activated until the locked evaluation and
+real-runtime smokes are recorded; callers may continue submitting evidence-
+linked claims explicitly.
 
 The base service does not require Docker, Redis, Postgres, a graph database, or
 a vector database. Authorization runs before retrieval, and every candidate is

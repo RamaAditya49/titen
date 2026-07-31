@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "derivation": [
+    {
+      "id": "indonesian",
+      "language": "id",
+      "content": "Rapat operasional dimulai setiap Senin pukul sembilan pagi.",
+      "statement": "Rapat operasional dimulai setiap Senin pukul sembilan pagi.",
+      "query": "rapat operasional Senin sembilan"
+    },
+    {
+      "id": "english",
+      "language": "en",
+      "content": "The release checklist requires a rollback smoke before publishing.",
+      "statement": "A rollback smoke is required before publishing a release.",
+      "query": "release rollback smoke publishing"
+    },
+    {
+      "id": "javanese_indonesian",
+      "language": "jv-id",
+      "content": "Aku biasane ngirim laporan proyek saben Jumat sore.",
+      "statement": "Laporan proyek dikirim setiap Jumat sore.",
+      "query": "laporan proyek Jumat sore"
+    }
+  ],
+  "reflection": {
+    "add_statement": "Rollback dan persetujuan adalah dua prasyarat publikasi.",
+    "link_relation": "duplicate_candidate"
+  }
+}

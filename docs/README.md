@@ -41,8 +41,8 @@ context without a documentation-site dependency.
 | Astro dashboard | Implemented and tested at `/dashboard/` against a frozen synthetic fixture |
 | Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
 | Optional embedding/indexing | Implemented on Bun and in Cloudflare adapter code; deployment evidence varies |
-| Automatic LLM derivation/reflection | Planned; ADR and dated pilot exist, runtime/job/provider path does not |
-| Live deployment | One recorded Bun/container embedding smoke; no equivalent live Cloudflare/VPS/local enrichment smoke |
+| Automatic LLM derivation/reflection | Implemented and dual-runtime tested; opt-in and not production-activated |
+| Live deployment | One recorded Bun/container embedding smoke; real Cloudflare Paid D1/VPS/local enrichment activation smokes remain open |
 
 ## Documentation rules
 

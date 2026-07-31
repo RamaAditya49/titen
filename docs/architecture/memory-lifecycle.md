@@ -182,22 +182,23 @@ validate → authorize → SQL transaction → canonical success
 Claims enter the system through two paths:
 
 1. **deterministic:** an authorized caller supplies a claim and evidence links;
-2. **model-assisted target:** bounded background derivation proposes claims from
+2. **model-assisted opt-in:** bounded background derivation proposes claims from
    eligible observations.
 
-Current implementation truth: `POST /v1/consolidations` implements only the
-first path and returns `model_used: false`. The indexing outbox does not extract
-claims and must not be described as an enrichment queue.
+`POST /v1/consolidations` always implements the first path and returns
+`model_used: false`. The separately configured enrichment ledger implements the
+second; the indexing outbox still does not extract claims and must not be
+described as an enrichment queue.
 
 Every proposed claim must pass schema, scope, evidence, trust, and temporal
 validation. A model cannot invent a source identifier, increase trust above its
 evidence, delete evidence, or resolve a dispute.
 
-The proposed first implementation favors ADD-only derivation. A changed interpretation
+The first implementation favors ADD-only derivation. A changed interpretation
 creates a new claim version or an explicit lifecycle transition instead of
 silently rewriting the old record.
 
-#### Proposed derivation and reflection lanes
+#### Derivation and reflection lanes
 
 ```text
 observation + enrichment job commit
@@ -492,8 +493,8 @@ are unit-normalized before storage/query.
 | Memory Atlas SQL lenses       | no              | no                | no             |
 | channel semantic retrieval    | yes             | no                | yes            |
 | semantic paraphrase retrieval | yes             | no                | yes            |
-| automatic claim extraction (proposed) | no       | optional          | no             |
-| background memory reflection (proposed) | candidate lookup | required when enabled | candidate lookup |
+| automatic claim extraction (opt-in) | no       | required when enabled | no             |
+| background memory reflection (opt-in) | candidate lookup | required when enabled | candidate lookup |
 | semantic reranking            | optional        | optional reranker | optional       |
 | checkpoints, leases, handoffs | no              | no                | no             |
 
@@ -507,7 +508,7 @@ retrieval does not require enabling automatic memory extraction.
 | Core                   | D1 or SQLite          | structured filters + FTS5              | none                                   | mandatory baseline, offline/degraded operation     |
 | Cloudflare hybrid      | D1 + Vectorize        | FTS5 + dense vector fusion             | Workers AI or compatible embedding API | serverless semantic recall                         |
 | Lightweight VPS hybrid | SQLite + `sqlite-vec` | FTS5 + exact vector fusion             | local or remote compatible embedder    | personal and small-team deployment                 |
-| Proposed model-managed | D1 or SQLite          | FTS5 plus optional vector shortlist    | one evaluated extraction model         | asynchronous derivation and reflection             |
+| Opt-in model-managed   | D1 or SQLite          | FTS5 plus optional vector shortlist    | one evaluated extraction model         | asynchronous derivation and reflection             |
 | Scale profile          | Postgres + `pgvector` | Postgres FTS + exact/ANN vector fusion | compatible embedder                    | later high-volume or existing-Postgres deployments |
 
 The base VPS remains Bun plus SQLite. `pgvector` is not the default because it
@@ -592,7 +593,7 @@ turn.
 This reduces embedding calls, index size, duplicate conversational noise, and
 the chance that raw instructions dominate semantic similarity. The tradeoff is
 that an observation is not context-eligible until a direct or derived claim
-exists. The proposed enrichment API must expose that pending state honestly
+exists. The enrichment API exposes that pending state honestly
 instead of hiding the delay.
 
 ### Embedding fingerprint contract
@@ -602,7 +603,7 @@ query/document profile, and calibrated cosine floor. Bun HTTP and Cloudflare
 Workers AI share the role transforms, unit normalization, and one validator for exact output cardinality,
 ordered provider indices when present, dense dimensions, and finite numeric
 coordinates. Capability contract version 1 reports embedding separately from
-planned extraction/background enrichment, and the deprecated `model` field
+opt-in extraction/background enrichment, and the deprecated `model` field
 mirrors embedding for `0.3.x` compatibility.
 
 Every semantic index is bound to a fingerprint containing:
@@ -667,9 +668,9 @@ only when a measured quality gain exceeds the simplest fusion path.
 | vector write is pending                  | keep canonical claim/FTS available; no recent overlay exists today |
 | vector query fails                       | return explicit degraded FTS result when policy permits  |
 | vector returns stale ID                  | reject during canonical hydration                        |
-| proposed extraction returns invalid sources | commit no proposed claims                             |
-| proposed extraction times out/rate-limits | retain leased work for bounded retry; expose degradation |
-| proposed enrichment lease expires         | reclaim idempotently; create no duplicate claim          |
+| extraction returns invalid sources          | commit no proposed claims                             |
+| extraction times out/rate-limits            | retain leased work for bounded retry; expose degradation |
+| enrichment lease expires                    | reclaim idempotently; create no duplicate claim          |
 | context budget cannot fit an item        | omit it and report packing metadata                      |
 | feedback is malicious or out of scope    | reject without changing utility                          |
 | lease expires                            | make work available; keep checkpoint history             |

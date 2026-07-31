@@ -1,7 +1,8 @@
 # Evaluation specification
 
 Status: memory-service release-gate contract. Deterministic service suites and
-selected live smokes exist; model-assisted enrichment remains a planned gate.
+selected live smokes exist; model-assisted enrichment is implemented opt-in but
+remains behind an independent production-activation gate.
 
 ## Purpose
 

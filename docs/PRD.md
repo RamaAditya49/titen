@@ -20,9 +20,10 @@ knowledge snapshots without exposing canonical memory.
 
 Personal, company, and enterprise installations use one engine and one external
 contract. Titen is self-hostable and does not require a hosted Titen service.
-Optional model-assisted enrichment may later derive and reflect over memory in
-the background, but SQL evidence and deterministic operation remain sufficient
-for the minimum useful product.
+Optional model-assisted enrichment can derive and reflect over memory in the
+background when explicitly configured, but SQL evidence and deterministic
+operation remain sufficient for the minimum useful product. The capability is
+not production-activated until its independent evaluation and runtime smokes pass.
 
 ## 2. Problem
 

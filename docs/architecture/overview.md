@@ -35,7 +35,7 @@ flowchart TB
     K --> S[Canonical SQL]
     K --> I[Optional vector index]
     K --> EM[Optional embedding gateway]
-    K -. proposed .-> XM[Proposed extraction gateway]
+    K -. optional .-> XM[Extraction gateway]
     C --> E[Event outbox]
     R --> S
     R --> I
@@ -71,7 +71,7 @@ flowchart TB
 | SQL adapter        | canonical transactions, FTS, hydration, outbox         | semantic policy   |
 | Vector adapter     | rebuildable embedding index                            | canonical content |
 | Embedding gateway  | vectors for candidate retrieval                         | classification    |
-| Proposed extraction gateway | bounded derivation/reflection proposals        | authority/storage |
+| Extraction gateway | bounded derivation/reflection proposals; opt-in only   | authority/storage |
 | Runtime entrypoint | bindings, startup, background trigger                  | domain logic      |
 
 ## Runtime matrix
@@ -85,7 +85,7 @@ flowchart TB
 | Embedding adapter (implemented) | Workers AI | local or remote compatible HTTP | local or remote compatible HTTP |
 | Additional Cloudflare embedding provider (proposed) | compatible HTTPS/VPC | n/a | n/a |
 | Background maintenance | scheduled/manual index and delivery drain | startup/timer/manual index and delivery drain | startup/timer/manual index and delivery drain |
-| Model enrichment (proposed) | Cron/manual drain plus Workers AI or compatible HTTPS/VPC | startup/timer/manual drain plus compatible local or remote HTTP | startup/timer/manual drain plus compatible local or remote HTTP |
+| Model enrichment (implemented, opt-in) | Cron/manual drain plus compatible HTTPS/VPC | startup/timer/manual drain plus compatible local or remote HTTP | startup/timer/manual drain plus compatible local or remote HTTP |
 | Crypto | Web Crypto | Web Crypto | Web Crypto |
 
 The core does not require `nodejs_compat` on Workers.
@@ -108,10 +108,12 @@ inferred from the preview. Signed federation event exchange is implemented;
 turning remote events into authorized, indexed, recallable canonical memory is
 planned.
 
-Automatic model-assisted derivation/reflection is also planned. Current
-maintenance drains claim indexing and delivery work only; it does not classify
-observations. Capability contract version 1 reports `embedding`, `extraction`,
-and `background_enrichment` separately. Deprecated `capabilities.model` mirrors
+Automatic model-assisted derivation/reflection is implemented as an optional,
+disabled-by-default capability. Maintenance drains its durable ledger only when
+the extraction tuple and runtime scheduler are configured; production activation
+still requires locked evaluation and real three-target smoke evidence. Capability
+contract version 1 reports `embedding`, `extraction`, and
+`background_enrichment` separately. Deprecated `capabilities.model` mirrors
 embedding for `0.3.x` compatibility and must not be read as extraction readiness.
 
 ## Write path
@@ -122,9 +124,8 @@ embedding for `0.3.x` compatibility and must not be read as extraction readiness
    indexing/event outbox in one SQL transaction.
 4. Return canonical success even when semantic indexing or webhook delivery is
    pending.
-5. Current background work drains indexing and delivery. After ADR-0004 is
-   implemented, a separate leased enrichment job may propose and validate
-   claims before enqueueing their index work.
+5. Configured background work drains indexing, delivery, and a separate leased
+   enrichment ledger; every proposal is validated before claim/index mutation.
 
 ## Context path
 
@@ -203,7 +204,7 @@ remain source-tool calls instead of stale knowledge releases.
 - SQL failure aborts the canonical mutation.
 - Embedding/vector failure degrades semantic retrieval and leaves repairable
   index work.
-- Under the proposed enrichment contract, extraction failure never rolls back
+- Under the optional enrichment contract, extraction failure never rolls back
   evidence; it leaves bounded enrichment work pending or terminally failed with
   no semantic mutation.
 - Policy failure denies before retrieval.
@@ -223,5 +224,5 @@ remain source-tool calls instead of stale knowledge releases.
 Astro, Playwright, and local fonts support the optional dashboard. The memory
 service uses native `Request`, `Response`, Web Crypto, D1, `bun:sqlite`,
 `Bun.serve`, and `fetch`; optional `sqlite-vec` is already isolated to the Bun
-vector capability. The proposed model-assisted enrichment design adds no
+vector capability. Model-assisted enrichment adds no
 provider SDK, queue, Redis, graph database, or dependency-injection framework.

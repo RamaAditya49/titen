@@ -518,10 +518,9 @@ slow or unavailable.
 
 ## Asynchronous enrichment path
 
-This is the ADR-0004 target, not current shipped behavior. Current maintenance
-drains claim indexing and webhook work; observation rows are not classified.
-After implementation, a background worker drains a separate durable enrichment
-job:
+This is the implemented ADR-0004 opt-in path. Configured maintenance drains a
+separate durable enrichment job; without the extraction tuple, observation rows
+remain canonical evidence and no model call occurs:
 
 ```mermaid
 flowchart LR

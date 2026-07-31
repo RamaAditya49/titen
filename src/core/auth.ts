@@ -36,6 +36,7 @@ export const SCOPES = [
   "webhooks:read",
   "webhooks:write",
   "index:write",
+  "enrichment:write",
   "keys:manage",
   "export:read",
   "export:all",
