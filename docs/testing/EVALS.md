@@ -227,6 +227,88 @@ to merge or classify memory. The 2026-07-31 embedding pilot is directional,
 not an activation gate: its fixture, gold, scorer, and raw-result manifest are
 not independently reproducible from repository evidence.
 
+`scripts/benchmark-embedding-calibration.ts` defines the reproducible
+`s-calibration-v1` embedding-only lane. Full scale generates 10,000 statements
+and 600 queries with 40 cases in every category/language stratum. A stable hash
+assigns 20 cases per stratum to calibration and 20 to a locked holdout. The
+runner embeds and ranks calibration first, selects the lowest evaluated cosine
+threshold that yields zero calibration no-result false positives while
+maximizing Recall@5, freezes it, and only then processes holdout queries. It
+reports Wilson 95% intervals for recall, coverage, and abstention, retains only
+ranked synthetic IDs/scores, and removes its temporary sqlite-vec database.
+`--scale smoke` uses the same generator and scorer at 600 statements and 60
+queries; it validates the harness but cannot satisfy the scale-S gate.
+The [first full scale run](./2026-07-31-embedding-s-calibration-v1-full.md)
+completed the lane, but its locked-holdout subgroup misses remain replacement
+blockers rather than a new default threshold.
+
+Preprocessing is part of the embedding fingerprint. `raw-v1` preserves the
+first full run as a baseline. The predeclared EmbeddingGemma challenger uses
+the model card's asymmetric retrieval templates: documents receive
+`title: none | text: {content}` and queries receive
+`task: search result | query: {content}`. See the
+[official EmbeddingGemma model card](https://huggingface.co/google/embeddinggemma-300m/blob/main/README.md).
+The [full retrieval-profile challenger](./2026-07-31-embeddinggemma-retrieval-profile-challenger.md)
+improved locked-holdout Recall@5 while retaining zero no-result false
+positives, but one cross-language direction remained at zero recall. The
+documented profile replaces raw input as the benchmark baseline; it does not
+turn embedding similarity into a memory-management decision.
+
+The [disjoint S-validation-v2 run](./2026-07-31-embedding-s-validation-v2-full.md)
+repeated 91.67% Recall@5 and zero no-result false positives without tuning the
+profile or `0.737307171` floor on the new 10,000-statement/600-query fixture.
+The English-query to Javanese-in-Indonesian-statement direction stayed at 0/40,
+and the provider revision remained unattested. This is deployment-specific
+evidence, not a universal default or replacement pass.
+
+## Recorded Mem0 replacement cycle
+
+The first versioned side-by-side run against `server-wulan` is documented in
+the [Titen 0.3.0 versus Mem0 cycle-1 report](./2026-07-31-mem0-replacement-cycle1.md).
+Its redacted raw trials, manifest, summary, report, and checksums are committed
+under [`results/2026-07-31-titen-030-vs-mem0-cycle1`](./results/2026-07-31-titen-030-vs-mem0-cycle1/).
+
+That run is a small directional gate, not a replacement win. It used eight
+facts, eight queries, ten seeded paired repeats, concurrency one, the same
+Wulan `embeddinggemma` service, Mem0 `infer:false`, and Titen direct claims.
+Titen tied Recall@1/5 but trailed Mem0 on MRR and nDCG; both returned a false
+positive for every no-result query at threshold zero. Titen request latency was
+lower through the shared SSH path, but automatic memory management remained
+unsupported while Mem0 `infer:true` passed its capability probe. Safety,
+recovery, and outage smokes are recorded separately in the report; Cloudflare,
+local-computer, migration, service-resource, saturation, and soak gates remain
+open.
+
+Future runs use [`scripts/benchmark-mem0-replacement.ts`](../../scripts/benchmark-mem0-replacement.ts)
+for this exact controlled lane. They must not reuse its tiny corpus as a
+production quality claim, compare its workstation telemetry as service-host
+telemetry, or count an external LLM harness as Titen enrichment.
+
+Cycle 2 is recorded in the
+[concurrency, migration, and enrichment-audit report](./2026-07-31-mem0-replacement-cycle2.md).
+It repeats the same controlled lane at concurrency 1, 8, and 32 with bounded
+per-pair AB/BA ordering and container CPU/memory time series. It also adds
+[`scripts/benchmark-mem0-migration.ts`](../../scripts/benchmark-mem0-migration.ts)
+for a reversible synthetic direct-import rehearsal and
+[`scripts/sample-docker-resources.ts`](../../scripts/sample-docker-resources.ts)
+for redacted Docker telemetry.
+
+The 20-record disposable migration rerun passed exact idempotent IDs, semantic
+recall, evidence provenance, and Mem0 cleanup. This is not a production
+migration claim: automatic extraction, scope/lifecycle mapping, bulk/delta
+catch-up, dual-write, and rollback soak remain open. Docker memory is container
+usage, not process RSS, and the five-container Mem0 topology is not equivalent
+to Titen's direct-retrieval container.
+
+[Cycle 3](./2026-07-31-mem0-replacement-cycle3.md) and
+[cycle 4](./2026-07-31-mem0-replacement-cycle4.md) retain the dated 0.3.0
+canary and source-QA snapshots. The frozen Sol/Terra run and later
+[Luna absolute gate](./2026-07-31-enrichment-model-gate-luna-full.md) selected
+no model: all candidates failed their measured lexical/output gates, Luna also
+failed 100% no-memory safety, and semantic adjudication plus immutable revision
+attestation remain absent. Moving issue, branch, and pull-request details in
+those reports are historical, not current repository status.
+
 ## Fixture format
 
 Fixtures will be versioned JSONL under `test/fixtures/evals/` when the harness is

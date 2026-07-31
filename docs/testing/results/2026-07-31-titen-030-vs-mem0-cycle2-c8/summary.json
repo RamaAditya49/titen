@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "run_id": "bench_3adf15c4eec54c089f21",
+  "fixture_version": "titen-mem0-cycle1-v1",
+  "status": "completed",
+  "verdict": "BLOCKED_NOT_READY_TO_REPLACE_MEM0",
+  "products": {
+    "titen": {
+      "samples": 80,
+      "successful_samples": 80,
+      "search_errors": 0,
+      "latency": {
+        "count": 80,
+        "p50_ms": 184.546,
+        "p95_ms": 239.455,
+        "p99_ms": 290.801,
+        "mean_ci95_ms": {
+          "mean": 191.745,
+          "low": 186.566,
+          "high": 196.924
+        }
+      },
+      "quality": {
+        "recall_at_1": 0.857,
+        "recall_at_5": 1,
+        "mrr_at_10": 0.886,
+        "ndcg_at_10": 0.912,
+        "no_result_false_positive_rate": 1
+      },
+      "by_language": {
+        "en": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "id": {
+          "samples": 50,
+          "recall_at_1": 0.75,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.8,
+          "ndcg_at_10": 0.847,
+          "no_result_false_positive_rate": 1
+        },
+        "jv-id": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      },
+      "by_category": {
+        "exact": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "hard_negative": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "no_result": {
+          "samples": 10,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "no_result_false_positive_rate": 1
+        },
+        "paraphrase": {
+          "samples": 30,
+          "recall_at_1": 0.667,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.733,
+          "ndcg_at_10": 0.796,
+          "no_result_false_positive_rate": null
+        },
+        "temporal": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      }
+    },
+    "mem0": {
+      "samples": 80,
+      "successful_samples": 80,
+      "search_errors": 0,
+      "latency": {
+        "count": 80,
+        "p50_ms": 1419.046,
+        "p95_ms": 1887.356,
+        "p99_ms": 2051.269,
+        "mean_ci95_ms": {
+          "mean": 1365.666,
+          "low": 1285.534,
+          "high": 1445.798
+        }
+      },
+      "quality": {
+        "recall_at_1": 0.857,
+        "recall_at_5": 1,
+        "mrr_at_10": 0.929,
+        "ndcg_at_10": 0.947,
+        "no_result_false_positive_rate": 1
+      },
+      "by_language": {
+        "en": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "id": {
+          "samples": 50,
+          "recall_at_1": 0.75,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.875,
+          "ndcg_at_10": 0.908,
+          "no_result_false_positive_rate": 1
+        },
+        "jv-id": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      },
+      "by_category": {
+        "exact": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "hard_negative": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "no_result": {
+          "samples": 10,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "no_result_false_positive_rate": 1
+        },
+        "paraphrase": {
+          "samples": 30,
+          "recall_at_1": 0.667,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.833,
+          "ndcg_at_10": 0.877,
+          "no_result_false_positive_rate": null
+        },
+        "temporal": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      }
+    }
+  },
+  "paired_latency": {
+    "count": 80,
+    "titen_minus_mem0_ms": {
+      "mean": -1173.921,
+      "low": -1253.318,
+      "high": -1094.524
+    }
+  },
+  "native_memory_management": {
+    "titen": {
+      "schema_version": 1,
+      "lane": "native_memory_management",
+      "run_id": "bench_3adf15c4eec54c089f21",
+      "fixture_version": "titen-mem0-cycle1-v1",
+      "product": "titen",
+      "status": "unsupported",
+      "pass": false,
+      "reason_code": "NO_AUTOMATIC_DERIVATION_OR_REFLECTION_RUNTIME_IN_0_3_0"
+    },
+    "mem0": {
+      "schema_version": 1,
+      "lane": "native_memory_management",
+      "run_id": "bench_3adf15c4eec54c089f21",
+      "fixture_version": "titen-mem0-cycle1-v1",
+      "product": "mem0",
+      "status": "not_run",
+      "pass": false,
+      "reason_code": "OPTIONAL_INFER_TRUE_PROBE_NOT_REQUESTED"
+    }
+  },
+  "blockers": [
+    "Titen 0.3.0 has no automatic derivation/reflection runtime.",
+    "Embedding revision equivalence requires separate deployment evidence because neither search API proves it.",
+    "This runner does not prove isolation, recovery, migration, service-resource, or sustained-soak gates."
+  ]
+}

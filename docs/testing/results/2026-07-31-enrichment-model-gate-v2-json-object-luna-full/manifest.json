@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "runner_version": "enrichment-model-gate-runner-v2",
+  "run_id": "8de971cb-020c-47b6-a37a-80a71917d3a8",
+  "contract_commit": "03a77a9",
+  "source_git_commit": "b69a1505b214f28786efee491d9e7b18faf5cca3",
+  "fixture": {
+    "path": "tests/fixtures/enrichment-model-gate-v2.json",
+    "sha256": "3fb615773a792519ad2bb15562f20b593fd60527571a6625b96d438d1c12cb42"
+  },
+  "runner": {
+    "path": "scripts/benchmark-enrichment-model.ts",
+    "sha256": "7e91f3ec9576c0ee09f31ad77bdb97a66c672797ad7dca6a829dd792eb42faac"
+  },
+  "prompts": {
+    "derivation": "f5ba758ff8895fa7e739d6da5c8c2ebca3dd2b463ed9a14d5cf746d039aa2e76",
+    "reflection": "6ab24dc9c6db4eaabe55d3c7c21cca74d28d42c5a5100cd6188f21f15ea5d236"
+  },
+  "schemas": {
+    "derivation": "d5e10608cdd78fbfa62759bab7aeb1b954834bd00ae44cf8a3f1932810831395",
+    "reflection": "190452d2ea8fc1d9e82eea6c76bc9f57e20b74a3e8a37c3441681e0f9be7e617"
+  },
+  "mode": "full",
+  "response_mode": "json_object",
+  "reasoning_effort": "omitted_provider_default",
+  "retry_count": 0,
+  "models": [
+    {
+      "role": "luna",
+      "id": "cx/gpt-5.6-luna"
+    }
+  ],
+  "revision_attested": false,
+  "provider_identity_sha256": "50385d5a1883ac02faf7a74acc71b03b9d76ad91e6f79f1cefbefd743fe5de84",
+  "config_sha256": "d9b465658fd98c057fedc946d9e98663528875bc383487295f5ebe154586fa16",
+  "safety": {
+    "raw_provider_bodies_persisted": false,
+    "parsed_proposals_persisted": false,
+    "prompts_persisted_in_results": false,
+    "credentials_persisted": false,
+    "private_memory_used": false,
+    "synthetic_fixture_only": true,
+    "forbidden_content_check": "safety-check.json"
+  },
+  "runner_host": {
+    "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+    "platform": "linux",
+    "release": "7.0.0-28-generic",
+    "arch": "x64",
+    "logical_cpus": 24
+  },
+  "seed": 20260731,
+  "concurrency": 6,
+  "repeats": 5,
+  "trial_count": 360,
+  "coverage": {
+    "concept_families": 24,
+    "reflection_premises_fixture_min": 1,
+    "reflection_premises_fixture_max": 3,
+    "reflection_premises_schema_max": 8,
+    "expected_output_claims_fixture_min": 1,
+    "expected_output_claims_fixture_max": 2,
+    "output_claims_schema_max": 4,
+    "premise_statuses": [
+      "active"
+    ],
+    "premise_versions": [
+      1
+    ],
+    "classification": "candidate gate, not final Level-6 product evidence"
+  },
+  "comparison_protocol": {
+    "estimand": "Terra minus Sol lexical-contract pass rate",
+    "cluster_unit": "24 locked concept families",
+    "method": "deterministic cluster bootstrap one-sided 95% lower bound",
+    "bootstrap_resamples": 10000,
+    "noninferiority_margin": -0.02,
+    "latency_or_cost_used_for_selection": false
+  }
+}

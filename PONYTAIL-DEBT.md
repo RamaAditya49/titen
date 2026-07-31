@@ -36,9 +36,15 @@ is local and uses tracked Git content; it does not require hosted automation.
 | `src/core/webhooks.ts:460` | Queue one bounded event page per pass | A large tenant backlog may need several passes | Measured backlog exceeds the maintenance freshness window; add per-organization cursors |
 | `src/runtime/bun/server.ts:131` | Use one process, one database handle, and synchronous `bun:sqlite` on the main thread | Throughput is limited by one event-loop core | An equivalent-quality, durability-preserving small-team workload misses its accepted latency or throughput objective; profile before workers or read replicas (#123) |
 
+## Benchmarks
+
+| Location | Deliberate shortcut | Ceiling | Upgrade trigger |
+| --- | --- | --- | --- |
+| `scripts/benchmark-enrichment-model.ts:720` | Use locked lexical aliases as a deterministic contract scorer | It cannot judge free-form semantic quality | A free-form production corpus becomes a release gate; use blinded independent adjudication |
+
 ## Summary
 
-- Markers: 19.
+- Markers: 20.
 - Markers without a source trigger: 3.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned

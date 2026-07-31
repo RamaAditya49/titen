@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "s-validation-v2",
+  "run_id": "s_val_d87475e1-7966-4880-9148-dcd58abaf5d1",
+  "scale": "full",
+  "source": {
+    "commit": "87685f662585c83e95003dabb805c47fae8dd045",
+    "dirty": false
+  },
+  "fixture": {
+    "statements": 10000,
+    "queries": 600,
+    "calibration_queries": 0,
+    "holdout_queries": 600,
+    "id": "s-validation-v2",
+    "group_offset": 1000,
+    "split_salt_sha256": "25b35726e74df0c07c125ff05350b75345c0fc34a65ae709af98829d5170c125",
+    "languages": [
+      "id",
+      "en",
+      "jv-id"
+    ],
+    "categories": [
+      "exact",
+      "paraphrase",
+      "cross_language",
+      "hard_negative",
+      "no_result"
+    ],
+    "fixture_sha256": "d76e58c45e6889f142d73bd32303b4be81c8a63ac323c01f466c87f5abd1ee01",
+    "split_sha256": "0007221bfa99d22d005796f31bed24d92ddb8750368f3674d942006c48d3b7c6"
+  },
+  "embedding": {
+    "model": "tuf/embeddinggemma",
+    "response_models": [
+      "embeddinggemma"
+    ],
+    "dimensions": 768,
+    "provider_endpoint_sha256": "50385d5a1883ac02faf7a74acc71b03b9d76ad91e6f79f1cefbefd743fe5de84",
+    "authenticated": true,
+    "immutable_revision_attested": false,
+    "fingerprint_sha256": "274141aedbd0fab5adcfec87af1d1baa1402b0af7a8358468fbf72931e93ee49",
+    "metric": "cosine",
+    "stored_precision": "float32",
+    "preprocessing": {
+      "id": "embeddinggemma-retrieval-v1",
+      "document_template": "title: none | text: {content}",
+      "query_template": "task: search result | query: {content}",
+      "sha256": "aeef4327d335d8e0d82867a6530d9533b448ff8d88a8853e20341d81783f45c2"
+    }
+  },
+  "execution": {
+    "batch_size": 64,
+    "preprocessing_profile": "embeddinggemma-retrieval-v1",
+    "top_k": 10,
+    "threshold_selected_before_holdout": true,
+    "threshold_tuned_on_current_fixture": false,
+    "vector_database": "disposable sqlite-vec",
+    "vector_database_bytes_before_cleanup": 32636928,
+    "raw_embeddings_retained": false,
+    "elapsed_ms": 248650.721
+  },
+  "host": {
+    "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+    "platform": "linux",
+    "release": "7.0.0-28-generic",
+    "arch": "x64",
+    "cpu_count": 24,
+    "cpu_model_sha256": "fbc8818b2ce27cd6ef9085a097c572b90ee1aa59908a86a3ee5052ea7bf6ea55",
+    "bun_version": "1.3.13"
+  },
+  "checksums": {
+    "fixture_sha256": "d76e58c45e6889f142d73bd32303b4be81c8a63ac323c01f466c87f5abd1ee01",
+    "split_sha256": "0007221bfa99d22d005796f31bed24d92ddb8750368f3674d942006c48d3b7c6",
+    "model_fingerprint_sha256": "274141aedbd0fab5adcfec87af1d1baa1402b0af7a8358468fbf72931e93ee49",
+    "raw_trials_sha256": "ea62e606b4ffe7ef28446b40a460d4579ba56e1caa1fa400028dfa0e5a12215d"
+  }
+}

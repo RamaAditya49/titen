@@ -1,12 +1,11 @@
 ---
 work_id: mem0-replacement-benchmark-030
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: cancelled
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Titen 0.3.0 versus Mem0 replacement benchmark
@@ -118,11 +117,60 @@ declaring a win from one latency number.
 - **AC-MRB-015 — State-driven:** While any hard gate, LLM management capability,
   Mem0-data migration rehearsal, or sustained sidecar soak remains incomplete,
   Mem0 shall stay active and no production cutover shall be described as ready.
+- **AC-MRB-016 — Event-driven:** When the embedding-only scale-S calibration
+  lane runs, the benchmark shall generate exactly 10,000 deterministic
+  synthetic statements and 600 stratified queries, select one cosine threshold
+  from a stable-hash calibration split with zero no-result false positives and
+  maximum Recall@5, then report locked-holdout quality, abstention, subgroup
+  Wilson intervals, model fingerprint, fixture/result checksums, and no raw
+  embeddings or credentials; any vector database shall be disposable.
+- **AC-MRB-017 — Unwanted behavior:** If the embedding model's primary
+  documentation prescribes asymmetric retrieval preprocessing, then the
+  benchmark shall fingerprint and apply its distinct document/query templates,
+  preserve the raw-input result as an immutable baseline, and evaluate a full
+  locked-holdout challenger before drawing an embedding-quality conclusion.
+- **AC-MRB-018 — Event-driven:** When the exact enrichment model gate runs, it
+  shall use the versioned 72-case language-balanced corpus for five repeats,
+  the production prompt and schemas, no semantic retries, and the hard safety,
+  quality, subgroup, temporal, reflection, stability, and two-point
+  non-inferiority thresholds already declared in `docs/testing/EVALS.md`.
+  The exact lane shall retain the product adapter's 30-second default timeout,
+  and provider response mode is a fingerprinted independent variable. Input
+  identifiers shall be deterministic and opaque so they disclose no case,
+  language, category, or expected-action label. Scorer self-tests shall reject
+  token-substring, negated-polarity, invented-time, and repeat-instability
+  mutations. Any smaller-model claim shall use paired case outcomes clustered
+  across translated concept families and a predeclared one-sided 95% lower
+  confidence bound against the two-point non-inferiority margin. Model revision
+  attestation and token-usage coverage shall be explicit rather than inferred
+  from a route name or missing values. The deterministic alias scorer shall be
+  labeled lexical-contract evidence only: it cannot adjudicate appended
+  hallucinations and therefore cannot satisfy the production semantic
+  precision/F1 or model-quality gate without blinded independent or human
+  adjudication. Artifact content shall be checked in memory before its first
+  write, then retain only fixed diagnostics, hashes, aggregate metrics, and
+  timings; credentials, endpoints, prompts, fixture text, raw model output,
+  and normalized proposals shall not be persisted.
+- **AC-MRB-019 — Event-driven:** When the selected embedding profile and cosine
+  floor are validated a second time, the benchmark shall first freeze a
+  disjoint deterministic fixture version and split salt, reuse the previously
+  selected `embeddinggemma-retrieval-v1` profile and `0.737307171` threshold
+  without tuning on the new data, generate exactly 10,000 synthetic statements
+  and 600 stratified queries, and report quality, abstention, subgroup,
+  endpoint/model fingerprint, and checksums without credentials, raw text, or
+  embeddings. A result from an unattested model revision shall remain
+  deployment-specific and shall not become a bundled universal default.
 
 ## Done conditions
 
-The versioned benchmark and raw evidence are reproducible; all distinct issues
-are reported; Titen passes the declared quality, safety, durability,
-performance, migration, and sustained-operation gates on `server-wulan`; the
-fresh Ponytail ledger is reported; and only then may a separate cutover work
-item be opened. Until then this spec remains active with concrete blockers.
+This time-boxed benchmark closes when its retained evidence supports either a
+replacement pass or a terminal NO-GO. A NO-GO closes the work as cancelled;
+unchecked criteria stay recorded as unmet historical gates and do not become
+product evidence. A future replacement attempt requires a new spec and fresh
+runtime evidence rather than reopening this benchmark.
+
+## Closure reason
+
+The retained evidence produced a terminal NO-GO for replacing the evaluated
+0.3.0 canary. Unmet quality, safety, migration, deployment, and soak criteria
+remain historical blockers rather than implied passes.

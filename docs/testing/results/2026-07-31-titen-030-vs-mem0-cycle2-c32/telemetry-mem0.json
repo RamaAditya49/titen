@@ -1,0 +1,738 @@
+{
+  "schema": "titen.docker-resource-samples.v1",
+  "timestamps": {
+    "started_at": "2026-07-31T08:11:12.485Z",
+    "ended_at": "2026-07-31T08:11:56.605Z"
+  },
+  "interval_ms": 500,
+  "host": "server-wulan",
+  "containers": [
+    "mem0-api-1",
+    "mem0-dashboard-1",
+    "mem0-ollama-1",
+    "mem0-postgres-1",
+    "mem0-worker-1"
+  ],
+  "rejected_line_count": 0,
+  "per_container": [
+    {
+      "container": "mem0-api-1",
+      "sample_count": 21,
+      "cpu_percent": {
+        "p50": 55.78,
+        "p95": 176.53,
+        "p99": 177.57,
+        "max": 177.57
+      },
+      "memory_usage_bytes": {
+        "p50": 361129574,
+        "p95": 361863578,
+        "p99": 368259891,
+        "max": 368259891
+      }
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "sample_count": 21,
+      "cpu_percent": {
+        "p50": 0,
+        "p95": 3.93,
+        "p99": 4.04,
+        "max": 4.04
+      },
+      "memory_usage_bytes": {
+        "p50": 56088330,
+        "p95": 56486789,
+        "p99": 56486789,
+        "max": 56486789
+      }
+    },
+    {
+      "container": "mem0-ollama-1",
+      "sample_count": 21,
+      "cpu_percent": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0
+      },
+      "memory_usage_bytes": {
+        "p50": 15655240,
+        "p95": 15655240,
+        "p99": 15655240,
+        "max": 15655240
+      }
+    },
+    {
+      "container": "mem0-postgres-1",
+      "sample_count": 21,
+      "cpu_percent": {
+        "p50": 1.07,
+        "p95": 4.57,
+        "p99": 4.78,
+        "max": 4.78
+      },
+      "memory_usage_bytes": {
+        "p50": 75853988,
+        "p95": 80174121,
+        "p99": 80174121,
+        "max": 80174121
+      }
+    },
+    {
+      "container": "mem0-worker-1",
+      "sample_count": 21,
+      "cpu_percent": {
+        "p50": 0.29,
+        "p95": 2.44,
+        "p99": 2.58,
+        "max": 2.58
+      },
+      "memory_usage_bytes": {
+        "p50": 27116175,
+        "p95": 27116175,
+        "p99": 27116175,
+        "max": 27116175
+      }
+    }
+  ],
+  "aggregate_memory_usage_bytes": {
+    "sample_count": 21,
+    "p50": 537070141,
+    "p95": 540886958,
+    "p99": 541264446,
+    "max": 541264446
+  },
+  "samples": [
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.3,
+      "memory_usage_bytes": 353894400,
+      "at_ms": 1785485474312
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 4.04,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485474313
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485474313
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 68807557,
+      "at_ms": 1785485474313
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485474313
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 11.41,
+      "memory_usage_bytes": 353684685,
+      "at_ms": 1785485476345
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485476345
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485476345
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.55,
+      "memory_usage_bytes": 68828529,
+      "at_ms": 1785485476345
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485476345
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.32,
+      "memory_usage_bytes": 353684685,
+      "at_ms": 1785485478376
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485478376
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485478376
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 68828529,
+      "at_ms": 1785485478376
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485478376
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 55.74,
+      "memory_usage_bytes": 353894400,
+      "at_ms": 1785485480412
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485480412
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485480412
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 1.07,
+      "memory_usage_bytes": 68744643,
+      "at_ms": 1785485480412
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485480412
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 55.78,
+      "memory_usage_bytes": 353894400,
+      "at_ms": 1785485482439
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485482439
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485482439
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 1.71,
+      "memory_usage_bytes": 68975329,
+      "at_ms": 1785485482439
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 2.44,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485482439
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 97.44,
+      "memory_usage_bytes": 354104115,
+      "at_ms": 1785485484484
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485484484
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485484484
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 1.71,
+      "memory_usage_bytes": 69856133,
+      "at_ms": 1785485484484
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 2.58,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485484484
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 177.57,
+      "memory_usage_bytes": 354208973,
+      "at_ms": 1785485486532
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485486532
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485486532
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.86,
+      "memory_usage_bytes": 70013420,
+      "at_ms": 1785485486532
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485486532
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 176.53,
+      "memory_usage_bytes": 354418688,
+      "at_ms": 1785485488563
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56077844,
+      "at_ms": 1785485488564
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485488564
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 1.35,
+      "memory_usage_bytes": 70013420,
+      "at_ms": 1785485488564
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485488564
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 161.99,
+      "memory_usage_bytes": 354733261,
+      "at_ms": 1785485490624
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0.01,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485490624
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485490624
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 1.72,
+      "memory_usage_bytes": 69614961,
+      "at_ms": 1785485490624
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 2.01,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485490624
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 159.84,
+      "memory_usage_bytes": 368259891,
+      "at_ms": 1785485492673
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485492673
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485492673
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 2.76,
+      "memory_usage_bytes": 69625446,
+      "at_ms": 1785485492673
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 2.12,
+      "memory_usage_bytes": 27042775,
+      "at_ms": 1785485492673
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 142.19,
+      "memory_usage_bytes": 360815002,
+      "at_ms": 1785485494743
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485494743
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485494743
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 4.57,
+      "memory_usage_bytes": 75853988,
+      "at_ms": 1785485494743
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.39,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485494743
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 101.25,
+      "memory_usage_bytes": 361549005,
+      "at_ms": 1785485496776
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485496776
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485496776
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 2.53,
+      "memory_usage_bytes": 79482061,
+      "at_ms": 1785485496776
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.33,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485496776
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 107.26,
+      "memory_usage_bytes": 361863578,
+      "at_ms": 1785485498821
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0.01,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485498821
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485498821
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 4.78,
+      "memory_usage_bytes": 79209431,
+      "at_ms": 1785485498822
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.33,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485498822
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 75.76,
+      "memory_usage_bytes": 361863578,
+      "at_ms": 1785485500855
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485500855
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485500855
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 3.78,
+      "memory_usage_bytes": 79681290,
+      "at_ms": 1785485500855
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.33,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485500855
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 88.89,
+      "memory_usage_bytes": 361863578,
+      "at_ms": 1785485502898
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56486789,
+      "at_ms": 1785485502899
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485502899
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 1.17,
+      "memory_usage_bytes": 80142664,
+      "at_ms": 1785485502899
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.36,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485502899
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.33,
+      "memory_usage_bytes": 361863578,
+      "at_ms": 1785485504918
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 3.93,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485504918
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485504918
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.12,
+      "memory_usage_bytes": 80163635,
+      "at_ms": 1785485504918
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.29,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485504918
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.32,
+      "memory_usage_bytes": 361863578,
+      "at_ms": 1785485506945
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485506945
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485506945
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.12,
+      "memory_usage_bytes": 80163635,
+      "at_ms": 1785485506945
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.29,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485506945
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 11.69,
+      "memory_usage_bytes": 361129574,
+      "at_ms": 1785485508975
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485508975
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485508975
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.15,
+      "memory_usage_bytes": 80174121,
+      "at_ms": 1785485508975
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.29,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485508975
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.34,
+      "memory_usage_bytes": 361129574,
+      "at_ms": 1785485510995
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485510995
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485510995
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.16,
+      "memory_usage_bytes": 80174121,
+      "at_ms": 1785485510995
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.3,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485510995
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.32,
+      "memory_usage_bytes": 361129574,
+      "at_ms": 1785485513022
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485513022
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485513022
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.13,
+      "memory_usage_bytes": 80174121,
+      "at_ms": 1785485513022
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.28,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485513022
+    },
+    {
+      "container": "mem0-api-1",
+      "cpu_percent": 0.31,
+      "memory_usage_bytes": 361129574,
+      "at_ms": 1785485515057
+    },
+    {
+      "container": "mem0-dashboard-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 56088330,
+      "at_ms": 1785485515057
+    },
+    {
+      "container": "mem0-ollama-1",
+      "cpu_percent": 0,
+      "memory_usage_bytes": 15655240,
+      "at_ms": 1785485515057
+    },
+    {
+      "container": "mem0-postgres-1",
+      "cpu_percent": 0.08,
+      "memory_usage_bytes": 80174121,
+      "at_ms": 1785485515057
+    },
+    {
+      "container": "mem0-worker-1",
+      "cpu_percent": 0.28,
+      "memory_usage_bytes": 27116175,
+      "at_ms": 1785485515057
+    }
+  ]
+}
