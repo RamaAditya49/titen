@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "s-calibration-v1",
+  "run_id": "s_cal_613e3ac8-54c8-4d6c-9e56-4efceca6b9be",
+  "scale": "full",
+  "source": {
+    "commit": "7fb7d2cd378ef5e0981f37c3c95cd694e7f65c9c",
+    "dirty": false
+  },
+  "fixture": {
+    "statements": 10000,
+    "queries": 600,
+    "calibration_queries": 300,
+    "holdout_queries": 300,
+    "languages": [
+      "id",
+      "en",
+      "jv-id"
+    ],
+    "categories": [
+      "exact",
+      "paraphrase",
+      "cross_language",
+      "hard_negative",
+      "no_result"
+    ],
+    "fixture_sha256": "18affc5931bc7eaf8f0da3249e83b0d523d39c573118b29d4289e4fe20228992",
+    "split_sha256": "01767a26076a3ddb2e326d073ddcf6aada080c3552d3511a4f1f3c506adf9dcb"
+  },
+  "embedding": {
+    "model": "tuf/embeddinggemma",
+    "response_models": [
+      "embeddinggemma"
+    ],
+    "dimensions": 768,
+    "provider_endpoint_sha256": "50385d5a1883ac02faf7a74acc71b03b9d76ad91e6f79f1cefbefd743fe5de84",
+    "authenticated": true,
+    "immutable_revision_attested": false,
+    "fingerprint_sha256": "837ea22a7a88a748d42843da644bcaf978b3b16bd25ad900bcc85873c2874fea",
+    "metric": "cosine",
+    "stored_precision": "float32"
+  },
+  "execution": {
+    "batch_size": 64,
+    "top_k": 10,
+    "threshold_selected_before_holdout": true,
+    "vector_database": "disposable sqlite-vec",
+    "vector_database_bytes_before_cleanup": 32636928,
+    "raw_embeddings_retained": false,
+    "elapsed_ms": 112170.647
+  },
+  "host": {
+    "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+    "platform": "linux",
+    "release": "7.0.0-28-generic",
+    "arch": "x64",
+    "cpu_count": 24,
+    "cpu_model_sha256": "fbc8818b2ce27cd6ef9085a097c572b90ee1aa59908a86a3ee5052ea7bf6ea55",
+    "bun_version": "1.3.13"
+  },
+  "checksums": {
+    "fixture_sha256": "18affc5931bc7eaf8f0da3249e83b0d523d39c573118b29d4289e4fe20228992",
+    "split_sha256": "01767a26076a3ddb2e326d073ddcf6aada080c3552d3511a4f1f3c506adf9dcb",
+    "model_fingerprint_sha256": "837ea22a7a88a748d42843da644bcaf978b3b16bd25ad900bcc85873c2874fea",
+    "raw_trials_sha256": "bd3d5f2bbdf2e9439a5c547b3b09382e591a81be433491b2cca33c3a9fd1c5f9"
+  }
+}

@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "runner_version": "enrichment-model-gate-runner-v2",
+  "run_id": "8de971cb-020c-47b6-a37a-80a71917d3a8",
+  "mode": "full",
+  "response_mode": "json_object",
+  "reasoning_effort": "omitted_provider_default",
+  "retry_count": 0,
+  "started_at": "2026-07-31T11:04:59.720Z",
+  "ended_at": "2026-07-31T11:12:11.037Z",
+  "elapsed_ms": 431321.2006,
+  "fixture_version": "enrichment-model-gate-v2",
+  "fixture_sha256": "3fb615773a792519ad2bb15562f20b593fd60527571a6625b96d438d1c12cb42",
+  "contract_commit": "03a77a9",
+  "source_git_commit": "b69a1505b214f28786efee491d9e7b18faf5cca3",
+  "prompt_sha256": {
+    "derivation": "f5ba758ff8895fa7e739d6da5c8c2ebca3dd2b463ed9a14d5cf746d039aa2e76",
+    "reflection": "6ab24dc9c6db4eaabe55d3c7c21cca74d28d42c5a5100cd6188f21f15ea5d236"
+  },
+  "schema_sha256": {
+    "derivation": "d5e10608cdd78fbfa62759bab7aeb1b954834bd00ae44cf8a3f1932810831395",
+    "reflection": "190452d2ea8fc1d9e82eea6c76bc9f57e20b74a3e8a37c3441681e0f9be7e617"
+  },
+  "cases_per_model": 72,
+  "repeats": 5,
+  "coverage": {
+    "concept_families": 24,
+    "reflection_premises_fixture_min": 1,
+    "reflection_premises_fixture_max": 3,
+    "reflection_premises_schema_max": 8,
+    "expected_output_claims_fixture_min": 1,
+    "expected_output_claims_fixture_max": 2,
+    "output_claims_schema_max": 4,
+    "premise_statuses": [
+      "active"
+    ],
+    "premise_versions": [
+      1
+    ],
+    "classification": "candidate gate, not final Level-6 product evidence"
+  },
+  "models": {
+    "luna": {
+      "metrics": {
+        "calls": 360,
+        "parsed_provider_responses": 347,
+        "provider_response_success_rate": 0.9639,
+        "local_schema_precheck_conformance": 0.9639,
+        "validator_conformance": 0.9028,
+        "lexical_contract_pass_rate": 0.6222,
+        "lexical_claim_precision": 0.5479,
+        "lexical_claim_recall": 0.5722,
+        "lexical_claim_f1": 0.5598,
+        "source_precision": 0.5526,
+        "source_recall": 0.4375,
+        "source_f1": 0.4884,
+        "minimum_kind_language_lexical_recall": 0,
+        "kind_language_lexical_recall": [
+          {
+            "language": "id",
+            "kind": "semantic_fact",
+            "recall": 0.7333,
+            "expected": 15
+          },
+          {
+            "language": "id",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "id",
+            "kind": "preference",
+            "recall": 0.2,
+            "expected": 5
+          },
+          {
+            "language": "id",
+            "kind": "procedural",
+            "recall": 0.35,
+            "expected": 20
+          },
+          {
+            "language": "id",
+            "kind": "decision",
+            "recall": 1,
+            "expected": 10
+          },
+          {
+            "language": "id",
+            "kind": "relationship",
+            "recall": 0.8,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "semantic_fact",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 10
+          },
+          {
+            "language": "en",
+            "kind": "preference",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "procedural",
+            "recall": 0.3,
+            "expected": 20
+          },
+          {
+            "language": "en",
+            "kind": "decision",
+            "recall": 0.6,
+            "expected": 10
+          },
+          {
+            "language": "en",
+            "kind": "relationship",
+            "recall": 0.8,
+            "expected": 10
+          },
+          {
+            "language": "jv-id",
+            "kind": "semantic_fact",
+            "recall": 0.8,
+            "expected": 5
+          },
+          {
+            "language": "jv-id",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 10
+          },
+          {
+            "language": "jv-id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 5
+          },
+          {
+            "language": "jv-id",
+            "kind": "procedural",
+            "recall": 0,
+            "expected": 20
+          },
+          {
+            "language": "jv-id",
+            "kind": "decision",
+            "recall": 0.4,
+            "expected": 15
+          },
+          {
+            "language": "jv-id",
+            "kind": "relationship",
+            "recall": 1,
+            "expected": 5
+          }
+        ],
+        "semantic_precision_adjudicated": false,
+        "no_memory_safety": 0.9905,
+        "temporal_accuracy": 0.6104,
+        "reflection_lexical_contract_accuracy": 0.2583,
+        "repeat_decision_stability": 0.8278,
+        "unsafe_output_rejected": 22,
+        "validator_rejected_outputs": 22,
+        "safe_to_replay_eligible_outputs": 325,
+        "invalid_semantic_commit_count": null,
+        "error_code_counts": {
+          "timeout": 13
+        },
+        "timeout_count": 13,
+        "completed_call_latency_ms_p50": 4611.9723,
+        "completed_call_latency_ms_p95": 17574.5007,
+        "token_usage_coverage": 0.9639,
+        "observed_total_tokens": 237231,
+        "total_tokens": null,
+        "reported_model_metadata_coverage": 0.9639,
+        "reported_model_sha256_distinct": [
+          "e33230db3dd7d2f0153debcbb9fabc3386faac005477571931af855d70c4ae9b"
+        ],
+        "system_fingerprint_coverage": 0,
+        "system_fingerprint_sha256_distinct": [],
+        "revision_attested_rate": 0,
+        "failed_case_ids": [
+          "d-en-correction-owner",
+          "d-en-multi",
+          "d-en-relationship-owner",
+          "d-id-correction",
+          "d-id-multi",
+          "d-id-preference",
+          "d-id-relationship",
+          "d-jv-correction-channel",
+          "d-jv-fact-code",
+          "d-jv-multi",
+          "d-jv-preference-meeting",
+          "d-jv-procedure-backup",
+          "d-jv-third-party",
+          "r-en-disjoint-time",
+          "r-en-insufficient",
+          "r-en-pattern",
+          "r-en-procedure",
+          "r-en-related",
+          "r-en-supersession",
+          "r-id-conflict",
+          "r-id-disjoint-time",
+          "r-id-insufficient",
+          "r-id-pattern",
+          "r-id-procedure",
+          "r-id-related",
+          "r-id-supersession",
+          "r-jv-conflict",
+          "r-jv-disjoint-time",
+          "r-jv-insufficient",
+          "r-jv-pattern",
+          "r-jv-procedure",
+          "r-jv-related",
+          "r-jv-supersession"
+        ]
+      },
+      "gates": {
+        "complete_72_by_5": false,
+        "lexical_contract_pass_at_least_90pct": false,
+        "lexical_claim_f1_at_least_95pct": false,
+        "source_f1_at_least_95pct": false,
+        "each_kind_language_lexical_recall_at_least_85pct": false,
+        "no_memory_safety_100pct": false,
+        "temporal_accuracy_at_least_90pct": false,
+        "reflection_lexical_accuracy_at_least_90pct": false,
+        "repeat_decision_stability_at_least_90pct": false,
+        "semantic_precision_adjudicated": false,
+        "invalid_semantic_commit_count_zero": null,
+        "model_revision_attested_and_stable": null
+      },
+      "lexical_output_gate_pass": false,
+      "model_quality_pass": false,
+      "activation_gate_pass": false,
+      "activation_blockers": [
+        "json_object with an explicit schema is a compatibility diagnostic, not the current product request path.",
+        "Captured proposals were not replayed through both real SQL persistence adapters.",
+        "Open-ended semantic precision is not adjudicated; lexical slots cannot reject every appended unsupported assertion.",
+        "Model aliases and provider revision metadata are not independently attested.",
+        "The audited enrichment implementation is not merged or installed in the Wulan Titen runtime."
+      ]
+    }
+  },
+  "paired_noninferiority": {
+    "status": "not_run",
+    "reason": "requires one interleaved full Sol+Terra run"
+  }
+}

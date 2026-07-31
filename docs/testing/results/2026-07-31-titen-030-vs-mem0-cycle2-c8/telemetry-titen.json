@@ -1,0 +1,148 @@
+{
+  "schema": "titen.docker-resource-samples.v1",
+  "timestamps": {
+    "started_at": "2026-07-31T08:10:17.331Z",
+    "ended_at": "2026-07-31T08:10:55.468Z"
+  },
+  "interval_ms": 500,
+  "host": "server-wulan",
+  "containers": [
+    "titen-canary"
+  ],
+  "rejected_line_count": 0,
+  "per_container": [
+    {
+      "container": "titen-canary",
+      "sample_count": 18,
+      "cpu_percent": {
+        "p50": 1.01,
+        "p95": 5.75,
+        "p99": 5.75,
+        "max": 5.75
+      },
+      "memory_usage_bytes": {
+        "p50": 38891684,
+        "p95": 41397780,
+        "p99": 41397780,
+        "max": 41397780
+      }
+    }
+  ],
+  "aggregate_memory_usage_bytes": {
+    "sample_count": 18,
+    "p50": 38891684,
+    "p95": 41397780,
+    "p99": 41397780,
+    "max": 41397780
+  },
+  "samples": [
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.11,
+      "memory_usage_bytes": 34644951,
+      "at_ms": 1785485419440
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.1,
+      "memory_usage_bytes": 34665923,
+      "at_ms": 1785485421455
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.09,
+      "memory_usage_bytes": 34655437,
+      "at_ms": 1785485423482
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.09,
+      "memory_usage_bytes": 34655437,
+      "at_ms": 1785485425510
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.13,
+      "memory_usage_bytes": 34676408,
+      "at_ms": 1785485427522
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 1.56,
+      "memory_usage_bytes": 35389440,
+      "at_ms": 1785485429562
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 1.01,
+      "memory_usage_bytes": 35064381,
+      "at_ms": 1785485431592
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 3.98,
+      "memory_usage_bytes": 38891684,
+      "at_ms": 1785485433642
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 5.75,
+      "memory_usage_bytes": 39195771,
+      "at_ms": 1785485435683
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 3.32,
+      "memory_usage_bytes": 39395000,
+      "at_ms": 1785485437732
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 5.32,
+      "memory_usage_bytes": 39772488,
+      "at_ms": 1785485439790
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 5.37,
+      "memory_usage_bytes": 40296776,
+      "at_ms": 1785485441813
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 3.08,
+      "memory_usage_bytes": 40590377,
+      "at_ms": 1785485443853
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 4.2,
+      "memory_usage_bytes": 40915436,
+      "at_ms": 1785485445895
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 3.15,
+      "memory_usage_bytes": 38168166,
+      "at_ms": 1785485447931
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.22,
+      "memory_usage_bytes": 41397780,
+      "at_ms": 1785485449974
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.13,
+      "memory_usage_bytes": 41387295,
+      "at_ms": 1785485452007
+    },
+    {
+      "container": "titen-canary",
+      "cpu_percent": 0.1,
+      "memory_usage_bytes": 41345352,
+      "at_ms": 1785485454035
+    }
+  ]
+}

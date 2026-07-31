@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "run_id": "bench_ba1df12e15d849088765",
+  "fixture_version": "titen-mem0-cycle1-v1",
+  "status": "completed",
+  "verdict": "BLOCKED_NOT_READY_TO_REPLACE_MEM0",
+  "products": {
+    "titen": {
+      "samples": 80,
+      "successful_samples": 80,
+      "search_errors": 0,
+      "latency": {
+        "count": 80,
+        "p50_ms": 170.27,
+        "p95_ms": 200.678,
+        "p99_ms": 307.451,
+        "mean_ci95_ms": {
+          "mean": 175.98,
+          "low": 171.354,
+          "high": 180.606
+        }
+      },
+      "quality": {
+        "recall_at_1": 0.857,
+        "recall_at_5": 1,
+        "mrr_at_10": 0.886,
+        "ndcg_at_10": 0.912,
+        "no_result_false_positive_rate": 1
+      },
+      "by_language": {
+        "en": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "id": {
+          "samples": 50,
+          "recall_at_1": 0.75,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.8,
+          "ndcg_at_10": 0.847,
+          "no_result_false_positive_rate": 1
+        },
+        "jv-id": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      },
+      "by_category": {
+        "exact": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "hard_negative": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "no_result": {
+          "samples": 10,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "no_result_false_positive_rate": 1
+        },
+        "paraphrase": {
+          "samples": 30,
+          "recall_at_1": 0.667,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.733,
+          "ndcg_at_10": 0.796,
+          "no_result_false_positive_rate": null
+        },
+        "temporal": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      }
+    },
+    "mem0": {
+      "samples": 80,
+      "successful_samples": 80,
+      "search_errors": 0,
+      "latency": {
+        "count": 80,
+        "p50_ms": 444.158,
+        "p95_ms": 514.114,
+        "p99_ms": 721.697,
+        "mean_ci95_ms": {
+          "mean": 460.596,
+          "low": 451.538,
+          "high": 469.653
+        }
+      },
+      "quality": {
+        "recall_at_1": 0.857,
+        "recall_at_5": 1,
+        "mrr_at_10": 0.929,
+        "ndcg_at_10": 0.947,
+        "no_result_false_positive_rate": 1
+      },
+      "by_language": {
+        "en": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "id": {
+          "samples": 50,
+          "recall_at_1": 0.75,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.875,
+          "ndcg_at_10": 0.908,
+          "no_result_false_positive_rate": 1
+        },
+        "jv-id": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      },
+      "by_category": {
+        "exact": {
+          "samples": 20,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "hard_negative": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        },
+        "no_result": {
+          "samples": 10,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "no_result_false_positive_rate": 1
+        },
+        "paraphrase": {
+          "samples": 30,
+          "recall_at_1": 0.667,
+          "recall_at_5": 1,
+          "mrr_at_10": 0.833,
+          "ndcg_at_10": 0.877,
+          "no_result_false_positive_rate": null
+        },
+        "temporal": {
+          "samples": 10,
+          "recall_at_1": 1,
+          "recall_at_5": 1,
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "no_result_false_positive_rate": null
+        }
+      }
+    }
+  },
+  "paired_latency": {
+    "count": 80,
+    "titen_minus_mem0_ms": {
+      "mean": -284.616,
+      "low": -294.026,
+      "high": -275.206
+    }
+  },
+  "native_memory_management": {
+    "titen": {
+      "schema_version": 1,
+      "lane": "native_memory_management",
+      "run_id": "bench_ba1df12e15d849088765",
+      "fixture_version": "titen-mem0-cycle1-v1",
+      "product": "titen",
+      "status": "unsupported",
+      "pass": false,
+      "reason_code": "NO_AUTOMATIC_DERIVATION_OR_REFLECTION_RUNTIME_IN_0_3_0"
+    },
+    "mem0": {
+      "schema_version": 1,
+      "lane": "native_memory_management",
+      "run_id": "bench_ba1df12e15d849088765",
+      "fixture_version": "titen-mem0-cycle1-v1",
+      "product": "mem0",
+      "status": "ok",
+      "pass": true,
+      "reason_code": "INFER_TRUE_CREATED_AND_RETRIEVED_MEMORY",
+      "created_count": 1,
+      "search_hit_count": 1,
+      "add_latency_ms": 6043.008,
+      "search_latency_ms": 450.696
+    }
+  },
+  "blockers": [
+    "Titen 0.3.0 has no automatic derivation/reflection runtime.",
+    "Embedding revision equivalence requires separate deployment evidence because neither search API proves it.",
+    "This runner does not prove isolation, recovery, migration, service-resource, or sustained-soak gates."
+  ]
+}

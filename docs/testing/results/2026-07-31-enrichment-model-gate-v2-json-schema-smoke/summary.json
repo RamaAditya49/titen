@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "runner_version": "enrichment-model-gate-runner-v2",
+  "run_id": "62bddd65-aaed-4750-a262-1774e9f29993",
+  "mode": "smoke",
+  "response_mode": "json_schema",
+  "reasoning_effort": "omitted_provider_default",
+  "retry_count": 0,
+  "started_at": "2026-07-31T09:32:04.641Z",
+  "ended_at": "2026-07-31T09:32:33.889Z",
+  "elapsed_ms": 29250.1557,
+  "fixture_version": "enrichment-model-gate-v2",
+  "fixture_sha256": "3fb615773a792519ad2bb15562f20b593fd60527571a6625b96d438d1c12cb42",
+  "contract_commit": "03a77a9",
+  "source_git_commit": "80ad4b42e51009ccac6ad5cd530de4f661b37105",
+  "prompt_sha256": {
+    "derivation": "f5ba758ff8895fa7e739d6da5c8c2ebca3dd2b463ed9a14d5cf746d039aa2e76",
+    "reflection": "6ab24dc9c6db4eaabe55d3c7c21cca74d28d42c5a5100cd6188f21f15ea5d236"
+  },
+  "schema_sha256": {
+    "derivation": "d5e10608cdd78fbfa62759bab7aeb1b954834bd00ae44cf8a3f1932810831395",
+    "reflection": "190452d2ea8fc1d9e82eea6c76bc9f57e20b74a3e8a37c3441681e0f9be7e617"
+  },
+  "cases_per_model": 3,
+  "repeats": 1,
+  "coverage": {
+    "concept_families": 24,
+    "reflection_premises_fixture_min": 1,
+    "reflection_premises_fixture_max": 3,
+    "reflection_premises_schema_max": 8,
+    "expected_output_claims_fixture_min": 1,
+    "expected_output_claims_fixture_max": 2,
+    "output_claims_schema_max": 4,
+    "premise_statuses": [
+      "active"
+    ],
+    "premise_versions": [
+      1
+    ],
+    "classification": "candidate gate, not final Level-6 product evidence"
+  },
+  "models": {
+    "sol": {
+      "metrics": {
+        "calls": 3,
+        "parsed_provider_responses": 3,
+        "provider_response_success_rate": 1,
+        "local_schema_precheck_conformance": 0,
+        "validator_conformance": 0,
+        "lexical_contract_pass_rate": 0,
+        "lexical_claim_precision": 0,
+        "lexical_claim_recall": 0,
+        "lexical_claim_f1": 0,
+        "source_precision": 0,
+        "source_recall": 0,
+        "source_f1": 0,
+        "minimum_kind_language_lexical_recall": 0,
+        "kind_language_lexical_recall": [
+          {
+            "language": "id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 1
+          }
+        ],
+        "semantic_precision_adjudicated": false,
+        "no_memory_safety": 0,
+        "temporal_accuracy": null,
+        "reflection_lexical_contract_accuracy": 0,
+        "repeat_decision_stability": null,
+        "unsafe_output_rejected": 0,
+        "validator_rejected_outputs": 3,
+        "safe_to_replay_eligible_outputs": 0,
+        "invalid_semantic_commit_count": null,
+        "error_code_counts": {},
+        "timeout_count": 0,
+        "completed_call_latency_ms_p50": 15132.4909,
+        "completed_call_latency_ms_p95": 21704.1709,
+        "token_usage_coverage": 1,
+        "observed_total_tokens": 2385,
+        "total_tokens": 2385,
+        "reported_model_metadata_coverage": 1,
+        "reported_model_sha256_distinct": [
+          "419255f2bb4c6801939e868fe2cdbbdc34d51742400939d1842d262a1fec749c"
+        ],
+        "system_fingerprint_coverage": 0,
+        "system_fingerprint_sha256_distinct": [],
+        "revision_attested_rate": 0,
+        "failed_case_ids": [
+          "d-id-injection",
+          "d-id-preference",
+          "r-en-conflict"
+        ]
+      },
+      "gates": {
+        "complete_72_by_5": false,
+        "lexical_contract_pass_at_least_90pct": false,
+        "lexical_claim_f1_at_least_95pct": false,
+        "source_f1_at_least_95pct": false,
+        "each_kind_language_lexical_recall_at_least_85pct": false,
+        "no_memory_safety_100pct": false,
+        "temporal_accuracy_at_least_90pct": false,
+        "reflection_lexical_accuracy_at_least_90pct": false,
+        "repeat_decision_stability_at_least_90pct": false,
+        "semantic_precision_adjudicated": false,
+        "invalid_semantic_commit_count_zero": null,
+        "model_revision_attested_and_stable": null
+      },
+      "lexical_output_gate_pass": false,
+      "model_quality_pass": false,
+      "activation_gate_pass": false,
+      "activation_blockers": [
+        "Captured proposals were not replayed through both real SQL persistence adapters.",
+        "Open-ended semantic precision is not adjudicated; lexical slots cannot reject every appended unsupported assertion.",
+        "Model aliases and provider revision metadata are not independently attested.",
+        "The audited enrichment implementation is not merged or installed in the Wulan Titen runtime."
+      ]
+    },
+    "terra": {
+      "metrics": {
+        "calls": 3,
+        "parsed_provider_responses": 3,
+        "provider_response_success_rate": 1,
+        "local_schema_precheck_conformance": 0,
+        "validator_conformance": 0,
+        "lexical_contract_pass_rate": 0,
+        "lexical_claim_precision": 0,
+        "lexical_claim_recall": 0,
+        "lexical_claim_f1": 0,
+        "source_precision": 0,
+        "source_recall": 0,
+        "source_f1": 0,
+        "minimum_kind_language_lexical_recall": 0,
+        "kind_language_lexical_recall": [
+          {
+            "language": "id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 1
+          }
+        ],
+        "semantic_precision_adjudicated": false,
+        "no_memory_safety": 0,
+        "temporal_accuracy": null,
+        "reflection_lexical_contract_accuracy": 0,
+        "repeat_decision_stability": null,
+        "unsafe_output_rejected": 1,
+        "validator_rejected_outputs": 3,
+        "safe_to_replay_eligible_outputs": 0,
+        "invalid_semantic_commit_count": null,
+        "error_code_counts": {},
+        "timeout_count": 0,
+        "completed_call_latency_ms_p50": 11515.522,
+        "completed_call_latency_ms_p95": 11647.8358,
+        "token_usage_coverage": 1,
+        "observed_total_tokens": 1796,
+        "total_tokens": 1796,
+        "reported_model_metadata_coverage": 1,
+        "reported_model_sha256_distinct": [
+          "deda3dc02a1d1575f15d5c9f9b3e31cf0c768a55508c31e7ff0f4fc8f33fc669"
+        ],
+        "system_fingerprint_coverage": 0,
+        "system_fingerprint_sha256_distinct": [],
+        "revision_attested_rate": 0,
+        "failed_case_ids": [
+          "d-id-injection",
+          "d-id-preference",
+          "r-en-conflict"
+        ]
+      },
+      "gates": {
+        "complete_72_by_5": false,
+        "lexical_contract_pass_at_least_90pct": false,
+        "lexical_claim_f1_at_least_95pct": false,
+        "source_f1_at_least_95pct": false,
+        "each_kind_language_lexical_recall_at_least_85pct": false,
+        "no_memory_safety_100pct": false,
+        "temporal_accuracy_at_least_90pct": false,
+        "reflection_lexical_accuracy_at_least_90pct": false,
+        "repeat_decision_stability_at_least_90pct": false,
+        "semantic_precision_adjudicated": false,
+        "invalid_semantic_commit_count_zero": null,
+        "model_revision_attested_and_stable": null
+      },
+      "lexical_output_gate_pass": false,
+      "model_quality_pass": false,
+      "activation_gate_pass": false,
+      "activation_blockers": [
+        "Captured proposals were not replayed through both real SQL persistence adapters.",
+        "Open-ended semantic precision is not adjudicated; lexical slots cannot reject every appended unsupported assertion.",
+        "Model aliases and provider revision metadata are not independently attested.",
+        "The audited enrichment implementation is not merged or installed in the Wulan Titen runtime."
+      ]
+    },
+    "luna": {
+      "metrics": {
+        "calls": 3,
+        "parsed_provider_responses": 3,
+        "provider_response_success_rate": 1,
+        "local_schema_precheck_conformance": 0,
+        "validator_conformance": 0,
+        "lexical_contract_pass_rate": 0,
+        "lexical_claim_precision": 0,
+        "lexical_claim_recall": 0,
+        "lexical_claim_f1": 0,
+        "source_precision": 0,
+        "source_recall": 0,
+        "source_f1": 0,
+        "minimum_kind_language_lexical_recall": 0,
+        "kind_language_lexical_recall": [
+          {
+            "language": "id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 1
+          }
+        ],
+        "semantic_precision_adjudicated": false,
+        "no_memory_safety": 0,
+        "temporal_accuracy": null,
+        "reflection_lexical_contract_accuracy": 0,
+        "repeat_decision_stability": null,
+        "unsafe_output_rejected": 0,
+        "validator_rejected_outputs": 3,
+        "safe_to_replay_eligible_outputs": 0,
+        "invalid_semantic_commit_count": null,
+        "error_code_counts": {},
+        "timeout_count": 0,
+        "completed_call_latency_ms_p50": 13031.2144,
+        "completed_call_latency_ms_p95": 29234.9453,
+        "token_usage_coverage": 1,
+        "observed_total_tokens": 3219,
+        "total_tokens": 3219,
+        "reported_model_metadata_coverage": 1,
+        "reported_model_sha256_distinct": [
+          "e33230db3dd7d2f0153debcbb9fabc3386faac005477571931af855d70c4ae9b"
+        ],
+        "system_fingerprint_coverage": 0,
+        "system_fingerprint_sha256_distinct": [],
+        "revision_attested_rate": 0,
+        "failed_case_ids": [
+          "d-id-injection",
+          "d-id-preference",
+          "r-en-conflict"
+        ]
+      },
+      "gates": {
+        "complete_72_by_5": false,
+        "lexical_contract_pass_at_least_90pct": false,
+        "lexical_claim_f1_at_least_95pct": false,
+        "source_f1_at_least_95pct": false,
+        "each_kind_language_lexical_recall_at_least_85pct": false,
+        "no_memory_safety_100pct": false,
+        "temporal_accuracy_at_least_90pct": false,
+        "reflection_lexical_accuracy_at_least_90pct": false,
+        "repeat_decision_stability_at_least_90pct": false,
+        "semantic_precision_adjudicated": false,
+        "invalid_semantic_commit_count_zero": null,
+        "model_revision_attested_and_stable": null
+      },
+      "lexical_output_gate_pass": false,
+      "model_quality_pass": false,
+      "activation_gate_pass": false,
+      "activation_blockers": [
+        "Captured proposals were not replayed through both real SQL persistence adapters.",
+        "Open-ended semantic precision is not adjudicated; lexical slots cannot reject every appended unsupported assertion.",
+        "Model aliases and provider revision metadata are not independently attested.",
+        "The audited enrichment implementation is not merged or installed in the Wulan Titen runtime."
+      ]
+    }
+  },
+  "paired_noninferiority": {
+    "status": "not_run",
+    "reason": "requires one interleaved full Sol+Terra run"
+  }
+}

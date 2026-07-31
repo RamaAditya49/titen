@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "run_id": "bench_968cb18b291f4bb89c8b",
+  "started_at": "2026-07-31T08:11:18.502Z",
+  "finished_at": "2026-07-31T08:11:43.316Z",
+  "release": {
+    "package": "titen-memory@0.3.0",
+    "npm_integrity": "sha512-R49HwOllKtfn3psuNz4WBW0vVrqJteuGwjatH25djqh4RA5hqbyM5hbd+nlNFtkvlkhuAMmiXrARFodp/wTR/w==",
+    "npm_shasum": "568d56175257f515ee3c79c7672d62bc39c07dda",
+    "git_commit": "9f10bfd625ba947897056f1dbc0ab7bfc4ce6304"
+  },
+  "fixture": {
+    "version": "titen-mem0-cycle1-v1",
+    "sha256": "e747cbac15f53a059203c76be81c8cb412635b58173a3158d9d2a13517462024",
+    "fact_count": 8,
+    "query_count": 8,
+    "emitted_fields": [
+      {
+        "id": "id_exact_identifier",
+        "language": "id",
+        "category": "exact",
+        "relevant": [
+          "fact_incident_code"
+        ]
+      },
+      {
+        "id": "id_semantic_rollback",
+        "language": "id",
+        "category": "paraphrase",
+        "relevant": [
+          "fact_rollback_rehearsal"
+        ]
+      },
+      {
+        "id": "en_exact_retention",
+        "language": "en",
+        "category": "exact",
+        "relevant": [
+          "fact_atlas_retention"
+        ]
+      },
+      {
+        "id": "en_semantic_timezone",
+        "language": "en",
+        "category": "paraphrase",
+        "relevant": [
+          "fact_mira_timezone"
+        ]
+      },
+      {
+        "id": "jv_in_id_preference",
+        "language": "jv-id",
+        "category": "paraphrase",
+        "relevant": [
+          "fact_raka_meeting"
+        ]
+      },
+      {
+        "id": "id_temporal_endpoint",
+        "language": "id",
+        "category": "temporal",
+        "relevant": [
+          "fact_active_endpoint"
+        ]
+      },
+      {
+        "id": "id_hard_negative_orion",
+        "language": "id",
+        "category": "hard_negative",
+        "relevant": [
+          "fact_orion_requirement"
+        ]
+      },
+      {
+        "id": "id_no_result_passport",
+        "language": "id",
+        "category": "no_result",
+        "relevant": []
+      }
+    ]
+  },
+  "runner": {
+    "sha256": "bd8f307b6da2174d24291762c8a6473999476132d8a2c0a49df2fa54b4aecba0",
+    "bun": "1.3.13",
+    "node": "24.3.0"
+  },
+  "configuration": {
+    "repeats": 10,
+    "seed": 20260731,
+    "top_k": 10,
+    "concurrency": 32,
+    "warmup_pairs": 1,
+    "order": "seeded balanced AB/BA",
+    "native_mem0_probe": false,
+    "endpoint_fingerprints": {
+      "titen": "bc60f27cfab85864368f98fa4e1d21763cab1acf17bc806e8937ae37d3c9debc",
+      "mem0": "e5bf1e6d3ebbe0906fc043547ff815ef1d07587c242155ba14e943dd9784b86c"
+    },
+    "fingerprint_sha256": "d19cb485913b0376c332ab03e17cfcf3a172d20b2b4f02e442649f63740195b0"
+  },
+  "services": {
+    "titen": {
+      "runtime": "bun-sqlite",
+      "revision": "npm-0.3.0",
+      "ready": true,
+      "schema": {
+        "applied": 12,
+        "expected": 12,
+        "verified": true
+      },
+      "capabilities": {
+        "fts": "enabled",
+        "vector": "enabled",
+        "model": "enabled"
+      },
+      "index_setup": "explicit_drain_succeeded"
+    },
+    "mem0": {
+      "title": "Mem0 REST APIs",
+      "version": "1.0.0"
+    }
+  },
+  "setup_latency": {
+    "titen_write": {
+      "count": 8,
+      "p50_ms": 56.921,
+      "p95_ms": 62.612,
+      "p99_ms": 62.612,
+      "mean_ci95_ms": {
+        "mean": 58.298,
+        "low": 56.549,
+        "high": 60.047
+      }
+    },
+    "mem0_write": {
+      "count": 8,
+      "p50_ms": 452.85,
+      "p95_ms": 506.191,
+      "p99_ms": 506.191,
+      "mean_ci95_ms": {
+        "mean": 463.307,
+        "low": 448.586,
+        "high": 478.028
+      }
+    }
+  },
+  "cleanup": {
+    "attempted": 8,
+    "deleted": 8,
+    "failures": []
+  },
+  "host": {
+    "start": {
+      "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+      "platform": "linux",
+      "release": "7.0.0-28-generic",
+      "arch": "x64",
+      "cpu_count": 24,
+      "cpu_model_sha256": "fbc8818b2ce27cd6ef9085a097c572b90ee1aa59908a86a3ee5052ea7bf6ea55",
+      "load_average": [
+        10.67,
+        7.86,
+        5.99
+      ],
+      "total_memory_bytes": 24775467008,
+      "free_memory_bytes": 15585103872,
+      "runner_rss_bytes": 55873536
+    },
+    "end": {
+      "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+      "platform": "linux",
+      "release": "7.0.0-28-generic",
+      "arch": "x64",
+      "cpu_count": 24,
+      "cpu_model_sha256": "fbc8818b2ce27cd6ef9085a097c572b90ee1aa59908a86a3ee5052ea7bf6ea55",
+      "load_average": [
+        9.68,
+        7.85,
+        6.04
+      ],
+      "total_memory_bytes": 24775467008,
+      "free_memory_bytes": 15438098432,
+      "runner_rss_bytes": 63823872
+    }
+  },
+  "uncollected_gates": [
+    "service_cpu",
+    "service_rss",
+    "storage_growth",
+    "restart_restore",
+    "scope_isolation",
+    "migration",
+    "sustained_soak"
+  ]
+}

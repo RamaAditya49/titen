@@ -17,7 +17,7 @@ const live = output.split("\n").map((line) => {
 });
 
 const ledger = readFileSync("PONYTAIL-DEBT.md", "utf8");
-const recorded = [...ledger.matchAll(/`((?:docs|plugins|src)\/[^`\n]+:\d+)`/g)]
+const recorded = [...ledger.matchAll(/`((?:docs|plugins|scripts|src)\/[^`\n]+:\d+)`/g)]
   .map((match) => match[1]);
 assert.deepEqual(recorded.sort(), [...live].sort(), "Ponytail ledger locations are stale");
 assert.equal(new Set(recorded).size, recorded.length, "Ponytail ledger has duplicate locations");

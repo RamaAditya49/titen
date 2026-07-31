@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "s-calibration-v1",
+  "run_id": "s_cal_d13fffc2-a0b3-4547-9c72-b17bf46215c3",
+  "scale": "full",
+  "source": {
+    "commit": "97c472824f7eba7f783ce22adc847b825a478080",
+    "dirty": false
+  },
+  "fixture": {
+    "statements": 10000,
+    "queries": 600,
+    "calibration_queries": 300,
+    "holdout_queries": 300,
+    "languages": [
+      "id",
+      "en",
+      "jv-id"
+    ],
+    "categories": [
+      "exact",
+      "paraphrase",
+      "cross_language",
+      "hard_negative",
+      "no_result"
+    ],
+    "fixture_sha256": "18affc5931bc7eaf8f0da3249e83b0d523d39c573118b29d4289e4fe20228992",
+    "split_sha256": "01767a26076a3ddb2e326d073ddcf6aada080c3552d3511a4f1f3c506adf9dcb"
+  },
+  "embedding": {
+    "model": "tuf/embeddinggemma",
+    "response_models": [
+      "embeddinggemma"
+    ],
+    "dimensions": 768,
+    "provider_endpoint_sha256": "50385d5a1883ac02faf7a74acc71b03b9d76ad91e6f79f1cefbefd743fe5de84",
+    "authenticated": true,
+    "immutable_revision_attested": false,
+    "fingerprint_sha256": "274141aedbd0fab5adcfec87af1d1baa1402b0af7a8358468fbf72931e93ee49",
+    "metric": "cosine",
+    "stored_precision": "float32",
+    "preprocessing": {
+      "id": "embeddinggemma-retrieval-v1",
+      "document_template": "title: none | text: {content}",
+      "query_template": "task: search result | query: {content}",
+      "sha256": "aeef4327d335d8e0d82867a6530d9533b448ff8d88a8853e20341d81783f45c2"
+    }
+  },
+  "execution": {
+    "batch_size": 64,
+    "preprocessing_profile": "embeddinggemma-retrieval-v1",
+    "top_k": 10,
+    "threshold_selected_before_holdout": true,
+    "vector_database": "disposable sqlite-vec",
+    "vector_database_bytes_before_cleanup": 32636928,
+    "raw_embeddings_retained": false,
+    "elapsed_ms": 117176.35
+  },
+  "host": {
+    "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+    "platform": "linux",
+    "release": "7.0.0-28-generic",
+    "arch": "x64",
+    "cpu_count": 24,
+    "cpu_model_sha256": "fbc8818b2ce27cd6ef9085a097c572b90ee1aa59908a86a3ee5052ea7bf6ea55",
+    "bun_version": "1.3.13"
+  },
+  "checksums": {
+    "fixture_sha256": "18affc5931bc7eaf8f0da3249e83b0d523d39c573118b29d4289e4fe20228992",
+    "split_sha256": "01767a26076a3ddb2e326d073ddcf6aada080c3552d3511a4f1f3c506adf9dcb",
+    "model_fingerprint_sha256": "274141aedbd0fab5adcfec87af1d1baa1402b0af7a8358468fbf72931e93ee49",
+    "raw_trials_sha256": "2f3bab6aa278d1d43f520383f2ef9236006f6ad94d1e70752d48bed08909dff8"
+  }
+}

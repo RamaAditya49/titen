@@ -170,6 +170,28 @@ answerable top score was 0.455. That tiny sample is not a production threshold.
 Cosine remains a shortlist signal; it cannot establish truth, memory kind,
 conflict, or whether a claim should exist.
 
+## 0.3.0 replacement-cycle re-probe
+
+The later [Wulan replacement cycle](../testing/2026-07-31-mem0-replacement-cycle1.md)
+re-probed the still-live routes after the 0.3.0 package was published. Ten
+embedding calls again returned finite, unit-normalized 768-dimension vectors;
+observed p50/p95 latency was 237/403 ms.
+
+A deliberately small three-case LLM canary tested an explicit preference,
+credential/prompt injection, and unrelated third-party statement three times
+per model. Luna, Terra, and Sol each passed 9/9 HTTP, exact-schema, and exact
+decision checks. Luna was fastest on this trivial set. Those 27 calls are only
+a route/regression smoke and do not overturn the broader 333-call result above:
+Luna still lacks evidence for the derivation schema, Terra still lacks a
+reflection advantage, and Sol remains the only canary candidate for the full
+proposed role.
+
+Current [OpenAI GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model)
+classifies Sol as flagship, Terra as the intelligence/cost balance, and Luna as
+the efficient high-volume tier. Titen still treats the Wulan route names as
+opaque and selects from its own versioned memory fixtures, not the marketing
+tier alone.
+
 ## Recommended rollout
 
 1. Keep direct structured claims deterministic and synchronous.

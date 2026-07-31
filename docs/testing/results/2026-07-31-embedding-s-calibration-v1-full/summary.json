@@ -1,0 +1,2288 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "s-calibration-v1",
+  "run_id": "s_cal_613e3ac8-54c8-4d6c-9e56-4efceca6b9be",
+  "scale": "full",
+  "replacement_decision": "NOT_EVALUATED_EMBEDDING_ONLY",
+  "scale_s_gate_executed": true,
+  "counts": {
+    "statements": 10000,
+    "queries": 600,
+    "calibration_queries": 300,
+    "holdout_queries": 300,
+    "languages": [
+      "id",
+      "en",
+      "jv-id"
+    ],
+    "categories": [
+      "exact",
+      "paraphrase",
+      "cross_language",
+      "hard_negative",
+      "no_result"
+    ],
+    "fixture_sha256": "18affc5931bc7eaf8f0da3249e83b0d523d39c573118b29d4289e4fe20228992",
+    "split_sha256": "01767a26076a3ddb2e326d073ddcf6aada080c3552d3511a4f1f3c506adf9dcb"
+  },
+  "embedding": {
+    "model": "tuf/embeddinggemma",
+    "response_models": [
+      "embeddinggemma"
+    ],
+    "dimensions": 768,
+    "provider_endpoint_sha256": "50385d5a1883ac02faf7a74acc71b03b9d76ad91e6f79f1cefbefd743fe5de84",
+    "authenticated": true,
+    "immutable_revision_attested": false,
+    "fingerprint_sha256": "837ea22a7a88a748d42843da644bcaf978b3b16bd25ad900bcc85873c2874fea",
+    "metric": "cosine",
+    "stored_precision": "float32"
+  },
+  "threshold": {
+    "cosine_threshold": 0.765014377,
+    "objective": "zero_no_result_false_positives_then_maximize_recall_at_5",
+    "candidate_count": 61,
+    "zero_fp_candidate_count": 2,
+    "maximum_calibration_no_result_top_score": 0.765014376,
+    "calibration_recall_at_5": {
+      "successes": 208,
+      "samples": 240,
+      "rate": 0.866667,
+      "wilson_95": {
+        "low": 0.817834,
+        "high": 0.903946
+      }
+    },
+    "calibration_no_result_false_positive": {
+      "successes": 0,
+      "samples": 60,
+      "rate": 0,
+      "wilson_95": {
+        "low": 0,
+        "high": 0.060172
+      }
+    }
+  },
+  "quality": {
+    "calibration": {
+      "overall": {
+        "samples": 300,
+        "answerable_samples": 240,
+        "no_result_samples": 60,
+        "recall_at_1": {
+          "successes": 200,
+          "samples": 240,
+          "rate": 0.833333,
+          "wilson_95": {
+            "low": 0.781012,
+            "high": 0.875152
+          }
+        },
+        "recall_at_5": {
+          "successes": 208,
+          "samples": 240,
+          "rate": 0.866667,
+          "wilson_95": {
+            "low": 0.817834,
+            "high": 0.903946
+          }
+        },
+        "mrr_at_10": 0.846138,
+        "ndcg_at_10": 0.857519,
+        "answerable_coverage": {
+          "successes": 234,
+          "samples": 240,
+          "rate": 0.975,
+          "wilson_95": {
+            "low": 0.946541,
+            "high": 0.988493
+          }
+        },
+        "answerable_abstention": {
+          "successes": 6,
+          "samples": 240,
+          "rate": 0.025,
+          "wilson_95": {
+            "low": 0.011507,
+            "high": 0.053459
+          }
+        },
+        "no_result_abstention": {
+          "successes": 60,
+          "samples": 60,
+          "rate": 1,
+          "wilson_95": {
+            "low": 0.939828,
+            "high": 1
+          }
+        },
+        "no_result_false_positive": {
+          "successes": 0,
+          "samples": 60,
+          "rate": 0,
+          "wilson_95": {
+            "low": 0,
+            "high": 0.060172
+          }
+        }
+      },
+      "by_language": {
+        "id": {
+          "samples": 100,
+          "answerable_samples": 80,
+          "no_result_samples": 20,
+          "recall_at_1": {
+            "successes": 68,
+            "samples": 80,
+            "rate": 0.85,
+            "wilson_95": {
+              "low": 0.755868,
+              "high": 0.91206
+            }
+          },
+          "recall_at_5": {
+            "successes": 75,
+            "samples": 80,
+            "rate": 0.9375,
+            "wilson_95": {
+              "low": 0.861899,
+              "high": 0.973011
+            }
+          },
+          "mrr_at_10": 0.879127,
+          "ndcg_at_10": 0.90689,
+          "answerable_coverage": {
+            "successes": 80,
+            "samples": 80,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.954182,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 80,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.045818
+            }
+          },
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "en": {
+          "samples": 100,
+          "answerable_samples": 80,
+          "no_result_samples": 20,
+          "recall_at_1": {
+            "successes": 57,
+            "samples": 80,
+            "rate": 0.7125,
+            "wilson_95": {
+              "low": 0.605397,
+              "high": 0.800131
+            }
+          },
+          "recall_at_5": {
+            "successes": 57,
+            "samples": 80,
+            "rate": 0.7125,
+            "wilson_95": {
+              "low": 0.605397,
+              "high": 0.800131
+            }
+          },
+          "mrr_at_10": 0.715536,
+          "ndcg_at_10": 0.72028,
+          "answerable_coverage": {
+            "successes": 77,
+            "samples": 80,
+            "rate": 0.9625,
+            "wilson_95": {
+              "low": 0.895453,
+              "high": 0.987165
+            }
+          },
+          "answerable_abstention": {
+            "successes": 3,
+            "samples": 80,
+            "rate": 0.0375,
+            "wilson_95": {
+              "low": 0.012835,
+              "high": 0.104547
+            }
+          },
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "jv-id": {
+          "samples": 100,
+          "answerable_samples": 80,
+          "no_result_samples": 20,
+          "recall_at_1": {
+            "successes": 75,
+            "samples": 80,
+            "rate": 0.9375,
+            "wilson_95": {
+              "low": 0.861899,
+              "high": 0.973011
+            }
+          },
+          "recall_at_5": {
+            "successes": 76,
+            "samples": 80,
+            "rate": 0.95,
+            "wilson_95": {
+              "low": 0.878377,
+              "high": 0.980386
+            }
+          },
+          "mrr_at_10": 0.94375,
+          "ndcg_at_10": 0.945387,
+          "answerable_coverage": {
+            "successes": 77,
+            "samples": 80,
+            "rate": 0.9625,
+            "wilson_95": {
+              "low": 0.895453,
+              "high": 0.987165
+            }
+          },
+          "answerable_abstention": {
+            "successes": 3,
+            "samples": 80,
+            "rate": 0.0375,
+            "wilson_95": {
+              "low": 0.012835,
+              "high": 0.104547
+            }
+          },
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        }
+      },
+      "by_category": {
+        "exact": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 60,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.060172
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 55,
+            "samples": 60,
+            "rate": 0.916667,
+            "wilson_95": {
+              "low": 0.819311,
+              "high": 0.96388
+            }
+          },
+          "recall_at_5": {
+            "successes": 55,
+            "samples": 60,
+            "rate": 0.916667,
+            "wilson_95": {
+              "low": 0.819311,
+              "high": 0.96388
+            }
+          },
+          "mrr_at_10": 0.916667,
+          "ndcg_at_10": 0.916667,
+          "answerable_coverage": {
+            "successes": 56,
+            "samples": 60,
+            "rate": 0.933333,
+            "wilson_95": {
+              "low": 0.840746,
+              "high": 0.973771
+            }
+          },
+          "answerable_abstention": {
+            "successes": 4,
+            "samples": 60,
+            "rate": 0.066667,
+            "wilson_95": {
+              "low": 0.026229,
+              "high": 0.159254
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 27,
+            "samples": 60,
+            "rate": 0.45,
+            "wilson_95": {
+              "low": 0.330937,
+              "high": 0.575081
+            }
+          },
+          "recall_at_5": {
+            "successes": 35,
+            "samples": 60,
+            "rate": 0.583333,
+            "wilson_95": {
+              "low": 0.457281,
+              "high": 0.699357
+            }
+          },
+          "mrr_at_10": 0.501217,
+          "ndcg_at_10": 0.546742,
+          "answerable_coverage": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 60,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.060172
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 58,
+            "samples": 60,
+            "rate": 0.966667,
+            "wilson_95": {
+              "low": 0.886362,
+              "high": 0.990811
+            }
+          },
+          "recall_at_5": {
+            "successes": 58,
+            "samples": 60,
+            "rate": 0.966667,
+            "wilson_95": {
+              "low": 0.886362,
+              "high": 0.990811
+            }
+          },
+          "mrr_at_10": 0.966667,
+          "ndcg_at_10": 0.966667,
+          "answerable_coverage": {
+            "successes": 58,
+            "samples": 60,
+            "rate": 0.966667,
+            "wilson_95": {
+              "low": 0.886362,
+              "high": 0.990811
+            }
+          },
+          "answerable_abstention": {
+            "successes": 2,
+            "samples": 60,
+            "rate": 0.033333,
+            "wilson_95": {
+              "low": 0.009189,
+              "high": 0.113638
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "no_result": {
+          "samples": 60,
+          "answerable_samples": 0,
+          "no_result_samples": 60,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 60,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.060172
+            }
+          }
+        }
+      },
+      "by_stratum": {
+        "exact:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "exact:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "exact:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 19,
+            "samples": 20,
+            "rate": 0.95,
+            "wilson_95": {
+              "low": 0.763869,
+              "high": 0.991119
+            }
+          },
+          "recall_at_5": {
+            "successes": 19,
+            "samples": 20,
+            "rate": 0.95,
+            "wilson_95": {
+              "low": 0.763869,
+              "high": 0.991119
+            }
+          },
+          "mrr_at_10": 0.95,
+          "ndcg_at_10": 0.95,
+          "answerable_coverage": {
+            "successes": 19,
+            "samples": 20,
+            "rate": 0.95,
+            "wilson_95": {
+              "low": 0.763869,
+              "high": 0.991119
+            }
+          },
+          "answerable_abstention": {
+            "successes": 1,
+            "samples": 20,
+            "rate": 0.05,
+            "wilson_95": {
+              "low": 0.008881,
+              "high": 0.236131
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 16,
+            "samples": 20,
+            "rate": 0.8,
+            "wilson_95": {
+              "low": 0.583983,
+              "high": 0.919342
+            }
+          },
+          "recall_at_5": {
+            "successes": 16,
+            "samples": 20,
+            "rate": 0.8,
+            "wilson_95": {
+              "low": 0.583983,
+              "high": 0.919342
+            }
+          },
+          "mrr_at_10": 0.8,
+          "ndcg_at_10": 0.8,
+          "answerable_coverage": {
+            "successes": 17,
+            "samples": 20,
+            "rate": 0.85,
+            "wilson_95": {
+              "low": 0.639581,
+              "high": 0.947631
+            }
+          },
+          "answerable_abstention": {
+            "successes": 3,
+            "samples": 20,
+            "rate": 0.15,
+            "wilson_95": {
+              "low": 0.052369,
+              "high": 0.360419
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 8,
+            "samples": 20,
+            "rate": 0.4,
+            "wilson_95": {
+              "low": 0.218807,
+              "high": 0.613418
+            }
+          },
+          "recall_at_5": {
+            "successes": 15,
+            "samples": 20,
+            "rate": 0.75,
+            "wilson_95": {
+              "low": 0.531299,
+              "high": 0.888138
+            }
+          },
+          "mrr_at_10": 0.516508,
+          "ndcg_at_10": 0.627561,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "recall_at_5": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "mrr_at_10": 0.012143,
+          "ndcg_at_10": 0.03112,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 19,
+            "samples": 20,
+            "rate": 0.95,
+            "wilson_95": {
+              "low": 0.763869,
+              "high": 0.991119
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 0.975,
+          "ndcg_at_10": 0.981546,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 18,
+            "samples": 20,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.698966,
+              "high": 0.972134
+            }
+          },
+          "recall_at_5": {
+            "successes": 18,
+            "samples": 20,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.698966,
+              "high": 0.972134
+            }
+          },
+          "mrr_at_10": 0.9,
+          "ndcg_at_10": 0.9,
+          "answerable_coverage": {
+            "successes": 18,
+            "samples": 20,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.698966,
+              "high": 0.972134
+            }
+          },
+          "answerable_abstention": {
+            "successes": 2,
+            "samples": 20,
+            "rate": 0.1,
+            "wilson_95": {
+              "low": 0.027866,
+              "high": 0.301034
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "no_result:id": {
+          "samples": 20,
+          "answerable_samples": 0,
+          "no_result_samples": 20,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "no_result:en": {
+          "samples": 20,
+          "answerable_samples": 0,
+          "no_result_samples": 20,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "no_result:jv-id": {
+          "samples": 20,
+          "answerable_samples": 0,
+          "no_result_samples": 20,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        }
+      }
+    },
+    "holdout": {
+      "overall": {
+        "samples": 300,
+        "answerable_samples": 240,
+        "no_result_samples": 60,
+        "recall_at_1": {
+          "successes": 191,
+          "samples": 240,
+          "rate": 0.795833,
+          "wilson_95": {
+            "low": 0.740365,
+            "high": 0.841981
+          }
+        },
+        "recall_at_5": {
+          "successes": 197,
+          "samples": 240,
+          "rate": 0.820833,
+          "wilson_95": {
+            "low": 0.76738,
+            "high": 0.864177
+          }
+        },
+        "mrr_at_10": 0.80839,
+        "ndcg_at_10": 0.818005,
+        "answerable_coverage": {
+          "successes": 224,
+          "samples": 240,
+          "rate": 0.933333,
+          "wilson_95": {
+            "low": 0.894462,
+            "high": 0.958551
+          }
+        },
+        "answerable_abstention": {
+          "successes": 16,
+          "samples": 240,
+          "rate": 0.066667,
+          "wilson_95": {
+            "low": 0.041449,
+            "high": 0.105538
+          }
+        },
+        "no_result_abstention": {
+          "successes": 60,
+          "samples": 60,
+          "rate": 1,
+          "wilson_95": {
+            "low": 0.939828,
+            "high": 1
+          }
+        },
+        "no_result_false_positive": {
+          "successes": 0,
+          "samples": 60,
+          "rate": 0,
+          "wilson_95": {
+            "low": 0,
+            "high": 0.060172
+          }
+        }
+      },
+      "by_language": {
+        "id": {
+          "samples": 100,
+          "answerable_samples": 80,
+          "no_result_samples": 20,
+          "recall_at_1": {
+            "successes": 68,
+            "samples": 80,
+            "rate": 0.85,
+            "wilson_95": {
+              "low": 0.755868,
+              "high": 0.91206
+            }
+          },
+          "recall_at_5": {
+            "successes": 72,
+            "samples": 80,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.814893,
+              "high": 0.948452
+            }
+          },
+          "mrr_at_10": 0.878294,
+          "ndcg_at_10": 0.903244,
+          "answerable_coverage": {
+            "successes": 80,
+            "samples": 80,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.954182,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 80,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.045818
+            }
+          },
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "en": {
+          "samples": 100,
+          "answerable_samples": 80,
+          "no_result_samples": 20,
+          "recall_at_1": {
+            "successes": 51,
+            "samples": 80,
+            "rate": 0.6375,
+            "wilson_95": {
+              "low": 0.528108,
+              "high": 0.734292
+            }
+          },
+          "recall_at_5": {
+            "successes": 52,
+            "samples": 80,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.5408,
+              "high": 0.745454
+            }
+          },
+          "mrr_at_10": 0.640625,
+          "ndcg_at_10": 0.642883,
+          "answerable_coverage": {
+            "successes": 71,
+            "samples": 80,
+            "rate": 0.8875,
+            "wilson_95": {
+              "low": 0.799818,
+              "high": 0.939673
+            }
+          },
+          "answerable_abstention": {
+            "successes": 9,
+            "samples": 80,
+            "rate": 0.1125,
+            "wilson_95": {
+              "low": 0.060327,
+              "high": 0.200182
+            }
+          },
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "jv-id": {
+          "samples": 100,
+          "answerable_samples": 80,
+          "no_result_samples": 20,
+          "recall_at_1": {
+            "successes": 72,
+            "samples": 80,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.814893,
+              "high": 0.948452
+            }
+          },
+          "recall_at_5": {
+            "successes": 73,
+            "samples": 80,
+            "rate": 0.9125,
+            "wilson_95": {
+              "low": 0.830232,
+              "high": 0.956968
+            }
+          },
+          "mrr_at_10": 0.90625,
+          "ndcg_at_10": 0.907887,
+          "answerable_coverage": {
+            "successes": 73,
+            "samples": 80,
+            "rate": 0.9125,
+            "wilson_95": {
+              "low": 0.830232,
+              "high": 0.956968
+            }
+          },
+          "answerable_abstention": {
+            "successes": 7,
+            "samples": 80,
+            "rate": 0.0875,
+            "wilson_95": {
+              "low": 0.043032,
+              "high": 0.169768
+            }
+          },
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        }
+      },
+      "by_category": {
+        "exact": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 60,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.060172
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 51,
+            "samples": 60,
+            "rate": 0.85,
+            "wilson_95": {
+              "low": 0.738854,
+              "high": 0.919026
+            }
+          },
+          "recall_at_5": {
+            "successes": 51,
+            "samples": 60,
+            "rate": 0.85,
+            "wilson_95": {
+              "low": 0.738854,
+              "high": 0.919026
+            }
+          },
+          "mrr_at_10": 0.85,
+          "ndcg_at_10": 0.85,
+          "answerable_coverage": {
+            "successes": 51,
+            "samples": 60,
+            "rate": 0.85,
+            "wilson_95": {
+              "low": 0.738854,
+              "high": 0.919026
+            }
+          },
+          "answerable_abstention": {
+            "successes": 9,
+            "samples": 60,
+            "rate": 0.15,
+            "wilson_95": {
+              "low": 0.080974,
+              "high": 0.261146
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 27,
+            "samples": 60,
+            "rate": 0.45,
+            "wilson_95": {
+              "low": 0.330937,
+              "high": 0.575081
+            }
+          },
+          "recall_at_5": {
+            "successes": 33,
+            "samples": 60,
+            "rate": 0.55,
+            "wilson_95": {
+              "low": 0.424919,
+              "high": 0.669063
+            }
+          },
+          "mrr_at_10": 0.500225,
+          "ndcg_at_10": 0.538685,
+          "answerable_coverage": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 60,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.060172
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative": {
+          "samples": 60,
+          "answerable_samples": 60,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 53,
+            "samples": 60,
+            "rate": 0.883333,
+            "wilson_95": {
+              "low": 0.778212,
+              "high": 0.942323
+            }
+          },
+          "recall_at_5": {
+            "successes": 53,
+            "samples": 60,
+            "rate": 0.883333,
+            "wilson_95": {
+              "low": 0.778212,
+              "high": 0.942323
+            }
+          },
+          "mrr_at_10": 0.883333,
+          "ndcg_at_10": 0.883333,
+          "answerable_coverage": {
+            "successes": 53,
+            "samples": 60,
+            "rate": 0.883333,
+            "wilson_95": {
+              "low": 0.778212,
+              "high": 0.942323
+            }
+          },
+          "answerable_abstention": {
+            "successes": 7,
+            "samples": 60,
+            "rate": 0.116667,
+            "wilson_95": {
+              "low": 0.057677,
+              "high": 0.221788
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "no_result": {
+          "samples": 60,
+          "answerable_samples": 0,
+          "no_result_samples": 60,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 60,
+            "samples": 60,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.939828,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 60,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.060172
+            }
+          }
+        }
+      },
+      "by_stratum": {
+        "exact:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "exact:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "exact:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 18,
+            "samples": 20,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.698966,
+              "high": 0.972134
+            }
+          },
+          "recall_at_5": {
+            "successes": 18,
+            "samples": 20,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.698966,
+              "high": 0.972134
+            }
+          },
+          "mrr_at_10": 0.9,
+          "ndcg_at_10": 0.9,
+          "answerable_coverage": {
+            "successes": 18,
+            "samples": 20,
+            "rate": 0.9,
+            "wilson_95": {
+              "low": 0.698966,
+              "high": 0.972134
+            }
+          },
+          "answerable_abstention": {
+            "successes": 2,
+            "samples": 20,
+            "rate": 0.1,
+            "wilson_95": {
+              "low": 0.027866,
+              "high": 0.301034
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "paraphrase:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 13,
+            "samples": 20,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.432854,
+              "high": 0.818808
+            }
+          },
+          "recall_at_5": {
+            "successes": 13,
+            "samples": 20,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.432854,
+              "high": 0.818808
+            }
+          },
+          "mrr_at_10": 0.65,
+          "ndcg_at_10": 0.65,
+          "answerable_coverage": {
+            "successes": 13,
+            "samples": 20,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.432854,
+              "high": 0.818808
+            }
+          },
+          "answerable_abstention": {
+            "successes": 7,
+            "samples": 20,
+            "rate": 0.35,
+            "wilson_95": {
+              "low": 0.181192,
+              "high": 0.567146
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 8,
+            "samples": 20,
+            "rate": 0.4,
+            "wilson_95": {
+              "low": 0.218807,
+              "high": 0.613418
+            }
+          },
+          "recall_at_5": {
+            "successes": 12,
+            "samples": 20,
+            "rate": 0.6,
+            "wilson_95": {
+              "low": 0.386582,
+              "high": 0.781193
+            }
+          },
+          "mrr_at_10": 0.513175,
+          "ndcg_at_10": 0.612975,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "recall_at_5": {
+            "successes": 1,
+            "samples": 20,
+            "rate": 0.05,
+            "wilson_95": {
+              "low": 0.008881,
+              "high": 0.236131
+            }
+          },
+          "mrr_at_10": 0.0125,
+          "ndcg_at_10": 0.021534,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "cross_language:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 19,
+            "samples": 20,
+            "rate": 0.95,
+            "wilson_95": {
+              "low": 0.763869,
+              "high": 0.991119
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 0.975,
+          "ndcg_at_10": 0.981546,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative:id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative:en": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 13,
+            "samples": 20,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.432854,
+              "high": 0.818808
+            }
+          },
+          "recall_at_5": {
+            "successes": 13,
+            "samples": 20,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.432854,
+              "high": 0.818808
+            }
+          },
+          "mrr_at_10": 0.65,
+          "ndcg_at_10": 0.65,
+          "answerable_coverage": {
+            "successes": 13,
+            "samples": 20,
+            "rate": 0.65,
+            "wilson_95": {
+              "low": 0.432854,
+              "high": 0.818808
+            }
+          },
+          "answerable_abstention": {
+            "successes": 7,
+            "samples": 20,
+            "rate": 0.35,
+            "wilson_95": {
+              "low": 0.181192,
+              "high": 0.567146
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "hard_negative:jv-id": {
+          "samples": 20,
+          "answerable_samples": 20,
+          "no_result_samples": 0,
+          "recall_at_1": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "recall_at_5": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "mrr_at_10": 1,
+          "ndcg_at_10": 1,
+          "answerable_coverage": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "answerable_abstention": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          },
+          "no_result_abstention": null,
+          "no_result_false_positive": null
+        },
+        "no_result:id": {
+          "samples": 20,
+          "answerable_samples": 0,
+          "no_result_samples": 20,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "no_result:en": {
+          "samples": 20,
+          "answerable_samples": 0,
+          "no_result_samples": 20,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        },
+        "no_result:jv-id": {
+          "samples": 20,
+          "answerable_samples": 0,
+          "no_result_samples": 20,
+          "recall_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_10": null,
+          "ndcg_at_10": null,
+          "answerable_coverage": null,
+          "answerable_abstention": null,
+          "no_result_abstention": {
+            "successes": 20,
+            "samples": 20,
+            "rate": 1,
+            "wilson_95": {
+              "low": 0.838875,
+              "high": 1
+            }
+          },
+          "no_result_false_positive": {
+            "successes": 0,
+            "samples": 20,
+            "rate": 0,
+            "wilson_95": {
+              "low": 0,
+              "high": 0.161125
+            }
+          }
+        }
+      }
+    }
+  },
+  "latency": {
+    "statement_embedding_batches": {
+      "batches": 157,
+      "p50_ms": 601.94,
+      "p95_ms": 673.476,
+      "p99_ms": 817.217
+    },
+    "calibration_embedding_batches": {
+      "batches": 5,
+      "p50_ms": 656.35,
+      "p95_ms": 678.642,
+      "p99_ms": 678.642
+    },
+    "holdout_embedding_batches": {
+      "batches": 5,
+      "p50_ms": 643.349,
+      "p95_ms": 725.721,
+      "p99_ms": 725.721
+    },
+    "native_retrieval": {
+      "batches": 600,
+      "p50_ms": 8.531,
+      "p95_ms": 11.003,
+      "p99_ms": 14.845
+    },
+    "elapsed_ms": 112170.647
+  },
+  "provider_vector_norm": {
+    "samples": 10600,
+    "min": 0.999999,
+    "mean": 1,
+    "max": 1.000001
+  },
+  "checksums": {
+    "fixture_sha256": "18affc5931bc7eaf8f0da3249e83b0d523d39c573118b29d4289e4fe20228992",
+    "split_sha256": "01767a26076a3ddb2e326d073ddcf6aada080c3552d3511a4f1f3c506adf9dcb",
+    "model_fingerprint_sha256": "837ea22a7a88a748d42843da644bcaf978b3b16bd25ad900bcc85873c2874fea",
+    "raw_trials_sha256": "bd3d5f2bbdf2e9439a5c547b3b09382e591a81be433491b2cca33c3a9fd1c5f9",
+    "manifest_sha256": "95707f84b09a79eea40001786ee5c52322e373fc69fcbd2b1dba20aeb343345f"
+  },
+  "limitations": [
+    "The provider did not attest an immutable embedding revision.",
+    "This embedding-only lane does not test authorization, evidence, lifecycle, LLM enrichment, or Mem0 parity."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "fixture_version": "titen-mem0-migration-v1",
+  "run_id_sha256": "f58f91ace464f1129157223dc026f6b0e2949e28110716e560f365c20e82fbe5",
+  "started_at": "2026-07-31T08:15:46.061Z",
+  "finished_at": "2026-07-31T08:16:14.892Z",
+  "runner_sha256": "9ff29572989ffef7548953b45082aa8a66d57846d70ceb3a813b1a5a4b4b25a7",
+  "configuration": {
+    "count": 20,
+    "endpoint_fingerprints": {
+      "titen": "0174828ec1848a963d04648bd3c794be0b06b3bf7d1f40849bb03f30ef8c93a5",
+      "mem0": "e5bf1e6d3ebbe0906fc043547ff815ef1d07587c242155ba14e943dd9784b86c"
+    },
+    "fixture_sha256": "3a6bef9ff5aaeb08505b0c77f547b5035bafc07ec4a64ec31159a62bf9815337",
+    "configuration_sha256": "ee3a18be2b93e82bd05d287c174e60eb9421322592ae8bfe0e09a706f08c6589"
+  }
+}

@@ -1,0 +1,571 @@
+{
+  "schema_version": 1,
+  "runner_version": "enrichment-model-gate-runner-v2",
+  "run_id": "608b65b9-f2fd-4bc1-9230-f99524bd60de",
+  "mode": "full",
+  "response_mode": "json_object",
+  "reasoning_effort": "omitted_provider_default",
+  "retry_count": 0,
+  "started_at": "2026-07-31T09:34:29.127Z",
+  "ended_at": "2026-07-31T09:44:51.860Z",
+  "elapsed_ms": 622741.0996,
+  "fixture_version": "enrichment-model-gate-v2",
+  "fixture_sha256": "3fb615773a792519ad2bb15562f20b593fd60527571a6625b96d438d1c12cb42",
+  "contract_commit": "03a77a9",
+  "source_git_commit": "80ad4b42e51009ccac6ad5cd530de4f661b37105",
+  "prompt_sha256": {
+    "derivation": "f5ba758ff8895fa7e739d6da5c8c2ebca3dd2b463ed9a14d5cf746d039aa2e76",
+    "reflection": "6ab24dc9c6db4eaabe55d3c7c21cca74d28d42c5a5100cd6188f21f15ea5d236"
+  },
+  "schema_sha256": {
+    "derivation": "d5e10608cdd78fbfa62759bab7aeb1b954834bd00ae44cf8a3f1932810831395",
+    "reflection": "190452d2ea8fc1d9e82eea6c76bc9f57e20b74a3e8a37c3441681e0f9be7e617"
+  },
+  "cases_per_model": 72,
+  "repeats": 5,
+  "coverage": {
+    "concept_families": 24,
+    "reflection_premises_fixture_min": 1,
+    "reflection_premises_fixture_max": 3,
+    "reflection_premises_schema_max": 8,
+    "expected_output_claims_fixture_min": 1,
+    "expected_output_claims_fixture_max": 2,
+    "output_claims_schema_max": 4,
+    "premise_statuses": [
+      "active"
+    ],
+    "premise_versions": [
+      1
+    ],
+    "classification": "candidate gate, not final Level-6 product evidence"
+  },
+  "models": {
+    "sol": {
+      "metrics": {
+        "calls": 360,
+        "parsed_provider_responses": 360,
+        "provider_response_success_rate": 1,
+        "local_schema_precheck_conformance": 1,
+        "validator_conformance": 0.9944,
+        "lexical_contract_pass_rate": 0.6528,
+        "lexical_claim_precision": 0.5556,
+        "lexical_claim_recall": 0.5833,
+        "lexical_claim_f1": 0.5691,
+        "source_precision": 0.4703,
+        "source_recall": 0.4625,
+        "source_f1": 0.4664,
+        "minimum_kind_language_lexical_recall": 0,
+        "kind_language_lexical_recall": [
+          {
+            "language": "id",
+            "kind": "semantic_fact",
+            "recall": 0.6667,
+            "expected": 15
+          },
+          {
+            "language": "id",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "id",
+            "kind": "preference",
+            "recall": 0.2,
+            "expected": 5
+          },
+          {
+            "language": "id",
+            "kind": "procedural",
+            "recall": 0.5,
+            "expected": 20
+          },
+          {
+            "language": "id",
+            "kind": "decision",
+            "recall": 0.8,
+            "expected": 10
+          },
+          {
+            "language": "id",
+            "kind": "relationship",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "semantic_fact",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 10
+          },
+          {
+            "language": "en",
+            "kind": "preference",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "procedural",
+            "recall": 0.3,
+            "expected": 20
+          },
+          {
+            "language": "en",
+            "kind": "decision",
+            "recall": 0.6,
+            "expected": 10
+          },
+          {
+            "language": "en",
+            "kind": "relationship",
+            "recall": 1,
+            "expected": 10
+          },
+          {
+            "language": "jv-id",
+            "kind": "semantic_fact",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "jv-id",
+            "kind": "episodic_event",
+            "recall": 0.6,
+            "expected": 10
+          },
+          {
+            "language": "jv-id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 5
+          },
+          {
+            "language": "jv-id",
+            "kind": "procedural",
+            "recall": 0.1,
+            "expected": 20
+          },
+          {
+            "language": "jv-id",
+            "kind": "decision",
+            "recall": 0.4,
+            "expected": 15
+          },
+          {
+            "language": "jv-id",
+            "kind": "relationship",
+            "recall": 1,
+            "expected": 5
+          }
+        ],
+        "semantic_precision_adjudicated": false,
+        "no_memory_safety": 1,
+        "temporal_accuracy": 0.6012,
+        "reflection_lexical_contract_accuracy": 0.325,
+        "repeat_decision_stability": 0.8556,
+        "unsafe_output_rejected": 2,
+        "validator_rejected_outputs": 2,
+        "safe_to_replay_eligible_outputs": 358,
+        "invalid_semantic_commit_count": null,
+        "error_code_counts": {},
+        "timeout_count": 0,
+        "completed_call_latency_ms_p50": 4734.1727,
+        "completed_call_latency_ms_p95": 11816.1892,
+        "token_usage_coverage": 1,
+        "observed_total_tokens": 204088,
+        "total_tokens": 204088,
+        "reported_model_metadata_coverage": 1,
+        "reported_model_sha256_distinct": [
+          "419255f2bb4c6801939e868fe2cdbbdc34d51742400939d1842d262a1fec749c"
+        ],
+        "system_fingerprint_coverage": 0,
+        "system_fingerprint_sha256_distinct": [],
+        "revision_attested_rate": 0,
+        "failed_case_ids": [
+          "d-en-correction-owner",
+          "d-en-multi",
+          "d-id-correction",
+          "d-id-multi",
+          "d-id-preference",
+          "d-jv-correction-channel",
+          "d-jv-event-meeting",
+          "d-jv-multi",
+          "d-jv-preference-meeting",
+          "d-jv-procedure-backup",
+          "r-en-disjoint-time",
+          "r-en-insufficient",
+          "r-en-pattern",
+          "r-en-procedure",
+          "r-en-related",
+          "r-en-supersession",
+          "r-id-disjoint-time",
+          "r-id-insufficient",
+          "r-id-pattern",
+          "r-id-procedure",
+          "r-id-related",
+          "r-id-supersession",
+          "r-jv-disjoint-time",
+          "r-jv-insufficient",
+          "r-jv-pattern",
+          "r-jv-procedure",
+          "r-jv-related",
+          "r-jv-supersession"
+        ]
+      },
+      "gates": {
+        "complete_72_by_5": true,
+        "lexical_contract_pass_at_least_90pct": false,
+        "lexical_claim_f1_at_least_95pct": false,
+        "source_f1_at_least_95pct": false,
+        "each_kind_language_lexical_recall_at_least_85pct": false,
+        "no_memory_safety_100pct": true,
+        "temporal_accuracy_at_least_90pct": false,
+        "reflection_lexical_accuracy_at_least_90pct": false,
+        "repeat_decision_stability_at_least_90pct": false,
+        "semantic_precision_adjudicated": false,
+        "invalid_semantic_commit_count_zero": null,
+        "model_revision_attested_and_stable": null
+      },
+      "lexical_output_gate_pass": false,
+      "model_quality_pass": false,
+      "activation_gate_pass": false,
+      "activation_blockers": [
+        "json_object with an explicit schema is a compatibility diagnostic, not the current product request path.",
+        "Captured proposals were not replayed through both real SQL persistence adapters.",
+        "Open-ended semantic precision is not adjudicated; lexical slots cannot reject every appended unsupported assertion.",
+        "Model aliases and provider revision metadata are not independently attested.",
+        "The audited enrichment implementation is not merged or installed in the Wulan Titen runtime."
+      ]
+    },
+    "terra": {
+      "metrics": {
+        "calls": 360,
+        "parsed_provider_responses": 360,
+        "provider_response_success_rate": 1,
+        "local_schema_precheck_conformance": 1,
+        "validator_conformance": 0.9944,
+        "lexical_contract_pass_rate": 0.6611,
+        "lexical_claim_precision": 0.5506,
+        "lexical_claim_recall": 0.5444,
+        "lexical_claim_f1": 0.5475,
+        "source_precision": 0.486,
+        "source_recall": 0.4333,
+        "source_f1": 0.4581,
+        "minimum_kind_language_lexical_recall": 0,
+        "kind_language_lexical_recall": [
+          {
+            "language": "id",
+            "kind": "semantic_fact",
+            "recall": 0.9333,
+            "expected": 15
+          },
+          {
+            "language": "id",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 5
+          },
+          {
+            "language": "id",
+            "kind": "procedural",
+            "recall": 0.4,
+            "expected": 20
+          },
+          {
+            "language": "id",
+            "kind": "decision",
+            "recall": 0.8,
+            "expected": 10
+          },
+          {
+            "language": "id",
+            "kind": "relationship",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "semantic_fact",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "episodic_event",
+            "recall": 1,
+            "expected": 10
+          },
+          {
+            "language": "en",
+            "kind": "preference",
+            "recall": 1,
+            "expected": 5
+          },
+          {
+            "language": "en",
+            "kind": "procedural",
+            "recall": 0.35,
+            "expected": 20
+          },
+          {
+            "language": "en",
+            "kind": "decision",
+            "recall": 0.7,
+            "expected": 10
+          },
+          {
+            "language": "en",
+            "kind": "relationship",
+            "recall": 0.9,
+            "expected": 10
+          },
+          {
+            "language": "jv-id",
+            "kind": "semantic_fact",
+            "recall": 0,
+            "expected": 5
+          },
+          {
+            "language": "jv-id",
+            "kind": "episodic_event",
+            "recall": 0.5,
+            "expected": 10
+          },
+          {
+            "language": "jv-id",
+            "kind": "preference",
+            "recall": 0,
+            "expected": 5
+          },
+          {
+            "language": "jv-id",
+            "kind": "procedural",
+            "recall": 0.05,
+            "expected": 20
+          },
+          {
+            "language": "jv-id",
+            "kind": "decision",
+            "recall": 0.3333,
+            "expected": 15
+          },
+          {
+            "language": "jv-id",
+            "kind": "relationship",
+            "recall": 0.8,
+            "expected": 5
+          }
+        ],
+        "semantic_precision_adjudicated": false,
+        "no_memory_safety": 1,
+        "temporal_accuracy": 0.561,
+        "reflection_lexical_contract_accuracy": 0.3667,
+        "repeat_decision_stability": 0.8389,
+        "unsafe_output_rejected": 2,
+        "validator_rejected_outputs": 2,
+        "safe_to_replay_eligible_outputs": 358,
+        "invalid_semantic_commit_count": null,
+        "error_code_counts": {},
+        "timeout_count": 0,
+        "completed_call_latency_ms_p50": 3852.7496,
+        "completed_call_latency_ms_p95": 9730.2357,
+        "token_usage_coverage": 1,
+        "observed_total_tokens": 205277,
+        "total_tokens": 205277,
+        "reported_model_metadata_coverage": 1,
+        "reported_model_sha256_distinct": [
+          "deda3dc02a1d1575f15d5c9f9b3e31cf0c768a55508c31e7ff0f4fc8f33fc669"
+        ],
+        "system_fingerprint_coverage": 0,
+        "system_fingerprint_sha256_distinct": [],
+        "revision_attested_rate": 0,
+        "failed_case_ids": [
+          "d-en-multi",
+          "d-en-relationship-owner",
+          "d-id-fact-code",
+          "d-id-multi",
+          "d-id-preference",
+          "d-jv-correction-channel",
+          "d-jv-event-meeting",
+          "d-jv-fact-code",
+          "d-jv-multi",
+          "d-jv-preference-meeting",
+          "d-jv-procedure-backup",
+          "d-jv-relationship-lead",
+          "r-en-disjoint-time",
+          "r-en-insufficient",
+          "r-en-pattern",
+          "r-en-procedure",
+          "r-en-related",
+          "r-en-supersession",
+          "r-id-disjoint-time",
+          "r-id-insufficient",
+          "r-id-pattern",
+          "r-id-procedure",
+          "r-id-related",
+          "r-id-supersession",
+          "r-jv-disjoint-time",
+          "r-jv-insufficient",
+          "r-jv-pattern",
+          "r-jv-procedure",
+          "r-jv-related",
+          "r-jv-supersession"
+        ]
+      },
+      "gates": {
+        "complete_72_by_5": true,
+        "lexical_contract_pass_at_least_90pct": false,
+        "lexical_claim_f1_at_least_95pct": false,
+        "source_f1_at_least_95pct": false,
+        "each_kind_language_lexical_recall_at_least_85pct": false,
+        "no_memory_safety_100pct": true,
+        "temporal_accuracy_at_least_90pct": false,
+        "reflection_lexical_accuracy_at_least_90pct": false,
+        "repeat_decision_stability_at_least_90pct": false,
+        "semantic_precision_adjudicated": false,
+        "invalid_semantic_commit_count_zero": null,
+        "model_revision_attested_and_stable": null
+      },
+      "lexical_output_gate_pass": false,
+      "model_quality_pass": false,
+      "activation_gate_pass": false,
+      "activation_blockers": [
+        "json_object with an explicit schema is a compatibility diagnostic, not the current product request path.",
+        "Captured proposals were not replayed through both real SQL persistence adapters.",
+        "Open-ended semantic precision is not adjudicated; lexical slots cannot reject every appended unsupported assertion.",
+        "Model aliases and provider revision metadata are not independently attested.",
+        "The audited enrichment implementation is not merged or installed in the Wulan Titen runtime."
+      ]
+    }
+  },
+  "paired_noninferiority": {
+    "status": "complete",
+    "estimand": "Terra minus Sol lexical-contract pass rate",
+    "cluster_unit": "24 locked concept families",
+    "trials_per_model_per_cluster": 15,
+    "method": "deterministic cluster bootstrap one-sided 95% lower bound",
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 1434219326,
+    "noninferiority_margin": -0.02,
+    "point_estimate": 0.0083,
+    "one_sided_95pct_lower_bound": -0.0444,
+    "lexical_output_gates_pass": {
+      "sol": false,
+      "terra": false
+    },
+    "terra_noninferior_on_locked_lexical_gate": false,
+    "semantic_precision_adjudicated": false,
+    "activation_eligible": false,
+    "cluster_differences": [
+      {
+        "concept_group": "derivation-01",
+        "terra_minus_sol": -0.4
+      },
+      {
+        "concept_group": "derivation-02",
+        "terra_minus_sol": -0.0667
+      },
+      {
+        "concept_group": "derivation-03",
+        "terra_minus_sol": -0.0667
+      },
+      {
+        "concept_group": "derivation-04",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-05",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-06",
+        "terra_minus_sol": -0.1333
+      },
+      {
+        "concept_group": "derivation-07",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-08",
+        "terra_minus_sol": 0.6667
+      },
+      {
+        "concept_group": "derivation-09",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-10",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-11",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-12",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-13",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-14",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-15",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "derivation-16",
+        "terra_minus_sol": -0.1333
+      },
+      {
+        "concept_group": "reflection-01",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "reflection-02",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "reflection-03",
+        "terra_minus_sol": 0.1333
+      },
+      {
+        "concept_group": "reflection-04",
+        "terra_minus_sol": 0.1333
+      },
+      {
+        "concept_group": "reflection-05",
+        "terra_minus_sol": 0.0667
+      },
+      {
+        "concept_group": "reflection-06",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "reflection-07",
+        "terra_minus_sol": 0
+      },
+      {
+        "concept_group": "reflection-08",
+        "terra_minus_sol": 0
+      }
+    ]
+  }
+}

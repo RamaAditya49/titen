@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "runner_version": "enrichment-model-gate-runner-v2",
+  "status": "pass",
+  "scanned_files": [
+    "manifest.json",
+    "report.md",
+    "summary.json",
+    "trials.jsonl"
+  ],
+  "checks": {
+    "api_key_value_absent": true,
+    "base_url_value_absent": true,
+    "raw_fixture_and_case_text_absent": true,
+    "prompt_text_absent": true,
+    "raw_provider_body_absent": true,
+    "raw_or_normalized_proposal_fields_absent": true,
+    "trial_field_allowlist_exact": true
+  }
+}

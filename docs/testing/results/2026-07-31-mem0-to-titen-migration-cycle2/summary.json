@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "fixture_version": "titen-mem0-migration-v1",
+  "status": "failed",
+  "verdict": "fail_keep_mem0_active",
+  "fatal_error_code": "LOCAL_Error",
+  "requested_source_count": 20,
+  "mem0_created_count": 20,
+  "source_count": 20,
+  "first_pass": {
+    "observations": 0,
+    "claims": 0
+  },
+  "replay_pass": {
+    "observations": 0,
+    "claims": 0
+  },
+  "idempotency": {
+    "expected_stable_ids": 40,
+    "stable_observation_ids": 0,
+    "stable_claim_ids": 0,
+    "stable_ids": 0,
+    "stable_id_rate": 0
+  },
+  "recall": {
+    "expected": 20,
+    "recalled": 0,
+    "rate": 0
+  },
+  "evidence": {
+    "expected": 20,
+    "exact": 0,
+    "exact_rate": 0
+  },
+  "index": {
+    "drain_passes": 0
+  },
+  "mem0_cleanup": {
+    "attempted": 20,
+    "deleted": 20,
+    "failures": [],
+    "complete": true
+  }
+}

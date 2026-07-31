@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "s-calibration-v1",
+  "run_id": "s_cal_0802aa37-bbcb-4c10-8550-5617cc0e77f6",
+  "scale": "smoke",
+  "source": {
+    "commit": "d8c936b75d7776f387fa818d9845e5a47e88a928",
+    "dirty": false
+  },
+  "fixture": {
+    "statements": 600,
+    "queries": 60,
+    "calibration_queries": 30,
+    "holdout_queries": 30,
+    "languages": [
+      "id",
+      "en",
+      "jv-id"
+    ],
+    "categories": [
+      "exact",
+      "paraphrase",
+      "cross_language",
+      "hard_negative",
+      "no_result"
+    ],
+    "fixture_sha256": "18d97310204ee19fc3977c2dae568815265162c1d2a2e2fb69c5d7c59fcbfd44",
+    "split_sha256": "3d085e3c78b3dc93684887fd58f587ab00b8fa6dcb0a8a2cb559aa22be640b91"
+  },
+  "embedding": {
+    "model": "tuf/embeddinggemma",
+    "response_models": [
+      "embeddinggemma"
+    ],
+    "dimensions": 768,
+    "provider_endpoint_sha256": "50385d5a1883ac02faf7a74acc71b03b9d76ad91e6f79f1cefbefd743fe5de84",
+    "authenticated": true,
+    "immutable_revision_attested": false,
+    "fingerprint_sha256": "837ea22a7a88a748d42843da644bcaf978b3b16bd25ad900bcc85873c2874fea",
+    "metric": "cosine",
+    "stored_precision": "float32"
+  },
+  "execution": {
+    "batch_size": 64,
+    "top_k": 10,
+    "threshold_selected_before_holdout": true,
+    "vector_database": "disposable sqlite-vec",
+    "vector_database_bytes_before_cleanup": 3297280,
+    "raw_embeddings_retained": false,
+    "elapsed_ms": 7094.232
+  },
+  "host": {
+    "hostname_sha256": "c7c67619c5505c96e88be33ceaa87bcd1b2baf55b02980f7fd0eca2c85d2f3a5",
+    "platform": "linux",
+    "release": "7.0.0-28-generic",
+    "arch": "x64",
+    "cpu_count": 24,
+    "cpu_model_sha256": "fbc8818b2ce27cd6ef9085a097c572b90ee1aa59908a86a3ee5052ea7bf6ea55",
+    "bun_version": "1.3.13"
+  },
+  "checksums": {
+    "fixture_sha256": "18d97310204ee19fc3977c2dae568815265162c1d2a2e2fb69c5d7c59fcbfd44",
+    "split_sha256": "3d085e3c78b3dc93684887fd58f587ab00b8fa6dcb0a8a2cb559aa22be640b91",
+    "model_fingerprint_sha256": "837ea22a7a88a748d42843da644bcaf978b3b16bd25ad900bcc85873c2874fea",
+    "raw_trials_sha256": "514632a352e696616e693cfc9b1166b64f2a94c192590d0ff522d699009b0edc"
+  }
+}
