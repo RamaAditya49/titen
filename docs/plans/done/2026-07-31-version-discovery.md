@@ -1,14 +1,13 @@
 ---
 work_id: version-discovery
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-version-discovery.md
+spec: docs/specs/done/2026-07-31-version-discovery.md
 ---
 # Plan
 
@@ -22,11 +21,11 @@ spec: docs/specs/active/2026-07-31-version-discovery.md
   change under `CHANGELOG.md` Unreleased.
 - [x] Run focused and repository-required local checks, inspect the full diff,
   and confirm the original checkout plus other worktrees remain untouched.
-- [ ] Commit with the required C.A.D.I.S. attribution, push, merge the reviewed
+- [x] Commit with the required C.A.D.I.S. attribution, push, merge the reviewed
   change without GitHub Actions, verify `origin/main`, and move this pair to
   `done` with terminal evidence.
 
-## Acceptance evidence mapping
+## Acceptance evidence
 
 - AC-VER-001: CLI integration test plus an injected valid schema-1 manifest and
   an empty command working directory.
@@ -47,7 +46,7 @@ requested. Before merge, rollback is branch deletion; after merge, rollback is
 a normal revert. The website remains a separate manual deployment and its live
 endpoint is smoke-tested only after that deployment exists.
 
-## Evidence
+## Verification
 
 - Focused CLI/MCP integration passed 21/21; the injected release manifest proved
   success, invalid-channel rejection, HTTP failure, version comparison, exact
@@ -65,3 +64,7 @@ endpoint is smoke-tested only after that deployment exists.
   expected, and the release/install links plus `www` manifest returned 200.
 - `.github/workflows/` remains absent. The dirty original Titen checkout and the
   separately owned Titen Web checkout were inspected read-only and unchanged.
+- Commit `e1a39ccdddae8a2369243f4e2c0aeeb9a72785d5` carries the exact C.A.D.I.S.
+  trailer and was fast-forwarded directly to `origin/main`; no remote feature
+  branch or pull request was created. Independent final review returned CLEAR
+  with no blocker or actionable non-blocker.
