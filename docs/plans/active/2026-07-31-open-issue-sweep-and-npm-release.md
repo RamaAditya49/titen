@@ -56,6 +56,10 @@ evidence.
   missing-dependency failure to healthy vector/embedding capability state.
 - [x] Declare `sqlite-vec@0.1.9` as an optional peer, then prove package-manager
   metadata does not pull it into the default production install.
+- [x] Reproduce issue #141 across FTS and vector retrieval; change missing
+  project scope to unscoped-only at the shared compiler boundary, capability-
+  gate explicit cross-project mode, return effective scope/reason, and prove
+  REST, SDK, MCP, OpenClaw guidance, and dual-runtime authorization parity.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -105,6 +109,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #137 | Validate all untrusted embedding output once in shared code; require exact cardinality, ordered unique contiguous provider indices when present, dense configured dimensions, and finite numeric coordinates before either runtime can query or mutate a vector index. |
 | #138 | Distinguish intentional FTS-only operation from configured semantic failure; persist/compare the migration-13 index fingerprint, fail local readiness closed on incompatible or unavailable vector state, and expose separate embedding/extraction/background capability fields without implementing planned enrichment. |
 | #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
+| #141 | Make omitted project scope select only unscoped claims; add explicit `cross_project` mode guarded by `context:compile:all`, report `project_mode` and the capability-backed broad reason, and make every distributed agent skill resolve a repository project before compile. |
 
 ## Acceptance evidence mapping
 
@@ -155,6 +160,17 @@ to its merged evidence or to the concrete decision recorded here.
 - AC-SWP-019: README/VPS instructions naming `sqlite-vec@0.1.9`, clean packed
   consumer smokes before and after installing it, and the focused semantic
   readiness matrix.
+- AC-SWP-020: dual-runtime contract fixtures with unscoped and two project-
+  scoped claims plus vector metadata proving omitted `project_id` cannot nominate
+  or hydrate either project.
+- AC-SWP-021: dual-runtime REST/MCP fixtures for explicit capability denial and
+  grant, mutual-exclusion validation, two organizations/subjects/principals/
+  projects, private/team/organization visibility, membership removal, foreign
+  project substitution, and exact effective-scope response metadata; SDK shape
+  and request tests cover the additive public contract.
+- AC-SWP-022: portable-skill copy parity and OpenClaw host-kit integration test
+  proving repository scope is resolved before compile and cross-project mode is
+  never the default.
 
 ## Security, migration, deployment, smoke, and rollback
 

@@ -139,7 +139,81 @@ test("compilation reports vector retrieval as used and calls the embedder", asyn
   assert.deepEqual(vectors.lastFilter(), {
     org_id: orgId,
     subject_id: subjectId,
+    project_id: "",
   });
+});
+
+test("vector retrieval treats missing project as unscoped and broad mode as explicit", async () => {
+  const client = withVectors();
+  const subject = "user_vector_project_scope_141";
+  const project = await client.call("POST", "/v1/projects/resolve", {
+    key,
+    body: { reference: "scope-fixture/vector-project", create: true },
+  });
+  assert.equal(project.status, 201);
+  const projectId = project.body.data.project_id as string;
+  const observed = await client.call("POST", "/v1/observations", {
+    key,
+    body: {
+      subject_id: subject,
+      project_id: projectId,
+      kind: "tool_result",
+      content: "Vector-only scoped canary evidence.",
+      source: { type: "test", ref: "scope-141" },
+      trust: "verified",
+      visibility: "organization",
+    },
+  });
+  assert.equal(observed.status, 201);
+  const consolidated = await client.call("POST", "/v1/consolidations", {
+    key,
+    body: {
+      subject_id: subject,
+      project_id: projectId,
+      claims: [{
+        kind: "procedural",
+        statement: "Vector-only scoped canary claim.",
+        visibility: "organization",
+        sources: [{ observation_id: observed.body.data.observation_id, relation: "supports" }],
+      }],
+    },
+  });
+  assert.equal(consolidated.status, 201);
+  const claimId = consolidated.body.data.claims[0].claim_id as string;
+  vectors.setScore(claimId, 1, {
+    org_id: orgId,
+    subject_id: subject,
+    project_id: projectId,
+  });
+
+  const request = (body: Record<string, unknown>) =>
+    client.call("POST", "/v1/context/compile", {
+      key,
+      body: { subject_id: subject, task: "semantically adjacent phrase", max_tokens: 900, ...body },
+    });
+  const omitted = await request({});
+  assert.equal(omitted.status, 200);
+  assert.equal(omitted.body.data.items.length, 0);
+  assert.deepEqual(vectors.lastFilter(), {
+    org_id: orgId,
+    subject_id: subject,
+    project_id: "",
+  });
+
+  const exact = await request({ project_id: projectId });
+  assert.equal(exact.status, 200);
+  assert.equal(exact.body.data.items[0].claim_id, claimId);
+  assert.deepEqual(vectors.lastFilter(), {
+    org_id: orgId,
+    subject_id: subject,
+    project_id: projectId,
+  });
+
+  const broad = await request({ cross_project: true });
+  assert.equal(broad.status, 200);
+  assert.equal(broad.body.data.items[0].claim_id, claimId);
+  assert.equal(broad.body.data.scope.project_mode, "cross_project");
+  assert.deepEqual(vectors.lastFilter(), { org_id: orgId, subject_id: subject });
 });
 
 test("Vectorize receives the same canonical metadata and query filter", async () => {

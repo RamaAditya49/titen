@@ -175,6 +175,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - The system MUST compile context for an authenticated actor, task/query,
   scope, and token budget.
 - It MUST filter by policy before retrieval.
+- Missing project scope MUST select only unscoped records; cross-project recall
+  MUST be explicit and separately authorized.
 - It MUST return provenance, trust, temporal validity, and unresolved conflicts.
 - It MUST support FTS-only operation when embeddings are unavailable.
 - Retrieved memory MUST be labeled as untrusted reference data.

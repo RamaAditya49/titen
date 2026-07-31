@@ -56,6 +56,12 @@ async function seedClaim(
     key,
     body: {
       subject_id: (overrides.observation?.subject_id as string) ?? "user_rama",
+      ...(typeof overrides.observation?.project_id === "string"
+        ? { project_id: overrides.observation.project_id }
+        : {}),
+      ...(typeof overrides.observation?.workspace_id === "string"
+        ? { workspace_id: overrides.observation.workspace_id }
+        : {}),
       claims: [claim(obs.body.data.observation_id, overrides.claim)],
     },
   });
@@ -662,6 +668,268 @@ export const CASES: Case[] = [
       });
       expectOk(selfView);
       assert.equal(selfView.body.data.items.length, 1, "the owner still reads its own memory");
+    },
+  },
+  {
+    name: "missing project scope is unscoped-only and broad compile needs an explicit grant",
+    async run(fx) {
+      const subjectId = "user_project_scope_141";
+      const owner = await fx.provision({ principalId: "agent_scope_owner", scopes: ["*"] });
+      const member = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "agent_scope_member",
+        scopes: [
+          "context:compile",
+          "context:compile:all",
+          "handoffs:write",
+          "mcp:call",
+        ],
+      });
+      const limited = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "agent_scope_limited",
+        scopes: ["context:compile", "mcp:call"],
+      });
+      const sibling = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "agent_scope_sibling",
+        scopes: ["*"],
+      });
+      const foreign = await fx.provision({ principalId: "agent_scope_foreign", scopes: ["*"] });
+
+      const resolve = async (key: string, reference: string) => {
+        const project = await fx.call("POST", "/v1/projects/resolve", {
+          key,
+          body: { reference, create: true },
+        });
+        expectOk(project, 201);
+        return project.body.data.project_id as string;
+      };
+      const projectA = await resolve(owner.key, "scope-fixture/project-a");
+      const projectB = await resolve(owner.key, "scope-fixture/project-b");
+      const foreignProject = await resolve(foreign.key, "scope-fixture/foreign");
+
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: owner.key,
+        body: { name: "scope-fixture-team" },
+      });
+      expectOk(workspace, 201);
+      const workspaceId = workspace.body.data.workspace_id as string;
+      let memberMembershipId = "";
+      for (const principal of [owner, member]) {
+        const membership = await fx.call("POST", "/v1/memberships", {
+          key: owner.key,
+          body: {
+            workspace_id: workspaceId,
+            principal_id: principal.principalId,
+            principal_kind: "agent",
+            role: "member",
+          },
+        });
+        expectOk(membership, 201);
+        if (principal === member)
+          memberMembershipId = membership.body.data.membership_id;
+      }
+
+      const marker = "scope sentinel 141";
+      const unscoped = await seedClaim(fx, owner.key, {
+        observation: {
+          subject_id: subjectId,
+          content: `${marker} unscoped organization evidence.`,
+          visibility: "organization",
+        },
+        claim: { statement: `${marker} unscoped organization claim.`, visibility: "organization" },
+      });
+      const inA = await seedClaim(fx, owner.key, {
+        observation: {
+          subject_id: subjectId,
+          project_id: projectA,
+          content: `${marker} project A organization evidence.`,
+          visibility: "organization",
+        },
+        claim: { statement: `${marker} project A organization claim.`, visibility: "organization" },
+      });
+      const inB = await seedClaim(fx, owner.key, {
+        observation: {
+          subject_id: subjectId,
+          project_id: projectB,
+          content: `${marker} project B organization evidence.`,
+          visibility: "organization",
+        },
+        claim: { statement: `${marker} project B organization claim.`, visibility: "organization" },
+      });
+      const teamA = await seedClaim(fx, owner.key, {
+        observation: {
+          subject_id: subjectId,
+          project_id: projectA,
+          workspace_id: workspaceId,
+          content: `${marker} project A team evidence.`,
+          visibility: "team",
+        },
+        claim: { statement: `${marker} project A team claim.`, visibility: "team" },
+      });
+      const privateA = await seedClaim(fx, sibling.key, {
+        observation: {
+          subject_id: subjectId,
+          project_id: projectA,
+          content: `${marker} sibling private evidence.`,
+          visibility: "private",
+        },
+        claim: { statement: `${marker} sibling private claim.`, visibility: "private" },
+      });
+      const otherSubject = await seedClaim(fx, owner.key, {
+        observation: {
+          subject_id: "user_project_scope_other",
+          project_id: projectA,
+          content: `${marker} other subject evidence.`,
+          visibility: "organization",
+        },
+        claim: { statement: `${marker} other subject claim.`, visibility: "organization" },
+      });
+      const foreignClaim = await seedClaim(fx, foreign.key, {
+        observation: {
+          subject_id: subjectId,
+          project_id: foreignProject,
+          content: `${marker} foreign organization evidence.`,
+          visibility: "organization",
+        },
+        claim: { statement: `${marker} foreign organization claim.`, visibility: "organization" },
+      });
+
+      const ids = (response: Res) =>
+        new Set(response.body.data.items.map((item: any) => item.claim_id as string));
+      const compile = (key: string, extra: Record<string, unknown> = {}) =>
+        fx.call("POST", "/v1/context/compile", {
+          key,
+          body: { subject_id: subjectId, task: marker, max_tokens: 4000, ...extra },
+        });
+
+      const omitted = await compile(member.key);
+      expectOk(omitted);
+      assert.deepEqual(omitted.body.data.scope, {
+        subject_id: subjectId,
+        project_id: null,
+        project_mode: "unscoped",
+        broad_access_reason: null,
+      });
+      assert.deepEqual(ids(omitted), new Set([unscoped.claimId]));
+
+      const scoped = await compile(member.key, { project_id: projectA });
+      expectOk(scoped);
+      assert.equal(scoped.body.data.scope.project_mode, "project");
+      assert.deepEqual(ids(scoped), new Set([inA.claimId, teamA.claimId]));
+
+      expectError(await compile(limited.key, { cross_project: true }), 403, "FORBIDDEN");
+      const deniedMcp = await fx.call("POST", "/mcp", {
+        key: limited.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 140,
+          method: "tools/call",
+          params: {
+            name: "titen_compile",
+            arguments: {
+              subject_id: subjectId,
+              task: marker,
+              max_tokens: 4000,
+              cross_project: true,
+            },
+          },
+        },
+      });
+      assert.equal(deniedMcp.body.result.isError, true);
+      assert.equal(JSON.parse(deniedMcp.body.result.content[0].text).code, "FORBIDDEN");
+      expectError(
+        await compile(member.key, { project_id: projectA, cross_project: true }),
+        400,
+        "VALIDATION_ERROR",
+      );
+      expectError(await compile(member.key, { project_id: foreignProject }), 404, "NOT_FOUND");
+
+      const broad = await compile(member.key, { cross_project: true });
+      expectOk(broad);
+      assert.deepEqual(broad.body.data.scope, {
+        subject_id: subjectId,
+        project_id: null,
+        project_mode: "cross_project",
+        broad_access_reason: "credential_scope:context:compile:all",
+      });
+      assert.deepEqual(ids(broad), new Set([unscoped.claimId, inA.claimId, inB.claimId, teamA.claimId]));
+      for (const hidden of [privateA.claimId, otherSubject.claimId, foreignClaim.claimId])
+        assert.equal(ids(broad).has(hidden), false);
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: member.key,
+        body: {
+          to_principal: owner.principalId,
+          subject_id: subjectId,
+          context_id: broad.body.data.context_id,
+          message: "Review the explicitly broad scope fixture.",
+        },
+      });
+      expectOk(handoff, 201);
+      const delegated = await fx.call(
+        "GET",
+        `/v1/context/${broad.body.data.context_id}`,
+        { key: owner.key },
+      );
+      expectOk(delegated);
+      assert.deepEqual(delegated.body.data.scope, broad.body.data.scope);
+      assert.deepEqual(ids(delegated), ids(broad));
+
+      const mcp = await fx.call("POST", "/mcp", {
+        key: member.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 141,
+          method: "tools/call",
+          params: {
+            name: "titen_compile",
+            arguments: {
+              subject_id: subjectId,
+              task: marker,
+              max_tokens: 4000,
+              cross_project: true,
+            },
+          },
+        },
+      });
+      assert.equal(mcp.status, 200);
+      const mcpPayload = JSON.parse(mcp.body.result.content[0].text);
+      assert.deepEqual(mcpPayload.data.scope, broad.body.data.scope);
+      assert.deepEqual(
+        new Set(mcpPayload.data.items.map((item: any) => item.claim_id)),
+        ids(broad),
+      );
+
+      expectOk(
+        await fx.call(
+          "DELETE",
+          `/v1/memberships/${memberMembershipId}`,
+          { key: owner.key },
+        ),
+      );
+      const afterRemoval = await compile(member.key, { cross_project: true });
+      expectOk(afterRemoval);
+      assert.equal(ids(afterRemoval).has(teamA.claimId), false);
+      assert.deepEqual(ids(afterRemoval), new Set([unscoped.claimId, inA.claimId, inB.claimId]));
+
+      const foreignBroad = await compile(foreign.key, { cross_project: true });
+      expectOk(foreignBroad);
+      assert.deepEqual(ids(foreignBroad), new Set([foreignClaim.claimId]));
+
+      await fx.query(
+        `UPDATE context_runs SET policy_snapshot = 'legacy-null-project-scope'
+          WHERE id = ?`,
+        [broad.body.data.context_id],
+      );
+      expectError(
+        await fx.call("GET", `/v1/context/${broad.body.data.context_id}`, {
+          key: owner.key,
+        }),
+        404,
+        "NOT_FOUND",
+      );
     },
   },
   {

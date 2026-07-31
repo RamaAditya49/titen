@@ -420,7 +420,8 @@ Required input:
 
 - authenticated actor;
 - task/query;
-- permitted subject/project scope;
+- permitted subject scope plus a concrete project, unscoped-only omission, or
+  explicitly capability-gated cross-project mode;
 - positive maximum token budget;
 - optional request to include eligible checkpoints.
 
@@ -432,11 +433,15 @@ Required output:
   IDs;
 - unresolved conflicts and qualifying evidence;
 - score components and degraded capability metadata;
+- effective project mode and the capability-backed reason for broad access;
 - explicit instruction that every item is untrusted reference data.
 
 Required behavior:
 
 - filter policy before lexical/vector retrieval;
+- treat omitted project scope as canonical `project_id IS NULL`; require
+  `context:compile:all` and an explicit request before removing that project
+  predicate;
 - rank eligible claims using task relevance, trust, temporal validity, utility,
   diversity, conflict coverage, and checkpoint relevance;
 - pack deterministically under the token budget;

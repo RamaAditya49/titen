@@ -345,6 +345,12 @@ It should resolve project scope deterministically:
 6. cache the returned opaque `project_id` for the current workspace;
 7. send that `project_id` on project-scoped memory operations.
 
+For repository work, this resolution happens before the first compile on every
+host, including OpenClaw. Omitting `project_id` means unscoped-only memory; it
+does not search every project. Hosts never set `cross_project` by default. An
+operator-only broad lookup must be explicit and use a credential with the
+separate `context:compile:all` capability.
+
 Titen must never infer `project_id` from memory content. A project label, local
 folder path, Git remote, and canonical Titen `project_id` are distinct values.
 Local absolute paths are not portable identifiers and are not shared by

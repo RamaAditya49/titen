@@ -43,6 +43,13 @@ the default tarball must stay dependency-light, while following the documented
 explicit `sqlite-vec@0.1.9` install must make the same packed artifact report a
 healthy local vector capability.
 
+Issue #141 demonstrated that omitting `project_id` from context compilation is
+currently translated into a wildcard predicate. A caller intending unscoped
+memory can therefore receive otherwise-visible claims from every project in the
+authenticated organization. The patch must make omission unscoped-only and
+reserve cross-project compilation for an explicit request backed by a separate
+credential capability.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -86,6 +93,11 @@ documentation, and an install smoke against the immutable npm artifact.
 - Exercise the packed npm artifact first without and then with the documented
   vector dependency so the public quick start proves fail-closed and healthy
   semantic initialization from a clean consumer tree.
+- Make missing `project_id` compile only records whose canonical project is
+  absent; require explicit cross-project mode plus separate authority for a
+  broader compile, and report the effective project mode and grant reason.
+- Keep REST, SDK, MCP, and the portable OpenClaw-compatible skill aligned so a
+  repository task resolves and supplies its canonical project by default.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -211,6 +223,20 @@ documentation, and an install smoke against the immutable npm artifact.
   missing-dependency error, and healthy semantic initialization after following
   that exact install command; focused tests shall also cover fingerprint
   mismatch.
+- **AC-SWP-020 — Unwanted behavior:** If context compilation omits `project_id`,
+  then Titen shall compile only canonical unscoped claims; it shall never treat
+  omission as permission to retrieve project-scoped candidates through FTS,
+  vector query, or vector hydration.
+- **AC-SWP-021 — Event-driven:** When a caller explicitly requests
+  cross-project compilation, Titen shall require both ordinary compile authority
+  and a separate broad-compile capability, reject a simultaneous project ID,
+  retain organization, subject, visibility, membership, lifecycle, and temporal
+  policy, and return the effective project mode plus the capability-backed broad
+  access reason through REST, SDK, and MCP parity.
+- **AC-SWP-022 — Ubiquitous:** Titen's portable agent guidance, including the
+  OpenClaw distribution, shall resolve the active canonical project and pass its
+  opaque ID for repository work; it shall use unscoped compilation only outside
+  a project and shall not request cross-project mode by default.
 
 ## Done conditions
 
@@ -225,4 +251,8 @@ is resolved by the verified `0.3.1` patch rather than by altering the immutable
 `0.3.0` artifact. Issue #137 is resolved only after malformed-output regressions
 pass against the shared validator and both runtime paths. Issue #138 is resolved
 only after configured semantic failures and fingerprint mismatches fail local
-readiness closed while intentional FTS-only operation remains ready.
+readiness closed while intentional FTS-only operation remains ready. Issue #141
+is resolved only after both runtimes prove default unscoped-only retrieval,
+explicit capability-gated broad retrieval, and denial of foreign project,
+subject, principal, membership, and visibility substitutions across REST and
+MCP.

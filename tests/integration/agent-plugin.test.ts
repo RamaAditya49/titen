@@ -80,6 +80,10 @@ test("the portable skill keeps the nine-tool and security boundaries", () => {
   assert.match(skill, /OpenClaw uses\n  `titen__<canonical-name>`/);
   assert.match(skill, /typed durable signals/);
   assert.match(skill, /Call `titen_project_resolve` when only a stable project reference/);
+  assert.match(skill, /For repository work, resolve and pass the canonical `project_id`/);
+  assert.match(skill, /Omit `project_id` only outside a project; omission selects unscoped memory/);
+  assert.match(skill, /Never set `cross_project` by default/);
+  assert.match(skill, /`context:compile:all` authority/);
   assert.match(skill, /Call `titen_consolidate` with that observation ID/);
   assert.match(skill, /Never store credentials or other secrets, raw transcripts or private\nconversations/);
   assert.match(skill, /chain of thought, prompts, embeddings, or routine command output/);

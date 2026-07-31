@@ -240,6 +240,23 @@ evidence IDs, trust, temporal validity, conflicts, score components, token usage
 and a `context_id`. Each item carries `untrusted: true`; this is structured
 provenance for the caller, not an instruction-enforcement claim.
 
+Project scope is fail-closed:
+
+- a concrete `project_id` selects only that authenticated-organization project;
+- omitting `project_id` selects only claims whose canonical `project_id` is
+  absent; omission is never a wildcard;
+- `cross_project: true` is the only all-project mode, is mutually exclusive with
+  `project_id`, and requires both `context:compile` and
+  `context:compile:all` on the credential.
+
+The response `scope` repeats `subject_id` and `project_id`, adds
+`project_mode` (`project`, `unscoped`, or `cross_project`), and returns
+`broad_access_reason` as `credential_scope:context:compile:all` only for an
+authorized broad compile. All modes retain organization, subject, visibility,
+membership, lifecycle, and temporal policy. A pre-`0.3.1` stored run whose null
+project scope included project claims fails current reauthorization instead of
+being relabeled as unscoped.
+
 Ranking is auditable and deterministic. Lexical BM25 and vector similarity are
 each min-max normalized inside the authorized candidate set; relevance is the
 stronger normalized signal. The final score is:
@@ -647,6 +664,11 @@ version. Every successful tool's text content serializes one stable
 `{ "data": ..., "meta"?: ... }` envelope. Tool schemas publish enforced enums,
 property descriptions, and `additionalProperties: false`; annotations remain
 conservative when a tool can mutate or is idempotent only with an optional key.
+
+`titen_compile` exposes the same optional `cross_project` flag as REST. The MCP
+credential needs ordinary `mcp:call` authority and the separate
+`context:compile:all` capability for that flag; omitting the flag and
+`project_id` remains unscoped-only.
 
 The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
 `GET /mcp` therefore returns `405`. A present `Origin` must match the request URL

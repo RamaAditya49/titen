@@ -77,6 +77,7 @@ export interface ClaimCandidate extends RankInput {
 export interface RetrievalScope {
   subjectId: string;
   projectId: string | null;
+  crossProject: boolean;
   at: string;
   limit?: number;
 }
@@ -134,7 +135,7 @@ export async function retrieveClaimsByIds(
         WHERE c.id IN (${group.map(() => "?").join(", ")})
           AND c.org_id = ?
           AND c.subject_id = ?
-          AND (? IS NULL OR c.project_id = ?)
+          AND (? = 1 OR c.project_id IS ?)
           AND c.status IN ('active', 'disputed')
           AND c.valid_from <= ?
           AND (c.valid_to IS NULL OR c.valid_to > ?)
@@ -143,7 +144,7 @@ export async function retrieveClaimsByIds(
         ...group,
         principal.orgId,
         scope.subjectId,
-        scope.projectId,
+        Number(scope.crossProject),
         scope.projectId,
         scope.at,
         scope.at,
@@ -180,7 +181,7 @@ export async function retrieveClaimCandidates(
               )
           AND c.org_id = ?
           AND c.subject_id = ?
-          AND (? IS NULL OR c.project_id = ?)
+          AND (? = 1 OR c.project_id IS ?)
           AND c.status IN ('active', 'disputed')
           AND c.valid_from <= ?
           AND (c.valid_to IS NULL OR c.valid_to > ?)
@@ -222,7 +223,7 @@ export async function retrieveClaimCandidates(
       match,
       principal.orgId,
       scope.subjectId,
-      scope.projectId,
+      Number(scope.crossProject),
       scope.projectId,
       scope.at,
       scope.at,
