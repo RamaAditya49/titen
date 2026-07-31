@@ -162,20 +162,19 @@ Implemented P0 behavior:
 - `GET /healthz` reports process liveness without sensitive details;
 - `GET /readyz` checks migrations, canonical SQL, and signing-secret
   decryptability;
-- readiness reports FTS, vector, the embedder under the legacy `model` name,
-  background-repair freshness, and export/import capability;
-- readiness performs no provider or vector-index network probe and does not
-  persist or compare a full embedding fingerprint;
+- readiness capability contract version 1 reports FTS, vector, embedding,
+  extraction, background enrichment, background-repair freshness, and
+  export/import state; the legacy `model` field aliases embedding for `0.3.x`;
+- readiness performs no provider or vector-index network probe, persists the
+  configured semantic fingerprint locally, and fails semantic readiness on
+  invalid configuration, vector initialization failure, missing legacy
+  fingerprint evidence, or fingerprint mismatch;
 - responses include a non-secret request ID and deployed revision/build value.
 
-Proposed readiness extensions (unimplemented):
+Remaining proposed readiness extensions:
 
-- replace the ambiguous `model` field with separate embedding, extraction, and
-  background-enrichment capability/degradation states;
 - when channel serving is enabled, readiness also checks release FTS schema and
   configured customer-assertion issuer/key references without exposing them;
-- persist an embedding/index compatibility fingerprint and fail semantic
-  readiness when it mismatches the configured index;
 - a transient optional embedding/vector/extraction outage is visible under its
   own capability while canonical FTS-only operation remains available.
 
@@ -184,8 +183,8 @@ Acceptance:
 - a missing canonical database or pending incompatible migration fails ready;
 - a disabled vector capability does not prevent observation and FTS context;
 - health output contains no key, content, prompt, embedding, or private ID;
-- the proposed fingerprint gate needs dual-runtime contract evidence before it
-  may be described as implemented.
+- a configured semantic mismatch returns `configured_error` with a fixed local
+  diagnostic and no provider call on both runtime adapters.
 
 ### FND-003 — Scoped credential verification
 
@@ -396,10 +395,10 @@ Required behavior:
 Current implementation note: adapters carry the configured embedding model and
 dimensions. Bun HTTP and Cloudflare Workers AI share validation for exact output
 cardinality, ordered provider indices when present, dense dimensions, and finite
-numeric coordinates. Titen does not yet persist or compare a complete index
-fingerprint.
+numeric coordinates. Titen persists and compares the configured semantic index
+fingerprint before exposing vector retrieval.
 
-Proposed compatibility requirements:
+Implemented compatibility requirements:
 
 - persist provider/model, dimensions, distance metric, normalization,
   preprocessing/template, and semantic-unit schema as a versioned fingerprint;
@@ -411,8 +410,7 @@ Acceptance:
 - FTS-only mode returns relevant results without a model/vector service;
 - vector outage cannot lose writes or bypass authorization;
 - stale vector records never return canonical content;
-- the proposed fingerprint mismatch gate passes on both runtime adapters before
-  it is reported as shipped.
+- the fingerprint mismatch gate passes on both runtime adapters.
 
 ### CTX-001 — Compile a bounded context pack
 
@@ -538,7 +536,7 @@ Required behavior:
 - make import idempotent and reject unknown incompatible versions;
 - require explicit authorized destination scope mapping;
 - rebuild FTS and enqueue optional vector re-indexing using the destination's
-  configured embedder; the complete destination fingerprint gate is proposed;
+  configured embedder and verified destination fingerprint;
 - preserve conflicts and history rather than last-write-wins replacement;
 - when v0.3 channel schemas are enabled, export channel/release snapshots and
   lifecycle history but no gateway credential or assertion-verification secret;

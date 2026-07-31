@@ -152,10 +152,17 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }));
 
   const degraded = {
+    version: 1,
     lexical: lexical.match ? "used" : "no_terms",
     semantic: false,
-    vector: ctx.app.vectors ? (vectorUsed ? "used" : "error") : "disabled",
-    model: ctx.app.vectors ? "enabled" : "disabled",
+    vector: ctx.app.vectors
+      ? (vectorUsed ? "used" : "error")
+      : ctx.app.semanticReadiness.vector,
+    embedding: ctx.app.semanticReadiness.embedding,
+    extraction: ctx.app.modelCapabilities.extraction,
+    background_enrichment: ctx.app.modelCapabilities.backgroundEnrichment,
+    /** @deprecated Use `embedding`; retained for the 0.3.x response contract. */
+    model: ctx.app.semanticReadiness.embedding,
     ...(includeCheckpoints ? { checkpoints: "unavailable" } : {}),
   };
 

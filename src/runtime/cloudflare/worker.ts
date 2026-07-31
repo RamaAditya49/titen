@@ -2,6 +2,7 @@ import { createApp } from "../../core/app";
 import { migrate, schemaState } from "../../core/migrations";
 import { createD1Db, type D1Database } from "./d1";
 import { runMaintenance } from "../../core/maintenance";
+import { prepareSemanticReadiness } from "../../core/vectors";
 import { tryCreateVectorize } from "./vectors";
 import { parseSecretCipher, prepareSigningSecrets } from "../../core/secrets";
 import type { WebhookSecurity } from "../../core/webhook-security";
@@ -16,6 +17,7 @@ export interface Env {
   AI?: unknown;
   TITEN_EMBED_MODEL?: string;
   TITEN_EMBED_DIMS?: string;
+  TITEN_EMBED_REVISION?: string;
   /** Secret JSON keyring; keep in a Worker secret, never vars or D1. */
   TITEN_SECRET_KEYS?: string;
   /** Test-only fixed resolution; production has no generic address-pinned fetch. */
@@ -73,7 +75,7 @@ export default {
       schemaVerification = undefined;
       migrationsReady = false;
     }
-    const vectors = tryCreateVectorize(env as any);
+    const vectorInitialization = tryCreateVectorize(env as any);
     let secretCipher;
     let secretStorageReady = false;
     try {
@@ -91,7 +93,8 @@ export default {
       db,
       revision: env.TITEN_REVISION ?? "dev",
       runtime: "cloudflare-d1",
-      vectors,
+      vectors: vectorInitialization.vectors,
+      semanticReadiness: vectorInitialization.readiness,
       backgroundRepair: { configured: true, staleAfterMs: 180_000 },
       migrationsReady,
       secretStorageReady,
@@ -109,7 +112,15 @@ export default {
    */
   async scheduled(_event: unknown, env: Env, context: { waitUntil(p: Promise<unknown>): void }) {
     const db = createD1Db(env.DB);
-    const vectors = tryCreateVectorize(env as never);
+    const vectorInitialization = tryCreateVectorize(env as never);
+    const semanticReadiness = await prepareSemanticReadiness(
+      db,
+      vectorInitialization,
+      new Date().toISOString(),
+    );
+    const vectors = semanticReadiness.vector === "enabled"
+      ? vectorInitialization.vectors
+      : undefined;
     const secretCipher = parseSecretCipher(env.TITEN_SECRET_KEYS);
     if (!(await prepareSigningSecrets(db, secretCipher)))
       throw new Error("Signing-secret storage is not ready.");

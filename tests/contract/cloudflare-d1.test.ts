@@ -12,6 +12,7 @@ import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
 import { assertPopulatedV11IntegrityMigration } from "./integrity-migration";
+import { assertSemanticReadiness } from "./semantic-readiness";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -111,6 +112,10 @@ test("batch writes are atomic on D1", async () => {
   await assertBatchAtomicity(db);
 });
 
+test("D1 semantic readiness persists and compares its fingerprint locally", async () => {
+  await assertSemanticReadiness(db, "cloudflare-d1");
+});
+
 test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));
   const stale = new Miniflare({
@@ -132,6 +137,36 @@ test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   } finally {
     await stale.dispose();
     rmSync(stalePersist, { recursive: true, force: true });
+  }
+});
+
+test("partial Worker semantic configuration fails readiness without leaking it", async () => {
+  const partialPersist = mkdtempSync(join(tmpdir(), "titen-d1-partial-semantic-"));
+  const partial = new Miniflare({
+    modules: true,
+    scriptPath,
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-partial-semantic" },
+    d1Persist: partialPersist,
+    bindings: {
+      TITEN_AUTO_MIGRATE: "1",
+      TITEN_EMBED_MODEL: "must-not-leak",
+      TITEN_SECRET_KEYS: JSON.stringify({ active: "test-v1", keys: { "test-v1": TEST_SECRET_KEY } }),
+    },
+  });
+  try {
+    await partial.ready;
+    assert.equal((await partial.dispatchFetch(`${origin}/healthz`)).status, 200);
+    const response = await partial.dispatchFetch(`${origin}/readyz`);
+    assert.equal(response.status, 503);
+    const body = await response.json() as any;
+    assert.equal(body.meta.capabilities.embedding, "configured_error");
+    assert.equal(body.meta.capabilities.vector, "configured_error");
+    assert.equal(body.meta.checks.semantic_index, "vector_initialization_failed");
+    assert.doesNotMatch(JSON.stringify(body), /must-not-leak/);
+  } finally {
+    await partial.dispose();
+    rmSync(partialPersist, { recursive: true, force: true });
   }
 });
 
@@ -166,10 +201,11 @@ test("a D1 migration batch rolls back on fault and concurrent retries converge",
     assert.equal(Number((await real.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations"))[0]!.version), SCHEMA_VERSION - 1);
     const integrity = await real.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
-        WHERE name IN ('checkpoints_scope', 'event_order') ORDER BY name`,
+        WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata')
+        ORDER BY name`,
     );
-    assert.deepEqual(integrity.map(({ name }) => name), ["checkpoints_scope"]);
-    assert.doesNotMatch(integrity[0]!.sql, /UNIQUE/);
+    assert.deepEqual(integrity.map(({ name }) => name), ["checkpoints_scope", "event_order"]);
+    assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
   } finally {
     await fault.dispose();

@@ -48,6 +48,14 @@
     "node": ">=22",
     "bun": ">=1.2"
   },
+  "peerDependencies": {
+    "sqlite-vec": "0.1.9"
+  },
+  "peerDependenciesMeta": {
+    "sqlite-vec": {
+      "optional": true
+    }
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build && node scripts/check-dashboard-bundle.mjs",

@@ -49,14 +49,15 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     assert.equal(Number(version[0]!.version), SCHEMA_VERSION - 1);
     const integrity = await db.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
-        WHERE name IN ('checkpoints_scope', 'event_order') ORDER BY name`,
+        WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata')
+        ORDER BY name`,
     );
     assert.deepEqual(
       integrity.map(({ name }) => name),
-      ["checkpoints_scope"],
+      ["checkpoints_scope", "event_order"],
       `migration must roll back after statement ${failureAfter + 1}`,
     );
-    assert.doesNotMatch(integrity[0]!.sql, /UNIQUE/);
+    assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
   }

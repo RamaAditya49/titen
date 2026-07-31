@@ -107,7 +107,32 @@ Cron binding, so those capabilities are not active by default or live-verified.
 - **Channel serving** — CRM/chatbot gateway via scoped service credential.
 - **Memory Atlas** — read-only browser client against authenticated REST.
 
-Readiness and `/healthz` will report when optional capabilities are unavailable.
+With no AI/Vectorize binding or embedding variables, the Worker remains ready
+in intentional FTS-only mode. Semantic opt-in requires both native bindings and
+a valid local contract. Configure `TITEN_EMBED_MODEL`, `TITEN_EMBED_DIMS`, and,
+when the provider exposes one, `TITEN_EMBED_REVISION`; the bound Vectorize index
+must use the same dimensions and cosine metric. A partial binding/variable set,
+invalid dimension, or binding object without the required methods returns
+`configured_error` and fails `/readyz`.
+
+Migration 13 persists provider `workers-ai`, model, revision, dimensions,
+cosine metric, preprocessing `text-v1`, and index schema `claims-scope-v1` in
+D1. Readiness compares those local facts without calling Workers AI or
+Vectorize. `enabled` is therefore not provider-reachability evidence; a real
+index drain/query smoke supplies that evidence.
+
+Changing any fingerprint field requires an explicit reindex. Provision a fresh
+compatible Vectorize index (or clear the rebuildable old projection), stop
+index maintenance, then reset only the D1 projection metadata/work:
+
+```bash
+wrangler d1 execute titen --remote --command \
+  "DELETE FROM semantic_index_metadata WHERE id = 'claims'; UPDATE index_outbox SET state = 'pending', attempts = 0 WHERE record_type = 'claim'; INSERT INTO index_outbox (id, org_id, record_type, record_id, operation, state, attempts, created_at) SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id, 'upsert', 'pending', 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM claims c WHERE c.status IN ('active', 'disputed') AND NOT EXISTS (SELECT 1 FROM index_outbox o WHERE o.record_type = 'claim' AND o.record_id = c.id AND o.operation = 'upsert');"
+```
+
+Bind the intended index, deploy, require `/readyz`, and drain the pending claim
+work before declaring semantic retrieval operational. Never reset canonical
+claims or observations for a reindex.
 
 ADR-0004's model-assisted target adds a separate leased D1 enrichment job. A
 Cron Trigger drains it in bounded passes and is the durability guarantee.

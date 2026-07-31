@@ -531,8 +531,9 @@ Vectorize insert and upsert visibility is asynchronous. Titen therefore treats
 mutation acceptance as pending index work, uses an outbox and bounded repair,
 and never makes Vectorize the canonical record.
 
-The current adapter does not persist a complete embedding fingerprint or
-compare one during readiness; that remains the proposed contract below.
+The adapter persists and compares the configured embedding/index fingerprint in
+D1 before exposing Vectorize. Readiness inspects only local binding shape and D1
+metadata; it does not call Workers AI or Vectorize.
 
 ### Lightweight VPS path
 
@@ -593,42 +594,39 @@ that an observation is not context-eligible until a direct or derived claim
 exists. The proposed enrichment API must expose that pending state honestly
 instead of hiding the delay.
 
-### Proposed embedding fingerprint contract
+### Embedding fingerprint contract
 
 Current adapters carry a configured model identifier and dimensions. Bun HTTP
 and Cloudflare Workers AI share one validator for exact output cardinality,
 ordered provider indices when present, dense dimensions, and finite numeric
-coordinates. Current readiness still reports only the generic embedder/vector
-capability state. Titen does not yet persist or compare a complete index
-fingerprint, probe the provider at startup, or fail readiness on a fingerprint
-mismatch.
+coordinates. Capability contract version 1 reports embedding separately from
+planned extraction/background enrichment, and the deprecated `model` field
+mirrors embedding for `0.3.x` compatibility.
 
-The proposed contract binds every semantic index to a fingerprint containing at
-least:
+Every semantic index is bound to a fingerprint containing:
 
 - provider and model identifier;
 - immutable revision when available;
 - output dimensions;
 - distance metric;
-- normalization and preprocessing version;
-- text-format/template version;
+- preprocessing version, including normalization and text formatting;
 - Titen semantic-unit schema version.
 
-Once implemented, startup and provisioning probe the configured model output
-and compare the persisted contract with the index. Titen will not pad or
-truncate mismatched vectors. Changing the fingerprint will require an explicit
-re-index and will fail semantic readiness until compatibility is restored.
+Startup compares the locally configured contract with migration-13 metadata
+without a provider request. Titen does not pad or truncate mismatched vectors.
+Changing the fingerprint requires an explicit re-index and fails semantic
+readiness until the vector backend is rebuilt, metadata is reset, and claim
+index work is requeued.
 
-Canonical export excludes embeddings by default. A destination currently
-rebuilds its semantic projection with its configured embedder; under the
-proposed contract it also declares and verifies the complete fingerprint.
-Changing providers can change retrieval scores without changing evidence,
-claims, or record IDs.
+Canonical export excludes embeddings by default. A destination rebuilds its
+semantic projection only with a declared, verified fingerprint. Changing
+providers can change retrieval scores without changing evidence, claims, or
+record IDs.
 
 The dated pilot found that `embeddinggemma` retrieved all 24 small multilingual
 gold targets within top five, but that synthetic result is not a permanent
-default, production threshold, or implementation evidence for the fingerprint
-gate. A production evaluation must record the available provider/model revision,
+default, production threshold, or provider-reachability evidence. A production
+evaluation must record the available provider/model revision,
 dimensions, preprocessing contract, and index configuration.
 
 ### Hybrid retrieval
@@ -722,9 +720,9 @@ or returns worse useful context is a failed benchmark.
 
 - “Works without embeddings” means canonical writes, FTS recall, context
   compilation, feedback, and collaboration primitives remain functional.
-- “Semantic retrieval enabled” currently names the configured model,
-  dimensions, and vector backend; after the proposed fingerprint gate ships, it
-  names the complete verified fingerprint.
+- “Semantic retrieval enabled” names a locally initialized vector backend whose
+  complete configured fingerprint matches migration-13 metadata; it does not
+  prove provider reachability until real indexing/query evidence exists.
 - “Faster” names the workload, comparison lane, dataset, p95/p99, quality floor,
   and raw results.
 - “More effective” requires downstream task or useful-context evidence.

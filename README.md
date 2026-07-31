@@ -78,6 +78,24 @@ The default listener is `http://127.0.0.1:8787`. Check it from another shell:
 curl http://127.0.0.1:8787/readyz
 ```
 
+The default install is FTS-only. A Bun vector deployment must explicitly add
+`sqlite-vec@0.1.9`; configured semantic retrieval fails readiness if the native
+extension or stored index fingerprint is incompatible.
+
+```bash
+bun add titen-memory sqlite-vec@0.1.9
+
+TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
+TITEN_EMBED_MODEL=embeddinggemma \
+TITEN_EMBED_DIMS=768 \
+TITEN_EMBED_REVISION=local-pinned \
+bunx titen-memory serve
+```
+
+The packaged vector path is verified on glibc Linux x64 with Bun 1.3.13.
+Other `sqlite-vec` prebuilt platforms need the same local ready/drain/query
+smoke before production use.
+
 For a durable host setup, backups, key rotation, and optional vector retrieval,
 use the [Bun/VPS deployment guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md).
 

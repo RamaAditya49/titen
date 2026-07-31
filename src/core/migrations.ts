@@ -735,6 +735,25 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          END`,
     ],
   },
+  {
+    version: 13,
+    statements: [
+      // One immutable contract binds the rebuildable claim-vector projection.
+      // Changing it requires an explicit reindex rather than silently mixing
+      // vectors produced by incompatible models or schemas.
+      `CREATE TABLE semantic_index_metadata (
+         id TEXT PRIMARY KEY CHECK (id = 'claims'),
+         provider TEXT NOT NULL,
+         model TEXT NOT NULL,
+         revision TEXT NOT NULL,
+         dimensions INTEGER NOT NULL CHECK (dimensions > 0),
+         metric TEXT NOT NULL,
+         preprocessing TEXT NOT NULL,
+         index_schema TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       )`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

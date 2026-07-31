@@ -105,11 +105,12 @@ reaches `latest`.
 Not shipped: the Astro dashboard (`src/pages`, `src/styles`), the Cloudflare
 adapter (deploy that from a clone with `wrangler`), tests, and docs.
 
-SDK and lexical-only server consumers install only `titen-memory`. A
-vector-enabled VPS explicitly installs `sqlite-vec`, which brings its platform
-binary. The repository retains `sqlite-vec` as a devDependency for integration
-tests. `astro`, `wrangler`, `playwright`, and `miniflare` remain development-only;
-none belongs on a consumer's disk.
+SDK and lexical-only server consumers install only `titen-memory`. The manifest
+declares pinned `sqlite-vec@0.1.9` as an optional peer; a vector-enabled VPS
+installs it explicitly, which brings its platform binary. The repository also
+retains it as a devDependency for integration tests. `astro`, `wrangler`,
+`playwright`, and `miniflare` remain development-only; none belongs on a
+consumer's disk.
 
 ## Publishing
 

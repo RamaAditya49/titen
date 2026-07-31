@@ -110,8 +110,9 @@ planned.
 
 Automatic model-assisted derivation/reflection is also planned. Current
 maintenance drains claim indexing and delivery work only; it does not classify
-observations. `capabilities.model` in the current implementation describes the
-embedder and must not be read as extraction readiness.
+observations. Capability contract version 1 reports `embedding`, `extraction`,
+and `background_enrichment` separately. Deprecated `capabilities.model` mirrors
+embedding for `0.3.x` compatibility and must not be read as extraction readiness.
 
 ## Write path
 

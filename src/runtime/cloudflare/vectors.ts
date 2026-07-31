@@ -1,5 +1,9 @@
 import { validateEmbeddingResponse } from "../../core/vectors";
-import type { VectorStore, VectorMatch, EmbeddingProvider, VectorCapability } from "../../core/vectors";
+import type {
+  EmbeddingProvider,
+  VectorInitialization,
+  VectorStore,
+} from "../../core/vectors";
 
 /** Minimal Vectorize binding interface (no @cloudflare/workers-types needed). */
 export interface VectorizeIndex {
@@ -46,18 +50,71 @@ export function createWorkersAiEmbedder(ai: AiBinding, model: string, dimensions
   };
 }
 
-/** Builds VectorCapability from Worker env bindings. Returns undefined if bindings absent. */
+/** Builds a locally validated capability from native Worker bindings. */
 export function tryCreateVectorize(env: {
   VECTORIZE?: VectorizeIndex;
   AI?: AiBinding;
   TITEN_EMBED_MODEL?: string;
   TITEN_EMBED_DIMS?: string;
-}): VectorCapability | undefined {
-  if (!env.VECTORIZE || !env.AI) return undefined;
+  TITEN_EMBED_REVISION?: string;
+}): VectorInitialization {
+  const requested = [
+    env.VECTORIZE,
+    env.AI,
+    env.TITEN_EMBED_MODEL,
+    env.TITEN_EMBED_DIMS,
+    env.TITEN_EMBED_REVISION,
+  ].some((value) => value !== undefined);
+  if (!requested)
+    return { readiness: { embedding: "disabled", vector: "disabled" } };
+
   const model = env.TITEN_EMBED_MODEL ?? "@cf/baai/bge-base-en-v1.5";
-  const dims = Number(env.TITEN_EMBED_DIMS ?? "768");
+  const dimensions = Number(env.TITEN_EMBED_DIMS ?? "768");
+  const aiReady = Boolean(env.AI && typeof env.AI.run === "function");
+  const vectorReady = Boolean(
+    env.VECTORIZE &&
+    typeof env.VECTORIZE.upsert === "function" &&
+    typeof env.VECTORIZE.query === "function" &&
+    typeof env.VECTORIZE.deleteByIds === "function"
+  );
+  if (
+    !model.trim() ||
+    model.trim().length > 200 ||
+    !Number.isInteger(dimensions) ||
+    dimensions < 1 ||
+    dimensions > 65_536 ||
+    (env.TITEN_EMBED_REVISION !== undefined &&
+      (!env.TITEN_EMBED_REVISION.trim() || env.TITEN_EMBED_REVISION.trim().length > 200))
+  )
+    return {
+      readiness: {
+        embedding: "configured_error",
+        vector: "configured_error",
+        diagnostic: "embedding_configuration_invalid",
+      },
+    };
+  if (!aiReady || !vectorReady)
+    return {
+      readiness: {
+        embedding: aiReady ? "enabled" : "configured_error",
+        vector: "configured_error",
+        diagnostic: "vector_initialization_failed",
+      },
+    };
   return {
-    store: createVectorizeStore(env.VECTORIZE),
-    embedder: createWorkersAiEmbedder(env.AI, model, dims),
+    readiness: { embedding: "enabled", vector: "enabled" },
+    vectors: {
+      store: createVectorizeStore(env.VECTORIZE!),
+      embedder: createWorkersAiEmbedder(env.AI!, model.trim(), dimensions),
+      fingerprint: {
+        provider: "workers-ai",
+        model: model.trim(),
+        revision: env.TITEN_EMBED_REVISION?.trim() ?? "unspecified",
+        dimensions,
+        metric: "cosine",
+        preprocessing: "text-v1",
+        index_schema: "claims-scope-v1",
+      },
+    },
   };
 }

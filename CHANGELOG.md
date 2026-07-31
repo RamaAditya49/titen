@@ -27,6 +27,21 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Bun HTTP and Cloudflare Workers AI embedding responses now require exact
   output cardinality, ordered provider indices when present, dense configured
   dimensions, and finite numeric coordinates before vector query or indexing.
+- Semantic readiness now distinguishes intentional FTS-only operation from
+  partial configuration, unavailable vector initialization, legacy untracked
+  vectors, missing requeue work, unsafe storage aliasing, empty restored
+  projections, and incompatible fingerprints; configured failures return a
+  fixed local diagnostic without probing providers.
+
+### Changed
+
+- Capability contract version 1 reports embedding, extraction, and background
+  enrichment separately while retaining `model` as a deprecated `0.3.x`
+  embedding alias. Migration 13 persists the claim-index provider, model,
+  revision, dimensions, metric, preprocessing, and schema fingerprint and
+  requires an explicit reindex after incompatibility.
+- `sqlite-vec@0.1.9` is a pinned optional peer: default installs remain
+  dependency-light while the documented vector install is machine-verifiable.
 
 ## [0.3.0] — 2026-07-31
 

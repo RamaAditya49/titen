@@ -3,7 +3,8 @@
 Status: logical target schema. Current migrations implement the canonical
 kernel, `index_outbox`, and delivery state; model-assisted `enrichment_jobs`,
 their worker lease/fingerprint semantics, and vector `submitted/ready` states
-remain proposed. Collaboration leases described below are implemented.
+remain proposed. Migration 13 implements the singleton semantic-index
+fingerprint; collaboration leases described below are implemented.
 
 ## Authority and precedence
 
@@ -372,8 +373,8 @@ not source claim IDs that a gateway could hydrate directly. Customer-private
 memory is never copied into the release vector corpus.
 
 Embedding provider, model, immutable revision when available, dimensions,
-metric, and normalization form a fingerprint. Padding or truncating a mismatched
-vector is prohibited.
+metric, preprocessing version, and index-schema version form a fingerprint.
+Padding or truncating a mismatched vector is prohibited.
 
 ### Memory Atlas projections
 
@@ -430,8 +431,8 @@ An outbox row is complete only when the derived index matches the target
 canonical version or the deletion is confirmed.
 
 The current physical `index_outbox` has a smaller `pending/done/failed` shape
-and marks an accepted upsert complete. It must not be presented as the target
-leased/fingerprinted readiness contract until a migration and parity tests ship.
+and marks an accepted upsert complete. Migration 13 fingerprints the index as a
+whole; per-row leased/fingerprinted outbox state remains proposed.
 
 ### `event_outbox`
 
@@ -477,13 +478,17 @@ paging. Pre-migration equal-timestamp events are backfilled deterministically by
 timestamp and ID; every event committed after migration follows database write
 order even when timestamps are identical.
 
-### `schema_meta`
+### `semantic_index_metadata`
 
-Stores migration/export versions and, when implemented, separate embedding and
-extraction pipeline fingerprints. Current `/readyz` fails on an incompatible
-migration. The proposed extension also fails semantic readiness on an enabled
-vector fingerprint mismatch and reports extraction degradation independently
-from semantic retrieval.
+Migration 13 stores one immutable `claims` row containing credential-free
+provider identity, model, revision, dimensions, metric, preprocessing, index
+schema, and creation time. `/readyz` fails semantic readiness when configured
+values differ, when indexable claims lack durable work, when legacy completed
+index work has no fingerprint, when a restored projection is empty, or when
+local vector initialization cannot satisfy the contract. Recovery is an
+explicit vector rebuild plus metadata reset and complete claim-work requeue;
+startup never rewrites a mismatch.
+Extraction pipeline metadata remains separate and proposed.
 
 ### `audit_events`
 
