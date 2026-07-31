@@ -99,6 +99,8 @@ plugin code is loaded. Its exposed tool names use
 `titen__<canonical-name>`. See [OpenClaw bundles](https://docs.openclaw.ai/plugins/bundles)
 and [native MCP configuration](https://docs.openclaw.ai/cli/mcp).
 
+<!-- ponytail: the standalone ClawHub skill is the temporary public install surface while bundle publication is blocked by openclaw/clawhub#3327. The ceiling is a separate skill install plus native MCP config merge; publish the validated bundle from commit 1cc8823 and replace this path when the upstream inspector sandbox recovers. -->
+
 The repository also contains the validated bundle-plugin package intended for
 `openclaw plugins install clawhub:@ramaaditya49/titen-memory`. Its live package
 publication remains blocked by the ClawHub inspector sandbox incident
