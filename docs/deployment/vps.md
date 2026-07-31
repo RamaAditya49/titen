@@ -182,6 +182,12 @@ dimensions, L2 metric, preprocessing `text-v1`, and index schema
 `claims-scope-v1`. A missing legacy fingerprint or any change fails readiness.
 Titen never rewrites this metadata or deletes vectors automatically.
 
+Migration 14 records only safe embedder/vector-store failure timestamps in
+semantic metadata. That local evidence fails `/readyz` without probing either
+dependency until a later complete embed/upsert proves recovery. After repairing
+an outage, drain eligible upsert work, require `/readyz`, then perform a semantic
+query smoke.
+
 To adopt a new fingerprint, stop Titen, take a verified canonical backup, then
 reset only the rebuildable projection and requeue claim index work:
 

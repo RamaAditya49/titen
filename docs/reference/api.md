@@ -615,15 +615,19 @@ provider identity, model, revision, dimensions, metric, preprocessing version,
 and index-schema version with migration-13 metadata. Partial/invalid
 configuration, unavailable or aliased local vector storage, an untracked legacy
 index, missing historical requeue work, an empty projection after canonical-only
-restore, or fingerprint mismatch returns `503 NOT_READY`, marks the affected
+restore, fingerprint mismatch, or a migration-14 locally recorded embedder/
+vector-store indexing failure returns `503 NOT_READY`, marks the affected
 capability `configured_error`, and supplies one fixed
 `checks.semantic_index` diagnostic. The response does not expose the
 fingerprint, endpoint, database path, or provider error.
 
 Readiness performs bounded local configuration/path/schema/metadata checks only. It
-makes no embedding-provider or vector-index network call. `enabled` therefore
-means locally initialized and fingerprint-compatible, not that a remote provider
-was reachable; indexing and context degradation report runtime provider failure.
+makes no embedding-provider or vector-index network call. Before a dependency is
+used, `enabled` means locally initialized and fingerprint-compatible. A failed
+manual or background index attempt stores only a safe dependency timestamp in
+semantic metadata, increments affected outbox attempts, and makes readiness fail
+locally. Only a later complete embed/upsert clears the observed failure; delete
+or retirement work cannot report recovery.
 
 `capabilities.background_repair` is canonical scheduler evidence. `enabled`
 means a configured scheduler recorded a successful pass within its bounded

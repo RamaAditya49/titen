@@ -9,6 +9,7 @@ import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { assertPopulatedV11IntegrityMigration } from "../contract/integrity-migration";
+import { fakeVectors } from "../contract/harness";
 
 const directories: string[] = [];
 const temporary = () => {
@@ -54,10 +55,15 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     );
     assert.deepEqual(
       integrity.map(({ name }) => name),
-      ["checkpoints_scope", "event_order"],
+      ["checkpoints_scope", "event_order", "semantic_index_metadata"],
       `migration must roll back after statement ${failureAfter + 1}`,
     );
     assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
+    assert.deepEqual(
+      (await db.all<{ name: string }>("PRAGMA table_info(semantic_index_metadata)"))
+        .filter(({ name }) => name.endsWith("_failure_at")),
+      [],
+    );
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
   }
@@ -144,6 +150,48 @@ test("a stale schema exposes diagnostics but blocks API traffic", async () => {
   assert.equal(blocked.status, 503);
   assert.equal(((await blocked.json()) as any).error.code, "UNAVAILABLE");
   await running.stop();
+});
+
+test("a pre-v14 schema with vectors still returns sanitized migration readiness", async () => {
+  const path = join(temporary(), "titen.db");
+  const database = openDatabase(path);
+  const db = createSqliteDb(database);
+  await db.exec(
+    `CREATE TABLE titen_migrations (
+       version INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL
+     )`,
+  );
+  for (const migration of MIGRATIONS.filter(({ version }) => version < SCHEMA_VERSION))
+    await db.batch([
+      ...migration.statements.map((sql) => ({ sql })),
+      {
+        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+        params: [migration.version, "2026-07-31T00:00:00.000Z"],
+      },
+    ]);
+  database.close();
+
+  const running = await serve({
+    dbPath: path,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    autoMigrate: false,
+    maintenanceIntervalMs: 0,
+    vectors: fakeVectors(),
+  });
+  try {
+    const readiness = await fetch(`${running.url}/readyz`);
+    assert.equal(readiness.status, 503);
+    const body = (await readiness.json()) as any;
+    assert.equal(body.error.code, "NOT_READY");
+    assert.equal(body.meta.schema.applied, SCHEMA_VERSION - 1);
+    assert.equal(body.meta.schema.expected, SCHEMA_VERSION);
+    assert.equal(body.meta.checks.migrations, "failed");
+  } finally {
+    await running.stop();
+  }
 });
 
 test("background repair reports enabled, stale, and disabled from canonical evidence", async () => {

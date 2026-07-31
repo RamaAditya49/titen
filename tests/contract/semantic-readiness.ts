@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { createApp } from "../../src/core/app";
 import type { Db } from "../../src/core/db";
+import {
+  completeSemanticIndexWork,
+  recordSemanticDependencyFailure,
+} from "../../src/core/vectors";
 import { clientVia, fakeVectors } from "./harness";
 
 const readyWith = (db: Db, runtime: string, vectors?: ReturnType<typeof fakeVectors>) =>
@@ -86,7 +90,11 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
                     '2026-07-31T00:00:00.000Z')`,
     },
   ]);
-  const healthy = await readyWith(db, runtime, vectors);
+  const persistent = clientVia(
+    createApp({ db, runtime, revision: "semantic-readiness", vectors }),
+    "http://titen.test",
+  );
+  const healthy = await persistent.call("GET", "/readyz");
   assert.equal(healthy.status, 200);
   assert.equal(healthy.body.data.capabilities.version, 1);
   assert.equal(healthy.body.data.capabilities.embedding, "enabled");
@@ -100,6 +108,102 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
        FROM semantic_index_metadata WHERE id = 'claims'`,
   );
   assert.deepEqual(persisted, [{ ...vectors.fingerprint }]);
+
+  await db.batch([{ sql: `DELETE FROM semantic_index_metadata WHERE id = 'claims'` }]);
+  const lostMetadata = await persistent.call("GET", "/readyz");
+  assert.equal(lostMetadata.status, 503);
+  assert.equal(lostMetadata.body.meta.checks.semantic_index, "index_metadata_unavailable");
+  assert.equal(vectors.embedCalls(), 0, "metadata loss readiness stays local");
+  assert.equal((await readyWith(db, runtime, vectors)).status, 200);
+
+  for (const dependency of ["embedder", "vector_store"] as const) {
+    await db.batch([
+      {
+        sql: `UPDATE semantic_index_metadata
+                 SET ${dependency === "embedder" ? "embedder_failure_at" : "vector_store_failure_at"} = ?
+               WHERE id = 'claims'`,
+        params: ["2026-07-31T00:00:01.000Z"],
+      },
+    ]);
+    const observedFailure = await readyWith(db, runtime, vectors);
+    assert.equal(observedFailure.status, 503);
+    assert.equal(
+      observedFailure.body.meta.checks.semantic_index,
+      dependency === "embedder"
+        ? "embedding_dependency_unavailable"
+        : "vector_dependency_unavailable",
+    );
+    assert.equal(vectors.embedCalls(), 0, "observed failure readiness stays local");
+    await db.batch([
+      {
+        sql: `UPDATE semantic_index_metadata
+                 SET ${dependency === "embedder" ? "embedder_failure_at" : "vector_store_failure_at"} = NULL
+               WHERE id = 'claims'`,
+      },
+    ]);
+    assert.equal((await readyWith(db, runtime, vectors)).status, 200);
+  }
+  await db.batch([
+    {
+      sql: `UPDATE semantic_index_metadata
+               SET embedder_failure_at = '2026-07-31T00:00:02.000Z',
+                   vector_store_failure_at = '2026-07-31T00:00:03.000Z'
+             WHERE id = 'claims'`,
+    },
+  ]);
+  const dualFailure = await readyWith(db, runtime, vectors);
+  assert.equal(dualFailure.status, 503);
+  assert.equal(
+    dualFailure.body.meta.checks.semantic_index,
+    "semantic_dependencies_unavailable",
+  );
+  assert.equal(dualFailure.body.meta.capabilities.embedding, "configured_error");
+  assert.equal(dualFailure.body.meta.capabilities.vector, "configured_error");
+  await db.batch([
+    {
+      sql: `UPDATE semantic_index_metadata
+               SET embedder_failure_at = NULL, vector_store_failure_at = NULL
+             WHERE id = 'claims'`,
+    },
+  ]);
+
+  await db.batch([
+    {
+      sql: `INSERT INTO organizations (id, name, created_at)
+            VALUES ('org_semantic_recovery_other', 'Other recovery org',
+                    '2026-07-31T00:00:00.000Z')`,
+    },
+    {
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+            VALUES ('idx_semantic_recovery_other', 'org_semantic_recovery_other',
+                    'claim', 'clm_semantic_recovery_other', 'upsert', 'pending', 0,
+                    '2026-07-31T00:00:00.000Z')`,
+    },
+  ]);
+  await recordSemanticDependencyFailure(
+    db,
+    "embedder",
+    "2026-07-31T00:00:04.000Z",
+    ["idx_semantic_backfill"],
+  );
+  assert.deepEqual(
+    await db.all(`SELECT attempts FROM index_outbox WHERE id = 'idx_semantic_backfill'`),
+    [{ attempts: 1 }],
+  );
+  assert.equal((await readyWith(db, runtime, vectors)).status, 503);
+  await completeSemanticIndexWork(db, ["idx_semantic_recovery_other"], true);
+  assert.equal(
+    (await readyWith(db, runtime, vectors)).status,
+    503,
+    "another organization cannot clear unresolved failure evidence",
+  );
+  await completeSemanticIndexWork(db, ["idx_semantic_backfill"], true);
+  assert.equal((await readyWith(db, runtime, vectors)).status, 200);
+  await db.batch([
+    { sql: `DELETE FROM index_outbox WHERE id = 'idx_semantic_recovery_other'` },
+    { sql: `DELETE FROM organizations WHERE id = 'org_semantic_recovery_other'` },
+  ]);
 
   await db.batch([
     {

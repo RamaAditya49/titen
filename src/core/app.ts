@@ -34,6 +34,7 @@ import type { Db } from "./db";
 import {
   CAPABILITY_VERSION,
   SEMANTIC_DISABLED,
+  observedSemanticReadiness,
   prepareSemanticReadiness,
   type CapabilityState,
   type SemanticReadiness,
@@ -68,16 +69,19 @@ export interface AppContext {
 }
 
 /** Capabilities are reported honestly based on what's configured. */
-export async function capabilities(app: AppContext) {
+export async function capabilities(
+  app: AppContext,
+  semanticReadiness = app.semanticReadiness,
+) {
   return {
     version: CAPABILITY_VERSION,
     fts: "enabled",
-    vector: app.semanticReadiness.vector,
-    embedding: app.semanticReadiness.embedding,
+    vector: semanticReadiness.vector,
+    embedding: semanticReadiness.embedding,
     extraction: app.modelCapabilities.extraction,
     background_enrichment: app.modelCapabilities.backgroundEnrichment,
     /** @deprecated Use `embedding`; this alias remains for the 0.3.x API. */
-    model: app.semanticReadiness.embedding,
+    model: semanticReadiness.embedding,
     background_repair: await backgroundRepairState({
       db: app.db,
       configured: app.backgroundRepair.configured,
@@ -235,19 +239,22 @@ export const ROUTE_INVENTORY: RouteInventoryEntry[] = ROUTES.map(({ method, path
 async function readiness(ctx: RequestContext): Promise<Result> {
   const checks: Record<string, string> = {};
   let ready = true;
+  let canonicalReady = true;
   try {
     await ctx.app.db.all(`SELECT 1 AS ok`);
     checks.canonical_sql = "ok";
   } catch {
     checks.canonical_sql = "unavailable";
+    canonicalReady = false;
     ready = false;
   }
   const schema = await schemaState(ctx.app.db);
+  const schemaReady = schema.applied === schema.expected && schema.verified;
   checks.migrations =
-    schema.applied === schema.expected && schema.verified
+    schemaReady
       ? "ok"
       : `invalid or pending (applied ${schema.applied}, expected ${schema.expected})`;
-  if (schema.applied !== schema.expected || !schema.verified) ready = false;
+  if (!schemaReady) ready = false;
   if (!ctx.app.migrationsReady) {
     checks.migrations = "failed";
     ready = false;
@@ -255,13 +262,28 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   checks.signing_secrets = ctx.app.secretStorageReady ? "ok" : "failed";
   if (!ctx.app.secretStorageReady) ready = false;
 
-  const caps = await capabilities(ctx.app);
-  checks.semantic_index = ctx.app.semanticReadiness.diagnostic ??
-    (ctx.app.semanticReadiness.vector === "enabled" ? "ok" : "disabled");
+  let semanticReadiness = ctx.app.semanticReadiness;
+  if (canonicalReady && schemaReady && ctx.app.migrationsReady) {
+    try {
+      semanticReadiness = await observedSemanticReadiness(
+        ctx.app.db,
+        semanticReadiness,
+      );
+    } catch {
+      semanticReadiness = {
+        embedding: "enabled",
+        vector: "configured_error",
+        diagnostic: "index_metadata_unavailable",
+      };
+    }
+  }
+  const caps = await capabilities(ctx.app, semanticReadiness);
+  checks.semantic_index = semanticReadiness.diagnostic ??
+    (semanticReadiness.vector === "enabled" ? "ok" : "disabled");
   if (
-    ctx.app.semanticReadiness.diagnostic ||
-    ctx.app.semanticReadiness.embedding === "configured_error" ||
-    ctx.app.semanticReadiness.vector === "configured_error"
+    semanticReadiness.diagnostic ||
+    semanticReadiness.embedding === "configured_error" ||
+    semanticReadiness.vector === "configured_error"
   )
     ready = false;
   checks.extraction = ctx.app.modelCapabilities.extraction;

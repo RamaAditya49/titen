@@ -136,7 +136,10 @@ export type CapabilityState = "disabled" | "enabled" | "configured_error";
 
 export type SemanticDiagnostic =
   | "embedding_configuration_invalid"
+  | "embedding_dependency_unavailable"
+  | "semantic_dependencies_unavailable"
   | "vector_initialization_failed"
+  | "vector_dependency_unavailable"
   | "vector_storage_conflict"
   | "index_backfill_required"
   | "index_fingerprint_missing"
@@ -158,6 +161,102 @@ export interface SemanticReadiness {
   embedding: CapabilityState;
   vector: CapabilityState;
   diagnostic?: SemanticDiagnostic;
+}
+
+export type SemanticDependency = "embedder" | "vector_store";
+
+/** Persist only safe local failure evidence; provider output never enters SQL. */
+export async function recordSemanticDependencyFailure(
+  db: Db,
+  dependency: SemanticDependency,
+  at: string,
+  outboxIds: string[],
+): Promise<void> {
+  const ids = [...new Set(outboxIds)];
+  if (ids.length === 0) return;
+  const column = dependency === "embedder"
+    ? "embedder_failure_at"
+    : "vector_store_failure_at";
+  const statements = [{
+    sql: `UPDATE semantic_index_metadata SET ${column} = ? WHERE id = 'claims'`,
+    params: [at],
+  }];
+  for (let index = 0; index < ids.length; index += 100) {
+    const group = ids.slice(index, index + 100);
+    statements.push({
+      sql: `UPDATE index_outbox
+               SET attempts = attempts + 1
+             WHERE state = 'pending' AND id IN (${group.map(() => "?").join(", ")})`,
+      params: group,
+    });
+  }
+  await db.batch(statements);
+}
+
+/** Complete selected work and clear outage evidence only after global recovery. */
+export async function completeSemanticIndexWork(
+  db: Db,
+  outboxIds: string[],
+  recovered: boolean,
+): Promise<void> {
+  for (let index = 0; index < outboxIds.length; index += 50) {
+    const statements = outboxIds.slice(index, index + 50).map((id) => ({
+      sql: `UPDATE index_outbox SET state = 'done', attempts = attempts + 1 WHERE id = ?`,
+      params: [id],
+    }));
+    if (recovered && index + 50 >= outboxIds.length)
+      statements.push({
+        sql: `UPDATE semantic_index_metadata
+                 SET embedder_failure_at = NULL, vector_store_failure_at = NULL
+               WHERE id = 'claims'
+                 AND NOT EXISTS (
+                   SELECT 1 FROM index_outbox
+                    WHERE state = 'pending' AND attempts > 0
+                 )`,
+        params: [],
+      });
+    await db.batch(statements);
+  }
+}
+
+/** Project durable dependency evidence into readiness without provider I/O. */
+export async function observedSemanticReadiness(
+  db: Db,
+  readiness: SemanticReadiness,
+): Promise<SemanticReadiness> {
+  if (readiness.embedding !== "enabled" || readiness.vector !== "enabled")
+    return readiness;
+  const state = (
+    await db.all<{
+      embedder_failure_at: string | null;
+      vector_store_failure_at: string | null;
+    }>(
+      `SELECT embedder_failure_at, vector_store_failure_at
+         FROM semantic_index_metadata WHERE id = 'claims'`,
+    )
+  )[0];
+  if (!state) throw new Error("Semantic index metadata is unavailable.");
+  const embedderFailed = state.embedder_failure_at !== null;
+  const vectorFailed = state.vector_store_failure_at !== null;
+  if (embedderFailed && vectorFailed)
+    return {
+      embedding: "configured_error",
+      vector: "configured_error",
+      diagnostic: "semantic_dependencies_unavailable",
+    };
+  if (embedderFailed)
+    return {
+      embedding: "configured_error",
+      vector: "enabled",
+      diagnostic: "embedding_dependency_unavailable",
+    };
+  if (vectorFailed)
+    return {
+      embedding: "enabled",
+      vector: "configured_error",
+      diagnostic: "vector_dependency_unavailable",
+    };
+  return readiness;
 }
 
 export interface VectorInitialization {

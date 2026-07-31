@@ -751,7 +751,14 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          preprocessing TEXT NOT NULL,
          index_schema TEXT NOT NULL,
          created_at TEXT NOT NULL
-       )`,
+      )`,
+    ],
+  },
+  {
+    version: 14,
+    statements: [
+      `ALTER TABLE semantic_index_metadata ADD COLUMN embedder_failure_at TEXT`,
+      `ALTER TABLE semantic_index_metadata ADD COLUMN vector_store_failure_at TEXT`,
     ],
   },
 ];

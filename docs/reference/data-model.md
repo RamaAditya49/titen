@@ -3,8 +3,9 @@
 Status: logical target schema. Current migrations implement the canonical
 kernel, `index_outbox`, and delivery state; model-assisted `enrichment_jobs`,
 their worker lease/fingerprint semantics, and vector `submitted/ready` states
-remain proposed. Migration 13 implements the singleton semantic-index
-fingerprint; collaboration leases described below are implemented.
+remain proposed. Migrations 13–14 implement the singleton semantic-index
+fingerprint and safe observed-failure marker; collaboration leases described
+below are implemented.
 
 ## Authority and precedence
 
@@ -432,7 +433,8 @@ canonical version or the deletion is confirmed.
 
 The current physical `index_outbox` has a smaller `pending/done/failed` shape
 and marks an accepted upsert complete. Migration 13 fingerprints the index as a
-whole; per-row leased/fingerprinted outbox state remains proposed.
+whole. Failed dependency attempts increment the existing `attempts` counter;
+leased/fingerprinted outbox state remains proposed.
 
 ### `event_outbox`
 
@@ -482,12 +484,15 @@ order even when timestamps are identical.
 
 Migration 13 stores one immutable `claims` row containing credential-free
 provider identity, model, revision, dimensions, metric, preprocessing, index
-schema, and creation time. `/readyz` fails semantic readiness when configured
-values differ, when indexable claims lack durable work, when legacy completed
-index work has no fingerprint, when a restored projection is empty, or when
-local vector initialization cannot satisfy the contract. Recovery is an
-explicit vector rebuild plus metadata reset and complete claim-work requeue;
-startup never rewrites a mismatch.
+schema, and creation time. Migration 14 adds nullable
+`embedder_failure_at`/`vector_store_failure_at` fields containing no provider
+output to that singleton row. `/readyz` fails semantic readiness when configured
+values differ, indexable claims lack durable work, legacy completed index work
+has no fingerprint, a restored projection is empty, local vector initialization
+cannot satisfy the contract, or an observed dependency failure lacks a later
+complete embed/upsert. Recovery from incompatibility is an explicit vector
+rebuild plus metadata reset and complete claim-work requeue; startup never
+rewrites a mismatch.
 Extraction pipeline metadata remains separate and proposed.
 
 ### `audit_events`

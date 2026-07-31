@@ -343,12 +343,89 @@ test("index drain reports embedder outages as retryable and preserves pending ro
   assert.equal(failed.body.meta.retryable, true);
   assert.equal(failed.body.meta.pending, before);
   assert.equal(await pendingCount(), before);
+  const unavailable = await app.call("GET", "/readyz");
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.body.meta.capabilities.embedding, "configured_error");
+  assert.equal(unavailable.body.meta.capabilities.vector, "enabled");
+  assert.equal(unavailable.body.meta.checks.semantic_index, "embedding_dependency_unavailable");
 
+  const other = await provisionWith(db, { scopes: ["*"] });
+  const otherObservation = await app.call("POST", "/v1/observations", {
+    key: other.key,
+    body: {
+      subject_id: "other_org_recovery",
+      kind: "tool_result",
+      content: "One tenant cannot clear another tenant's dependency outage.",
+      source: { type: "tool", ref: "cross-org-recovery" },
+      trust: "verified",
+    },
+  });
+  assert.equal(otherObservation.status, 201);
+  assert.equal(
+    (
+      await app.call("POST", "/v1/consolidations", {
+        key: other.key,
+        body: {
+          subject_id: "other_org_recovery",
+          claims: [{
+            kind: "procedural",
+            statement: "Cross-organization recovery remains isolated.",
+            sources: [{
+              observation_id: otherObservation.body.data.observation_id,
+              relation: "supports",
+            }],
+          }],
+        },
+      })
+    ).status,
+    201,
+  );
+  broken.restoreEmbedder();
+  const otherRecovery = await app.call("POST", "/v1/index/drain", { key: other.key });
+  assert.equal(otherRecovery.status, 200);
+  assert.ok(otherRecovery.body.data.indexed > 0);
+  assert.equal((await app.call("GET", "/readyz")).status, 503);
+
+  const retiring = await db.all<{ id: string; record_id: string; status: string }>(
+    `SELECT queued.id, queued.record_id, c.status
+       FROM (
+         SELECT id, record_id FROM index_outbox
+          WHERE org_id = ? AND state = 'pending'
+          ORDER BY created_at, id LIMIT 50
+       ) queued
+       JOIN claims c ON c.id = queued.record_id
+      WHERE c.status IN ('active', 'disputed')`,
+    [orgId],
+  );
+  assert.ok(retiring.length > 0);
+  await db.batch(
+    [...new Set(retiring.map(({ record_id }) => record_id))].map((id) => ({
+      sql: `UPDATE claims SET status = 'expired' WHERE id = ?`,
+      params: [id],
+    })),
+  );
+  const deleteOnly = await app.call("POST", "/v1/index/drain", { key });
+  assert.equal(deleteOnly.status, 200);
+  assert.equal(deleteOnly.body.data.indexed, 0);
+  assert.equal((await app.call("GET", "/readyz")).status, 503);
+
+  const originalStatus = new Map(retiring.map(({ record_id, status }) => [record_id, status]));
+  await db.batch([
+    ...[...originalStatus].map(([id, status]) => ({
+      sql: `UPDATE claims SET status = ? WHERE id = ?`,
+      params: [status, id],
+    })),
+    ...retiring.map(({ id }) => ({
+      sql: `UPDATE index_outbox SET state = 'pending' WHERE id = ?`,
+      params: [id],
+    })),
+  ]);
   broken.restoreEmbedder();
   const recovered = await app.call("POST", "/v1/index/drain", { key });
   assert.equal(recovered.status, 200);
   assert.ok(recovered.body.data.indexed > 0);
   assert.ok((await pendingCount()) < before);
+  assert.equal((await app.call("GET", "/readyz")).status, 200);
   assert.deepEqual(broken.metadataFor(claimIds[0]!), {
     org_id: orgId,
     subject_id: subjectId,
@@ -369,12 +446,18 @@ test("index drain reports vector-store outages as retryable and preserves pendin
   assert.equal(failed.body.meta.retryable, true);
   assert.equal(failed.body.meta.pending, before);
   assert.equal(await pendingCount(), before);
+  const unavailable = await app.call("GET", "/readyz");
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.body.meta.capabilities.embedding, "enabled");
+  assert.equal(unavailable.body.meta.capabilities.vector, "configured_error");
+  assert.equal(unavailable.body.meta.checks.semantic_index, "vector_dependency_unavailable");
 
   broken.restoreStore();
   const recovered = await app.call("POST", "/v1/index/drain", { key });
   assert.equal(recovered.status, 200);
   assert.ok(recovered.body.data.indexed > 0);
   assert.ok((await pendingCount()) < before);
+  assert.equal((await app.call("GET", "/readyz")).status, 200);
 });
 
 test("purge drain removes an already indexed claim", async () => {
