@@ -100,7 +100,10 @@ export function embeddingProfileMatchesModel(
   profile: EmbeddingProfile,
   model: string,
 ): boolean {
-  const embeddingGemma = model.toLowerCase().includes("embeddinggemma");
+  const embeddingGemma = model
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]/g, "")
+    .includes("embeddinggemma");
   return embeddingGemma
     ? profile === "embeddinggemma-retrieval-v1"
     : profile === "raw-unit-v1";

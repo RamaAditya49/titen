@@ -144,7 +144,7 @@ test("embedding policies are canonical, role-aware, and model-specific", () => {
   assert.equal(
     embeddingProfileMatchesModel(
       "embeddinggemma-retrieval-v1",
-      "google/embeddinggemma-300m",
+      "google/embedding-gemma-300m",
     ),
     true,
   );
