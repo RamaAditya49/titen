@@ -17,12 +17,6 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
-### Fixed
-
-- Bun HTTP and Cloudflare Workers AI embedding responses now require exact
-  output cardinality, ordered provider indices when present, dense configured
-  dimensions, and finite numeric coordinates before vector query or indexing.
-
 ## [0.3.1] — 2026-07-31
 
 ### Fixed
@@ -30,6 +24,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Successful SDK responses now reject array, `null`, and primitive JSON
   envelopes with an `INVALID_RESPONSE` `TitenError` while preserving the HTTP
   status, request ID, and safe response metadata.
+- Bun HTTP and Cloudflare Workers AI embedding responses now require exact
+  output cardinality, ordered provider indices when present, dense configured
+  dimensions, and finite numeric coordinates before vector query or indexing.
 
 ## [0.3.0] — 2026-07-31
 

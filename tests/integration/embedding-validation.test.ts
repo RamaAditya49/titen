@@ -108,15 +108,18 @@ test("shared embedding validator accepts both provider shapes in input order", (
 
 const adapters: {
   name: string;
-  create: () => { embedder: EmbeddingProvider; close: () => void | Promise<void> };
+  create: (response: unknown) => {
+    embedder: EmbeddingProvider;
+    close: () => void | Promise<void>;
+  };
 }[] = [
   {
     name: "Bun HTTP",
-    create() {
+    create(response) {
       const server = Bun.serve({
         port: 0,
         hostname: "127.0.0.1",
-        fetch: () => Response.json({ data: [] }),
+        fetch: () => Response.json(response),
       });
       return {
         embedder: createHttpEmbedder({
@@ -130,9 +133,9 @@ const adapters: {
   },
   {
     name: "Cloudflare Workers AI",
-    create: () => ({
+    create: (response) => ({
       embedder: createWorkersAiEmbedder(
-        { run: async () => ({ data: [] }) },
+        { run: async () => response },
         "malformed",
         dimensions,
       ),
@@ -142,11 +145,28 @@ const adapters: {
 ];
 
 for (const adapter of adapters)
+  for (const [name, response, expectedCount] of invalid)
+    test(`${adapter.name} rejects ${name}`, async () => {
+      const { embedder, close } = adapter.create(response());
+      try {
+        await assert.rejects(
+          () =>
+            embedder.embed(
+              Array.from({ length: expectedCount }, () => "input"),
+            ),
+          /^Error: Invalid embedding response\.$/,
+        );
+      } finally {
+        await close();
+      }
+    });
+
+for (const adapter of adapters)
   test(`${adapter.name} malformed output stays retryable and degrades to FTS`, async () => {
     const directory = mkdtempSync(join(tmpdir(), "titen-embed-validation-"));
     const handle = openDatabase(join(directory, "titen.db"));
     const db = createSqliteDb(handle);
-    const { embedder, close } = adapter.create();
+    const { embedder, close } = adapter.create({ data: [] });
     let vectorWrites = 0;
     let vectorQueries = 0;
     const store: VectorStore = {
