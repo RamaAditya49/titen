@@ -116,8 +116,12 @@ function redact(value: string, secrets: readonly string[]) {
     safe = safe.replaceAll(secret, "[redacted]");
   }
   safe = safe.replace(
-    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)((?:\\?["']))(?:(?!\3)(?:\\.|[\s\S]))*\3/gi,
+    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)((?:\\?["']))(?:(?!\3(?=$|[^A-Za-z0-9_$]))(?:\\.|[^\r\n]))*\3(?=$|[^A-Za-z0-9_$])/gi,
     "$1$2$3[redacted]$3",
+  );
+  safe = safe.replace(
+    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)((?:\\?["']))(?!(?:(?!\3(?=$|[^A-Za-z0-9_$]))(?:\\.|[^\r\n]))*\3(?=$|[^A-Za-z0-9_$]))[^\r\n]*/gi,
+    "$1$2$3[redacted]",
   );
   return safe.replace(
     /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)(?:bearer\s+)?(?:\[redacted\]|[^\\\s"',;}\])>]+)/gi,
