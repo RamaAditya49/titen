@@ -29,19 +29,33 @@ model boundary and trigger the same bounded maintenance drain.
 - Atomically enqueue a derivation job with each eligible observation when an
   extraction capability is configured.
 - Schedule idempotent reflection jobs from bounded, currently authorized,
-  same-scope claim snapshots.
+  same-scope claim snapshots through a durable cursor so a perpetually hot
+  newest page cannot starve older eligible anchors.
 - Lease and drain both lanes from one durable SQL ledger with at most four
   attempts, a 60-second lease, and exponential backoff capped at five minutes.
+- Acquire work immediately before each sequential provider call; never pre-lease
+  a batch whose later calls can begin after their lease expires.
 - Store immutable model, prompt, schema, input, and policy fingerprints plus
-  sanitized operational failure classes; never persist prompts or model output.
+  sanitized operational failure classes and a SHA-256 output hash; never
+  persist prompts or raw model output.
+- Lease only work whose model, prompt, and schema fingerprints match the active
+  worker so an overlapping rollout cannot consume or terminally fail an older
+  pipeline's acknowledged work (#148).
 - Send at most one observation to derivation and at most eight claims to
-  reflection. Accept at most four ADD claims or eight link-only results.
+  reflection. Accept at most one atomic ADD claim or eight link-only results so
+  the same worst-case commit fits the Cloudflare Free query budget.
 - Validate exact source/premise IDs, scope, visibility, trust, lifecycle,
   Unicode, size, and temporal fields locally before one ADD-only transaction.
 - Materialize model-assisted claims at `unverified` trust with exact observation
   sources and, for reflection, exact premise links.
 - Report embedding, extraction, and background enrichment separately while
   retaining the existing readiness compatibility fields.
+- Keep every Cloudflare enrichment invocation within an explicit D1 query and
+  bound-parameter budget; unsupported or unproven activation fails readiness
+  closed instead of discovering a plan limit during mutation (#149).
+- Extend the versioned logical export/import contract with enrichment jobs,
+  commits, generated-claim links, and output hashes; reject incomplete or
+  conflicting generated-claim provenance before mutation (#150).
 - Freeze Indonesian, English, and Javanese-in-Indonesian derivation/reflection
   fixtures and replay the same core contract on SQLite and D1.
 
@@ -65,10 +79,21 @@ model boundary and trigger the same bounded maintenance drain.
 - A job lease may expire during a model call. The semantic commit must prove
   current lease ownership inside the same SQL transaction so two workers cannot
   commit duplicate output.
+- A rolling deployment may have two valid pipeline generations. Each worker may
+  lease only its own generation; unmatched jobs remain pending until a matching
+  worker drains them or an explicit future supersession records an audit trail.
 - Every reflection premise is re-authorized and version-checked at commit time.
   Policy or source drift fails closed and produces no semantic mutation.
 - Operational logs and job rows may expose only bounded IDs, fingerprints,
-  counters, and fixed failure classes, never content or provider messages.
+  output hashes, counters, and fixed failure classes, never content or provider
+  messages.
+- Cloudflare Free allows 50 D1 queries per invocation and 100 bound parameters
+  per query. Commit shape, scheduler breadth, and all maintenance sharing the
+  invocation must stay below those limits with headroom; local Miniflare success
+  alone is not production evidence.
+- A logical transfer must either reproduce the complete immutable derivation
+  chain or reject it atomically. It may not import a generated claim as if it
+  were a caller-authored claim.
 - Migration 13 is reserved for semantic-index readiness work in issue #138;
   this feature owns additive migration 14.
 
@@ -85,7 +110,8 @@ model boundary and trigger the same bounded maintenance drain.
 - **AC-ENR-003 — State-driven:** While a derivation or reflection job is due,
   Titen shall grant one 60-second durable lease, attempt it at most four times,
   and retry transient failure with deterministic exponential backoff capped at
-  five minutes.
+  five minutes; each sequential model call shall receive a fresh lease and no
+  later batch member may be charged against an already aging shared lease.
 - **AC-ENR-004 — Ubiquitous:** Titen shall store immutable model, prompt, schema,
   input, and policy fingerprints for every enrichment job and shall reject any
   attempt to mutate those fields after insertion.
@@ -110,7 +136,8 @@ model boundary and trigger the same bounded maintenance drain.
 - **AC-ENR-010 — Event-driven:** When reflection scheduling sees an authorized
   claim snapshot, Titen shall derive its identity from ordered premise IDs and
   versions plus policy and pipeline fingerprints, reuse an unchanged snapshot,
-  and create a distinct job after premise-version or policy change.
+  create a distinct job after premise-version or policy change, and advance a
+  durable pipeline/scope cursor so every eligible anchor is eventually visited.
 - **AC-ENR-011 — Ubiquitous:** Readiness shall report `embedding`, `extraction`,
   and `background_enrichment` independently; pending work shall not be reported
   as claim-ready memory and compatibility fields shall remain truthful.
@@ -122,11 +149,46 @@ model boundary and trigger the same bounded maintenance drain.
   Cloudflare, VPS, and local-computer smoke evidence is incomplete, Titen shall
   keep automatic enrichment opt-in and shall not describe it as production
   activated.
+- **AC-ENR-014 — Unwanted behavior:** If a due job's model, prompt, or schema
+  fingerprint differs from the active worker, then that worker shall not lease
+  or terminally fail the job; overlapping old/new workers shall leave every
+  acknowledged job in exactly one successful, explicitly superseded, or still
+  pending compatible state across restart and retry (#148).
+- **AC-ENR-015 — Event-driven:** When a provider returns proposal JSON, Titen
+  shall immediately compute its deterministic SHA-256 output hash and persist
+  only that hash for a valid commit or terminal invalid/unsafe result; provider
+  failures without output shall retain a null hash and raw proposal content
+  shall never enter canonical storage.
+- **AC-ENR-016 — Unwanted behavior:** If a Cloudflare drain cannot prove its
+  worst-case scheduling, lease, read, commit, cleanup, and maintenance work fits
+  the declared D1 query, parameter, and duration budget, then extraction and
+  background enrichment shall report `configured_error` and perform no model
+  mutation; supported Free/Paid claims require a max-bound real-D1 smoke (#149).
+- **AC-ENR-017 — Event-driven:** When Titen exports a generated claim, the
+  versioned stream shall include its immutable enrichment job, output hash,
+  commit, and generated-claim links; import preflight shall reject missing,
+  conflicting, cross-scope, or non-current dependencies atomically, while
+  re-import preserves stable IDs and fingerprints (#150).
+- **AC-ENR-018 — Unwanted behavior:** If one reflection anchor has stale
+  workspace authority, then the scheduler shall skip only that anchor and shall
+  continue healthy anchors from other tenants; storage and programming failures
+  shall still surface.
+- **AC-ENR-019 — Unwanted behavior:** If an extraction endpoint redirects or a
+  rejected/oversized response still has a body, then Titen shall refuse the
+  redirect and cancel the body so the configured endpoint fingerprint remains
+  the actual payload destination and retries cannot leak unbounded resources.
+- **AC-ENR-020 — Event-driven:** When an eligible observation is an exact
+  same-scope duplicate of previously derived evidence, Titen shall reuse the
+  existing semantic result and append exact provenance without another model
+  call or duplicate canonical claim; non-identical evidence remains independently
+  eligible.
 
 ## Done conditions
 
 Migration replay, frozen dual-runtime contracts, adversarial validator cases,
-lease/retry/crash recovery, exact provenance, outage-safe direct writes/recall,
-readiness, package/docs, and workflow checks pass. Locked evaluation and real
-Cloudflare, VPS, and local-computer smoke are recorded before activation. Every
-plan item is complete and this pair moves to `done/` with exact evidence.
+rollout-compatible lease/retry/crash recovery, hashed exact provenance,
+portable round-trip/rejection, D1 query-budget saturation, outage-safe direct
+writes/recall, readiness, package/docs, and workflow checks pass. Locked
+evaluation and worst-case real Cloudflare D1, VPS, and local-computer smoke are
+recorded before activation. Every plan item is complete and this pair moves to
+`done/` with exact evidence.
