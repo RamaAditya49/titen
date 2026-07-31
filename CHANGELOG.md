@@ -313,8 +313,9 @@ titen — self-hosted memory service
 
 ## Releasing
 
-Releases are cut by hand from a maintainer's machine and deliberately have no
-GitHub Action, so an npm token never lives in repository secrets. See
+Releases are cut by hand from a maintainer's machine. GitHub Actions stays
+disabled so the repository has no hosted automation cost; manual publication
+also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
 [Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.3.1...HEAD

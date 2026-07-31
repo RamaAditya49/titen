@@ -69,7 +69,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #96 | Close as duplicate of #80. |
 | #80, #81, #87, #90 | Close not planned: explicit conflict evidence, the current remote MCP boundary, full explainability, and host support remain deliberate until their recorded triggers occur. |
 | #115 | Close the in-core token-bucket proposal not planned; rate limits stay at authenticated ingress where Cloudflare and VPS controls are authoritative. |
-| #117 | Close not planned because manual npm publication and disabled GitHub Actions are an explicit project decision. |
+| #117 | Close not planned because Actions are intentionally disabled to keep the repository free of hosted automation cost; publication remains manual. |
 | #123 | Record and retain the single-process ceiling, then close worker pools/sharding until measured small-team demand breaches it. |
 | #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
 | #133 | Reject non-object 2xx JSON envelopes once in `requestWithMeta()`; cover every JSON top-level shape and typed callers, then publish the compatible correction as `0.3.1`. |

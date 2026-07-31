@@ -77,8 +77,9 @@ documentation, and an install smoke against the immutable npm artifact.
   must be packed, installed, and exercised before publication.
 - Parallel agents work in isolated worktrees and commit with the repository's
   required attribution. Integration happens once on the release branch.
-- Titen does not use GitHub Actions; issue #117 cannot override that project
-  decision without a new direct maintainer decision.
+- Titen does not use GitHub Actions so the repository incurs no hosted
+  automation cost; issue #117 cannot override that project decision without a
+  new direct maintainer decision and budget.
 - The dashboard remains synthetic where current docs say it is synthetic. A
   polished website is not runtime evidence for the memory API.
 
@@ -108,7 +109,8 @@ documentation, and an install smoke against the immutable npm artifact.
   package gate.
 - **AC-SWP-006 — Ubiquitous:** Titen shall keep GitHub Actions disabled and
   shall perform verification, integration, publication, and release evidence
-  through the documented manual workflow.
+  through the documented manual workflow so the repository has no hosted
+  automation cost.
 - **AC-SWP-007 — Event-driven:** When the merged batch is ready to release,
   Titen shall choose the smallest SemVer bump allowed by the highest public API
   impact, move the exact `Unreleased` entries under that version, and make
