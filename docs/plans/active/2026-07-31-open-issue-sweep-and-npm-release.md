@@ -37,6 +37,32 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
 - [ ] Remove only merged temporary branches/worktrees, re-audit GitHub/npm and
   the preserved original checkout, then record the durable non-secret handoff.
 
+## Issue disposition
+
+This matrix fixes shared root causes once. Final GitHub comments link each issue
+to its merged evidence or to the concrete decision recorded here.
+
+| Issues | Resolution |
+| --- | --- |
+| #83, #84, #85, #120, #122 | One FTS v11 migration and retrieval/packing batch; merged into this release branch. |
+| #101 | Prevent duplicate statements inside one context pack and document deterministic import for re-sync; automatic write-time convergence remains outside the evidence-preserving contract. |
+| #88, #91, #93, #95, #97, #98 | One SDK/MCP batch: project resolution, evidence-to-claim recall, timeout/signal composition, misuse guard, typed results/error metadata, and truthful schemas/envelopes. |
+| #94, #108 | Runnable README flow, accurate injection language, packaged security guidance, input hardening, and security-file packaging. |
+| #92, #99, #118, #119 | One validation/erasure batch for audited tombstoning, field paths/depth, timestamp ordering, and foreign references. |
+| #102, #103, #104, #106 | One collaboration-integrity batch for atomic checkpoints/handoffs, handoff readability, principal idempotency, and monotonic event cursors. |
+| #110, #111, #112, part of #116 | One bounded portability/backup batch; portable canonical dependencies only, byte-safe pages, explicit authority, and atomic verified backup. |
+| #100, #105, #107, remainder of #116 | One operational batch for actionable CLI errors, maintenance of ephemeral bookkeeping, high-value audit coverage, quiet/dry-run/export operations, and native operator guidance. |
+| #114, #121 | One portable SQL-shape batch that bounds candidates before correlated hydration; no scheduler or provider abstraction. |
+| #79, #82 | Close as umbrella issues after every referenced focused issue has its own resolution; no second competitive or HA framework. |
+| #86 | Close after #84/#85: score components are relative candidate signals, while zero-result noise and fixed packing were the current defects. |
+| #89 | Close after #88/#91: authorized compile already covers search without duplicating the retrieval API or removing required subject scope. |
+| #96 | Close as duplicate of #80. |
+| #80, #81, #87, #90 | Close not planned: explicit conflict evidence, the current remote MCP boundary, full explainability, and host support remain deliberate until their recorded triggers occur. |
+| #115 | Close the in-core token-bucket proposal not planned; rate limits stay at authenticated ingress where Cloudflare and VPS controls are authoritative. |
+| #117 | Close not planned because manual npm publication and disabled GitHub Actions are an explicit project decision. |
+| #123 | Record and retain the single-process ceiling, then close worker pools/sharding until measured small-team demand breaches it. |
+| #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
+
 ## Acceptance evidence mapping
 
 - AC-SWP-001: issue resolution matrix plus final GitHub issue audit and linked
