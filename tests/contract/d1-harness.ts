@@ -123,7 +123,6 @@ export class D1RunDiagnostics {
   readonly handleRuntimeStdio: (stdout: Readable, stderr: Readable) => void;
   #phase = "startup";
   #stderr = Buffer.alloc(0);
-  #emitted = 0;
 
   constructor(
     readonly owner: D1LaneOwner,
@@ -138,28 +137,19 @@ export class D1RunDiagnostics {
   }
 
   recordStderr(value: string) {
-    const safe = Buffer.from(redact(value, this.secrets));
-    const combined = Buffer.concat([this.#stderr, safe]);
-    this.#stderr = Buffer.from(combined.subarray(Math.max(0, combined.length - this.limit)));
-
-    const remaining = this.limit - this.#emitted;
-    if (remaining <= 0) return;
-    const output = safe.subarray(0, remaining).toString("utf8");
-    if (this.#emitted === 0) {
-      this.emit(`[d1-contract run=${this.owner.run_id} phase=${this.#phase} workerd-stderr]\n`);
-    }
-    this.emit(output);
-    this.#emitted += Buffer.byteLength(output);
+    const combined = `${this.#stderr.toString("utf8")}${value}`;
+    const safe = Buffer.from(redact(combined, this.secrets));
+    this.#stderr = Buffer.from(safe.subarray(Math.max(0, safe.length - this.limit)));
   }
 
   async run<T>(phase: string, operation: () => T | Promise<T>): Promise<T> {
     this.#phase = phase;
     this.#stderr = Buffer.alloc(0);
-    this.#emitted = 0;
     try {
       return await operation();
     } catch (error) {
       const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${this.#stderr.toString("utf8").trim() || "<none captured>"}`;
+      this.emit(`${context}\n`);
       if (error instanceof Error) {
         error.message = `${redact(error.message, this.secrets)}\n${context}`;
         if (error.stack) error.stack = `${redact(error.stack, this.secrets)}\n${context}`;

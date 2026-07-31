@@ -67,7 +67,11 @@ test("D1 diagnostics retain the original assertion and only bounded redacted std
 
   await assert.rejects(
     diagnostics.run("checkpoint contention", async () => {
-      diagnostics.recordStderr(`Authorization: Bearer raw-token private-test-key ${"x".repeat(180)}`);
+      diagnostics.recordStderr("x".repeat(180));
+      diagnostics.recordStderr("private-");
+      diagnostics.recordStderr("test-key Authoriza");
+      diagnostics.recordStderr("tion: Bearer raw-auth-");
+      diagnostics.recordStderr("token");
       throw failure;
     }),
     (error) => {
@@ -76,10 +80,12 @@ test("D1 diagnostics retain the original assertion and only bounded redacted std
       assert.equal((error as assert.AssertionError).expected, 11);
       assert.match((error as Error).message, /expected exact product result/);
       assert.match((error as Error).message, /run=run-diagnostic-test phase=checkpoint contention/);
-      assert.doesNotMatch((error as Error).message, /raw-token|private-test-key/);
+      assert.doesNotMatch(`${(error as Error).message}\n${(error as Error).stack}`, /raw-auth-token|private-test-key/);
       return true;
     },
   );
-  assert.ok(Buffer.byteLength(emitted.join("")) <= 220);
-  assert.doesNotMatch(emitted.join(""), /raw-token|private-test-key/);
+  const output = emitted.join("");
+  assert.ok(Buffer.byteLength(output) <= 220);
+  assert.match(output, /\[redacted\]/);
+  assert.doesNotMatch(output, /raw-auth-token|private-test-key/);
 });
