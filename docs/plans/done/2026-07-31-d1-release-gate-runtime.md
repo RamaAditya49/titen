@@ -1,14 +1,13 @@
 ---
 work_id: d1-release-gate-runtime
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-d1-release-gate-runtime.md
+spec: docs/specs/done/2026-07-31-d1-release-gate-runtime.md
 ---
 # Plan
 
@@ -25,10 +24,10 @@ spec: docs/specs/active/2026-07-31-d1-release-gate-runtime.md
   production audit, secret scan, and the full local repository gate.
 - [x] Rebase onto current `origin/main`, review the exact diff, merge through a
   pull request, and repeat the release-critical checks from clean source.
-- [ ] Run a real Cloudflare D1 smoke, record issue/PR evidence, and close this
+- [x] Run a real Cloudflare D1 smoke, record issue/PR evidence, and close this
   pair only when every criterion is proven.
 
-## Evidence mapping
+## Acceptance evidence
 
 - AC-D1G-001: five old-runtime logs, five candidate-runtime logs, and five final
   clean-branch 94/94 transcripts with no rerun.
@@ -39,8 +38,12 @@ spec: docs/specs/active/2026-07-31-d1-release-gate-runtime.md
   owned-workerd inspection after the five-run lane.
 - AC-D1G-004: exact manifest/lock versions, frozen install, supply-chain policy,
   `pnpm build:worker` output, and Node-built-in D1 runner transcript.
-- AC-D1G-005: production Worker revision plus real D1 health, readiness, and
+- AC-D1G-005: disposable Worker revision plus real D1 health, readiness, and
   authenticated write/read smoke without logging credentials.
+- AC-D1G-006: schema 16, health/readiness 200, unauthenticated 401, twelve
+  concurrent checkpoint saves with one durable head, twelve concurrent handoff
+  resolutions with one durable winner, and post-delete inventories proving the
+  exact Worker and D1 targets absent.
 
 ## Security, deployment, smoke, and rollback
 
@@ -52,7 +55,7 @@ passes. Before merge, rollback is branch deletion; after merge it is a reviewed
 revert to the prior pins, which cannot be used as release approval because the
 old gate failed two of five controlled runs.
 
-## Current verification
+## Verification
 
 - PRs #164 and #170 are merged; the final release candidate retains the matched
   Miniflare/Wrangler patch set and Node built-in test runner.
@@ -60,6 +63,13 @@ old gate failed two of five controlled runs.
   Bun/vector/SDK 120/120, integration 164/164, dashboard adapter smoke, and
   browser 10/10 with no retry. The Worker dry build is 463.72 KiB upload and
   98.11 KiB gzip.
-- The remaining unchecked item is the disposable real Cloudflare D1 smoke.
-  Cloudflare's account API currently returns edge 521/523/525 during a minor
-  service outage; no remote resource has been created.
+- The disposable real Cloudflare smoke used only synthetic state and an
+  ephemeral credential. Schema 16 applied; health and readiness returned 200;
+  an unauthenticated protected write returned 401; twelve concurrent checkpoint
+  saves produced one 201, eleven 200 updates, one ID, and one durable row;
+  twelve concurrent handoff resolutions produced one winner, one resolution
+  row, and one terminal event.
+- The exact disposable Worker and D1 database
+  `titen-release-smoke-20260731-1237` were deleted and verified absent. No
+  route or persistent deployment was added, and the mode-600 credential
+  workspace was deleted.

@@ -100,7 +100,7 @@ evidence.
 - [x] Prove the lane with an overlap regression and a controlled owner/contender
   experiment, then run five predeclared complete isolated D1 files with no
   retry.
-- [ ] Keep the real Cloudflare D1 smoke separate. Create uniquely named
+- [x] Keep the real Cloudflare D1 smoke separate. Create uniquely named
   disposable D1 and Worker resources, apply the release schema, exercise only
   synthetic authenticated health/readiness/write/read and checkpoint/handoff
   concurrency, enumerate the exact targets, then delete both without adding a
@@ -194,9 +194,9 @@ to its merged evidence or to the concrete decision recorded here.
 | #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
 | #141 | Make omitted project scope select only unscoped claims; add explicit `cross_project` mode guarded by `context:compile:all`, report `project_mode` and the capability-backed broad reason, and make every distributed agent skill resolve a repository project before compile. |
 | #142 | Close not planned: bounded operator inspection/lifecycle/purge already use Atlas and privileged REST/audit surfaces, while ADR-0003 explicitly rejects widening ordinary-agent MCP with operator projections. Reopen only for a concrete missing operator workflow with exact scope and authority. |
-| #102 recurrence | Keep the atomic UPSERT and handoff fence; retain safe diagnostics for each unexpected D1 contention response, keep the issue open until isolated repeated evidence classifies the recurrence, and add no product retry without a reproducible database failure. |
+| #102 recurrence | Keep the atomic UPSERT and handoff fence; the disposable real-D1 run proved one durable checkpoint head and one handoff winner under contention, so no product retry or second coordination layer was added. |
 | #144, #155 | Use one explicit fingerprinted role-aware embedding policy and absolute cosine gate before the existing relative ranker; require operator calibration and never ship the inspected threshold as a universal default. |
-| #157 | Serialize the manual local D1 lane with a host-wide owner lock, remove the hidden provisioning retry, preserve bounded run/case/workerd diagnostics, and keep the still-required real D1 smoke distinct from emulator evidence and #102. |
+| #157 | Serialize the manual local D1 lane with a host-wide owner lock, remove the hidden provisioning retry, preserve bounded run/case/workerd diagnostics, and close only after the separate disposable real-D1/Worker smoke and exact cleanup passed. |
 | #166 | Remove the Node 22 file-parent timeout conflict; retain 20-second ordinary case/hook bounds and only the measured 60-second semantic-readiness exception, then prove controlled-failure cleanup without changing product behavior. |
 | #162 | Fence `index_outbox` work with one expiring SQL owner shared by manual and background drains; stale completion/failure becomes a no-op and no queue framework or dependency is added. |
 | #167 | Reduce owned work to one canonical repair before each external upsert/removal, retain it across stale or ambiguous outcomes without retry amplification, and count only ownership-confirmed work. |
@@ -356,3 +356,16 @@ plan. The user's original dirty checkout is never a release source or rollback
 mechanism. The D1 lane lock owns only its tokenized temporary directory and
 Miniflare instances; rollback removes the harness change, never a sibling lock,
 process, database, or remote Cloudflare resource.
+
+## Current release evidence
+
+- Every issue open at sweep start is now closed with merged, duplicate,
+  not-planned, or real-runtime evidence. The only open pull request is the
+  release PR #180.
+- The disposable Cloudflare gate applied schema 16 and returned
+  health/readiness 200 plus unauthenticated 401. Twelve concurrent checkpoint
+  saves produced one durable head; twelve concurrent handoff resolutions
+  produced one durable winner.
+- Direct D1 inspection found one checkpoint row, one resolution row, and one
+  terminal event. The exact disposable Worker and D1 database were deleted and
+  verified absent; no route or persistent deployment remains.
