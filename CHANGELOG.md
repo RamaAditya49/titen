@@ -17,6 +17,14 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-07-31
+
+### Fixed
+
+- Successful SDK responses now reject array, `null`, and primitive JSON
+  envelopes with an `INVALID_RESPONSE` `TitenError` while preserving the HTTP
+  status, request ID, and safe response metadata.
+
 ## [0.3.0] — 2026-07-31
 
 ### Added
@@ -305,11 +313,13 @@ titen — self-hosted memory service
 
 ## Releasing
 
-Releases are cut by hand from a maintainer's machine and deliberately have no
-GitHub Action, so an npm token never lives in repository secrets. See
+Releases are cut by hand from a maintainer's machine. GitHub Actions stays
+disabled so the repository has no hosted automation cost; manual publication
+also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.1
 [0.3.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.0
 [0.2.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.1
 [0.2.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.0

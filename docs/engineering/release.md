@@ -13,10 +13,11 @@ That is npm's typosquat filter, not a name collision — `npm view titen` return
 fail at the registry after every local check has passed. The **CLI command is
 still `titen`**, because that comes from `bin`, not from the package name.
 
-Titen publishes to npm **manually, from a maintainer's machine**. There is no
-release GitHub Action and adding one is a decision, not a chore: the npm token
-would then live in repository secrets, and a compromised workflow could publish
-on its own. Publishing by hand keeps the credential on one machine.
+Titen publishes to npm **manually, from a maintainer's machine**. GitHub Actions
+is intentionally disabled so the repository incurs no hosted automation cost.
+Publishing by hand also keeps the npm credential on one machine instead of in a
+repository secret. Adding a release workflow requires a new maintainer decision
+and an explicit cost budget.
 
 ## Versioning and channels
 
@@ -90,8 +91,8 @@ reaches `latest`.
 
 ## What ships
 
-`package.json#files` is an allowlist. The `0.3.0` candidate packs 46 files /
-~106 kB:
+`package.json#files` is an allowlist. The `0.3.1` candidate packs 46 files /
+108,895 bytes:
 
 | Included | Why |
 | --- | --- |

@@ -19,6 +19,13 @@ package and contains an unreleased agent-distribution batch. The original local
 checkout also contains older dirty work that must not be reset, overwritten, or
 mistaken for current release source.
 
+After `titen-memory@0.3.0` was published, issue #133 demonstrated that a 2xx
+response containing valid JSON with an array or primitive top-level value is
+silently accepted as a successful SDK envelope. The correction requires the
+smallest compatible patch release, `0.3.1`. Any terminal closure drafted for
+the `0.3.0` sweep is withdrawn; this pair remains active until the patch has
+verified publication evidence.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -43,6 +50,9 @@ documentation, and an install smoke against the immutable npm artifact.
 - Select the smallest SemVer release justified by the merged batch, publish the
   exact verified candidate to npm, create the matching annotated tag and GitHub
   release, and smoke the registry artifact.
+- Reject non-object successful SDK envelopes at the shared response boundary,
+  preserve diagnostic status, request ID, and safe response metadata in the
+  resulting `TitenError`, and publish the verified correction as `0.3.1`.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -67,8 +77,9 @@ documentation, and an install smoke against the immutable npm artifact.
   must be packed, installed, and exercised before publication.
 - Parallel agents work in isolated worktrees and commit with the repository's
   required attribution. Integration happens once on the release branch.
-- Titen does not use GitHub Actions; issue #117 cannot override that project
-  decision without a new direct maintainer decision.
+- Titen does not use GitHub Actions so the repository incurs no hosted
+  automation cost; issue #117 cannot override that project decision without a
+  new direct maintainer decision and budget.
 - The dashboard remains synthetic where current docs say it is synthetic. A
   polished website is not runtime evidence for the memory API.
 
@@ -98,7 +109,8 @@ documentation, and an install smoke against the immutable npm artifact.
   package gate.
 - **AC-SWP-006 — Ubiquitous:** Titen shall keep GitHub Actions disabled and
   shall perform verification, integration, publication, and release evidence
-  through the documented manual workflow.
+  through the documented manual workflow so the repository has no hosted
+  automation cost.
 - **AC-SWP-007 — Event-driven:** When the merged batch is ready to release,
   Titen shall choose the smallest SemVer bump allowed by the highest public API
   impact, move the exact `Unreleased` entries under that version, and make
@@ -115,6 +127,15 @@ documentation, and an install smoke against the immutable npm artifact.
 - **AC-SWP-010 — Ubiquitous:** Titen shall leave the original checkout's tracked
   modifications, untracked files, branch pointer, and stash unchanged throughout
   the sweep.
+- **AC-SWP-011 — Unwanted behavior:** If a 2xx SDK response contains valid JSON
+  whose top-level value is an array, `null`, string, number, or boolean, then
+  `requestWithMeta()` and typed convenience methods shall reject it with a
+  `TitenError` whose code is `INVALID_RESPONSE` and which preserves the HTTP
+  status, request ID, and any safe response metadata available at that boundary.
+- **AC-SWP-012 — Event-driven:** When the issue #133 regression evidence passes,
+  Titen shall publish the same verified source as the backward-compatible
+  `0.3.1` npm patch, annotated tag, and GitHub release; valid object envelopes
+  shall retain their current behavior.
 
 ## Done conditions
 
@@ -124,4 +145,6 @@ remain; all merged temporary branches are removed; the README and release docs
 match the shipped artifact; every mapped gate passes; npm `latest`, the
 annotated tag, the GitHub release, and the release commit agree; a clean install
 smoke passes; the original dirty checkout is unchanged; and this spec and its
-paired plan move to `done` with terminal evidence.
+paired plan move to `done` with terminal evidence. The post-release issue #133
+is resolved by the verified `0.3.1` patch rather than by altering the immutable
+`0.3.0` artifact.
