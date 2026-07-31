@@ -10,6 +10,7 @@ import { planFtsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./re
 import { loadAuthorizedEvidenceIds } from "./evidence";
 import { estimateJsonTokens } from "./tokens";
 import type { RequestContext, Result } from "./http";
+import { validateEmbeddingVectors } from "./vectors";
 import {
   FEEDBACK_OUTCOMES,
   LIMITS,
@@ -74,7 +75,11 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   let vectorUsed = false;
   if (ctx.app.vectors) {
     try {
-      const queryVec = (await ctx.app.vectors.embedder.embed([task]))[0];
+      const queryVec = validateEmbeddingVectors(
+        await ctx.app.vectors.embedder.embed([task]),
+        1,
+        ctx.app.vectors.embedder.dimensions,
+      )[0];
       if (queryVec) {
         const hits = await ctx.app.vectors.store.query(queryVec, {
           topK: LIMITS.candidates,

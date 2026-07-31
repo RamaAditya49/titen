@@ -4,9 +4,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../../src/core/app";
+import { runMaintenance } from "../../src/core/maintenance";
 import { migrate } from "../../src/core/migrations";
 import {
   validateEmbeddingResponse,
+  validateEmbeddingVectors,
   type EmbeddingProvider,
   type VectorStore,
 } from "../../src/core/vectors";
@@ -106,6 +108,24 @@ test("shared embedding validator accepts both provider shapes in input order", (
   );
 });
 
+const invalidNormalized = [
+  ["missing output", () => []],
+  ["extra output", () => [new Float32Array(dense()), new Float32Array(dense())]],
+  ["sparse output list", () => Array(1)],
+  ["plain numeric array", () => [dense()]],
+  ["wrong dimensions", () => [new Float32Array(2)]],
+  ["NaN coordinate", () => [new Float32Array([1, Number.NaN, 0, 0])]],
+  ["infinite coordinate", () => [new Float32Array([1, Number.POSITIVE_INFINITY, 0, 0])]],
+] as const;
+
+for (const [name, response] of invalidNormalized)
+  test(`normalized embedding boundary rejects ${name}`, () => {
+    assert.throws(
+      () => validateEmbeddingVectors(response(), 1, dimensions),
+      /^Error: Invalid embedding response\.$/,
+    );
+  });
+
 const adapters: {
   name: string;
   create: (response: unknown) => {
@@ -144,6 +164,23 @@ const adapters: {
   },
 ];
 
+const consumers: typeof adapters = [
+  ...adapters,
+  {
+    name: "Injected provider",
+    create: () => ({
+      embedder: {
+        dimensions,
+        model: "malformed",
+        async embed(): Promise<Float32Array[]> {
+          return [];
+        },
+      },
+      close: () => {},
+    }),
+  },
+];
+
 for (const adapter of adapters)
   for (const [name, response, expectedCount] of invalid)
     test(`${adapter.name} rejects ${name}`, async () => {
@@ -161,7 +198,7 @@ for (const adapter of adapters)
       }
     });
 
-for (const adapter of adapters)
+for (const adapter of consumers)
   test(`${adapter.name} malformed output stays retryable and degrades to FTS`, async () => {
     const directory = mkdtempSync(join(tmpdir(), "titen-embed-validation-"));
     const handle = openDatabase(join(directory, "titen.db"));
@@ -183,24 +220,25 @@ for (const adapter of adapters)
     try {
       await migrate(db);
       const provisioned = await provisionWith(db, { scopes: ["*"] });
+      const vectors = {
+        store,
+        embedder,
+        fingerprint: {
+          provider: "test",
+          model: embedder.model,
+          revision: "test",
+          dimensions,
+          metric: "cosine",
+          preprocessing: "none",
+          index_schema: "claims-v1",
+        },
+      };
       const client = clientVia(
         createApp({
           db,
           revision: "embedding-validation",
           runtime: adapter.name,
-          vectors: {
-            store,
-            embedder,
-            fingerprint: {
-              provider: "test",
-              model: embedder.model,
-              revision: "test",
-              dimensions,
-              metric: "cosine",
-              preprocessing: "none",
-              index_schema: "claims-v1",
-            },
-          },
+          vectors,
         }),
         "http://titen.test",
       );
@@ -257,6 +295,18 @@ for (const adapter of adapters)
       assert.equal(failed.body.meta.retryable, true);
       assert.equal(failed.body.meta.pending, before);
       assert.doesNotMatch(JSON.stringify(failed.body), /Invalid embedding response/);
+      assert.equal(await pending(), before);
+      assert.equal(vectorWrites, 0);
+
+      const background = await runMaintenance({
+        db,
+        vectors,
+        limit: 50,
+        now: new Date("2026-07-31T00:00:00.000Z"),
+        deliverWebhooks: false,
+      });
+      assert.equal(background.indexed, 0);
+      assert.deepEqual(background.errors, [`index:${provisioned.orgId.slice(0, 12)}`]);
       assert.equal(await pending(), before);
       assert.equal(vectorWrites, 0);
 
