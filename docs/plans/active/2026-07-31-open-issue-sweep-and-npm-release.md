@@ -39,6 +39,10 @@ evidence.
   readiness, and maintenance through both runtime adapters; add migration 13
   for the minimal index fingerprint and fail configured semantic startup closed
   without adding provider probes or abstractions.
+- [ ] Extend semantic metadata with the last safe dependency failure kind/time;
+  record it from manual and background index drains, make `/readyz` fail locally
+  after the observed outage, and clear it only after a successful embed/upsert
+  recovery on both SQL runtimes.
 - [x] Bind Bun fingerprints to the normalized endpoint without storing topology,
   reject canonical/vector path aliasing before extension mutation, and fail
   readiness closed when historical indexable claims lack requeue work.
