@@ -11,6 +11,7 @@ observed.
 | `docs/architecture/agent-integration.md` | All host packages omit automatic lifecycle hooks | No automatic recall or end-of-session flush | A measured workflow needs the behavior and a parity fixture covers failure paths |
 | `docs/architecture/agent-integration.md` | Pi ships a skill package without an MCP client extension | Pi needs an operator-selected MCP adapter | The selected adapter is insufficient and a full process-authority review exists |
 | `plugins/claude/titen-memory/.clawhubignore` | ClawHub omits Claude's remote `.mcp.json` and OpenClaw uses a separate native config fragment | OpenClaw install needs one config merge after the skill bundle | OpenClaw compatible bundles natively import Streamable HTTP MCP servers with environment-backed headers |
+| `docs/agent-plugins.md` | Publish the standalone ClawHub skill while the validated bundle package is blocked | OpenClaw setup requires a separate skill install and native MCP config merge | ClawHub fixes `openclaw/clawhub#3327`; publish the bundle from commit `1cc8823` and replace the temporary install path |
 | `docs/architecture/agent-integration.md` | Vendor-owned public catalogs are not submitted | Repository marketplaces and ClawHub are the distribution surfaces | A maintainer schedules a specific vendor review and listing assets |
 
 ## Runtime and retrieval
@@ -47,7 +48,7 @@ observed.
 
 ## Summary
 
-- Markers: 27.
+- Markers: 28.
 - Markers without an upgrade trigger: 0.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned
