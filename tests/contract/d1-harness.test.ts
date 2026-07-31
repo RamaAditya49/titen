@@ -197,12 +197,86 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
       forbidden: ["SENSITIVE_ESCAPED_JSON_TOKEN_9382"],
       expected: '\\"token\\":\\"[redacted]\\"',
     },
+    {
+      name: "quoted structural value",
+      input: 'context-before {"access_token":"SENSITIVE_HEAD_9382 SPACE_SECRET_9382;SEMICOLON_SECRET_9382,COMMA_SECRET_9382}BRACE_SECRET_9382 and \\"QUOTE_SECRET_9382\\" tail","safe":"KEEP_SAFE_9382; still, }"} context-after',
+      secrets: [],
+      forbidden: [
+        "SENSITIVE_HEAD_9382",
+        "SPACE_SECRET_9382",
+        "SEMICOLON_SECRET_9382",
+        "COMMA_SECRET_9382",
+        "BRACE_SECRET_9382",
+        "QUOTE_SECRET_9382",
+      ],
+      expected: '"access_token":"[redacted]"',
+      redacted: 'context-before {"access_token":"[redacted]","safe":"KEEP_SAFE_9382; still, }"} context-after',
+    },
+    {
+      name: "single quoted structural value",
+      input: "context-before client_secret='SENSITIVE_SINGLE_9382 SPACE_SINGLE_9382;SEMICOLON_SINGLE_9382,COMMA_SINGLE_9382}BRACE_SINGLE_9382 and \\'QUOTE_SINGLE_9382\\' tail' context-after",
+      secrets: [],
+      forbidden: [
+        "SENSITIVE_SINGLE_9382",
+        "SPACE_SINGLE_9382",
+        "SEMICOLON_SINGLE_9382",
+        "COMMA_SINGLE_9382",
+        "BRACE_SINGLE_9382",
+        "QUOTE_SINGLE_9382",
+      ],
+      expected: "client_secret='[redacted]'",
+      redacted: "context-before client_secret='[redacted]' context-after",
+    },
+    {
+      name: "quoted bearer structural value",
+      input: 'context-before {"Authorization":"Bearer SENSITIVE_BEARER_9382 SPACE_BEARER_9382;SEMICOLON_BEARER_9382,COMMA_BEARER_9382}BRACE_BEARER_9382"} context-after',
+      secrets: [],
+      forbidden: [
+        "SENSITIVE_BEARER_9382",
+        "SPACE_BEARER_9382",
+        "SEMICOLON_BEARER_9382",
+        "COMMA_BEARER_9382",
+        "BRACE_BEARER_9382",
+      ],
+      expected: '"Authorization":"[redacted]"',
+      redacted: 'context-before {"Authorization":"[redacted]"} context-after',
+    },
+    {
+      name: "escaped JSON structural value",
+      input: String.raw`context-before \{\"token\":\"SENSITIVE_ESCAPED_9382 SPACE_ESCAPED_9382;SEMICOLON_ESCAPED_9382,COMMA_ESCAPED_9382}BRACE_ESCAPED_9382\",\"safe\":\"KEEP_ESCAPED_SAFE_9382; still, }\"\} context-after`,
+      secrets: [],
+      forbidden: [
+        "SENSITIVE_ESCAPED_9382",
+        "SPACE_ESCAPED_9382",
+        "SEMICOLON_ESCAPED_9382",
+        "COMMA_ESCAPED_9382",
+        "BRACE_ESCAPED_9382",
+      ],
+      expected: String.raw`\"token\":\"[redacted]\"`,
+      redacted: String.raw`context-before \{\"token\":\"[redacted]\",\"safe\":\"KEEP_ESCAPED_SAFE_9382; still, }\"\} context-after`,
+    },
+    {
+      name: "escaped single quoted structural value",
+      input: String.raw`context-before secret_key=\'SENSITIVE_ESINGLE_9382 SPACE_ESINGLE_9382;SEMICOLON_ESINGLE_9382,COMMA_ESINGLE_9382}BRACE_ESINGLE_9382\' context-after`,
+      secrets: [],
+      forbidden: [
+        "SENSITIVE_ESINGLE_9382",
+        "SPACE_ESINGLE_9382",
+        "SEMICOLON_ESINGLE_9382",
+        "COMMA_ESINGLE_9382",
+        "BRACE_ESINGLE_9382",
+      ],
+      expected: String.raw`secret_key=\'[redacted]\'`,
+      redacted: String.raw`context-before secret_key=\'[redacted]\' context-after`,
+    },
   ];
 
   for (const fixture of cases) {
-    const expectedLine = fixture.input
-      .replace(fixture.forbidden[0], "[redacted]")
-      .replace("Bearer [redacted]", "[redacted]");
+    const expectedLine = "redacted" in fixture
+      ? fixture.redacted
+      : fixture.input
+          .replace(fixture.forbidden[0], "[redacted]")
+          .replace("Bearer [redacted]", "[redacted]");
     for (let split = 0; split <= fixture.input.length; split++) {
       const owner: D1LaneOwner = {
         run_id: `run-${fixture.name.replaceAll(" ", "-")}-${split}`,
