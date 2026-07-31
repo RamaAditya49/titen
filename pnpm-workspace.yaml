@@ -6,8 +6,8 @@ allowBuilds:
   workerd: true
 
 minimumReleaseAgeExclude:
-  - miniflare@4.20260722.1
-  - wrangler@4.115.0
+  - miniflare@4.20260730.0
+  - wrangler@4.116.0
 
 onlyBuiltDependencies:
   - esbuild
