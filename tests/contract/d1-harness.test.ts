@@ -89,3 +89,32 @@ test("D1 diagnostics retain the original assertion and only bounded redacted std
   assert.match(output, /\[redacted\]/);
   assert.doesNotMatch(output, /raw-auth-token|private-test-key/);
 });
+
+test("D1 diagnostics hold an incomplete bearer prefix until the token chunk arrives", async () => {
+  const owner: D1LaneOwner = {
+    run_id: "run-bearer-boundary-test",
+    pid: process.pid,
+    worktree: "fixture",
+    started_at: "2026-07-31T00:00:00.000Z",
+  };
+  const emitted: string[] = [];
+  const diagnostics = new D1RunDiagnostics(owner, [], 128, (value) => emitted.push(value));
+  const failure = new Error("controlled bearer boundary failure");
+
+  await assert.rejects(
+    diagnostics.run("bearer boundary", () => {
+      diagnostics.recordStderr("Authorization: Bearer ");
+      diagnostics.recordStderr("SENSITIVE_BEARER_9382");
+      throw failure;
+    }),
+    (error) => {
+      assert.equal(error, failure);
+      assert.match((error as Error).message, /Authorization: \[redacted\]/);
+      assert.doesNotMatch(`${(error as Error).message}\n${(error as Error).stack}`, /SENSITIVE_BEARER_9382/);
+      return true;
+    },
+  );
+  const output = emitted.join("");
+  assert.match(output, /Authorization: \[redacted\]/);
+  assert.doesNotMatch(output, /SENSITIVE_BEARER_9382/);
+});

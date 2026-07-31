@@ -108,14 +108,18 @@ export async function acquireD1Lane(port = D1_LANE_PORT): Promise<D1Lane> {
   };
 }
 
-function redact(value: string, secrets: readonly string[]) {
+function redact(value: string, secrets: readonly string[], flush = false) {
   let safe = value;
   for (const secret of secrets) {
     if (secret) safe = safe.replaceAll(secret, "[redacted]");
   }
-  return safe
-    .replace(/(authorization\s*[:=]\s*)(?:bearer\s+)?[^\s,;]+/gi, "$1[redacted]")
+  safe = safe
+    .replace(/(authorization\s*[:=]\s*)bearer\s+[^\s,;]+/gi, "$1[redacted]")
+    .replace(/(authorization\s*[:=]\s*)(?!bearer(?:\s|$))[^\s,;]+/gi, "$1[redacted]")
     .replace(/((?:api[_-]?key|secret|token)\s*[:=]\s*)[^\s,;}]+/gi, "$1[redacted]");
+  return flush
+    ? safe.replace(/(authorization\s*[:=]\s*)bearer[^\S\r\n]*(?=\r?$)/gim, "$1[redacted]")
+    : safe;
 }
 
 /** Adds bounded, redacted workerd context without changing assertion objects. */
@@ -148,14 +152,16 @@ export class D1RunDiagnostics {
     try {
       return await operation();
     } catch (error) {
-      const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${this.#stderr.toString("utf8").trim() || "<none captured>"}`;
+      const safe = Buffer.from(redact(this.#stderr.toString("utf8"), this.secrets, true));
+      const stderr = safe.subarray(Math.max(0, safe.length - this.limit)).toString("utf8");
+      const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${stderr.trim() || "<none captured>"}`;
       this.emit(`${context}\n`);
       if (error instanceof Error) {
-        error.message = `${redact(error.message, this.secrets)}\n${context}`;
-        if (error.stack) error.stack = `${redact(error.stack, this.secrets)}\n${context}`;
+        error.message = `${redact(error.message, this.secrets, true)}\n${context}`;
+        if (error.stack) error.stack = `${redact(error.stack, this.secrets, true)}\n${context}`;
         throw error;
       }
-      throw new Error(`${redact(String(error), this.secrets)}\n${context}`);
+      throw new Error(`${redact(String(error), this.secrets, true)}\n${context}`);
     }
   }
 }
