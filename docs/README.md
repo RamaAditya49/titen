@@ -44,10 +44,6 @@ context without a documentation-site dependency.
 | Automatic LLM derivation/reflection | Planned; ADR and dated pilot exist, runtime/job/provider path does not |
 | Live deployment | One recorded Bun/container embedding smoke; no equivalent live Cloudflare/VPS/local enrichment smoke |
 
-The `0.3.1` package version identifies the static dashboard implementation. It
-does not mean that the roadmap's v0.3 memory-service, governance, or live Atlas
-capabilities have shipped.
-
 ## Documentation rules
 
 - `PRD.md` defines **what and why**.

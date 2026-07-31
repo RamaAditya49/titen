@@ -41,9 +41,11 @@ in its issue or pull request.
 
 ## Repository stage
 
-The memory service remains in product-definition/P0 preparation. The repository
-does contain a runnable Astro dashboard preview; it uses synthetic data and has
-no memory-service write path.
+The repository contains the P0 memory service, shared core, Cloudflare/D1
+adapter, Bun/SQLite adapter, and dual-runtime contract tests. This is local
+verification, not proof of a live Cloudflare deployment. The Astro dashboard
+preview still uses synthetic data, and automatic model-assisted derivation and
+reflection remain planned.
 
 Install and verify the current repository with:
 
