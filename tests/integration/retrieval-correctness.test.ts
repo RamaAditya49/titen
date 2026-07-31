@@ -74,6 +74,7 @@ test("hot retrieval SQL bounds candidates and drives evidence from claim sources
   await retrieveClaimCandidates(db, principal, '"marker"', {
     subjectId: "subject_test",
     projectId: null,
+    crossProject: false,
     at: "2026-07-31T00:00:00.000Z",
   });
 

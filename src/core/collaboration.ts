@@ -6,6 +6,7 @@ import type { Db } from "./db";
 import { notFound, validationError, conflict } from "./errors";
 import { eventStatement } from "./events";
 import { newId } from "./ids";
+import { POLICY_SNAPSHOT } from "./context";
 import type { RequestContext, Result } from "./http";
 import {
   LIMITS,
@@ -348,20 +349,26 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
   if (!recipient) throw notFound();
 
   if (contextId) {
-    const context = await first<{ id: string; project_id: string | null }>(
+    const context = await first<{
+      id: string;
+      project_id: string | null;
+      policy_snapshot: string;
+    }>(
       ctx.app.db,
-      `SELECT id, project_id FROM context_runs
+      `SELECT id, project_id, policy_snapshot FROM context_runs
         WHERE id = ? AND org_id = ? AND subject_id = ?`,
       [contextId, orgId, subjectId],
     );
     if (!context) throw notFound();
+    const crossProject =
+      context.policy_snapshot === `${POLICY_SNAPSHOT}:cross_project`;
     const items = await first<{ total: number; authorized: number }>(
       ctx.app.db,
       `SELECT COUNT(*) AS total,
               COUNT(CASE WHEN c.id IS NOT NULL
                               AND c.org_id = ?
                               AND c.subject_id = ?
-                              AND c.project_id IS ?
+                              AND (? = 1 OR c.project_id IS ?)
                               AND ${recordAccessSql("c")}
                               AND ${recordAccessSql("c")}
                          THEN 1 END) AS authorized
@@ -371,6 +378,7 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
       [
         orgId,
         subjectId,
+        Number(crossProject),
         context.project_id,
         ...recordAccessParams(principalId),
         ...recordAccessParams(toPrincipal),

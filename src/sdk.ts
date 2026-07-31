@@ -86,6 +86,8 @@ export interface CompileOptions {
   /** JSON token budget accepted by the server: 128 through 32,000. */
   max_tokens: number;
   project_id?: string;
+  /** Explicit all-project request; requires the separate context:compile:all capability. */
+  cross_project?: boolean;
   include_checkpoints?: boolean;
 }
 
@@ -191,7 +193,12 @@ export interface ConsolidationResult {
 export interface ContextPack {
   context_id: string;
   query: string;
-  scope: { subject_id: string; project_id: string | null };
+  scope: {
+    subject_id: string;
+    project_id: string | null;
+    project_mode: "project" | "unscoped" | "cross_project";
+    broad_access_reason: "credential_scope:context:compile:all" | null;
+  };
   budget: { max_tokens: number; used_tokens: number };
   items: Array<{
     untrusted: true;

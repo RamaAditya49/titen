@@ -147,6 +147,8 @@ test("ping answers, and the full handshake completes in order", async () => {
   const compile = tools.body.result.tools.find((tool: any) => tool.name === "titen_compile");
   assert.equal(compile.annotations.readOnlyHint, false, "compile records a context run");
   assert.equal(compile.annotations.idempotentHint, false, "compile creates a new context run");
+  assert.equal(compile.inputSchema.properties.cross_project.type, "boolean");
+  assert.match(compile.inputSchema.properties.cross_project.description, /context:compile:all/);
   const remember = tools.body.result.tools.find((tool: any) => tool.name === "titen_remember");
   assert.deepEqual(remember.inputSchema.properties.kind.enum, [
     "user_statement", "tool_result", "imported_source", "decision", "system_event",

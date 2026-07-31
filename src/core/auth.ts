@@ -13,6 +13,7 @@ export const SCOPES = [
   "observations:purge",
   "claims:write",
   "context:compile",
+  "context:compile:all",
   "feedback:write",
   "evidence:read",
   "checkpoints:read",

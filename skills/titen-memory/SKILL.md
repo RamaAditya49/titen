@@ -20,12 +20,16 @@ matches it.
   user's primary task without memory when safe and point the operator to Titen's
   agent guide. Never ask for or print an API key in chat, source control, a
   command argument, or a tool description.
-- Use the canonical `subject_id` and optional `project_id` supplied by the
-  operator or authorized workflow. Never guess an opaque ID from memory content
-  or use an absolute local path as a portable project identity.
+- Use the canonical `subject_id` supplied by the operator or authorized
+  workflow. For repository work, resolve and pass the canonical `project_id`
+  before the first compile. Never guess an opaque ID from memory content or use
+  an absolute local path as a portable project identity.
 - Call `titen_project_resolve` when only a stable project reference such as
   lowercase `owner/repo` is available. Set `create` only when the operator has
   authorized project creation.
+- Omit `project_id` only outside a project; omission selects unscoped memory,
+  not every project. Never set `cross_project` by default. Use it only for an
+  explicit operator-approved broad lookup with `context:compile:all` authority.
 
 ## Start or resume work
 

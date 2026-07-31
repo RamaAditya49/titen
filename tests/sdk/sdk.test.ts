@@ -79,14 +79,31 @@ test("the client drives the whole Level 5 loop", async () => {
 
   const context = await titen.compile({
     subject_id: "user_sdk",
+    project_id: project.project_id,
     task: "checkout rollback smoke before release",
     max_tokens: 900,
   });
   assert.match(context.context_id, /^ctx_/);
   assert.ok(context.budget.used_tokens <= 900);
   assert.match(context.instructions, /untrusted reference data/i);
+  assert.deepEqual(context.scope, {
+    subject_id: "user_sdk",
+    project_id: project.project_id,
+    project_mode: "project",
+    broad_access_reason: null,
+  });
   const selected = context.items.find((item) => item.claim_id === claimId);
   assert.ok(selected, "the client must receive the claim it just wrote");
+
+  const broad = await titen.compile({
+    subject_id: "user_sdk",
+    task: "checkout rollback smoke before release",
+    max_tokens: 900,
+    cross_project: true,
+  });
+  assert.equal(broad.scope.project_mode, "cross_project");
+  assert.equal(broad.scope.broad_access_reason, "credential_scope:context:compile:all");
+  assert.ok(broad.items.some((item) => item.claim_id === claimId));
 
   const feedback = await titen.feedback(context.context_id, {
     outcome: "useful",

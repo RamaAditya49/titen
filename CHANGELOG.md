@@ -44,6 +44,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   requires an explicit reindex after incompatibility.
 - `sqlite-vec@0.1.9` is a pinned optional peer: default installs remain
   dependency-light while the documented vector install is machine-verifiable.
+- Context compilation now treats a missing `project_id` as unscoped-only;
+  explicit cross-project recall requires `cross_project: true` plus the separate
+  `context:compile:all` capability and reports its effective scope and grant
+  reason across REST, SDK, and MCP.
 
 ## [0.3.0] — 2026-07-31
 
