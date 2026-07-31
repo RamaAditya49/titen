@@ -22,7 +22,7 @@
     "cloudflare-workers"
   ],
   "bin": {
-    "titen": "src/runtime/bun/bin.mjs"
+    "titen": "src/runtime/bun/cli.ts"
   },
   "exports": {
     ".": {

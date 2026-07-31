@@ -7,12 +7,13 @@ import { createSqliteDb, openDatabase } from "./sqlite";
 import { serve } from "./server";
 import { parseSecretCipher } from "../../core/secrets";
 import { createBunWebhookSecurity } from "./webhooks";
-import { chmodSync, existsSync, renameSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 const USAGE = `titen — self-hosted memory service
 
 Usage:
+  titen --version
   titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
   titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--label owner] [--print-sql]
@@ -28,6 +29,10 @@ Notes:
   locally. A raw key is printed once and is never recoverable afterwards.
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
+
+const VERSION = (JSON.parse(
+  readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
+) as { version: string }).version;
 
 function fail(message: string): never {
   console.error(`error: ${message}`);
@@ -49,6 +54,10 @@ const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> =
 };
 
 function parseArgs(argv: string[]) {
+  if (argv.length === 1 && argv[0] === "--version") {
+    console.log(VERSION);
+    process.exit(0);
+  }
   // Help is conventionally read-only. Handle it before command validation so
   // no malformed companion flag can open a database or create a credential.
   if (argv.includes("--help")) {

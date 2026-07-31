@@ -12,13 +12,13 @@ trap 'rm -rf "$work"' EXIT
 echo "==> packing"
 tarball="$work/$(npm pack --pack-destination "$work" --silent | tail -1)"
 
-echo "==> 1/7 packaged README"
+echo "==> 1/8 packaged README"
 if tar -xOf "$tarball" package/README.md | grep -Eq '(href|src)="\./|\]\(\./'; then
   echo "FAIL: packaged README contains repository-relative references" >&2
   exit 1
 fi
 
-echo "==> 2/7 packaged security policy"
+echo "==> 2/8 packaged security policy"
 tar -xOf "$tarball" package/SECURITY.md >/dev/null \
   || { echo "FAIL: SECURITY.md is missing from the package" >&2; exit 1; }
 tar -xOf "$tarball" package/README.md | grep -q 'TITEN_SECRET_KEYS' \
@@ -29,7 +29,7 @@ cd "$work"
 npm init -y >/dev/null
 npm install "$tarball" >/dev/null
 
-echo "==> 3/7 dependency tree"
+echo "==> 3/8 dependency tree"
 installed="$(ls node_modules | grep -v '^\.' | sort | tr '\n' ' ')"
 echo "    $installed"
 if [ -d node_modules/sqlite-vec ]; then
@@ -48,15 +48,11 @@ for toolchain in astro wrangler playwright miniflare vite esbuild; do
     exit 1
   fi
 done
-node_bin="$(command -v node)"
-mkdir "$work/empty-path"
-missing_bun="$(PATH="$work/empty-path" "$node_bin" node_modules/titen-memory/src/runtime/bun/bin.mjs --help 2>&1 || true)"
-printf '%s\n' "$missing_bun" | grep -q 'Titen CLI requires Bun (it uses bun:sqlite).' \
-  || { echo "FAIL: installed CLI did not explain its Bun requirement" >&2; exit 1; }
-printf '%s\n' "$missing_bun" | grep -q 'https://bun.sh/docs/installation' \
-  || { echo "FAIL: installed CLI omitted Bun installation guidance" >&2; exit 1; }
+version="$(node -p 'require("./node_modules/titen-memory/package.json").version')"
+[ "$(./node_modules/.bin/titen --version)" = "$version" ] \
+  || { echo "FAIL: installed CLI version differs from package.json" >&2; exit 1; }
 
-echo "==> 4/7 titen bootstrap"
+echo "==> 4/8 titen bootstrap"
 bootstrap="$(./node_modules/.bin/titen bootstrap --db "$work/t.db" --org 'Pack Verify')"
 printf '%s\n' "$bootstrap" | grep -q '^api_key: titen_' \
   || { echo "FAIL: bootstrap printed no API key" >&2; exit 1; }
@@ -65,7 +61,7 @@ api_key="$(printf '%s\n' "$bootstrap" | sed -n 's/^api_key: //p')"
 umask 077
 printf 'header = "authorization: Bearer %s"\n' "$api_key" >"$work/curl-auth"
 
-echo "==> 5/7 titen serve + MCP"
+echo "==> 5/8 titen serve + MCP"
 # The verifier may run beside other Titen processes. Ask the OS for a free port
 # instead of mistaking an unrelated fixed-port server for this candidate.
 port="$(node --input-type=module -e '
@@ -197,7 +193,7 @@ esac
 kill "$server" 2>/dev/null || true
 trap 'rm -rf "$work"' EXIT
 
-echo "==> 6/7 SDK on plain node"
+echo "==> 6/8 SDK on plain node"
 node --input-type=module -e '
   const { createRequire } = await import("node:module");
   const { TitenClient } = await import("titen-memory");
@@ -213,11 +209,19 @@ node --input-type=module -e '
   createRequire(process.cwd() + "/").resolve("titen-memory/package.json");
 ' || { echo "FAIL: node cannot import the SDK" >&2; exit 1; }
 
-echo "==> 7/7 custom global prefix"
+echo "==> 7/8 custom npm global prefix"
 prefix="$work/npm-prefix"
 npm install --global --prefix "$prefix" "$tarball" >/dev/null
 "$prefix/bin/titen" --help | grep -q '^titen — self-hosted memory service' \
   || { echo "FAIL: custom-prefix titen binary did not execute" >&2; exit 1; }
+
+echo "==> 8/8 packed global bin without Node"
+bun_bin="$(command -v bun)"
+mkdir "$work/bun-only-path"
+ln -s "$bun_bin" "$work/bun-only-path/bun"
+PATH="$work/bun-only-path" "$prefix/bin/titen" --version >"$work/bun-version"
+[ "$(cat "$work/bun-version")" = "$version" ] \
+  || { echo "FAIL: packed global titen needs Node or reports the wrong version" >&2; exit 1; }
 
 echo
 echo "OK — $(basename "$tarball") is publishable."

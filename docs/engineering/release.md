@@ -91,8 +91,8 @@ reaches `latest`.
 
 ## What ships
 
-`package.json#files` is an allowlist. The `0.3.1` candidate packs 46 files /
-108,895 bytes:
+`package.json#files` is an allowlist. The `0.3.1` candidate packs 45 files /
+109,253 bytes:
 
 | Included | Why |
 | --- | --- |
@@ -182,20 +182,22 @@ release never contained.
 ## Verifying a candidate
 
 `scripts/verify-pack.sh` packs the current tree, installs the tarball into a
-throwaway directory, and asserts the six things a broken publish breaks:
+throwaway directory, and asserts the eight things a broken publish breaks:
 
 1. the packaged README contains no repository-relative references to omitted files;
-2. the dependency tree contains no build toolchain;
-3. `titen bootstrap` creates a database and an API key;
-4. `titen serve` answers `/readyz` with every migration applied;
-5. plain `node` can `import { TitenClient } from "titen-memory"` and `"titen-memory/sdk"`.
-6. a global install under a custom npm prefix exposes an executable `titen` bin.
+2. `SECURITY.md` and key-management guidance ship with the package;
+3. the dependency tree contains no build toolchain and the CLI reports the package version;
+4. `titen bootstrap` creates a database and an API key;
+5. `titen serve` answers `/readyz` with every migration applied;
+6. plain `node` can `import { TitenClient } from "titen-memory"` and `"titen-memory/sdk"`;
+7. a global install under a custom npm prefix exposes an executable `titen` bin;
+8. that packed global executable runs with Bun as the only runtime on `PATH`.
 
 The bootstrap and serve checks execute the installed `node_modules/.bin/titen`
-shim, so a missing or invalid bin fails without importing npm's private package
-normalizer or assuming where npm itself is installed. The gate therefore works
-with a system npm and a custom user global prefix as well as an npm installed
-under that prefix.
+entrypoint, so a missing or invalid bin fails without importing npm's private
+package normalizer or assuming where npm itself is installed. The gate therefore
+works with a system npm and a custom user global prefix as well as an npm
+installed under that prefix.
 
 Run it before every publish. It exits non-zero on the first failure.
 
