@@ -17,20 +17,50 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-31
+
 ### Added
 
 - Native Claude/ZCode and Cursor marketplace bundles, a ClawHub/OpenClaw skill
   bundle plus native MCP config, a Hermes skill plugin, a Pi skill package, and
-  OpenCode/Windsurf/TRAE host kits now package the same seven-tool Titen MCP
+  OpenCode/Windsurf/TRAE host kits now package the same nine-tool Titen MCP
   contract without duplicating the server or embedding an endpoint or
   credential. The standalone Titen Memory skill is public on ClawHub; its
   bundle-plugin package is staged while an upstream inspector incident blocks
   live package publication.
+- The TypeScript SDK now covers project resolution, evidence-linked claims,
+  feedback, checkpoints, leases, and handoffs with typed results, bounded
+  timeout/signal handling, structured API errors, and mutation retry keys. The
+  same nine operations are available through MCP with truthful schemas.
 - Handoff recipients can read the exact delegated checkpoint and currently
   authorized context pack; operators can page organization leases and active
   organization-level owners/admins can force-release a failed agent's lease.
 - `titen migrate --dry-run` prints the pending forward-only SQL without creating
   or changing the SQLite database.
+- `titen serve --quiet`, bounded cleanup of expired execution state, and
+  content-free audits for credential, portability, collaboration, webhook, and
+  federation changes use the existing runtime and SQL primitives.
+- The README is now a concise international open-source entrypoint with a
+  runnable SDK example, explicit maturity boundaries, and a prominent link to
+  [titen.dev](https://titen.dev).
+
+### Changed
+
+- **Breaking:** JSONL export format v2 adds workspace and membership streams,
+  actor mappings, supersession pointers, deployment-scoped export authority,
+  and byte-bounded pages. Import remains backward-compatible with v1, but code
+  that parses export headers must accept format version 2.
+- **Breaking:** MCP now exposes nine tools and uses normalized JSON-RPC tool
+  results with structured content. Clients that hard-code the previous
+  seven-tool list or result shape must update for `0.3.0`.
+- Migration 11 atomically rebuilds the derived observation and claim FTS tables
+  with Porter stemming and encoded scope terms; canonical SQL is unchanged.
+- Migration 12 repairs unsafe collaboration pointers, adds database fences for
+  handoff resolution, scopes idempotency to principals across key rotation, and
+  assigns monotonic event order without changing public event IDs.
+- The default npm install no longer downloads `sqlite-vec`. SDK and lexical-only
+  users install only `titen-memory`; vector-enabled VPS and container paths add
+  `sqlite-vec@0.1.9` explicitly.
 
 ### Security
 
@@ -45,6 +75,13 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ### Fixed
 
+- Lexical retrieval now stems multilingual terms, removes stopword noise,
+  applies organization and subject scope before ranking and candidate limits,
+  preserves useful tail terms, and fills token budgets without duplicate
+  statements or an arbitrary three-item-per-kind ceiling.
+- Context compilation bounds correlated SQL work before evidence hydration, so
+  large authorized corpora do not turn small requested result sets into
+  unbounded query work.
 - Checkpoint saves and handoff resolutions now have database-enforced single
   winners under D1 latency, with deterministic duplicate repair and safe
   handoff foreign keys during migration.
@@ -69,6 +106,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   and safely repeatable.
 - The installed CLI now explains when Bun is missing, while SDK-only installs
   no longer download the optional `sqlite-vec` native package.
+- No-vector deployments avoid unused index-outbox work. Configured vector
+  deployments retain claim upserts and purge deletes; SQLite uses explicit
+  `synchronous=FULL`, and CLI startup failures are short and actionable.
 
 ## [0.2.1] — 2026-07-31
 
@@ -265,7 +305,9 @@ Releases are cut by hand from a maintainer's machine and deliberately have no
 GitHub Action, so an npm token never lives in repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.0
+[0.2.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.1
 [0.2.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.0
 [0.1.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.1.2
 [0.1.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.1.1

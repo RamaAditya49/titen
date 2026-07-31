@@ -90,7 +90,8 @@ reaches `latest`.
 
 ## What ships
 
-`package.json#files` is an allowlist, so the tarball is 41 files / ~73 kB:
+`package.json#files` is an allowlist. The `0.3.0` candidate packs 46 files /
+~106 kB:
 
 | Included | Why |
 | --- | --- |
@@ -98,6 +99,7 @@ reaches `latest`.
 | `src/runtime/bun/**` | The `titen` CLI and `Bun.serve` runtime. |
 | `src/sdk.ts` | Source of truth for the SDK, and its `types` entry. |
 | `dist/npm/sdk.js` | Type-stripped SDK for Node/Deno/workers, built by `prepack`. |
+| `README.md`, `SECURITY.md`, `LICENSE` | npm entrypoint, disclosure policy, and license. |
 
 Not shipped: the Astro dashboard (`src/pages`, `src/styles`), the Cloudflare
 adapter (deploy that from a clone with `wrangler`), tests, and docs.
@@ -118,13 +120,15 @@ npm login
 git status --short          # must be empty
 pnpm test:all
 
-# 2. Write the entry FIRST, while the reasons are still in your head.
-#    Move CHANGELOG.md's [Unreleased] items under the new version heading,
-#    date it, and update the compare links at the bottom.
+# 2. Prepare the reviewed release commit before merging it.
+#    Move CHANGELOG.md's [Unreleased] items under the exact dated version,
+#    set package.json to that same version, and update the compare links.
 $EDITOR CHANGELOG.md
+$EDITOR package.json
 
-# 3. Bump. This commits package.json and creates the vN.N.N tag.
-npm version <patch|minor|major>
+# 3. Merge the release pull request, then check out that exact clean commit.
+#    Do not run `npm version`: the reviewed commit already carries the version.
+git status --short          # must still be empty
 
 # 4. Prove the tarball works before it becomes permanent (see below).
 #    npm publish is irreversible after 72 hours.
@@ -132,9 +136,11 @@ bash scripts/verify-pack.sh
 
 # 5. Ship.
 npm publish                 # prepack rebuilds dist/npm/sdk.js
-git push && git push --tags
 
-# 6. Publish the GitHub release from the entry you already wrote.
+# 6. Tag that same commit and publish the generated GitHub release.
+git tag -a "v$(node -p 'require("./package.json").version')" \
+  -m "titen-memory $(node -p 'require("./package.json").version')"
+git push origin "v$(node -p 'require("./package.json").version')"
 gh release create "v$(node -p 'require("./package.json").version')" \
   --title "…" --notes-file <(scripts/changelog-section.sh)
 ```
