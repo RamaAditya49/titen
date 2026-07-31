@@ -1,12 +1,11 @@
 ---
 work_id: reference-agent-plugin
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Reference agent plugin
