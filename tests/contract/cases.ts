@@ -922,6 +922,62 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "lexical limiting ranks a late best match before candidate and token budgets",
+    async run(fx) {
+      const agent = await fx.provision();
+      const obs = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({
+          subject_id: "user_late_rank",
+          content: "Shared evidence for a bounded lexical scale regression.",
+        }),
+      });
+      expectOk(obs, 201);
+      const observationId = obs.body.data.observation_id as string;
+
+      // Insert 200 weaker matches first so limiting by row order would exclude
+      // the final, more relevant claim before BM25 and token packing can see it.
+      for (let batch = 0; batch < 4; batch += 1) {
+        const claims = Array.from({ length: 50 }, (_unused, index) => ({
+          kind: "procedural",
+          statement: `Generic release note ${batch}-${index} with unrelated filler.`,
+          sources: [{ observation_id: observationId, relation: "supports" }],
+        }));
+        expectOk(await fx.call("POST", "/v1/consolidations", {
+          key: agent.key,
+          body: { subject_id: "user_late_rank", claims },
+        }), 201);
+      }
+
+      const target = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_late_rank",
+          claims: [{
+            kind: "procedural",
+            statement: "Quartz rollback smoke is required before release.",
+            sources: [{ observation_id: observationId, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(target, 201);
+      const targetId = target.body.data.claims[0].claim_id as string;
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: "user_late_rank",
+          task: "quartz rollback smoke release",
+          max_tokens: 300,
+        },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.meta.candidates, 200);
+      assert.equal(compiled.body.data.items[0]?.claim_id, targetId);
+      assert.deepEqual(compiled.body.data.items[0]?.evidence_ids, [observationId]);
+    },
+  },
+  {
     name: "a managed key cannot exceed the credential that created it",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"], maxTrust: "policy_approved" });

@@ -2,6 +2,7 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import type { Principal } from "../../src/core/auth";
 import type { Db, Param } from "../../src/core/db";
+import { loadAuthorizedEvidenceIds } from "../../src/core/evidence";
 import { packUnderBudget } from "../../src/core/rank";
 import { planFtsQuery, retrieveClaimCandidates } from "../../src/core/retrieval";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
@@ -45,7 +46,7 @@ test("packing covers kinds first, fills the remaining budget, and suppresses dup
   ], 3).selected, ["top", "other"]);
 });
 
-test("claim retrieval puts encoded organization and subject scope inside MATCH", async () => {
+test("hot retrieval SQL bounds candidates and drives evidence from claim sources", async () => {
   let capturedSql = "";
   let capturedParams: Param[] = [];
   const db: Db = {
@@ -78,12 +79,29 @@ test("claim retrieval puts encoded organization and subject scope inside MATCH",
 
   assert.match(capturedSql, /claims_fts MATCH \([\s\S]*org_scope[\s\S]*subject_scope[\s\S]*statement/);
   assert.ok(capturedSql.indexOf("subject_scope") < capturedSql.indexOf("ORDER BY bm25"));
+  assert.ok(capturedSql.indexOf("LIMIT ?") < capturedSql.indexOf("FROM claim_sources s"));
+  assert.ok(capturedSql.indexOf("LIMIT ?") < capturedSql.indexOf("context_feedback"));
   assert.deepEqual(capturedParams.slice(0, 5), [
     "org_test",
     "subject_test",
     '"marker"',
     "org_test",
     "subject_test",
+  ]);
+
+  await loadAuthorizedEvidenceIds(db, principal, ["claim_late", "claim_early"]);
+  assert.match(capturedSql, /FROM claim_sources s/);
+  assert.doesNotMatch(capturedSql, /JOIN observations/);
+  assert.match(capturedSql, /EXISTS \([\s\S]*FROM observations o/);
+  assert.match(capturedSql, /o\.id = s\.observation_id/);
+  assert.match(capturedSql, /o\.org_id = \?/);
+  assert.match(capturedSql, /o\.visibility/);
+  assert.deepEqual(capturedParams, [
+    "claim_late",
+    "claim_early",
+    "org_test",
+    "agent_test",
+    "agent_test",
   ]);
 });
 

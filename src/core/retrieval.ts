@@ -168,7 +168,27 @@ export async function retrieveClaimCandidates(
 ): Promise<ClaimCandidate[]> {
   const limit = scope.limit ?? LIMITS.candidates;
   return db.all<ClaimCandidate>(
-    `SELECT c.id,
+    `WITH candidate_ids AS (
+       SELECT claims_fts.claim_id,
+              bm25(claims_fts, 1.0, 0.0, 0.0, 0.0) AS lexical_bm25
+         FROM claims_fts
+         JOIN claims c ON c.id = claims_fts.claim_id
+        WHERE claims_fts MATCH (
+                'org_scope : "' || lower(hex(?)) || '0" AND '
+                || 'subject_scope : "' || lower(hex(?)) || '0" AND '
+                || 'statement : (' || ? || ')'
+              )
+          AND c.org_id = ?
+          AND c.subject_id = ?
+          AND (? IS NULL OR c.project_id = ?)
+          AND c.status IN ('active', 'disputed')
+          AND c.valid_from <= ?
+          AND (c.valid_to IS NULL OR c.valid_to > ?)
+          AND ${recordAccessSql("c")}
+        ORDER BY bm25(claims_fts, 1.0, 0.0, 0.0, 0.0)
+        LIMIT ?
+     )
+     SELECT c.id,
             c.kind,
             c.statement,
             c.confidence,
@@ -179,7 +199,7 @@ export async function retrieveClaimCandidates(
             c.valid_from,
             c.valid_to,
             c.created_at,
-            bm25(claims_fts, 1.0, 0.0, 0.0, 0.0) AS bm25,
+            candidate_ids.lexical_bm25 AS bm25,
             CASE
               WHEN c.status = 'disputed' THEN 1
               WHEN EXISTS (
@@ -193,22 +213,9 @@ export async function retrieveClaimCandidates(
             (SELECT COUNT(*) FROM context_feedback f
               WHERE f.claim_id = c.id AND f.outcome IN ('irrelevant', 'incorrect', 'harmful')) AS feedback_negative,
             (SELECT COUNT(*) FROM context_feedback f WHERE f.claim_id = c.id) AS feedback_total
-       FROM claims_fts
-       JOIN claims c ON c.id = claims_fts.claim_id
-      WHERE claims_fts MATCH (
-              'org_scope : "' || lower(hex(?)) || '0" AND '
-              || 'subject_scope : "' || lower(hex(?)) || '0" AND '
-              || 'statement : (' || ? || ')'
-            )
-        AND c.org_id = ?
-        AND c.subject_id = ?
-        AND (? IS NULL OR c.project_id = ?)
-        AND c.status IN ('active', 'disputed')
-        AND c.valid_from <= ?
-        AND (c.valid_to IS NULL OR c.valid_to > ?)
-        AND ${recordAccessSql("c")}
-      ORDER BY bm25(claims_fts, 1.0, 0.0, 0.0, 0.0)
-      LIMIT ?`,
+       FROM candidate_ids
+       JOIN claims c ON c.id = candidate_ids.claim_id
+      ORDER BY candidate_ids.lexical_bm25`,
     [
       principal.orgId,
       scope.subjectId,

@@ -43,7 +43,7 @@ export const LIMITS = {
   // ponytail: a fixed candidate ceiling rather than one scaled to the corpus.
   // The ceiling is that recall past this many lexical matches is unreachable
   // no matter how the caller ranks or budgets. Upgrade path: make it a
-  // per-request option once retrieval is cheap enough to widen (#121).
+  // per-request option only when recall evaluation shows a quality miss.
   candidates: 200,
   claimsPerConsolidation: 50,
   sourcesPerClaim: 20,

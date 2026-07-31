@@ -126,9 +126,13 @@ export async function loadAuthorizedEvidenceIds(
     const rows = await db.all<{ claim_id: string; observation_id: string }>(
       `SELECT s.claim_id, s.observation_id
          FROM claim_sources s
-         JOIN observations o ON o.id = s.observation_id
         WHERE s.claim_id IN (${group.map(() => "?").join(", ")})
-          AND o.org_id = ? AND ${recordAccessSql("o")}
+          AND EXISTS (
+            SELECT 1 FROM observations o
+             WHERE o.id = s.observation_id
+               AND o.org_id = ?
+               AND ${recordAccessSql("o")}
+          )
         ORDER BY s.claim_id, s.observation_id`,
       [
         ...group,
