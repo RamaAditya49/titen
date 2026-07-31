@@ -9,7 +9,8 @@
  * provider factory or network probe in readiness.
  */
 
-import type { Db } from "./db";
+import { chunk, MAX_BOUND_PARAMS, type Db, type Stmt } from "./db";
+import { newId } from "./ids";
 
 export interface VectorMatch {
   id: string;
@@ -295,32 +296,251 @@ export interface SemanticReadiness {
 
 export type SemanticDependency = "embedder" | "vector_store";
 
+export const SEMANTIC_INDEX_LEASE_MS = 5 * 60_000;
+
+export interface SemanticIndexLease {
+  token: string;
+  ids: string[];
+  acquiredAt: string;
+}
+
+export interface SemanticIndexWrite {
+  outboxId: string;
+  sourceOutboxId: string;
+  recordId: string;
+  repairId: string;
+}
+
+/** Atomically fence rebuildable index work before any provider call. */
+export async function claimSemanticIndexWork(
+  db: Db,
+  outboxIds: string[],
+): Promise<SemanticIndexLease> {
+  const ids = [...new Set(outboxIds)];
+  if (ids.length === 0)
+    return { token: newId("idxlease"), ids: [], acquiredAt: "1970-01-01T00:00:00.000Z" };
+  const token = newId("idxlease");
+  const claimed: string[] = [];
+  const expiries: string[] = [];
+  for (const group of chunk(ids, MAX_BOUND_PARAMS - 1)) {
+    await db.batch([{
+      sql: `UPDATE index_outbox
+               SET lease_token = ?,
+                   lease_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+${SEMANTIC_INDEX_LEASE_MS / 1000} seconds')
+             WHERE state = 'pending'
+               AND (lease_expires_at IS NULL OR lease_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+               AND id IN (${group.map(() => "?").join(", ")})`,
+      params: [token, ...group],
+    }]);
+    const rows = await db.all<{ id: string; lease_expires_at: string }>(
+      `SELECT id, lease_expires_at FROM index_outbox
+        WHERE state = 'pending' AND lease_token = ?
+          AND id IN (${group.map(() => "?").join(", ")})`,
+      [token, ...group],
+    );
+    claimed.push(...rows.map(({ id }) => id));
+    expiries.push(...rows.map(({ lease_expires_at }) => lease_expires_at));
+  }
+  const parsedExpiries = expiries.map((value) => Date.parse(value));
+  if (parsedExpiries.some((value) => !Number.isFinite(value)))
+    throw new Error("Invalid semantic index lease expiry.");
+  const acquiredAt = parsedExpiries.length === 0
+    ? "1970-01-01T00:00:00.000Z"
+    : new Date(Math.max(...parsedExpiries) - SEMANTIC_INDEX_LEASE_MS).toISOString();
+  return { token, ids: claimed, acquiredAt };
+}
+
+/** Persist canonical reconciliation before an owned external mutation. */
+export async function prepareSemanticIndexWrites(
+  db: Db,
+  entries: { outboxId: string; recordId: string }[],
+  leaseToken: string,
+): Promise<SemanticIndexWrite[]> {
+  const unique = [...new Map(entries.map((entry) => [entry.outboxId, entry])).values()];
+  const order = new Map(unique.map(({ outboxId }, index) => [outboxId, index]));
+  const owned: { id: string; record_id: string; operation: string }[] = [];
+  for (const group of chunk(unique.map(({ outboxId }) => outboxId), MAX_BOUND_PARAMS - 1))
+    owned.push(...await db.all<{ id: string; record_id: string; operation: string }>(
+      `SELECT id, record_id, operation FROM index_outbox
+        WHERE state = 'pending' AND lease_token = ?
+          AND id IN (${group.map(() => "?").join(", ")})`,
+      [leaseToken, ...group],
+    ));
+  owned.sort((left, right) => order.get(left.id)! - order.get(right.id)!);
+
+  const rowsByRecord = new Map<string, typeof owned>();
+  for (const row of owned) {
+    const rows = rowsByRecord.get(row.record_id) ?? [];
+    rows.push(row);
+    rowsByRecord.set(row.record_id, rows);
+  }
+  const writes = [...rowsByRecord].map(([recordId, rows]) => {
+    const source = rows.find(({ operation }) => operation !== "reconcile") ?? rows[0]!;
+    const repair = rows.find(
+      ({ id, operation }) => id !== source.id && operation === "reconcile",
+    );
+    return {
+      outboxId: source.id,
+      sourceOutboxId: source.id,
+      recordId,
+      repairId: repair?.id ?? newId("obx"),
+      sourceIds: rows.map(({ id }) => id),
+      insertedRepair: !repair,
+    };
+  });
+  for (const write of writes) {
+    const placeholders = write.sourceIds.map(() => "?").join(", ");
+    const statements: Stmt[] = [
+      {
+        sql: `UPDATE index_outbox
+                 SET lease_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+${SEMANTIC_INDEX_LEASE_MS / 1000} seconds')
+               WHERE state = 'pending' AND lease_token = ?
+                 AND id IN (${placeholders})`,
+        params: [leaseToken, ...write.sourceIds],
+      },
+    ];
+    if (write.insertedRepair) statements.push({
+      sql: `INSERT INTO index_outbox
+                (id, org_id, record_type, record_id, operation, state, attempts,
+                 created_at, lease_token, lease_expires_at)
+              SELECT ?, org_id, 'claim', record_id, 'reconcile', 'pending', 0,
+                     strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), lease_token, lease_expires_at
+                FROM index_outbox
+               WHERE id = ? AND record_type = 'claim'
+                 AND state = 'pending' AND lease_token = ?`,
+      params: [write.repairId, write.outboxId, leaseToken],
+    });
+    const redundantIds = write.sourceIds.filter(
+      (id) => id !== write.outboxId && id !== write.repairId,
+    );
+    if (redundantIds.length > 0) statements.push({
+      sql: `UPDATE index_outbox
+                 SET state = 'done', attempts = attempts + 1,
+                     lease_token = NULL, lease_expires_at = NULL
+               WHERE state = 'pending' AND lease_token = ?
+                 AND id IN (${redundantIds.map(() => "?").join(", ")})
+                 AND EXISTS (
+                   SELECT 1 FROM index_outbox repair
+                    WHERE repair.id = ? AND repair.operation = 'reconcile'
+                      AND repair.state = 'pending' AND repair.lease_token = ?
+                 )`,
+      params: [leaseToken, ...redundantIds, write.repairId, leaseToken],
+    });
+    await db.batch(statements);
+  }
+
+  const prepared = new Set<string>();
+  const preparedIds = [...new Set(writes.flatMap(
+    ({ outboxId, repairId }) => [outboxId, repairId],
+  ))];
+  for (const group of chunk(preparedIds, MAX_BOUND_PARAMS - 1))
+    for (const { id } of await db.all<{ id: string }>(
+      `SELECT id FROM index_outbox
+        WHERE state = 'pending' AND lease_token = ?
+          AND id IN (${group.map(() => "?").join(", ")})`,
+      [leaseToken, ...group],
+    )) prepared.add(id);
+  return writes
+    .filter(({ outboxId, repairId }) => prepared.has(outboxId) && prepared.has(repairId))
+    .map(({ sourceIds: _, insertedRepair: __, ...write }) => write);
+}
+
+/** Leave one immediately claimable canonical repair per affected record. */
+export async function ensureSemanticIndexReconciliation(
+  db: Db,
+  orgId: string,
+  recordIds: string[],
+): Promise<void> {
+  const entries = [...new Set(recordIds)].map((recordId) => ({
+    id: newId("obx"),
+    recordId,
+  }));
+  for (const group of chunk(entries))
+    await db.batch(group.map((entry) => ({
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts,
+               created_at, lease_token, lease_expires_at)
+            SELECT ?, ?, 'claim', ?, 'reconcile', 'pending', 0,
+                   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, NULL
+             WHERE NOT EXISTS (
+               SELECT 1 FROM index_outbox
+                WHERE org_id = ? AND record_type = 'claim' AND record_id = ?
+                  AND operation IN ('upsert', 'reconcile') AND state = 'pending'
+                  AND lease_token IS NULL
+             )`,
+      params: [entry.id, orgId, entry.recordId, orgId, entry.recordId],
+    })));
+}
+
+/** Release owned pending work without consuming an attempt. */
+export async function releaseSemanticIndexWork(
+  db: Db,
+  outboxIds: string[],
+  leaseToken: string,
+): Promise<void> {
+  for (const group of chunk([...new Set(outboxIds)], MAX_BOUND_PARAMS - 1))
+    await db.batch([{
+      sql: `UPDATE index_outbox
+               SET lease_token = NULL, lease_expires_at = NULL
+             WHERE state = 'pending' AND lease_token = ?
+               AND id IN (${group.map(() => "?").join(", ")})`,
+      params: [leaseToken, ...group],
+    }]);
+}
+
+/** Activate owned write-ahead repair and replace any repair lost to takeover. */
+export async function preserveSemanticIndexReconciliation(
+  db: Db,
+  writes: SemanticIndexWrite[],
+  orgId: string,
+  leaseToken: string,
+): Promise<void> {
+  await releaseSemanticIndexWork(
+    db,
+    writes.map(({ repairId }) => repairId),
+    leaseToken,
+  );
+  await ensureSemanticIndexReconciliation(
+    db,
+    orgId,
+    writes.map(({ recordId }) => recordId),
+  );
+}
+
 /** Persist only safe local failure evidence; provider output never enters SQL. */
 export async function recordSemanticDependencyFailure(
   db: Db,
   dependency: SemanticDependency,
   at: string,
   outboxIds: string[],
+  leaseToken: string,
 ): Promise<void> {
   const ids = [...new Set(outboxIds)];
   if (ids.length === 0) return;
   const column = dependency === "embedder"
     ? "embedder_failure_at"
     : "vector_store_failure_at";
-  const statements = [{
-    sql: `UPDATE semantic_index_metadata SET ${column} = ? WHERE id = 'claims'`,
-    params: [at],
-  }];
-  for (let index = 0; index < ids.length; index += 100) {
-    const group = ids.slice(index, index + 100);
-    statements.push({
-      sql: `UPDATE index_outbox
-               SET attempts = attempts + 1
-             WHERE state = 'pending' AND id IN (${group.map(() => "?").join(", ")})`,
-      params: group,
-    });
+  for (const group of chunk(ids, MAX_BOUND_PARAMS - 2)) {
+    await db.batch([
+      {
+        sql: `UPDATE semantic_index_metadata SET ${column} = ?
+               WHERE id = 'claims' AND EXISTS (
+                 SELECT 1 FROM index_outbox
+                  WHERE state = 'pending' AND lease_token = ?
+                    AND id IN (${group.map(() => "?").join(", ")})
+               )`,
+        params: [at, leaseToken, ...group],
+      },
+      {
+        sql: `UPDATE index_outbox
+                 SET attempts = attempts + 1,
+                     lease_token = NULL, lease_expires_at = NULL
+               WHERE state = 'pending' AND lease_token = ?
+                 AND id IN (${group.map(() => "?").join(", ")})`,
+        params: [leaseToken, ...group],
+      },
+    ]);
   }
-  await db.batch(statements);
 }
 
 /** Complete selected work and clear outage evidence only after global recovery. */
@@ -328,37 +548,153 @@ export async function completeSemanticIndexWork(
   db: Db,
   outboxIds: string[],
   recovered: boolean,
-): Promise<void> {
-  for (let index = 0; index < outboxIds.length; index += 50) {
-    const group = outboxIds.slice(index, index + 50);
-    const statements = [];
+  leaseToken: string,
+): Promise<string[]> {
+  const ids = [...new Set(outboxIds)];
+  const completed: string[] = [];
+  for (const group of chunk(ids, Math.floor((MAX_BOUND_PARAMS - 2) / 2))) {
+    const statements: Stmt[] = group.map((id) => ({
+      sql: `UPDATE index_outbox
+               SET state = 'done', attempts = attempts + 1,
+                   lease_expires_at = NULL
+             WHERE id = ? AND state = 'pending' AND lease_token = ?`,
+      params: [id, leaseToken],
+    }));
     if (recovered)
       statements.push({
-        // Recovery is proven by work that entered this transaction as a failed
-        // upsert retry. Clearing first is safe because the batch is atomic.
         sql: `UPDATE semantic_index_metadata
                  SET embedder_failure_at = NULL, vector_store_failure_at = NULL
                WHERE id = 'claims'
                  AND EXISTS (
-                   SELECT 1 FROM index_outbox recovered
-                    WHERE recovered.state = 'pending'
-                      AND recovered.operation = 'upsert'
-                      AND recovered.attempts > 0
-                      AND recovered.id IN (${group.map(() => "?").join(", ")})
+                   SELECT 1 FROM index_outbox
+                    WHERE state = 'done' AND lease_token = ?
+                      AND attempts > 1
+                      AND id IN (${group.map(() => "?").join(", ")})
                  )
                  AND NOT EXISTS (
-                   SELECT 1 FROM index_outbox
-                    WHERE state = 'pending' AND attempts > 0
-                      AND id NOT IN (${group.map(() => "?").join(", ")})
+                   SELECT 1 FROM index_outbox unresolved
+                    WHERE unresolved.state = 'pending' AND unresolved.attempts > 0
                  )`,
-        params: [...group, ...group],
+        params: [leaseToken, ...group],
       });
-    statements.push(...group.map((id) => ({
-      sql: `UPDATE index_outbox SET state = 'done', attempts = attempts + 1 WHERE id = ?`,
-      params: [id],
-    })));
     await db.batch(statements);
+    const owned = (await db.all<{ id: string }>(
+      `SELECT id FROM index_outbox
+        WHERE state = 'done' AND lease_token = ?
+          AND id IN (${group.map(() => "?").join(", ")})`,
+      [leaseToken, ...group],
+    )).map(({ id }) => id);
+    completed.push(...owned);
+    if (owned.length > 0)
+      await db.batch([{
+        sql: `UPDATE index_outbox SET lease_token = NULL
+               WHERE state = 'done' AND lease_token = ?
+                 AND id IN (${owned.map(() => "?").join(", ")})`,
+        params: [leaseToken, ...owned],
+      }]);
   }
+  return completed;
+}
+
+/** Complete a vector mutation and its canonical reconciliation in one batch. */
+export async function completeSemanticIndexWrites(
+  db: Db,
+  writes: SemanticIndexWrite[],
+  recovery: "none" | "vector_store" | "all",
+  leaseToken: string,
+): Promise<string[]> {
+  const completed: string[] = [];
+  for (const group of chunk(writes, Math.floor((MAX_BOUND_PARAMS - 2) / 2))) {
+    const sourceIds = group.map(({ outboxId }) => outboxId);
+    const repairIds = group.map(({ repairId }) => repairId);
+    const statements: Stmt[] = [];
+    for (const write of group) statements.push(
+      {
+        sql: `UPDATE index_outbox
+                 SET state = 'done', attempts = attempts + 1,
+                     lease_expires_at = NULL
+               WHERE id = ? AND state = 'pending'
+                 AND lease_token = ?
+                 AND EXISTS (
+                   SELECT 1 FROM index_outbox repair
+                    WHERE repair.id = ? AND repair.operation = 'reconcile'
+                      AND repair.state = 'pending' AND repair.lease_token = ?
+                 )`,
+        params: [write.outboxId, leaseToken, write.repairId, leaseToken],
+      },
+      {
+        sql: `UPDATE index_outbox
+                 SET state = 'done', attempts = attempts + 1,
+                     lease_expires_at = NULL
+               WHERE id = ? AND operation = 'reconcile' AND state = 'pending'
+                 AND lease_token = ?
+                 AND EXISTS (
+                   SELECT 1 FROM index_outbox source
+                    WHERE source.id = ? AND source.state = 'done'
+                      AND source.lease_token = ?
+                 )`,
+        params: [write.repairId, leaseToken, write.outboxId, leaseToken],
+      },
+    );
+    if (recovery !== "none") statements.push({
+      sql: `UPDATE semantic_index_metadata
+               SET ${recovery === "all"
+                 ? "embedder_failure_at = NULL, vector_store_failure_at = NULL"
+                 : "vector_store_failure_at = NULL"}
+             WHERE id = 'claims'
+               AND EXISTS (
+                 SELECT 1 FROM index_outbox
+                  WHERE state = 'done' AND lease_token = ?
+                    AND attempts > 1
+                    AND id IN (${sourceIds.map(() => "?").join(", ")})
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM index_outbox unresolved
+                  WHERE unresolved.state = 'pending' AND unresolved.attempts > 0
+               )`,
+      params: [leaseToken, ...sourceIds],
+    });
+    await db.batch(statements);
+    const ownedRepairs = new Set((await db.all<{ id: string }>(
+      `SELECT id FROM index_outbox
+        WHERE state = 'done' AND lease_token = ?
+          AND id IN (${repairIds.map(() => "?").join(", ")})`,
+      [leaseToken, ...repairIds],
+    )).map(({ id }) => id));
+    const owned = group.filter(({ repairId }) => ownedRepairs.has(repairId));
+    completed.push(...owned.map(({ outboxId }) => outboxId));
+    const doneIds = [...new Set(owned.flatMap(
+      ({ outboxId, repairId }) => [outboxId, repairId],
+    ))];
+    if (doneIds.length > 0)
+      await db.batch([{
+        sql: `UPDATE index_outbox SET lease_token = NULL
+               WHERE state = 'done' AND lease_token = ?
+                 AND id IN (${doneIds.map(() => "?").join(", ")})`,
+        params: [leaseToken, ...doneIds],
+      }]);
+  }
+  return completed;
+}
+
+/** Remove a stale write and leave current canonical reconciliation queued. */
+export async function compensateStaleSemanticIndexWrites(
+  db: Db,
+  store: VectorStore,
+  writes: SemanticIndexWrite[],
+  orgId: string,
+  leaseToken: string,
+): Promise<void> {
+  if (writes.length === 0) return;
+  const recordIds = [...new Set(writes.map(({ recordId }) => recordId))];
+  await preserveSemanticIndexReconciliation(db, writes, orgId, leaseToken);
+  await store.remove(recordIds);
+  await completeSemanticIndexWork(
+    db,
+    writes.map(({ repairId }) => repairId),
+    false,
+    leaseToken,
+  );
 }
 
 /** Project durable dependency evidence into readiness without provider I/O. */

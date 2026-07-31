@@ -204,6 +204,12 @@ dependency until a later complete embed/upsert proves recovery. After repairing
 an outage, drain eligible upsert work, require `/readyz`, then perform a semantic
 query smoke.
 
+Migration 16 adds nullable ownership and expiry fields to the rebuildable index
+outbox. Manual and background drains use the SQLite clock for conditional
+claims, and every external upsert or removal keeps canonical reconciliation
+until ownership-confirmed completion. The migration never infers recovery or
+clears an existing dependency-failure marker.
+
 To adopt a new fingerprint, stop Titen, take a verified canonical backup, then
 reset only the rebuildable projection and requeue claim index work:
 
@@ -212,7 +218,9 @@ rm /var/lib/titen/titen.db.vec
 sqlite3 /var/lib/titen/titen.db <<'SQL'
 BEGIN IMMEDIATE;
 DELETE FROM semantic_index_metadata WHERE id = 'claims';
-UPDATE index_outbox SET state = 'pending', attempts = 0
+UPDATE index_outbox
+   SET state = 'pending', attempts = 0,
+       lease_token = NULL, lease_expires_at = NULL
  WHERE record_type = 'claim';
 INSERT INTO index_outbox
   (id, org_id, record_type, record_id, operation, state, attempts, created_at)

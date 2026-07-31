@@ -1,8 +1,13 @@
 import type { Db } from "./db";
 import { processWebhooks } from "./webhooks";
 import {
+  claimSemanticIndexWork,
+  compensateStaleSemanticIndexWrites,
   completeSemanticIndexWork,
+  completeSemanticIndexWrites,
   embedForRetrieval,
+  prepareSemanticIndexWrites,
+  preserveSemanticIndexReconciliation,
   recordSemanticDependencyFailure,
   type VectorCapability,
 } from "./vectors";
@@ -114,6 +119,7 @@ async function recordMaintenance(
 async function orgsWithPendingIndex(db: Db, limit: number): Promise<string[]> {
   const rows = await db.all<{ org_id: string }>(
     `SELECT org_id FROM index_outbox WHERE state = 'pending'
+      AND (lease_expires_at IS NULL OR lease_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       GROUP BY org_id ORDER BY MIN(created_at) LIMIT ?`,
     [limit],
   );
@@ -131,12 +137,13 @@ export async function indexPendingForOrg(
   orgId: string,
   vectors: VectorCapability,
   limit: number,
-  at: string,
 ): Promise<number> {
   const pending = await db.all<{ id: string; record_type: string; record_id: string; operation: string }>(
     `SELECT id, record_type, record_id, operation FROM index_outbox
       WHERE org_id = ? AND state = 'pending'
-      ORDER BY created_at, id LIMIT ?`,
+        AND (lease_expires_at IS NULL OR lease_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ORDER BY CASE WHEN operation = 'delete' THEN 0 ELSE 1 END, created_at, id
+      LIMIT ?`,
     [orgId, limit],
   );
   if (pending.length === 0) return 0;
@@ -153,12 +160,12 @@ export async function indexPendingForOrg(
     projectId: string | null;
   }[] = [];
   for (const row of pending) {
-    if (row.operation === "delete") {
-      removals.push({ outboxId: row.id, recordId: row.record_id });
-      continue;
-    }
     if (row.record_type !== "claim") {
       retire.push(row.id);
+      continue;
+    }
+    if (row.operation === "delete") {
+      removals.push({ outboxId: row.id, recordId: row.record_id });
       continue;
     }
     const claim = await db.all<{
@@ -184,47 +191,101 @@ export async function indexPendingForOrg(
     else removals.push({ outboxId: row.id, recordId: row.record_id });
   }
 
-  if (removals.length > 0) {
+  const removalLease = await claimSemanticIndexWork(
+    db,
+    removals.map((entry) => entry.outboxId),
+  );
+  const ownedRemovalIds = new Set(removalLease.ids);
+  const ownedRemovals = removals.filter((entry) => ownedRemovalIds.has(entry.outboxId));
+  const preparedRemovals = await prepareSemanticIndexWrites(
+    db,
+    ownedRemovals.map((entry) => ({
+      outboxId: entry.outboxId,
+      recordId: entry.recordId,
+    })),
+    removalLease.token,
+  );
+  if (preparedRemovals.length > 0) {
     try {
-      await vectors.store.remove([...new Set(removals.map((entry) => entry.recordId))]);
+      await vectors.store.remove([
+        ...new Set(preparedRemovals.map((entry) => entry.recordId)),
+      ]);
     } catch (error) {
       await recordSemanticDependencyFailure(
         db,
         "vector_store",
-        at,
-        removals.map((entry) => entry.outboxId),
+        removalLease.acquiredAt,
+        preparedRemovals.map((entry) => entry.outboxId),
+        removalLease.token,
+      );
+      await preserveSemanticIndexReconciliation(
+        db,
+        preparedRemovals,
+        orgId,
+        removalLease.token,
       );
       throw error;
     }
+    const confirmed = new Set(await completeSemanticIndexWrites(
+      db,
+      preparedRemovals,
+      "vector_store",
+      removalLease.token,
+    ));
+    await preserveSemanticIndexReconciliation(
+      db,
+      preparedRemovals.filter(({ outboxId }) => !confirmed.has(outboxId)),
+      orgId,
+      removalLease.token,
+    );
   }
 
   let indexed = 0;
-  if (eligible.length > 0) {
+  const eligibleLease = await claimSemanticIndexWork(
+    db,
+    eligible.map((entry) => entry.outboxId),
+  );
+  const ownedEligibleIds = new Set(eligibleLease.ids);
+  const ownedEligible = eligible.filter((entry) => ownedEligibleIds.has(entry.outboxId));
+  if (ownedEligible.length > 0) {
     let embeddings: Float32Array[];
     try {
       embeddings = await embedForRetrieval(
         vectors,
         "document",
-        eligible.map((entry) => entry.statement),
+        ownedEligible.map((entry) => entry.statement),
       );
     } catch (error) {
       await recordSemanticDependencyFailure(
         db,
         "embedder",
-        at,
-        eligible.map((entry) => entry.outboxId),
+        eligibleLease.acquiredAt,
+        ownedEligible.map((entry) => entry.outboxId),
+        eligibleLease.token,
       );
       throw error;
     }
+    const prepared = await prepareSemanticIndexWrites(
+      db,
+      ownedEligible.map((entry) => ({
+        outboxId: entry.outboxId,
+        recordId: entry.claimId,
+      })),
+      eligibleLease.token,
+    );
+    const eligibleById = new Map(ownedEligible.map((entry, index) => [
+      entry.outboxId,
+      { entry, vector: embeddings[index]! },
+    ]));
     try {
-      await vectors.store.upsert(
-        eligible.map((entry, index) => ({
-          id: entry.claimId,
-          vector: embeddings[index]!,
+      if (prepared.length > 0) await vectors.store.upsert(
+        prepared.map((write) => ({
+          id: write.recordId,
+          vector: eligibleById.get(write.sourceOutboxId)!.vector,
           metadata: {
             org_id: orgId,
-            subject_id: entry.subjectId,
-            project_id: entry.projectId ?? "",
+            subject_id: eligibleById.get(write.sourceOutboxId)!.entry.subjectId,
+            project_id: eligibleById.get(write.sourceOutboxId)!.entry.projectId ?? "",
           },
         })),
       );
@@ -232,16 +293,40 @@ export async function indexPendingForOrg(
       await recordSemanticDependencyFailure(
         db,
         "vector_store",
-        at,
-        eligible.map((entry) => entry.outboxId),
+        eligibleLease.acquiredAt,
+        prepared.map((write) => write.outboxId),
+        eligibleLease.token,
+      );
+      await preserveSemanticIndexReconciliation(
+        db,
+        prepared,
+        orgId,
+        eligibleLease.token,
       );
       throw error;
     }
-    indexed = eligible.length;
+    const confirmed = new Set(await completeSemanticIndexWrites(
+      db,
+      prepared,
+      "all",
+      eligibleLease.token,
+    ));
+    const stale = prepared.filter(({ outboxId }) => !confirmed.has(outboxId));
+    await compensateStaleSemanticIndexWrites(
+      db,
+      vectors.store,
+      stale,
+      orgId,
+      eligibleLease.token,
+    );
+    const staleRecords = new Set(stale.map(({ recordId }) => recordId));
+    indexed = prepared.filter(
+      ({ outboxId, recordId }) => confirmed.has(outboxId) && !staleRecords.has(recordId),
+    ).length;
   }
 
-  const done = [...eligible.map((entry) => entry.outboxId), ...removals.map((entry) => entry.outboxId), ...retire];
-  await completeSemanticIndexWork(db, done, indexed > 0);
+  const retireLease = await claimSemanticIndexWork(db, retire);
+  await completeSemanticIndexWork(db, retireLease.ids, false, retireLease.token);
 
   return indexed;
 }
@@ -339,14 +424,16 @@ export async function runMaintenance(options: {
   vectors?: VectorCapability;
   extraction?: ExtractionCapability;
   limit?: number;
-  now?: Date;
+  now?: Date | (() => Date);
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
   deliverWebhooks?: boolean;
   expectedIntervalMs?: number;
 }): Promise<MaintenanceResult> {
   const limit = options.limit ?? 50;
-  const startedAt = options.now ?? new Date();
+  const sourceNow = typeof options.now === "function"
+    ? options.now
+    : () => options.now ?? new Date();
   const result: MaintenanceResult = { enriched: 0, indexed: 0, delivered: 0, errors: [] };
 
   if (options.extraction) {
@@ -357,9 +444,7 @@ export async function runMaintenance(options: {
         // Five provider calls per automatic pass is the cost ceiling. Operators
         // may explicitly request a larger bounded batch through the drain route.
         limit: Math.min(limit, 5),
-        // Production must re-read time after a potentially slow provider call
-        // so the SQL lease fence cannot compare against a stale tick timestamp.
-        now: options.now ? () => startedAt : () => new Date(),
+        now: sourceNow,
         vectors: options.vectors,
       });
       result.enriched = enrichment.completed;
@@ -370,7 +455,7 @@ export async function runMaintenance(options: {
   }
 
   // A slow provider must not make subsequent leases and readiness evidence stale.
-  const maintenanceNow = options.now ?? new Date();
+  const maintenanceNow = sourceNow();
 
   if (options.vectors) {
     try {
@@ -381,7 +466,6 @@ export async function runMaintenance(options: {
             orgId,
             options.vectors,
             limit,
-            maintenanceNow.toISOString(),
           );
         } catch (error) {
           // Named by organization, without the message, which can carry content.

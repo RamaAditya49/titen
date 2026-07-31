@@ -6,8 +6,12 @@ import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_CIPHER, TEST_WEBHOOK_SECURITY, type Fixture } from "./harness";
-import { assertSemanticReadiness } from "./semantic-readiness";
 import { assertEnrichmentContract } from "./enrichment";
+import {
+  assertSemanticIndexOwnership,
+  assertSemanticIndexWriteRepair,
+  assertSemanticReadiness,
+} from "./semantic-readiness";
 
 const directory = mkdtempSync(join(tmpdir(), "titen-bun-"));
 const dbPath = join(directory, "titen.db");
@@ -68,6 +72,14 @@ test("bun:sqlite semantic readiness persists and compares its fingerprint locall
 test("bun:sqlite replays bounded model enrichment", async () => {
   await assertEnrichmentContract(db, "bun-sqlite");
 }, 20_000);
+
+test("bun:sqlite fences overlapping semantic index attempts", async () => {
+  await assertSemanticIndexOwnership(db, "bun-sqlite");
+});
+
+test("bun:sqlite repairs stale external semantic index writes", async () => {
+  await assertSemanticIndexWriteRepair(db, "bun-sqlite");
+});
 
 for (const contractCase of CASES)
   test(`bun-sqlite: ${contractCase.name}`, async () => {

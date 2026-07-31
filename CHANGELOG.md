@@ -39,6 +39,15 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Semantic retrieval now discards sub-threshold cosine hits before canonical
   hydration, so relative ranking cannot turn a best bad neighbor into useful
   context. Bun and Cloudflare share the same validated unit-vector boundary.
+- Manual and background semantic-index drains now fence each outbox row before
+  provider I/O, so an expired losing attempt cannot add stale failure evidence
+  after another attempt completes the row. Lease eligibility and expiry now use
+  the database clock at each conditional claim, so caller clock skew and earlier
+  work cannot create an expired or stranded owner.
+- Semantic-index upserts and removals now persist canonical reconciliation
+  before external mutation and recreate it after stale or apply-then-throw
+  outcomes, so a losing owner cannot resurrect a purged vector, erase a newer
+  projection, or report unowned work as complete.
 
 ### Changed
 
@@ -59,6 +68,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   role-aware preprocessing profile, and an operator-calibrated cosine floor in
   the existing index fingerprint. EmbeddingGemma uses its official asymmetric
   query/document prompts; Titen ships no universal threshold.
+- Migration 16 adds nullable owner and expiry fields to the rebuildable semantic
+  index outbox; canonical observations and claims are unchanged.
 
 ## [0.3.0] — 2026-07-31
 

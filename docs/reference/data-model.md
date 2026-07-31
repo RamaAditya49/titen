@@ -445,8 +445,10 @@ canonical version or the deletion is confirmed.
 
 The current physical `index_outbox` has a smaller `pending/done/failed` shape
 and marks an accepted upsert complete. Migration 13 fingerprints the index as a
-whole. Failed dependency attempts increment the existing `attempts` counter;
-leased/fingerprinted outbox state remains proposed.
+whole. Migration 16 adds nullable owner-token and lease-expiry fields so manual
+and background drains cannot commit the same attempt; failed owned attempts
+increment the existing `attempts` counter. Per-row target fingerprints and
+versions remain proposed.
 
 ### `event_outbox`
 

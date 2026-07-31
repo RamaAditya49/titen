@@ -512,16 +512,42 @@ test("index drain reports embedder outages as retryable and preserves pending ro
 test("index drain reports vector-store outages as retryable and preserves pending rows", async () => {
   await seed(withVectors());
   const broken = fakeVectors();
+  const upsert = broken.store.upsert.bind(broken.store);
+  let mutationCalls = 0;
+  broken.store.upsert = async (records) => {
+    mutationCalls += 1;
+    await upsert(records);
+  };
   broken.breakStore();
   const app = clientVia(createApp({ db, revision: "test", runtime: "bun-sqlite", vectors: broken }), origin);
   const before = await pendingCount();
+  const repairsBefore = Number((await db.all<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM index_outbox
+      WHERE state = 'pending' AND operation = 'reconcile'`,
+  ))[0]?.count ?? 0);
   const failed = await app.call("POST", "/v1/index/drain", { key });
   assert.equal(failed.status, 503);
   assert.equal(failed.body.error.code, "UNAVAILABLE");
   assert.equal(failed.body.meta.dependency, "vector_store");
   assert.equal(failed.body.meta.retryable, true);
   assert.equal(failed.body.meta.pending, before);
-  assert.equal(await pendingCount(), before);
+  const after = await pendingCount();
+  const repairsAfter = Number((await db.all<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM index_outbox
+      WHERE state = 'pending' AND operation = 'reconcile'`,
+  ))[0]?.count ?? 0);
+  assert.ok(repairsAfter > repairsBefore, "ambiguous external writes retain canonical repair");
+  assert.equal(after - before, repairsAfter - repairsBefore);
+  for (let attempt = 2; attempt <= 6; attempt += 1) {
+    const repeated = await app.call("POST", "/v1/index/drain", { key });
+    assert.equal(repeated.status, 503);
+    assert.equal(await pendingCount(), after);
+    assert.equal(Number((await db.all<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM index_outbox
+        WHERE state = 'pending' AND operation = 'reconcile'`,
+    ))[0]?.count ?? 0), repairsAfter);
+  }
+  assert.equal(mutationCalls, 6, "one vector mutation is attempted per bounded retry");
   const unavailable = await app.call("GET", "/readyz");
   assert.equal(unavailable.status, 503);
   assert.equal(unavailable.body.meta.capabilities.embedding, "enabled");
@@ -572,10 +598,43 @@ test("purge drain removes an already indexed claim", async () => {
   const repeated = await client.call("DELETE", `/v1/observations/${observation.body.data.observation_id}`, { key });
   assert.equal(repeated.status, 200);
   assert.equal(repeated.body.data.already_purged, true);
+  const remove = vectors.store.remove.bind(vectors.store);
+  let removalUnavailable = true;
+  vectors.store.remove = async (ids) => {
+    if (removalUnavailable) throw new Error("controlled vector removal outage");
+    await remove(ids);
+  };
+  const failed = await client.call("POST", "/v1/index/drain?limit=100", { key });
+  assert.equal(failed.status, 503);
+  assert.deepEqual(await db.all(
+    `SELECT embedder_failure_at IS NOT NULL AS embedder_failed,
+            vector_store_failure_at IS NOT NULL AS vector_failed
+       FROM semantic_index_metadata WHERE id = 'claims'`,
+  ), [{ embedder_failed: 0, vector_failed: 1 }]);
+  await db.batch([{
+    sql: `UPDATE semantic_index_metadata SET embedder_failure_at = ?
+           WHERE id = 'claims'`,
+    params: ["2026-07-31T00:00:00.000Z"],
+  }]);
+  removalUnavailable = false;
   const removed = await client.call("POST", "/v1/index/drain?limit=100", { key });
+  vectors.store.remove = remove;
   assert.equal(removed.status, 200);
   assert.ok(removed.body.data.removed >= 1);
   assert.equal(vectors.metadataFor(claimId), undefined);
+  assert.deepEqual(await db.all(
+    `SELECT embedder_failure_at, vector_store_failure_at
+       FROM semantic_index_metadata WHERE id = 'claims'`,
+  ), [{
+    embedder_failure_at: "2026-07-31T00:00:00.000Z",
+    vector_store_failure_at: null,
+  }]);
+  assert.equal((await client.call("GET", "/readyz")).status, 503);
+  await db.batch([{
+    sql: `UPDATE semantic_index_metadata SET embedder_failure_at = NULL
+           WHERE id = 'claims'`,
+  }]);
+  assert.equal((await client.call("GET", "/readyz")).status, 200);
 });
 
 test("an unavailable embedder degrades to lexical retrieval instead of failing", async () => {

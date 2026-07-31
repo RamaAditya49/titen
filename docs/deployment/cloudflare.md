@@ -130,13 +130,19 @@ timestamps in semantic metadata, so `/readyz` fails without a provider probe
 until a later complete embed/upsert proves recovery. A real drain/query smoke
 supplies the initial reachability evidence and proves recovery.
 
+Migration 16 adds nullable ownership and expiry fields to the rebuildable index
+outbox. Manual and scheduled drains use D1's SQLite clock for conditional
+claims, and every Vectorize upsert or removal keeps canonical reconciliation
+until ownership-confirmed completion. The migration never infers recovery or
+clears an existing dependency-failure marker.
+
 Changing any fingerprint field requires an explicit reindex. Provision a fresh
 compatible Vectorize index (or clear the rebuildable old projection), stop
 index maintenance, then reset only the D1 projection metadata/work:
 
 ```bash
 wrangler d1 execute titen --remote --command \
-  "DELETE FROM semantic_index_metadata WHERE id = 'claims'; UPDATE index_outbox SET state = 'pending', attempts = 0 WHERE record_type = 'claim'; INSERT INTO index_outbox (id, org_id, record_type, record_id, operation, state, attempts, created_at) SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id, 'upsert', 'pending', 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM claims c WHERE c.status IN ('active', 'disputed') AND NOT EXISTS (SELECT 1 FROM index_outbox o WHERE o.record_type = 'claim' AND o.record_id = c.id AND o.operation = 'upsert');"
+  "DELETE FROM semantic_index_metadata WHERE id = 'claims'; UPDATE index_outbox SET state = 'pending', attempts = 0, lease_token = NULL, lease_expires_at = NULL WHERE record_type = 'claim'; INSERT INTO index_outbox (id, org_id, record_type, record_id, operation, state, attempts, created_at) SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id, 'upsert', 'pending', 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM claims c WHERE c.status IN ('active', 'disputed') AND NOT EXISTS (SELECT 1 FROM index_outbox o WHERE o.record_type = 'claim' AND o.record_id = c.id AND o.operation = 'upsert');"
 ```
 
 Bind the intended index, deploy, require `/readyz`, and drain the pending claim

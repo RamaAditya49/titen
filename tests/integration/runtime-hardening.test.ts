@@ -83,7 +83,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     );
     assert.deepEqual(
       integrity.map(({ name }) => name),
-      ["checkpoints_scope", "event_order", "semantic_index_metadata"],
+      ["checkpoints_scope", "enrichment_jobs", "event_order", "semantic_index_metadata"],
       `migration must roll back after statement ${failureAfter + 1}`,
     );
     assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
@@ -93,13 +93,19 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
         .map(({ name }) => name)
         .sort(),
       ["embedder_failure_at", "vector_store_failure_at"],
-      `the completed migration 14 must survive failed migration 15 statement ${failureAfter + 1}`,
+      `the completed migration 15 must survive failed migration 16 statement ${failureAfter + 1}`,
     );
     assert.equal(
       (await db.all<{ name: string }>("PRAGMA table_info(claims)"))
         .some(({ name }) => name === "enrichment_job_id"),
-      false,
-      `migration must roll back the claims column after statement ${failureAfter + 1}`,
+      true,
+      `completed migration 15 must retain the claims column after statement ${failureAfter + 1}`,
+    );
+    assert.deepEqual(
+      (await db.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
+        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at"),
+      [],
+      `migration 16 must roll back its lease columns after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at
@@ -121,6 +127,13 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       diagnostic: "embedding_dependency_unavailable",
     });
     assert.equal(await migrate(db), SCHEMA_VERSION);
+    assert.deepEqual(
+      (await db.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
+        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at")
+        .map(({ name }) => name)
+        .sort(),
+      ["lease_expires_at", "lease_token"],
+    );
     database.close();
   }
 });

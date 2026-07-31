@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { createApp } from "../../src/core/app";
 import type { Db } from "../../src/core/db";
+import { runMaintenance } from "../../src/core/maintenance";
 import {
+  claimSemanticIndexWork,
   completeSemanticIndexWork,
   recordSemanticDependencyFailure,
+  SEMANTIC_INDEX_LEASE_MS,
 } from "../../src/core/vectors";
-import { clientVia, fakeVectors } from "./harness";
+import { clientVia, fakeVectors, provisionWith } from "./harness";
 
 const readyWith = (db: Db, runtime: string, vectors?: ReturnType<typeof fakeVectors>) =>
   clientVia(
@@ -181,24 +184,47 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
                     '2026-07-31T00:00:00.000Z')`,
     },
   ]);
+  const failedLease = await claimSemanticIndexWork(
+    db,
+    ["idx_semantic_backfill"],
+  );
   await recordSemanticDependencyFailure(
     db,
     "embedder",
     "2026-07-31T00:00:04.000Z",
     ["idx_semantic_backfill"],
+    failedLease.token,
   );
   assert.deepEqual(
     await db.all(`SELECT attempts FROM index_outbox WHERE id = 'idx_semantic_backfill'`),
     [{ attempts: 1 }],
   );
   assert.equal((await readyWith(db, runtime, vectors)).status, 503);
-  await completeSemanticIndexWork(db, ["idx_semantic_recovery_other"], true);
+  const otherLease = await claimSemanticIndexWork(
+    db,
+    ["idx_semantic_recovery_other"],
+  );
+  await completeSemanticIndexWork(
+    db,
+    ["idx_semantic_recovery_other"],
+    true,
+    otherLease.token,
+  );
   assert.equal(
     (await readyWith(db, runtime, vectors)).status,
     503,
     "another organization cannot clear unresolved failure evidence",
   );
-  await completeSemanticIndexWork(db, ["idx_semantic_backfill"], true);
+  const recoveryLease = await claimSemanticIndexWork(
+    db,
+    ["idx_semantic_backfill"],
+  );
+  await completeSemanticIndexWork(
+    db,
+    ["idx_semantic_backfill"],
+    true,
+    recoveryLease.token,
+  );
   assert.equal((await readyWith(db, runtime, vectors)).status, 200);
   await db.batch([
     { sql: `DELETE FROM index_outbox WHERE id = 'idx_semantic_recovery_other'` },
@@ -231,10 +257,28 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
                '2026-07-31T00:00:02.000Z')`,
     },
   ]);
-  await completeSemanticIndexWork(db, ["idx_semantic_delete_only"], false);
+  const deleteOnlyLease = await claimSemanticIndexWork(
+    db,
+    ["idx_semantic_delete_only"],
+  );
+  await completeSemanticIndexWork(
+    db,
+    ["idx_semantic_delete_only"],
+    false,
+    deleteOnlyLease.token,
+  );
   assert.equal((await readyWith(db, runtime, vectors)).status, 503,
     "delete-only completion is not dependency recovery");
-  await completeSemanticIndexWork(db, ["idx_semantic_unowned_success"], true);
+  const unownedSuccessLease = await claimSemanticIndexWork(
+    db,
+    ["idx_semantic_unowned_success"],
+  );
+  await completeSemanticIndexWork(
+    db,
+    ["idx_semantic_unowned_success"],
+    true,
+    unownedSuccessLease.token,
+  );
   assert.equal((await readyWith(db, runtime, vectors)).status, 503,
     "unowned success without a failed attempt cannot erase outage evidence");
   await db.batch([{
@@ -244,7 +288,16 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
                   'clm_semantic_owned_retry', 'upsert', 'pending', 1,
                   '2026-07-31T00:00:03.000Z')`,
   }]);
-  await completeSemanticIndexWork(db, ["idx_semantic_owned_retry"], true);
+  const ownedRetryLease = await claimSemanticIndexWork(
+    db,
+    ["idx_semantic_owned_retry"],
+  );
+  await completeSemanticIndexWork(
+    db,
+    ["idx_semantic_owned_retry"],
+    true,
+    ownedRetryLease.token,
+  );
   assert.equal((await readyWith(db, runtime, vectors)).status, 200,
     "a successful retry of previously failed work proves recovery");
   await db.batch([
@@ -341,4 +394,700 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
     },
     { sql: `DELETE FROM organizations WHERE id = 'org_semantic_backfill'` },
   ]);
+}
+
+/** Same owner-fence race against bun:sqlite and D1. */
+export async function assertSemanticIndexOwnership(db: Db, runtime: string) {
+  for (const winner of ["manual", "background"] as const) {
+    const provisioned = await provisionWith(db, { scopes: ["*"] });
+    const claimId = `clm_index_owner_${winner}`;
+    const outboxId = `idx_index_owner_${winner}`;
+    const base = new Date("2026-07-31T01:00:00.000Z");
+    const takeover = new Date(base.getTime() + SEMANTIC_INDEX_LEASE_MS + 1);
+    const vectors = fakeVectors();
+    const embed = vectors.embedder.embed.bind(vectors.embedder);
+    let providerCalls = 0;
+    let releaseFirst!: () => void;
+    let markStarted!: () => void;
+    const firstStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const firstRelease = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    vectors.embedder.embed = async (texts) => {
+      providerCalls += 1;
+      if (providerCalls === 1) {
+        markStarted();
+        await firstRelease;
+        throw new Error("controlled late embedder failure");
+      }
+      return embed(texts);
+    };
+
+    await db.batch([
+      {
+        sql: `INSERT OR IGNORE INTO semantic_index_metadata
+                (id, provider, model, revision, dimensions, metric,
+                 preprocessing, index_schema, created_at)
+              VALUES ('claims', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        params: [
+          vectors.fingerprint.provider,
+          vectors.fingerprint.model,
+          vectors.fingerprint.revision,
+          vectors.fingerprint.dimensions,
+          vectors.fingerprint.metric,
+          vectors.fingerprint.preprocessing,
+          vectors.fingerprint.index_schema,
+          base.toISOString(),
+        ],
+      },
+      {
+        sql: `UPDATE semantic_index_metadata
+                 SET embedder_failure_at = NULL, vector_store_failure_at = NULL
+               WHERE id = 'claims'`,
+      },
+      {
+        sql: `INSERT INTO claims
+                (id, org_id, subject_id, project_id, workspace_id, observer_id,
+                 actor_id, kind, statement, confidence, trust, visibility, status,
+                 version, valid_from, valid_to, created_at)
+              VALUES (?, ?, 'subject_index_owner', NULL, NULL, NULL, ?,
+                      'semantic_fact', 'Owner fencing keeps readiness truthful.',
+                      1, 'verified', 'private', 'active', 1, ?, NULL, ?)`,
+        params: [
+          claimId,
+          provisioned.orgId,
+          provisioned.principalId,
+          base.toISOString(),
+          base.toISOString(),
+        ],
+      },
+      {
+        sql: `INSERT INTO index_outbox
+                (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+              VALUES (?, ?, 'claim', ?, 'upsert', 'pending', 0, ?)`,
+        params: [outboxId, provisioned.orgId, claimId, base.toISOString()],
+      },
+    ]);
+
+    const manualAt = (at: Date) => clientVia(
+      createApp({
+        db,
+        runtime,
+        revision: "index-owner",
+        vectors,
+        semanticPrepared: true,
+        now: () => at,
+      }),
+      "http://titen.test",
+    );
+    const late = manualAt(base).call("POST", "/v1/index/drain?limit=1", {
+      key: provisioned.key,
+    });
+    await firstStarted;
+    assert.deepEqual(
+      await db.all(
+        `SELECT state, attempts, lease_token IS NOT NULL AS owned
+           FROM index_outbox WHERE id = ?`,
+        [outboxId],
+      ),
+      [{ state: "pending", attempts: 0, owned: 1 }],
+    );
+
+    const contend = async (at: Date): Promise<number> => {
+      if (winner === "manual") {
+        const result = await manualAt(at).call("POST", "/v1/index/drain?limit=1", {
+          key: provisioned.key,
+        });
+        assert.equal(result.status, 200);
+        return result.body.data.indexed;
+      }
+      const result = await runMaintenance({
+        db,
+        vectors,
+        limit: 1,
+        now: at,
+        deliverWebhooks: false,
+      });
+      assert.deepEqual(result.errors, []);
+      return result.indexed;
+    };
+    assert.equal(await contend(new Date(base.getTime() + 1)), 0);
+    assert.equal(providerCalls, 1, "an active owner excludes an overlapping drain");
+    await db.batch([{
+      sql: `UPDATE index_outbox
+               SET lease_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')
+             WHERE id = ?`,
+      params: [outboxId],
+    }]);
+    assert.equal(await contend(takeover), 1);
+
+    releaseFirst();
+    const stale = await late;
+    assert.equal(stale.status, 503);
+    assert.equal(stale.body.meta.dependency, "embedder");
+    assert.deepEqual(
+      await db.all(
+        `SELECT state, attempts, lease_token, lease_expires_at
+           FROM index_outbox WHERE id = ?`,
+        [outboxId],
+      ),
+      [{ state: "done", attempts: 1, lease_token: null, lease_expires_at: null }],
+    );
+    assert.deepEqual(
+      await db.all(
+        `SELECT embedder_failure_at, vector_store_failure_at
+           FROM semantic_index_metadata WHERE id = 'claims'`,
+      ),
+      [{ embedder_failure_at: null, vector_store_failure_at: null }],
+    );
+
+    const callsBeforeReadiness = providerCalls;
+    const ready = await manualAt(takeover).call("GET", "/readyz");
+    assert.equal(ready.status, 200);
+    assert.equal(providerCalls, callsBeforeReadiness);
+    const idle = await manualAt(takeover).call("POST", "/v1/index/drain?limit=1", {
+      key: provisioned.key,
+    });
+    assert.equal(idle.status, 200);
+    assert.equal(idle.body.data.drained, 0);
+    assert.equal(idle.body.data.remaining, 0);
+
+    await db.batch([
+      { sql: `DELETE FROM index_outbox WHERE id = ?`, params: [outboxId] },
+      { sql: `DELETE FROM claims WHERE id = ?`, params: [claimId] },
+      { sql: `DELETE FROM api_keys WHERE org_id = ?`, params: [provisioned.orgId] },
+      { sql: `DELETE FROM organizations WHERE id = ?`, params: [provisioned.orgId] },
+    ]);
+  }
+}
+
+/** Same stale external-write repair contract against bun:sqlite and D1. */
+export async function assertSemanticIndexWriteRepair(db: Db, runtime: string) {
+  const fingerprint = fakeVectors().fingerprint;
+  await db.batch([
+    {
+      sql: `INSERT OR IGNORE INTO semantic_index_metadata
+              (id, provider, model, revision, dimensions, metric,
+               preprocessing, index_schema, created_at)
+            VALUES ('claims', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [
+        fingerprint.provider,
+        fingerprint.model,
+        fingerprint.revision,
+        fingerprint.dimensions,
+        fingerprint.metric,
+        fingerprint.preprocessing,
+        fingerprint.index_schema,
+        "2026-07-31T00:00:00.000Z",
+      ],
+    },
+    {
+      sql: `UPDATE semantic_index_metadata
+               SET embedder_failure_at = NULL, vector_store_failure_at = NULL
+             WHERE id = 'claims'`,
+    },
+  ]);
+  const run = async (
+    winner: "manual" | "background",
+    purge: boolean,
+    crashAfterWrite = false,
+    applyThenThrow = false,
+  ) => {
+    const provisioned = await provisionWith(db, { scopes: ["*"] });
+    const caseId = `${winner}_${purge}_${crashAfterWrite}_${applyThenThrow}`;
+    const base = new Date(
+      `2026-07-31T0${winner === "manual" ? 2 : 3}:00:00.000Z`,
+    );
+    let contenderAt = purge
+      ? new Date(base.getTime() + 1)
+      : new Date(base.getTime() + SEMANTIC_INDEX_LEASE_MS + 1);
+    const vectors = fakeVectors();
+    const upsert = vectors.store.upsert.bind(vectors.store);
+    const remove = vectors.store.remove.bind(vectors.store);
+    let release!: () => void;
+    let started!: () => void;
+    const blocked = new Promise<void>((resolve) => { started = resolve; });
+    const resume = new Promise<void>((resolve) => { release = resolve; });
+    let upsertCalls = 0;
+    let visibleGeneration = 0;
+    vectors.store.upsert = async (records) => {
+      upsertCalls += 1;
+      const generation = upsertCalls;
+      if (upsertCalls === 1) {
+        started();
+        await resume;
+      }
+      await upsert(records);
+      visibleGeneration = generation;
+      if (generation === 1 && applyThenThrow)
+        throw new Error("controlled apply-then-throw vector failure");
+    };
+    let releaseRemoval!: () => void;
+    let removalStarted!: () => void;
+    const removalBlocked = new Promise<void>((resolve) => { removalStarted = resolve; });
+    const removalResume = new Promise<void>((resolve) => { releaseRemoval = resolve; });
+    let firstRemoval = !purge;
+    vectors.store.remove = async (ids) => {
+      if (firstRemoval) {
+        firstRemoval = false;
+        removalStarted();
+        await removalResume;
+      }
+      await remove(ids);
+    };
+
+    let stopAfterWrite = crashAfterWrite;
+    const ownerDb: Db = {
+      all: (sql, params) => db.all(sql, params),
+      async batch(statements) {
+        if (
+          stopAfterWrite && visibleGeneration > 0 &&
+          statements.some(({ sql }) => sql.includes("SET state = 'done'"))
+        ) {
+          stopAfterWrite = false;
+          throw new Error("controlled process stop after external vector write");
+        }
+        await db.batch(statements);
+      },
+      exec: (sql) => db.exec(sql),
+    };
+    const clientAt = (at: Date | (() => Date), targetDb: Db = db) => clientVia(
+      createApp({
+        db: targetDb,
+        runtime,
+        revision: "index-write-repair",
+        vectors,
+        semanticPrepared: true,
+        now: typeof at === "function" ? at : () => at,
+      }),
+      "http://titen.test",
+    );
+    const seed = clientAt(base);
+    const observation = await seed.call("POST", "/v1/observations", {
+      key: provisioned.key,
+      body: {
+        subject_id: `subject_write_repair_${winner}_${purge}`,
+        kind: "tool_result",
+        content: "Synthetic stale write repair evidence.",
+        source: { type: "tool", ref: `write-repair-${winner}-${purge}` },
+        trust: "verified",
+      },
+    });
+    assert.equal(observation.status, 201);
+    const observationId = observation.body.data.observation_id as string;
+    const consolidated = await seed.call("POST", "/v1/consolidations", {
+      key: provisioned.key,
+      body: {
+        subject_id: `subject_write_repair_${winner}_${purge}`,
+        claims: [{
+          kind: "procedural",
+          statement: "A stale vector write must retain durable repair.",
+          sources: [{ observation_id: observationId, relation: "supports" }],
+        }],
+      },
+    });
+    assert.equal(consolidated.status, 201);
+    const claimId = consolidated.body.data.claims[0].claim_id as string;
+
+    if (!purge) await db.batch([{
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+            VALUES (?, ?, 'claim', ?, 'delete', 'pending', 0, ?)`,
+      params: [
+        `idx_slow_delete_${caseId}`,
+        provisioned.orgId,
+        `clm_slow_delete_${caseId}`,
+        new Date(base.getTime() - 1).toISOString(),
+      ],
+    }]);
+
+    let ownerAt = base;
+    const staleCall = clientAt(() => ownerAt, ownerDb).call("POST", "/v1/index/drain?limit=100", {
+      key: provisioned.key,
+    });
+    if (!purge) {
+      await removalBlocked;
+      ownerAt = contenderAt;
+      releaseRemoval();
+    }
+    await blocked;
+    const writeAhead = await db.all<{ operation: string; state: string; org_id: string }>(
+      `SELECT operation, state, org_id FROM index_outbox
+        WHERE record_type = 'claim' AND record_id = ? AND operation = 'reconcile'
+          AND state = 'pending' AND lease_token IS NOT NULL`,
+      [claimId],
+    );
+    assert.deepEqual(writeAhead, [{
+      operation: "reconcile",
+      state: "pending",
+      org_id: provisioned.orgId,
+    }]);
+
+    if (purge) {
+      const purged = await clientAt(contenderAt).call(
+        "DELETE",
+        `/v1/observations/${observationId}`,
+        { key: provisioned.key },
+      );
+      assert.equal(purged.status, 200);
+    }
+    const contend = async (at: Date): Promise<number> => {
+      if (winner === "manual") {
+        const result = await clientAt(at).call(
+          "POST",
+          "/v1/index/drain?limit=100",
+          { key: provisioned.key },
+        );
+        assert.equal(result.status, 200);
+        return result.body.data.indexed;
+      }
+      const result = await runMaintenance({
+        db,
+        vectors,
+        limit: 100,
+        now: at,
+        deliverWebhooks: false,
+      });
+      assert.deepEqual(result.errors, []);
+      return result.indexed;
+    };
+    if (purge) {
+      await contend(contenderAt);
+    } else {
+      const lease = (await db.all<{ lease_expires_at: string; inspected_at: string }>(
+        `SELECT lease_expires_at,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS inspected_at
+           FROM index_outbox
+          WHERE record_type = 'claim' AND record_id = ? AND operation = 'upsert'`,
+        [claimId],
+      ))[0];
+      assert.ok(lease?.lease_expires_at);
+      assert.ok(
+        Date.parse(lease.lease_expires_at) - Date.parse(lease.inspected_at) >=
+          SEMANTIC_INDEX_LEASE_MS - 1_000,
+        "later work receives a full database-clock lease",
+      );
+      assert.equal(await contend(new Date("2099-01-01T00:00:00.000Z")), 0);
+      assert.equal(await contend(new Date("2000-01-01T00:00:00.000Z")), 0);
+      assert.equal(upsertCalls, 1, "an immediate contender performs no provider write");
+      await db.batch([{
+        sql: `UPDATE index_outbox
+                 SET lease_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')
+               WHERE record_type = 'claim' AND record_id = ? AND state = 'pending'`,
+        params: [claimId],
+      }]);
+      assert.ok(await contend(contenderAt) >= 1);
+    }
+    if (purge) assert.equal(vectors.metadataFor(claimId), undefined);
+    else assert.ok(vectors.metadataFor(claimId));
+
+    release();
+    const stale = await staleCall;
+    assert.equal(stale.status, crashAfterWrite ? 500 : applyThenThrow ? 503 : 200);
+    if (applyThenThrow) {
+      assert.equal(visibleGeneration, 1, "the stale provider result must be externally visible");
+      assert.ok(vectors.metadataFor(claimId));
+    } else if (!crashAfterWrite) {
+      assert.equal(stale.body.data.indexed, 0);
+      assert.ok(stale.body.data.remaining > 0);
+      assert.equal(vectors.metadataFor(claimId), undefined);
+    } else {
+      assert.ok(vectors.metadataFor(claimId), "the crash fixture must leave the external write visible");
+    }
+    const canonical = (await db.all<{ status: string }>(
+      `SELECT status FROM claims WHERE id = ? AND org_id = ?`,
+      [claimId, provisioned.orgId],
+    ))[0];
+    assert.equal(canonical?.status, purge ? "revoked" : "active");
+    const queued = await db.all<{ org_id: string; operation: string }>(
+      `SELECT org_id, operation FROM index_outbox
+        WHERE record_type = 'claim' AND record_id = ? AND state = 'pending'`,
+      [claimId],
+    );
+    assert.ok(queued.length > 0);
+    assert.ok(queued.every(({ org_id }) => org_id === provisioned.orgId));
+
+    // A fresh app instance against the same SQL and vector stores converges.
+    await db.batch([{
+      sql: `UPDATE index_outbox
+               SET lease_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')
+             WHERE record_type = 'claim' AND record_id = ? AND state = 'pending'
+               AND lease_token IS NOT NULL`,
+      params: [claimId],
+    }]);
+    const repairAt = new Date(contenderAt.getTime() + 1);
+    const repaired = await clientAt(repairAt).call(
+      "POST",
+      "/v1/index/drain?limit=100",
+      { key: provisioned.key },
+    );
+    assert.equal(repaired.status, 200);
+    assert.equal(repaired.body.data.remaining, 0);
+    if (purge) assert.equal(vectors.metadataFor(claimId), undefined);
+    else {
+      assert.ok(vectors.metadataFor(claimId));
+      if (applyThenThrow)
+        assert.ok(visibleGeneration > 1, "fresh repair must overwrite the ambiguous stale generation");
+    }
+  };
+
+  assert.deepEqual((await claimSemanticIndexWork(db, [])).ids, []);
+
+  await run("manual", true, true);
+  await run("background", true);
+  await run("manual", false);
+  await run("background", false);
+  await run("manual", false, false, true);
+
+  const runStaleRemoval = async (
+    winner: "manual" | "background",
+    applyThenThrow: boolean,
+  ) => {
+    const provisioned = await provisionWith(db, { scopes: ["*"] });
+    const suffix = `${winner}_${applyThenThrow ? "ambiguous" : "success"}`;
+    const vectors = fakeVectors();
+    const at = (value: Date) => clientVia(createApp({
+      db,
+      runtime,
+      revision: "index-remove-repair",
+      vectors,
+      semanticPrepared: true,
+      now: () => value,
+    }), "http://titen.test");
+    const base = new Date("2026-07-31T05:00:00.000Z");
+    const seed = at(base);
+    const observation = await seed.call("POST", "/v1/observations", {
+      key: provisioned.key,
+      body: {
+        subject_id: `subject_remove_repair_${suffix}`,
+        kind: "tool_result",
+        content: "Synthetic stale removal repair evidence.",
+        source: { type: "tool", ref: `remove-repair-${suffix}` },
+        trust: "verified",
+      },
+    });
+    assert.equal(observation.status, 201);
+    const consolidated = await seed.call("POST", "/v1/consolidations", {
+      key: provisioned.key,
+      body: {
+        subject_id: `subject_remove_repair_${suffix}`,
+        claims: [{
+          kind: "procedural",
+          statement: "Canonical reconciliation repairs a stale vector removal.",
+          sources: [{
+            observation_id: observation.body.data.observation_id,
+            relation: "supports",
+          }],
+        }],
+      },
+    });
+    assert.equal(consolidated.status, 201);
+    const claimId = consolidated.body.data.claims[0].claim_id as string;
+    const indexed = await seed.call("POST", "/v1/index/drain?limit=100", {
+      key: provisioned.key,
+    });
+    assert.equal(indexed.status, 200);
+    assert.ok(vectors.metadataFor(claimId));
+
+    await db.batch([{
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+            VALUES (?, ?, 'claim', ?, 'delete', 'pending', 0, ?)`,
+      params: [`idx_stale_remove_${suffix}`, provisioned.orgId, claimId, base.toISOString()],
+    }]);
+    const remove = vectors.store.remove.bind(vectors.store);
+    let release!: () => void;
+    let started!: () => void;
+    const blocked = new Promise<void>((resolve) => { started = resolve; });
+    const resume = new Promise<void>((resolve) => { release = resolve; });
+    let removeCalls = 0;
+    vectors.store.remove = async (ids) => {
+      removeCalls += 1;
+      const call = removeCalls;
+      if (call === 1) {
+        started();
+        await resume;
+      }
+      await remove(ids);
+      if (call === 1 && applyThenThrow)
+        throw new Error("controlled apply-then-throw remove failure");
+    };
+
+    const staleCall = at(base).call("POST", "/v1/index/drain?limit=1", {
+      key: provisioned.key,
+    });
+    await blocked;
+    assert.equal(Number((await db.all<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM index_outbox
+        WHERE org_id = ? AND record_id = ? AND operation = 'reconcile'
+          AND state = 'pending' AND lease_token IS NOT NULL`,
+      [provisioned.orgId, claimId],
+    ))[0]?.count ?? 0), 1);
+    await db.batch([{
+      sql: `UPDATE index_outbox
+               SET lease_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')
+             WHERE org_id = ? AND record_id = ? AND state = 'pending'`,
+      params: [provisioned.orgId, claimId],
+    }]);
+
+    if (winner === "manual") {
+      const takeover = await at(new Date("2099-01-01T00:00:00.000Z")).call(
+        "POST",
+        "/v1/index/drain?limit=100",
+        { key: provisioned.key },
+      );
+      assert.equal(takeover.status, 200);
+      assert.ok(takeover.body.data.indexed >= 1);
+    } else {
+      const takeover = await runMaintenance({
+        db,
+        vectors,
+        limit: 100,
+        now: new Date("2000-01-01T00:00:00.000Z"),
+        deliverWebhooks: false,
+      });
+      assert.deepEqual(takeover.errors, []);
+      assert.ok(takeover.indexed >= 1);
+    }
+    assert.ok(vectors.metadataFor(claimId), "takeover restores the current claim");
+
+    release();
+    const stale = await staleCall;
+    assert.equal(stale.status, applyThenThrow ? 503 : 200);
+    if (!applyThenThrow) assert.equal(stale.body.data.removed, 0);
+    assert.equal(vectors.metadataFor(claimId), undefined);
+    assert.ok(Number((await db.all<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM index_outbox
+        WHERE org_id = ? AND record_id = ? AND operation = 'reconcile'
+          AND state = 'pending' AND lease_token IS NULL`,
+      [provisioned.orgId, claimId],
+    ))[0]?.count ?? 0) >= 1);
+    assert.deepEqual(await db.all(
+      `SELECT embedder_failure_at, vector_store_failure_at
+         FROM semantic_index_metadata WHERE id = 'claims'`,
+    ), [{ embedder_failure_at: null, vector_store_failure_at: null }]);
+
+    const repaired = await at(base).call("POST", "/v1/index/drain?limit=100", {
+      key: provisioned.key,
+    });
+    assert.equal(repaired.status, 200);
+    assert.equal(repaired.body.data.remaining, 0);
+    assert.ok(vectors.metadataFor(claimId));
+  };
+
+  await runStaleRemoval("manual", false);
+  await runStaleRemoval("background", true);
+
+  const early = await provisionWith(db, { scopes: ["*"] });
+  const later = await provisionWith(db, { scopes: ["*"] });
+  const base = new Date("2026-07-31T04:00:00.000Z");
+  const vectors = fakeVectors();
+  const seed = clientAt(base);
+  function clientAt(at: Date) {
+    return clientVia(createApp({
+      db,
+      runtime,
+      revision: "index-cross-org-lease",
+      vectors,
+      semanticPrepared: true,
+      now: () => at,
+    }), "http://titen.test");
+  }
+  const observation = await seed.call("POST", "/v1/observations", {
+    key: later.key,
+    body: {
+      subject_id: "subject_cross_org_lease",
+      kind: "tool_result",
+      content: "Synthetic later organization lease evidence.",
+      source: { type: "tool", ref: "cross-org-lease" },
+      trust: "verified",
+    },
+  });
+  assert.equal(observation.status, 201);
+  const consolidated = await seed.call("POST", "/v1/consolidations", {
+    key: later.key,
+    body: {
+      subject_id: "subject_cross_org_lease",
+      claims: [{
+        kind: "procedural",
+        statement: "Later organizations receive fresh index leases.",
+        sources: [{
+          observation_id: observation.body.data.observation_id,
+          relation: "supports",
+        }],
+      }],
+    },
+  });
+  assert.equal(consolidated.status, 201);
+  const claimId = consolidated.body.data.claims[0].claim_id as string;
+  await db.batch([{
+    sql: `INSERT INTO index_outbox
+            (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+          VALUES ('idx_early_org_delete', ?, 'claim', 'clm_early_org_delete',
+                  'delete', 'pending', 0, ?)`,
+    params: [early.orgId, new Date(base.getTime() - 1).toISOString()],
+  }]);
+
+  const remove = vectors.store.remove.bind(vectors.store);
+  let releaseRemoval!: () => void;
+  let removalStarted!: () => void;
+  const removalBlocked = new Promise<void>((resolve) => { removalStarted = resolve; });
+  const removalResume = new Promise<void>((resolve) => { releaseRemoval = resolve; });
+  vectors.store.remove = async (ids) => {
+    removalStarted();
+    await removalResume;
+    await remove(ids);
+  };
+  const upsert = vectors.store.upsert.bind(vectors.store);
+  let releaseUpsert!: () => void;
+  let upsertStarted!: () => void;
+  const upsertBlocked = new Promise<void>((resolve) => { upsertStarted = resolve; });
+  const upsertResume = new Promise<void>((resolve) => { releaseUpsert = resolve; });
+  let upserts = 0;
+  vectors.store.upsert = async (records) => {
+    upserts += 1;
+    upsertStarted();
+    await upsertResume;
+    await upsert(records);
+  };
+
+  let ownerAt = base;
+  const owner = runMaintenance({
+    db,
+    vectors,
+    limit: 100,
+    now: () => ownerAt,
+    deliverWebhooks: false,
+  });
+  await removalBlocked;
+  ownerAt = new Date(base.getTime() + 86_400_000);
+  releaseRemoval();
+  await upsertBlocked;
+  const lease = (await db.all<{ lease_expires_at: string; inspected_at: string }>(
+    `SELECT lease_expires_at,
+            strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS inspected_at
+       FROM index_outbox
+      WHERE org_id = ? AND record_id = ? AND operation = 'upsert'`,
+    [later.orgId, claimId],
+  ))[0];
+  assert.ok(lease?.lease_expires_at);
+  assert.ok(
+    Date.parse(lease.lease_expires_at) - Date.parse(lease.inspected_at) >=
+      SEMANTIC_INDEX_LEASE_MS - 1_000,
+    "a later organization receives a full database-clock lease",
+  );
+  const providerCalls = vectors.embedCalls();
+  const contender = await clientAt(new Date("2000-01-01T00:00:00.000Z")).call("POST", "/v1/index/drain?limit=100", {
+    key: later.key,
+  });
+  assert.equal(contender.status, 200);
+  assert.equal(contender.body.data.indexed, 0);
+  assert.equal(vectors.embedCalls(), providerCalls);
+  assert.equal(upserts, 1);
+  releaseUpsert();
+  const result = await owner;
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.indexed, 1);
 }
