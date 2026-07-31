@@ -1,14 +1,13 @@
 ---
 work_id: reference-agent-plugin
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-reference-agent-plugin.md
+spec: docs/specs/done/2026-07-31-reference-agent-plugin.md
 ---
 # Plan
 
@@ -23,7 +22,7 @@ spec: docs/specs/active/2026-07-31-reference-agent-plugin.md
   focused MCP, plugin, package, workflow, and diff gates.
 - [x] Run independent security, packaging, host-UX, and Ponytail reviews; fix all
   blockers without widening the approved scope.
-- [ ] Commit with the required attribution, push, open and merge a reviewed PR,
+- [x] Commit with the required attribution, push, open and merge a reviewed PR,
   remove only the merged temporary branch/worktree, and move this pair to done.
 
 ## Verification before the implementation PR
@@ -39,6 +38,12 @@ spec: docs/specs/active/2026-07-31-reference-agent-plugin.md
 - Seven parallel review roles covered MCP/debt inventory, Codex/Claude research,
   Pi/OpenClaw/Hermes research, security, packaging, host UX, and final Ponytail
   simplicity. Security, packaging, host UX, and final Ponytail reviews are clean.
+- Implementation PR #109 merged as `39619b7`; it had the expected 13 scoped
+  files, no automated Actions checks, and an independent exact-commit approval.
+- No issue was closed by this slice: #81 still requests a native OpenClaw
+  provider and #90 still requests stdio MCP, neither of which this plugin ships.
+  The terminal documentation PR is the sole temporary PR/branch exception and
+  is removed after merge.
 
 ## Acceptance evidence mapping
 
