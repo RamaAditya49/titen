@@ -1,14 +1,13 @@
 ---
 work_id: cross-host-agent-distribution
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: cancelled
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-cross-host-agent-distribution.md
+spec: docs/specs/done/2026-07-31-cross-host-agent-distribution.md
 ---
 # Plan
 
@@ -80,3 +79,11 @@ required. The existing MCP and npm service remain independently usable.
 - Live bundle publication is still blocked by the upstream ClawHub inspector
   sandbox incident `openclaw/clawhub#3327`. Keep the publication and terminal
   evidence items unchecked until the package itself is public and inspected.
+
+## Closure reason
+
+Cancelled at the external publication boundary. The nine-tool host packages
+remain merged, tested, and usable, but the upstream ClawHub inspector incident
+prevents an honest immutable bundle publication claim. npm release does not
+depend on that separate catalog, so the two unchecked publication items remain
+recorded and require a new work item after the upstream service recovers.

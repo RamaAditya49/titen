@@ -13,12 +13,12 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
 # Plan
 
 The terminal `0.3.0` closure is withdrawn. Keep this pair active until the
-reviewed `0.3.1` artifact has complete registry, tag, release, and issue
+reviewed `0.4.0` artifact has complete registry, tag, release, and issue
 evidence.
 
 - [x] Capture the immutable starting inventory: local WIP/stash, remote heads,
   open issues and pull requests, tags/releases, npm metadata, and Actions state.
-- [ ] Review and integrate or explicitly supersede every remote topic branch;
+- [x] Review and integrate or explicitly supersede every remote topic branch;
   validate its completed workflow artifacts and remove only a merged branch.
 - [x] Build an issue resolution matrix, group shared root causes, and update this
   spec first if a verified issue requires scope outside its current boundaries.
@@ -73,15 +73,15 @@ evidence.
   one-head/one-winner assertions. Instrumentation is ready; the checkpoint
   recurrence remains unclassified, while only emulator transport instability
   is separately tracked in #157.
-- [ ] Add one shared embedding-policy helper for role-specific text transforms,
+- [x] Add one shared embedding-policy helper for role-specific text transforms,
   validation, and unit normalization; require explicit revision/profile/cosine
   floor in Bun and Cloudflare configuration, with EmbeddingGemma bound to its
   official query/document profile.
-- [ ] Gate vector hits by the configured absolute cosine floor before hydration
+- [x] Gate vector hits by the configured absolute cosine floor before hydration
   and relative ranking; fingerprint the exact profile/threshold in existing
   semantic metadata and prove mismatch requires the documented explicit
   projection reset/requeue rather than a new schema or provider abstraction.
-- [ ] Add dual-runtime hard-negative/empty-pack, role parity, sub-threshold
+- [x] Add dual-runtime hard-negative/empty-pack, role parity, sub-threshold
   non-hydration, scope/provenance, malformed/zero-vector, configuration, and
   reindex regressions; integrate the immutable calibration evidence branch and
   run a second untouched holdout before publishing any bundled threshold.
@@ -100,10 +100,11 @@ evidence.
 - [x] Prove the lane with an overlap regression and a controlled owner/contender
   experiment, then run five predeclared complete isolated D1 files with no
   retry.
-- [ ] Keep real Cloudflare D1 smoke separate and read-only. Current
-  `wrangler.jsonc` contains only `replace-with-your-d1-database-id`, and this
-  lane has no authority for a disposable remote database; no resource was
-  created, migrated, deployed, or deleted.
+- [ ] Keep the real Cloudflare D1 smoke separate. Create uniquely named
+  disposable D1 and Worker resources, apply the release schema, exercise only
+  synthetic authenticated health/readiness/write/read and checkpoint/handoff
+  concurrency, enumerate the exact targets, then delete both without adding a
+  route or retaining a deployment.
 - [x] Remove the D1 file-level parent timeout, apply 20-second bounds directly
   to every ordinary case plus setup and teardown, and retain 60 seconds only
   for the measured semantic-readiness case without changing any assertion or
@@ -155,8 +156,10 @@ evidence.
   prepublish gate, publish npm manually, push the annotated tag, generate the
   GitHub release from the changelog, and smoke a clean registry install.
 - [x] After the issue #133 fix passes focused and package gates, record it in the
-  changelog, set `package.json` to `0.3.1`, and verify the pnpm lockfile remains
-  valid and unchanged because it does not store the root package version.
+  changelog, prepare the original `0.3.1` candidate, and verify the pnpm lockfile
+  remains valid and unchanged because it does not store the root package version;
+  the later breaking semantic configuration batch raises the final release to
+  `0.4.0` under AC-SWP-007.
 - [ ] Remove only merged temporary branches/worktrees, re-audit GitHub/npm and
   the preserved original checkout, then record the durable non-secret handoff.
 
@@ -185,7 +188,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #117 | Close not planned because Actions are intentionally disabled to keep the repository free of hosted automation cost; publication remains manual. |
 | #123 | Record and retain the single-process ceiling, then close worker pools/sharding until measured small-team demand breaches it. |
 | #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
-| #133 | Reject non-object 2xx JSON envelopes once in `requestWithMeta()`; cover every JSON top-level shape and typed callers, then publish the compatible correction as `0.3.1`. |
+| #133 | Reject non-object 2xx JSON envelopes once in `requestWithMeta()`; cover every JSON top-level shape and typed callers, then include the compatible correction in the combined `0.4.0` release. |
 | #137 | Validate all untrusted embedding output once in shared code; require exact cardinality, ordered unique contiguous provider indices when present, dense configured dimensions, and finite numeric coordinates before either runtime can query or mutate a vector index. |
 | #138 | Distinguish intentional FTS-only operation from configured semantic failure; persist/compare the migration-13 index fingerprint, fail local readiness closed on incompatible or unavailable vector state, and expose separate embedding/extraction/background capability fields without implementing planned enrichment. |
 | #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
@@ -226,7 +229,7 @@ to its merged evidence or to the concrete decision recorded here.
   convenience method, including `TitenError` status/request-ID/metadata checks.
 - AC-SWP-012: changelog and package version diff, frozen-lockfile verification,
   focused SDK and package gates, annotated-tag peel, npm/GitHub metadata, and
-  clean `0.3.1` registry smoke against the exact reviewed source.
+  clean `0.4.0` registry smoke against the exact reviewed source.
 - AC-SWP-013: table-driven adapter and normalized-core validator cases plus Bun
   HTTP, Cloudflare Workers AI, and injected-provider regressions for missing/
   extra/index/sparse/type/finite/dimension failures, no vector query or write,
@@ -275,13 +278,17 @@ to its merged evidence or to the concrete decision recorded here.
   failure coverage for bounded redacted stderr and run/case identity, the
   20-second default plus the measured 60-second semantic-readiness bound,
   old-versus-current pinned emulator evidence, unchanged product assertions,
-  five predeclared complete isolated D1 runs, and a separate read-only real D1
-  smoke or explicit external-authority blocker.
+  five predeclared complete isolated D1 runs, and the separate disposable real
+  D1/Worker smoke with exact cleanup.
 - AC-SWP-042: manifest inspection proving no file-level timeout, direct source
   inspection of 20-second ordinary case/setup/teardown bounds and the sole
   60-second semantic-readiness exception, complete Node 22 and default-runtime
   transcripts, and a controlled failing-child transcript proving nonzero exit,
   persistence removal, and no owned workerd residue.
+- AC-SWP-043: remote inventory plus exact disposable resource names, schema and
+  synthetic authenticated smoke results, one checkpoint head and one handoff
+  winner under concurrency, followed by inventory proving both exact resources
+  were deleted and no route or persistent deployment remains.
 - AC-SWP-050: shared policy unit tests plus Bun HTTP, Workers AI, injected-
   provider, fingerprint-mismatch, explicit-reindex, zero/non-finite-vector, and
   configuration regressions proving exact query/document transforms and unit

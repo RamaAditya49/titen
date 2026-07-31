@@ -20,10 +20,10 @@ spec: docs/specs/active/2026-07-31-d1-release-gate-runtime.md
   exclusions, remove the parser retry, bundle the D1 test entrypoint for Node's
   built-in runner, bound only its long semantic-readiness case at 60 seconds,
   and add exact checkpoint response diagnostics.
-- [ ] Run focused diagnostics, frozen install, supply-chain check, Worker build,
+- [x] Run focused diagnostics, frozen install, supply-chain check, Worker build,
   five complete D1 passes, teardown inspection, workflow checks, package smoke,
   production audit, secret scan, and the full local repository gate.
-- [ ] Rebase onto current `origin/main`, review the exact diff, merge through a
+- [x] Rebase onto current `origin/main`, review the exact diff, merge through a
   pull request, and repeat the release-critical checks from clean source.
 - [ ] Run a real Cloudflare D1 smoke, record issue/PR evidence, and close this
   pair only when every criterion is proven.
@@ -51,3 +51,15 @@ dependency pin itself, but the release remains blocked until a real D1 smoke
 passes. Before merge, rollback is branch deletion; after merge it is a reviewed
 revert to the prior pins, which cannot be used as release approval because the
 old gate failed two of five controlled runs.
+
+## Current verification
+
+- PRs #164 and #170 are merged; the final release candidate retains the matched
+  Miniflare/Wrangler patch set and Node built-in test runner.
+- The final manual gate passed the harness 9/9, Cloudflare/D1 98/98,
+  Bun/vector/SDK 120/120, integration 164/164, dashboard adapter smoke, and
+  browser 10/10 with no retry. The Worker dry build is 463.72 KiB upload and
+  98.11 KiB gzip.
+- The remaining unchecked item is the disposable real Cloudflare D1 smoke.
+  Cloudflare's account API currently returns edge 521/523/525 during a minor
+  service outage; no remote resource has been created.

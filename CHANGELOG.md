@@ -17,7 +17,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
-## [0.3.1] — 2026-07-31
+## [0.4.0] — 2026-07-31
 
 ### Fixed
 
@@ -64,7 +64,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   explicit cross-project recall requires `cross_project: true` plus the separate
   `context:compile:all` capability and reports its effective scope and grant
   reason across REST, SDK, and MCP.
-- Semantic configuration now requires an immutable model revision, a named
+- **Breaking:** Semantic configuration now requires an immutable model revision, a named
   role-aware preprocessing profile, and an operator-calibrated cosine floor in
   the existing index fingerprint. EmbeddingGemma uses its official asymmetric
   query/document prompts; Titen ships no universal threshold.
@@ -364,8 +364,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.3.1...HEAD
-[0.3.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.1
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.0
 [0.3.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.0
 [0.2.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.1
 [0.2.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.0

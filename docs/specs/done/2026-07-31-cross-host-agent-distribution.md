@@ -1,12 +1,11 @@
 ---
 work_id: cross-host-agent-distribution
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: cancelled
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Cross-host agent distribution

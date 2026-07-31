@@ -51,7 +51,7 @@ is the source of truth for shipped and planned capabilities.
 | Surface | Current evidence | Boundary |
 | --- | --- | --- |
 | Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
-| Containerized Bun service with optional embeddings | Verified live in a recorded container run | The systemd/Caddy VPS path has not been verified. |
+| Containerized Bun service with optional embeddings | Historical 0.3.0 canary evidence | The recorded loopback container does not verify this release, systemd/Caddy, or Cloudflare. |
 | Memory Atlas dashboard | Interactive prototype | The checked-in preview uses a frozen synthetic fixture. It is not evidence of live API integration. |
 | Live Vectorize, Workers AI, and Cloudflare production | Planned | Local configuration and emulation are not production evidence. |
 | Enterprise governance and recallable-memory federation | Planned | Signed event exchange exists, but remote events do not become canonical memory automatically. |

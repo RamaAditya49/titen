@@ -43,6 +43,9 @@ failed canonical-integrity run is retained rather than averaged away.
   owned runtime is disposed after the complete lane.
 - Require five predeclared complete serial passes and a real Cloudflare D1
   smoke before the npm release can proceed.
+- For the authorized remote smoke only, create uniquely named disposable D1
+  and Worker resources, use synthetic data and an ephemeral key, then delete
+  those exact resources after evidence is recorded.
 
 ## Out of scope
 
@@ -51,6 +54,7 @@ failed canonical-integrity run is retained rather than averaged away.
 - Raising the timeout for the complete D1 lane or its race cases.
 - GitHub Actions, a new test framework, or a cross-platform lock service.
 - Automatic derivation/reflection implementation or unrelated open issues.
+- A persistent Worker, custom route, production database, or live customer data.
 
 ## Constraints and risks
 
@@ -80,6 +84,10 @@ failed canonical-integrity run is retained rather than averaged away.
   execute under the repository's supported Node 22-or-newer runtime.
 - **AC-D1G-005 — State-driven:** While the npm candidate lacks a passing real
   Cloudflare D1 smoke, Titen shall not publish the release.
+- **AC-D1G-006 — Event-driven:** When the real D1 smoke runs, Titen shall apply
+  the release schema to uniquely named disposable resources, prove health,
+  readiness, authenticated write/read, one checkpoint head, and one handoff
+  winner under concurrency, and then delete only the enumerated D1 and Worker.
 
 ## Done conditions
 

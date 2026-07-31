@@ -21,10 +21,12 @@ mistaken for current release source.
 
 After `titen-memory@0.3.0` was published, issue #133 demonstrated that a 2xx
 response containing valid JSON with an array or primitive top-level value is
-silently accepted as a successful SDK envelope. The correction requires the
-smallest compatible patch release, `0.3.1`. Any terminal closure drafted for
-the `0.3.0` sweep is withdrawn; this pair remains active until the patch has
-verified publication evidence.
+silently accepted as a successful SDK envelope. That correction initially
+prepared the compatible `0.3.1` candidate. The merged batch later changed the
+required semantic configuration and fingerprint contract, which is a public
+breaking change below 1.0. The smallest valid release is therefore `0.4.0`,
+and this pair remains active until that minor release has verified publication
+evidence.
 
 Issue #137 subsequently demonstrated that both embedding adapters trust
 successful provider payloads too far: missing or extra outputs, invalid
@@ -154,7 +156,7 @@ documentation, and an install smoke against the immutable npm artifact.
   release, and smoke the registry artifact.
 - Reject non-object successful SDK envelopes at the shared response boundary,
   preserve diagnostic status, request ID, and safe response metadata in the
-  resulting `TitenError`, and publish the verified correction as `0.3.1`.
+  resulting `TitenError`, and include the verified correction in `0.4.0`.
 - Validate Bun HTTP, Cloudflare Workers AI, and injected embedding-provider
   output through shared adapter parsing plus one normalized core boundary before
   any vector query or mutation can consume it.
@@ -308,8 +310,9 @@ documentation, and an install smoke against the immutable npm artifact.
   `TitenError` whose code is `INVALID_RESPONSE` and which preserves the HTTP
   status, request ID, and any safe response metadata available at that boundary.
 - **AC-SWP-012 — Event-driven:** When the issue #133 regression evidence passes,
-  Titen shall publish the same verified source as the backward-compatible
-  `0.3.1` npm patch, annotated tag, and GitHub release; valid object envelopes
+  Titen shall include the same verified correction in the `0.4.0` npm minor,
+  annotated tag, and GitHub release because the combined release also contains
+  a breaking pre-1.0 semantic configuration change; valid object envelopes
   shall retain their current behavior.
 - **AC-SWP-013 — Unwanted behavior:** If an embedding provider returns anything
   other than exactly one dense configured-dimension vector per input containing
@@ -391,6 +394,13 @@ documentation, and an install smoke against the immutable npm artifact.
   20-second ceiling, only semantic readiness shall receive 60 seconds, all 94
   product assertions shall remain unchanged, and a controlled failing child
   shall exit nonzero after removing its owned persistence and workerd runtime.
+- **AC-SWP-043 — Event-driven:** When the maintainer authorizes the real D1
+  smoke, Titen shall create uniquely named disposable D1 and Worker resources,
+  apply the exact release schema, use synthetic data and an ephemeral key,
+  prove health, readiness, one checkpoint head, and one handoff winner under
+  concurrent requests, then enumerate and delete only those exact resources;
+  no credential, private memory, route, or persistent production deployment
+  shall remain.
 - **AC-SWP-050 — Unwanted behavior:** If semantic retrieval is configured, then
   Titen shall require an immutable model revision, a supported named/versioned
   role-aware preprocessing profile, and an explicit finite cosine floor; the
@@ -460,8 +470,8 @@ match the shipped artifact; every mapped gate passes; npm `latest`, the
 annotated tag, the GitHub release, and the release commit agree; a clean install
 smoke passes; the original dirty checkout is unchanged; and this spec and its
 paired plan move to `done` with terminal evidence. The post-release issue #133
-is resolved by the verified `0.3.1` patch rather than by altering the immutable
-`0.3.0` artifact. Issue #137 is resolved only after malformed-output regressions
+is resolved by the verified correction included in `0.4.0`, without altering
+the immutable `0.3.0` artifact. Issue #137 is resolved only after malformed-output regressions
 pass against the shared validator and both runtime paths. Issue #138 is resolved
 only after configured semantic failures and fingerprint mismatches fail local
 readiness closed while intentional FTS-only operation remains ready. Issue #141
@@ -470,7 +480,7 @@ explicit capability-gated broad retrieval, and denial of foreign project,
 subject, principal, membership, and visibility substitutions across REST and
 MCP. Issue #157 is resolved only after the overlap regression, five predeclared
 complete isolated D1 runs without retry, owned-runtime teardown evidence, and a
-separately authorized read-only real D1 smoke; none of that evidence resolves
+separately authorized disposable real D1/Worker smoke with exact cleanup; none of that evidence resolves
 the still-independent #102 product assertion. Issue #166 is resolved only after
 the complete lane passes on Node 22 and the default supported Node runtime and a
 controlled failure proves owned-resource cleanup; that compatibility evidence
