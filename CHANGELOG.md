@@ -23,7 +23,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   bundle plus native MCP config, a Hermes skill plugin, a Pi skill package, and
   OpenCode/Windsurf/TRAE host kits now package the same seven-tool Titen MCP
   contract without duplicating the server or embedding an endpoint or
-  credential.
+  credential. The standalone Titen Memory skill is public on ClawHub; its
+  bundle-plugin package is staged while an upstream inspector incident blocks
+  live package publication.
 
 ## [0.2.1] — 2026-07-31
 
