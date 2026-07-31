@@ -121,6 +121,25 @@ The CLI needs **Bun**: it runs on `bun:sqlite`, so `npx titen-memory` only works
 with Bun on `PATH`. From a clone, the same commands are `pnpm titen bootstrap`
 and `pnpm titen serve` after `pnpm install`.
 
+### Codex plugin
+
+Titen ships a repo-marketplace Codex plugin with a portable Agent Skill. Install
+the plugin, then connect it to your operator-selected self-hosted MCP endpoint:
+
+```bash
+codex plugin marketplace add RamaAditya49/titen --ref main \
+  --sparse .agents/plugins --sparse plugins/titen-memory
+codex plugin add titen-memory@titen
+codex mcp add titen --url "${TITEN_URL%/}/mcp" \
+  --bearer-token-env-var TITEN_API_KEY
+```
+
+Set `TITEN_URL` and `TITEN_API_KEY` outside the repository first. The plugin
+contains lifecycle/security instructions only; it deliberately contains no
+instance URL, credential, automatic transcript capture, or second MCP server.
+See the [agent guide](https://github.com/RamaAditya49/titen/blob/main/docs/agent-guide.md#mcp-integration)
+for the seven-tool allowlist and approval configuration.
+
 ### Agent SDK (any runtime)
 
 The client is plain `fetch` — Node 22+, Bun, Deno, and edge workers:

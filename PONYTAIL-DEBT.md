@@ -1,6 +1,6 @@
 # Ponytail debt ledger
 
-Generated from every Ponytail source marker on 2026-07-30. This is a trigger-based
+Generated from every Ponytail source marker on 2026-07-31. This is a trigger-based
 ledger, not a backlog promise: keep each shortcut until its stated ceiling is
 observed.
 
@@ -8,10 +8,10 @@ observed.
 
 | Location | Deliberate shortcut | Ceiling | Upgrade trigger |
 | --- | --- | --- | --- |
-| `docs/architecture/agent-integration.md:118` | One portable Agent Skill and per-host MCP recipes before native lifecycle hooks | No automatic recall or end-of-session flush | A real host needs automatic lifecycle behavior and has a parity fixture |
-| `docs/architecture/agent-integration.md:119` | Pi uses REST/SDK instead of a native extension | Pi cannot consume Titen through built-in MCP | Pi becomes an active adopter; then ship the smallest reviewed npm extension |
-| `docs/architecture/agent-integration.md:120` | No polyglot universal plugin or separate host artifacts | Install UX remains host-specific | Each proposed artifact has a maintainer and an install smoke fixture |
-| `docs/architecture/agent-integration.md:121` | No public Codex/ChatGPT directory package or listing assets | Titen is configured directly, not discoverable in that directory | A public directory submission is scheduled |
+| `docs/architecture/agent-integration.md:123` | Codex reference plugin has no automatic lifecycle hooks | No automatic recall or end-of-session flush | A measured workflow needs the behavior and a parity fixture covers failure paths |
+| `docs/architecture/agent-integration.md:124` | Pi uses REST/SDK instead of a native extension | Pi cannot consume Titen through built-in MCP | Pi becomes an active adopter; then ship the smallest reviewed npm extension |
+| `docs/architecture/agent-integration.md:125` | Claude, OpenClaw, and Hermes reuse the portable skill plus MCP recipes | Install/lifecycle UX remains host-specific | A host has a maintainer and an install smoke fixture |
+| `docs/architecture/agent-integration.md:126` | No public Codex/ChatGPT directory package or listing assets | Titen is installed from its repository marketplace, not a public directory | A public directory submission is scheduled |
 
 ## Runtime and retrieval
 
@@ -34,5 +34,5 @@ observed.
 
 - Markers: 11.
 - Markers without an upgrade trigger: 0.
-- Native agent artifacts intentionally deferred: portable skill automation,
-  Pi extension, per-host packages, and public directory packaging.
+- Native agent artifacts intentionally deferred: Codex lifecycle hooks, Pi
+  extension, other host packages, and public directory packaging.

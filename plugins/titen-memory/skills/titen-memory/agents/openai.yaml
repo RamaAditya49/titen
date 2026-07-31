@@ -1,0 +1,10 @@
+interface:
+  display_name: "Titen Memory"
+  short_description: "Use evidence-grounded collaborative memory"
+  default_prompt: "Use $titen-memory to recall relevant project context and record a verified durable outcome."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "titen"
+      description: "Operator-configured Titen MCP server"

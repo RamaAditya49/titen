@@ -432,7 +432,8 @@ planned area in documentation is not implementation evidence.
 
 - exact stable Bun, pnpm, TypeScript, and Wrangler versions at P0;
 - first extraction model after a structured-output mini-eval;
-- exact v0.2 reference host plugin selected after the generic MCP contract;
+- additional host-native plugins after the Codex reference plugin, selected only
+  with an active adopter and install/parity evidence;
 - identity-provider interface when enterprise work starts;
 - exact signed customer-assertion format and issuer/key-rotation contract at
   v0.3;
