@@ -1,12 +1,11 @@
 ---
 work_id: open-issue-sweep-and-npm-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Open issue sweep and npm release
@@ -460,6 +459,19 @@ documentation, and an install smoke against the immutable npm artifact.
   failed pending semantic work remains, Titen shall clear the vector-store
   failure marker while preserving any embedder failure marker and shall return
   ready without a provider probe.
+
+## Verification
+
+Release `0.4.0` is published from merge commit
+`729ec078d4bdc4490904c5c243a6dfa3c0647def`. Registry SHA-1
+`df0ecc5d22c1261cde53ec6785b2f8c51de0897d`, the annotated tag peel, and
+the GitHub Release agree with that reviewed source. The exact merge passed the
+full local gate and package verifier; a clean registry install passed SDK,
+CLI/bootstrap, schema-16 readiness, and MCP smokes. Every starting issue is
+closed, the pre-terminal audit found no open issue or pull request and only
+`main` remotely, disposable Cloudflare resources were deleted, Actions stays
+disabled, and the original dirty checkout hashes and stash object are
+unchanged.
 
 ## Done conditions
 
