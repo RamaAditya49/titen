@@ -72,6 +72,27 @@ portable default. The runtime therefore needs one explicit, fingerprinted
 profile and revision plus an operator-calibrated absolute cosine floor before
 relative ranking; no model-independent threshold may be invented.
 
+Issue #157 separately records complete Cloudflare/D1 contract runs that receive
+invalid synchronous Miniflare RPC text or hang only when exercised as part of
+the aggregate lane. Some failures coincided with other worktree validations,
+while named reruns passed. The manual gate must therefore reserve one host-wide
+workerd lane, preserve bounded emulator diagnostics without retry, and prove
+that an overlapping runner cannot disturb or terminate the owner. This harness
+work does not classify or close the independent checkpoint race in #102. A
+controlled isolated run subsequently reproduced the invalid RPC on the pinned
+`miniflare@4.20260722.1`/`workerd@1.20260722.1`, ruling out overlap as the sole
+trigger; the smallest emulator correction is verification against the current
+official `miniflare@4.20260730.0`/`workerd@1.20260730.1` pair, not a product
+retry.
+
+Issue #166 then reproduced a deterministic Node 22 host defect in the updated
+manual gate: the file-level `--test-timeout=20000` expires before the one
+measured semantic-readiness case may use its 60-second child timeout. Node
+cancels the parent, skips normal teardown, and leaves that run's persistence
+directory behind. The gate must put the 20-second bound on ordinary cases and
+hooks themselves, retain 60 seconds only for semantic readiness, and impose no
+shorter parent timeout.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -133,6 +154,15 @@ documentation, and an install smoke against the immutable npm artifact.
 - Require an explicit calibrated cosine floor, fingerprint it with the profile,
   discard sub-threshold semantic hits before hydration/ranking, and keep
   authorized lexical recall and successful empty packs unchanged.
+- Isolate the complete local D1 contract behind a host-wide owner lock, retain
+  unique temporary persistence and kernel-assigned ports, capture bounded safe
+  workerd diagnostics with run/case identity, and remove the existing hidden
+  provisioning retry; pin the verified current Miniflare/workerd patch pair if
+  the old emulator reproduces invalid RPC while isolated.
+- Make the same manual D1 gate portable across every supported Node 22-or-newer
+  host by bounding ordinary cases and hooks at 20 seconds, retaining the
+  measured 60-second semantic-readiness bound, and always disposing the owning
+  runtime and persistence after a controlled child failure.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -149,6 +179,11 @@ documentation, and an install smoke against the immutable npm artifact.
   publication of the already inspected challenger threshold as a safe default.
 - Publishing the externally blocked ClawHub bundle unless the upstream
   inspector accepts the already validated package during this work.
+- Retrying a failed D1 assertion, changing product checkpoint/lease behavior,
+  closing #102 through harness evidence, or creating, deleting, migrating, or
+  deploying a Cloudflare resource for the local isolation fix.
+- Raising the timeout of ordinary D1 cases or adding a file-level parent
+  timeout.
 - Changing or cleaning the original dirty checkout.
 
 ## Constraints and risks
@@ -281,6 +316,27 @@ documentation, and an install smoke against the immutable npm artifact.
   shall be retained in assertion-failure evidence, exact aggregate status
   counts shall remain asserted, exactly one durable head shall remain, and no
   unexplained non-success shall be hidden behind an aggregate count.
+- **AC-SWP-040 — Event-driven:** When a local Cloudflare/D1 contract process
+  starts, Titen shall acquire one host-wide owner lock before starting
+  Miniflare, use process-owned temporary persistence and kernel-assigned
+  loopback ports, and release the lock only after its own runtimes are disposed;
+  an overlapping process shall fail fast with safe owner/run/worktree identity
+  without signalling, disposing, or deleting any sibling resource.
+- **AC-SWP-041 — Unwanted behavior:** If a local Miniflare/workerd operation
+  returns invalid RPC data, exits, or exceeds its bounded case limit of 20
+  seconds (60 seconds only for the measured multi-phase semantic-readiness
+  case), then the D1 contract shall fail that run without retry and preserve
+  its run, phase or case, original error, and bounded redacted workerd stderr;
+  the gate shall use the exact verified Miniflare/workerd patch pair, product
+  assertions shall remain unchanged, five predeclared complete isolated runs
+  shall pass before release, and this local evidence shall not be presented as
+  a real Cloudflare D1 smoke.
+- **AC-SWP-042 — Ubiquitous:** The manual Cloudflare/D1 gate shall run under
+  every supported Node 22-or-newer host without a file-level timeout shorter
+  than a child case; every ordinary case plus setup and teardown shall retain a
+  20-second ceiling, only semantic readiness shall receive 60 seconds, all 94
+  product assertions shall remain unchanged, and a controlled failing child
+  shall exit nonzero after removing its owned persistence and workerd runtime.
 - **AC-SWP-050 — Unwanted behavior:** If semantic retrieval is configured, then
   Titen shall require an immutable model revision, a supported named/versioned
   role-aware preprocessing profile, and an explicit finite cosine floor; the
@@ -312,7 +368,13 @@ readiness closed while intentional FTS-only operation remains ready. Issue #141
 is resolved only after both runtimes prove default unscoped-only retrieval,
 explicit capability-gated broad retrieval, and denial of foreign project,
 subject, principal, membership, and visibility substitutions across REST and
-MCP.
+MCP. Issue #157 is resolved only after the overlap regression, five predeclared
+complete isolated D1 runs without retry, owned-runtime teardown evidence, and a
+separately authorized read-only real D1 smoke; none of that evidence resolves
+the still-independent #102 product assertion. Issue #166 is resolved only after
+the complete lane passes on Node 22 and the default supported Node runtime and a
+controlled failure proves owned-resource cleanup; that compatibility evidence
+does not replace #157's real D1 smoke.
 Issues #144 and #155 are resolved only after both runtime adapters share the
 same role-aware profile and absolute-gate contract, fingerprint changes fail
 readiness until explicit reindex, deterministic hard-negative regressions pass,
