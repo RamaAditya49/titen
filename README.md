@@ -93,11 +93,32 @@ const titen = new TitenClient({
   key: process.env.TITEN_API_KEY!,
 });
 
+const subject = "release-runbook";
+const observation = await titen.observe({
+  subject_id: subject,
+  kind: "imported_source",
+  content: "The release runbook requires a rollback smoke test after deployment.",
+  source: { type: "runbook", ref: "ops/release.md" },
+  trust: "verified",
+});
+
+await titen.consolidate(subject, [
+  {
+    kind: "procedural",
+    statement: "Run a rollback smoke test after deployment.",
+    sources: [
+      { observation_id: observation.observation_id, relation: "supports" },
+    ],
+  },
+]);
+
 const context = await titen.compile({
-  subject_id: "user_123",
-  task: "Prepare the next safe deployment step",
+  subject_id: subject,
+  task: "rollback smoke after deployment",
   max_tokens: 900,
 });
+
+console.log(context.items);
 ```
 
 Typed methods cover common agent operations. `request()` and `requestRaw()`
@@ -137,6 +158,10 @@ One Web-Standards TypeScript core serves both runtimes:
 | Optional vectors | `sqlite-vec` | Vectorize (planned live) |
 | Automatic model enrichment | Proposed: compatible HTTP | Proposed: Workers AI or compatible HTTP |
 | Background work | Startup and bounded timer | Scheduled handler; trigger provisioning varies |
+
+The model row defines a runtime integration boundary, not a shipped extractor.
+Automatic model-assisted claim derivation and reflection are not implemented;
+callers submit evidence-linked claims explicitly.
 
 The base service does not require Docker, Redis, Postgres, a graph database, or
 a vector database. Authorization runs before retrieval, and every candidate is
@@ -184,6 +209,14 @@ Changes follow `spec -> plan -> implement -> done`. Read
 before changing public behavior, storage, authorization, or runtime contracts.
 
 ## Security
+
+Keep Titen bound to `127.0.0.1`. Remote agents should use a private network or
+a trusted TLS reverse proxy. When that proxy exposes `/mcp`, set
+`TITEN_MCP_ORIGIN` to its exact public origin. Use `TITEN_SECRET_KEYS` as the
+external encryption keyring for persisted webhook and federation signing
+secrets, and set `TITEN_WEBHOOK_ALLOWED_HOSTNAMES` before enabling outbound
+webhooks. The [VPS security guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md#configuration)
+defines the formats and rotation procedure.
 
 Do not report vulnerabilities in a public issue. Use
 [GitHub Private Vulnerability Reporting](https://github.com/RamaAditya49/titen/security/advisories/new)
