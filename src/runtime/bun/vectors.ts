@@ -6,10 +6,15 @@ import { basename, dirname, join, resolve } from "node:path";
 import type {
   EmbeddingProvider,
   EmbeddingFingerprint,
+  EmbeddingProfile,
   VectorInitialization,
   VectorStore,
 } from "../../core/vectors";
-import { validateEmbeddingResponse } from "../../core/vectors";
+import {
+  embeddingPolicyFingerprint,
+  embeddingProfileMatchesModel,
+  validateEmbeddingResponse,
+} from "../../core/vectors";
 
 function normalizedFilePath(path: string): string {
   const absolute = resolve(path);
@@ -43,10 +48,9 @@ function aliasesFile(first: string, second: string): boolean {
  * the extension, database, or expected schema is unavailable; configured
  * semantic readiness then fails closed while canonical SQL remains intact.
  *
- * ponytail: cosine-style scoring derived from L2 distance as 1/(1+d). The
- * ceiling is that the score is monotonic but not a calibrated similarity, which
- * is enough for ranking and not enough to compare across queries. Upgrade path:
- * store normalized vectors and use a cosine distance metric directly.
+ * The shared embedding policy stores unit vectors. vec0 searches them by exact
+ * L2 distance; 1-(distance^2/2) converts that distance back to cosine so Bun and
+ * Vectorize apply the same calibrated absolute gate.
  */
 export function createSqliteVecStore(
   dbPath: string,
@@ -160,7 +164,10 @@ export function createSqliteVecStore(
           id: string;
           distance: number;
         }[];
-      return rows.map((row) => ({ id: row.id, score: 1 / (1 + row.distance) }));
+      return rows.map((row) => ({
+        id: row.id,
+        score: Math.max(-1, Math.min(1, 1 - (row.distance * row.distance) / 2)),
+      }));
     },
     async remove(ids) {
       if (ids.length === 0) return;
@@ -214,6 +221,8 @@ export function tryCreateVectors(config: {
   embedModel?: string;
   embedDims?: number | string;
   embedRevision?: string;
+  embedProfile?: string;
+  embedMinCosine?: number | string;
   embedApiKey?: string;
 }): VectorInitialization {
   const requested = [
@@ -221,12 +230,16 @@ export function tryCreateVectors(config: {
     config.embedModel,
     config.embedDims,
     config.embedRevision,
+    config.embedProfile,
+    config.embedMinCosine,
     config.embedApiKey,
   ].some((value) => value !== undefined);
   if (!requested)
     return { readiness: { embedding: "disabled", vector: "disabled" } };
 
   const dimensions = Number(config.embedDims);
+  const minimumCosine = Number(config.embedMinCosine);
+  const profile = config.embedProfile?.trim() as EmbeddingProfile | undefined;
   let baseUrl: URL;
   try {
     baseUrl = new URL(config.embedBaseUrl ?? "");
@@ -242,6 +255,13 @@ export function tryCreateVectors(config: {
   if (
     !config.embedModel?.trim() ||
     config.embedModel.trim().length > 200 ||
+    !config.embedRevision?.trim() ||
+    config.embedRevision.trim().length > 200 ||
+    !profile ||
+    !embeddingProfileMatchesModel(profile, config.embedModel.trim()) ||
+    !Number.isFinite(minimumCosine) ||
+    minimumCosine < -1 ||
+    minimumCosine > 1 ||
     !Number.isInteger(dimensions) ||
     dimensions < 1 ||
     dimensions > 65_536 ||
@@ -251,8 +271,6 @@ export function tryCreateVectors(config: {
     baseUrl.search ||
     baseUrl.hash ||
     baseUrl.href.length > 2_048 ||
-    (config.embedRevision !== undefined &&
-      (!config.embedRevision.trim() || config.embedRevision.trim().length > 200)) ||
     (config.vecDbPath !== undefined && !config.vecDbPath.trim())
   )
     return {
@@ -289,10 +307,10 @@ export function tryCreateVectors(config: {
   const fingerprint: EmbeddingFingerprint = {
     provider: `openai-compatible:${createHash("sha256").update(endpoint).digest("hex")}`,
     model: config.embedModel.trim(),
-    revision: config.embedRevision?.trim() ?? "unspecified",
+    revision: config.embedRevision.trim(),
     dimensions,
-    metric: "l2",
-    preprocessing: "text-v1",
+    metric: "cosine",
+    preprocessing: embeddingPolicyFingerprint(profile, minimumCosine),
     index_schema: "claims-scope-v1",
   };
   return {

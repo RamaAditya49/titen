@@ -7,9 +7,16 @@ import { createApp } from "../../src/core/app";
 import { runMaintenance } from "../../src/core/maintenance";
 import { migrate } from "../../src/core/migrations";
 import {
+  eligibleVectorMatches,
+  embedForRetrieval,
+  embeddingInput,
+  embeddingPolicyFingerprint,
+  embeddingProfileMatchesModel,
+  parseEmbeddingPolicy,
   validateEmbeddingResponse,
   validateEmbeddingVectors,
   type EmbeddingProvider,
+  type VectorCapability,
   type VectorStore,
 } from "../../src/core/vectors";
 import { createHttpEmbedder } from "../../src/runtime/bun/vectors";
@@ -105,6 +112,171 @@ test("shared embedding validator accepts both provider shapes in input order", (
       dimensions,
     ),
     [new Float32Array(dense()), new Float32Array(dense())],
+  );
+});
+
+test("embedding policies are canonical, role-aware, and model-specific", () => {
+  const fingerprint = embeddingPolicyFingerprint(
+    "embeddinggemma-retrieval-v1",
+    0.737307171,
+  );
+  assert.equal(
+    fingerprint,
+    "embeddinggemma-retrieval-v1;min_cosine=0.737307171",
+  );
+  assert.deepEqual(parseEmbeddingPolicy(fingerprint), {
+    profile: "embeddinggemma-retrieval-v1",
+    minimumCosine: 0.737307171,
+  });
+  assert.equal(
+    embeddingInput("embeddinggemma-retrieval-v1", "query", "release gate"),
+    "task: search result | query: release gate",
+  );
+  assert.equal(
+    embeddingInput("embeddinggemma-retrieval-v1", "document", "release gate"),
+    "title: none | text: release gate",
+  );
+  assert.equal(embeddingInput("raw-unit-v1", "query", "release gate"), "release gate");
+  assert.deepEqual(
+    parseEmbeddingPolicy(embeddingPolicyFingerprint("raw-unit-v1", 0)),
+    { profile: "raw-unit-v1", minimumCosine: 0 },
+  );
+  assert.equal(
+    embeddingProfileMatchesModel(
+      "embeddinggemma-retrieval-v1",
+      "google/embeddinggemma-300m",
+    ),
+    true,
+  );
+  assert.equal(
+    embeddingProfileMatchesModel("raw-unit-v1", "tuf/embeddinggemma"),
+    false,
+  );
+  assert.equal(parseEmbeddingPolicy("raw-unit-v1;min_cosine=0.10"), undefined);
+});
+
+test("both runtime adapters receive identical role prompts and return unit vectors", async () => {
+  const seen: string[][] = [];
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch(request: Request) {
+      const body = await request.json() as { input: string[] };
+      seen.push(body.input);
+      return Response.json({
+        data: body.input.map(() => ({ embedding: [3, 4, 0, 0] })),
+      });
+    },
+  });
+  const providers = [
+    createHttpEmbedder({
+      baseUrl: `http://127.0.0.1:${server.port}/v1`,
+      model: "tuf/embeddinggemma",
+      dimensions,
+    }),
+    createWorkersAiEmbedder(
+      {
+        async run(_model, input) {
+          seen.push(input.text);
+          return { data: input.text.map(() => [3, 4, 0, 0]) };
+        },
+      },
+      "tuf/embeddinggemma",
+      dimensions,
+    ),
+  ];
+  const store: VectorStore = {
+    async upsert() {},
+    async query() { return []; },
+    async remove() {},
+  };
+
+  try {
+    for (const embedder of providers) {
+      const capability: VectorCapability = {
+        store,
+        embedder,
+        fingerprint: {
+          provider: "test",
+          model: embedder.model,
+          revision: "immutable-test-revision",
+          dimensions,
+          metric: "cosine",
+          preprocessing: embeddingPolicyFingerprint(
+            "embeddinggemma-retrieval-v1",
+            0.7,
+          ),
+          index_schema: "claims-scope-v1",
+        },
+      };
+      const [query] = await embedForRetrieval(capability, "query", ["release gate"]);
+      const [document] = await embedForRetrieval(capability, "document", ["release gate"]);
+      assert.deepEqual([...query!], [0.6000000238418579, 0.800000011920929, 0, 0]);
+      assert.deepEqual([...document!], [...query!]);
+    }
+    assert.deepEqual(seen, [
+      ["task: search result | query: release gate"],
+      ["title: none | text: release gate"],
+      ["task: search result | query: release gate"],
+      ["title: none | text: release gate"],
+    ]);
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("shared retrieval boundary rejects zero vectors and invalid vector matches", async () => {
+  const capability: VectorCapability = {
+    store: {
+      async upsert() {},
+      async query() { return []; },
+      async remove() {},
+    },
+    embedder: {
+      dimensions: 2,
+      model: "test-model",
+      async embed() { return [new Float32Array([0, 0])]; },
+    },
+    fingerprint: {
+      provider: "test",
+      model: "test-model",
+      revision: "immutable-test-revision",
+      dimensions: 2,
+      metric: "cosine",
+      preprocessing: embeddingPolicyFingerprint("raw-unit-v1", 0.5),
+      index_schema: "claims-scope-v1",
+    },
+  };
+  await assert.rejects(
+    () => embedForRetrieval(capability, "query", ["query"]),
+    /^Error: Invalid embedding response\.$/,
+  );
+  assert.deepEqual(
+    eligibleVectorMatches(
+      [
+        { id: "below", score: 0.499 },
+        { id: "equal", score: 0.5 },
+        { id: "above", score: 1 },
+      ],
+      0.5,
+    ),
+    [
+      { id: "equal", score: 0.5 },
+      { id: "above", score: 1 },
+    ],
+  );
+  for (const matches of [
+    [{ id: "duplicate", score: 0.9 }, { id: "duplicate", score: 0.8 }],
+    [{ id: "outside-cosine", score: 1.01 }],
+    [{ id: "not-finite", score: Number.NaN }],
+  ])
+    assert.throws(
+      () => eligibleVectorMatches(matches, 0.5),
+      /^Error: Invalid vector response\.$/,
+    );
+  assert.throws(
+    () => eligibleVectorMatches([], -1.01),
+    /^Error: Invalid vector response\.$/,
   );
 });
 
@@ -238,7 +410,7 @@ for (const adapter of consumers)
           revision: "test",
           dimensions,
           metric: "cosine",
-          preprocessing: "none",
+          preprocessing: embeddingPolicyFingerprint("raw-unit-v1", 0.1),
           index_schema: "claims-v1",
         },
       };

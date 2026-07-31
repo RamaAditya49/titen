@@ -1,8 +1,13 @@
 import { validateEmbeddingResponse } from "../../core/vectors";
 import type {
   EmbeddingProvider,
+  EmbeddingProfile,
   VectorInitialization,
   VectorStore,
+} from "../../core/vectors";
+import {
+  embeddingPolicyFingerprint,
+  embeddingProfileMatchesModel,
 } from "../../core/vectors";
 
 /** Minimal Vectorize binding interface (no @cloudflare/workers-types needed). */
@@ -57,6 +62,8 @@ export function tryCreateVectorize(env: {
   TITEN_EMBED_MODEL?: string;
   TITEN_EMBED_DIMS?: string;
   TITEN_EMBED_REVISION?: string;
+  TITEN_EMBED_PROFILE?: string;
+  TITEN_EMBED_MIN_COSINE?: string;
 }): VectorInitialization {
   const requested = [
     env.VECTORIZE,
@@ -64,12 +71,17 @@ export function tryCreateVectorize(env: {
     env.TITEN_EMBED_MODEL,
     env.TITEN_EMBED_DIMS,
     env.TITEN_EMBED_REVISION,
+    env.TITEN_EMBED_PROFILE,
+    env.TITEN_EMBED_MIN_COSINE,
   ].some((value) => value !== undefined);
   if (!requested)
     return { readiness: { embedding: "disabled", vector: "disabled" } };
 
   const model = env.TITEN_EMBED_MODEL ?? "@cf/baai/bge-base-en-v1.5";
   const dimensions = Number(env.TITEN_EMBED_DIMS ?? "768");
+  const revision = env.TITEN_EMBED_REVISION?.trim();
+  const profile = env.TITEN_EMBED_PROFILE?.trim() as EmbeddingProfile | undefined;
+  const minimumCosine = Number(env.TITEN_EMBED_MIN_COSINE);
   const aiReady = Boolean(env.AI && typeof env.AI.run === "function");
   const vectorReady = Boolean(
     env.VECTORIZE &&
@@ -80,11 +92,16 @@ export function tryCreateVectorize(env: {
   if (
     !model.trim() ||
     model.trim().length > 200 ||
+    !revision ||
+    revision.length > 200 ||
+    !profile ||
+    !embeddingProfileMatchesModel(profile, model.trim()) ||
+    !Number.isFinite(minimumCosine) ||
+    minimumCosine < -1 ||
+    minimumCosine > 1 ||
     !Number.isInteger(dimensions) ||
     dimensions < 1 ||
-    dimensions > 65_536 ||
-    (env.TITEN_EMBED_REVISION !== undefined &&
-      (!env.TITEN_EMBED_REVISION.trim() || env.TITEN_EMBED_REVISION.trim().length > 200))
+    dimensions > 65_536
   )
     return {
       readiness: {
@@ -109,10 +126,10 @@ export function tryCreateVectorize(env: {
       fingerprint: {
         provider: "workers-ai",
         model: model.trim(),
-        revision: env.TITEN_EMBED_REVISION?.trim() ?? "unspecified",
+        revision,
         dimensions,
         metric: "cosine",
-        preprocessing: "text-v1",
+        preprocessing: embeddingPolicyFingerprint(profile, minimumCosine),
         index_schema: "claims-scope-v1",
       },
     },

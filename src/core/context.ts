@@ -11,7 +11,11 @@ import { planFtsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./re
 import { loadAuthorizedEvidenceIds } from "./evidence";
 import { estimateJsonTokens } from "./tokens";
 import type { RequestContext, Result } from "./http";
-import { validateEmbeddingVectors } from "./vectors";
+import {
+  eligibleVectorMatches,
+  embedForRetrieval,
+  parseEmbeddingPolicy,
+} from "./vectors";
 import {
   FEEDBACK_OUTCOMES,
   LIMITS,
@@ -100,20 +104,22 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   let vectorUsed = false;
   if (ctx.app.vectors) {
     try {
-      const queryVec = validateEmbeddingVectors(
-        await ctx.app.vectors.embedder.embed([task]),
-        1,
-        ctx.app.vectors.embedder.dimensions,
-      )[0];
+      const queryVec = (await embedForRetrieval(ctx.app.vectors, "query", [task]))[0];
       if (queryVec) {
-        const hits = await ctx.app.vectors.store.query(queryVec, {
-          topK: LIMITS.candidates,
-          filter: {
-            org_id: principal.orgId,
-            subject_id: subjectId,
-            ...(crossProject ? {} : { project_id: projectId ?? "" }),
-          },
-        });
+        const policy = parseEmbeddingPolicy(
+          ctx.app.vectors.fingerprint.preprocessing,
+        )!;
+        const hits = eligibleVectorMatches(
+          await ctx.app.vectors.store.query(queryVec, {
+            topK: LIMITS.candidates,
+            filter: {
+              org_id: principal.orgId,
+              subject_id: subjectId,
+              ...(crossProject ? {} : { project_id: projectId ?? "" }),
+            },
+          }),
+          policy.minimumCosine,
+        );
         const similarity = new Map(hits.map((hit) => [hit.id, hit.score]));
 
         const known = new Set(candidates.map((candidate) => candidate.id));

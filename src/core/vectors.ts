@@ -42,6 +42,70 @@ export interface EmbeddingProvider {
   model: string;
 }
 
+export const EMBEDDING_PROFILES = [
+  "raw-unit-v1",
+  "embeddinggemma-retrieval-v1",
+] as const;
+export type EmbeddingProfile = (typeof EMBEDDING_PROFILES)[number];
+export type EmbeddingRole = "document" | "query";
+
+export interface EmbeddingPolicy {
+  profile: EmbeddingProfile;
+  minimumCosine: number;
+}
+
+export function embeddingPolicyFingerprint(
+  profile: EmbeddingProfile,
+  minimumCosine: number,
+): string {
+  if (
+    !EMBEDDING_PROFILES.includes(profile) ||
+    !Number.isFinite(minimumCosine) ||
+    minimumCosine < -1 ||
+    minimumCosine > 1
+  )
+    throw new Error("Invalid embedding policy.");
+  return `${profile};min_cosine=${minimumCosine}`;
+}
+
+export function parseEmbeddingPolicy(value: string): EmbeddingPolicy | undefined {
+  const separator = value.lastIndexOf(";min_cosine=");
+  if (separator < 1) return undefined;
+  const profile = value.slice(0, separator) as EmbeddingProfile;
+  const rawMinimum = value.slice(separator + 12);
+  const minimumCosine = Number(rawMinimum);
+  if (
+    !EMBEDDING_PROFILES.includes(profile) ||
+    rawMinimum !== String(minimumCosine) ||
+    !Number.isFinite(minimumCosine) ||
+    minimumCosine < -1 ||
+    minimumCosine > 1
+  )
+    return undefined;
+  return { profile, minimumCosine };
+}
+
+export function embeddingInput(
+  profile: EmbeddingProfile,
+  role: EmbeddingRole,
+  content: string,
+): string {
+  if (profile === "raw-unit-v1") return content;
+  return role === "document"
+    ? `title: none | text: ${content}`
+    : `task: search result | query: ${content}`;
+}
+
+export function embeddingProfileMatchesModel(
+  profile: EmbeddingProfile,
+  model: string,
+): boolean {
+  const embeddingGemma = model.toLowerCase().includes("embeddinggemma");
+  return embeddingGemma
+    ? profile === "embeddinggemma-retrieval-v1"
+    : profile === "raw-unit-v1";
+}
+
 function invalidEmbeddingResponse(): never {
   throw new Error("Invalid embedding response.");
 }
@@ -63,6 +127,69 @@ export function validateEmbeddingVectors(
       if (!Number.isFinite(value)) invalidEmbeddingResponse();
   }
   return response;
+}
+
+/** Apply the fingerprinted role transform and normalize every vector once. */
+export async function embedForRetrieval(
+  capability: VectorCapability,
+  role: EmbeddingRole,
+  texts: string[],
+): Promise<Float32Array[]> {
+  const policy = parseEmbeddingPolicy(capability.fingerprint.preprocessing);
+  if (!policy) throw new Error("Invalid embedding policy.");
+  const vectors = validateEmbeddingVectors(
+    await capability.embedder.embed(
+      texts.map((text) => embeddingInput(policy.profile, role, text)),
+    ),
+    texts.length,
+    capability.embedder.dimensions,
+  );
+  return vectors.map((vector) => {
+    let squared = 0;
+    for (const value of vector) squared += value * value;
+    const norm = Math.sqrt(squared);
+    if (!Number.isFinite(norm) || norm === 0) invalidEmbeddingResponse();
+    const normalized = new Float32Array(vector.length);
+    for (let index = 0; index < vector.length; index += 1) {
+      normalized[index] = vector[index]! / norm;
+      if (!Number.isFinite(normalized[index])) invalidEmbeddingResponse();
+    }
+    return normalized;
+  });
+}
+
+/** Validate absolute cosine evidence before any ID can reach canonical SQL. */
+export function eligibleVectorMatches(
+  matches: unknown,
+  minimumCosine: number,
+): VectorMatch[] {
+  if (
+    !Array.isArray(matches) ||
+    !Number.isFinite(minimumCosine) ||
+    minimumCosine < -1 ||
+    minimumCosine > 1
+  )
+    throw new Error("Invalid vector response.");
+  const ids = new Set<string>();
+  const eligible: VectorMatch[] = [];
+  for (const match of matches) {
+    if (
+      !match ||
+      typeof match !== "object" ||
+      typeof (match as VectorMatch).id !== "string" ||
+      !(match as VectorMatch).id ||
+      ids.has((match as VectorMatch).id) ||
+      typeof (match as VectorMatch).score !== "number" ||
+      !Number.isFinite((match as VectorMatch).score) ||
+      (match as VectorMatch).score < -1 ||
+      (match as VectorMatch).score > 1
+    )
+      throw new Error("Invalid vector response.");
+    ids.add((match as VectorMatch).id);
+    if ((match as VectorMatch).score >= minimumCosine)
+      eligible.push(match as VectorMatch);
+  }
+  return eligible;
 }
 
 /** Validate untrusted provider output before it can reach a vector backend. */
@@ -315,9 +442,15 @@ export async function prepareSemanticReadiness(
   if (initialization.readiness.vector !== "enabled")
     return initialization.readiness;
   const fingerprint = initialization.vectors?.fingerprint;
+  const policy = fingerprint
+    ? parseEmbeddingPolicy(fingerprint.preprocessing)
+    : undefined;
   if (
     !fingerprint ||
+    !policy ||
     !validFingerprint(fingerprint) ||
+    fingerprint.metric !== "cosine" ||
+    !embeddingProfileMatchesModel(policy.profile, fingerprint.model) ||
     fingerprint.model !== initialization.vectors?.embedder.model ||
     fingerprint.dimensions !== initialization.vectors.embedder.dimensions
   )

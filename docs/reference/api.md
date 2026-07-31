@@ -611,8 +611,9 @@ separate fields; planned extraction/enrichment remain `disabled` until their
 own implementation and evidence ship.
 
 When semantic retrieval is configured, readiness compares credential-free
-provider identity, model, revision, dimensions, metric, preprocessing version,
-and index-schema version with migration-13 metadata. Partial/invalid
+provider identity, model, immutable revision, dimensions, cosine metric, named
+role-aware preprocessing/unit normalization plus calibrated floor, and
+index-schema version with migration-13 metadata. Partial/invalid
 configuration, unavailable or aliased local vector storage, an untracked legacy
 index, missing historical requeue work, an empty projection after canonical-only
 restore, fingerprint mismatch, or a migration-14 locally recorded embedder/
@@ -620,6 +621,11 @@ vector-store indexing failure returns `503 NOT_READY`, marks the affected
 capability `configured_error`, and supplies one fixed
 `checks.semantic_index` diagnostic. The response does not expose the
 fingerprint, endpoint, database path, or provider error.
+
+The cosine floor is an operator-supplied calibration policy, not a public API
+field or universal Titen default. Sub-threshold vector IDs never reach canonical
+hydration; authorized lexical candidates and successful empty packs retain their
+normal behavior.
 
 Readiness performs bounded local configuration/path/schema/metadata checks only. It
 makes no embedding-provider or vector-index network call. Before a dependency is

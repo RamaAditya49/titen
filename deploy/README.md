@@ -107,10 +107,17 @@ Set environment variables in the systemd unit or an env file:
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
+TITEN_EMBED_REVISION=<immutable-provider-revision>
+TITEN_EMBED_PROFILE=raw-unit-v1
+TITEN_EMBED_MIN_COSINE=<calibrated-cosine-floor>
 TITEN_EMBED_API_KEY=<optional-bearer-secret>
 ```
 
 Requires an OpenAI-compatible embedding endpoint (e.g., Ollama, vLLM).
+Revision, profile, and cosine floor are required for semantic readiness. Choose
+the floor from a locked evaluation of the exact model/profile; Titen has no
+universal default. EmbeddingGemma uses `embeddinggemma-retrieval-v1`, not the
+raw profile.
 This config enables retrieval/indexing only. Automatic LLM extraction and
 reflection are planned and the current service has no `TITEN_EXTRACT_*`
 configuration. In rootless containers, use `host.containers.internal`, host

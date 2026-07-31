@@ -160,6 +160,8 @@ switch (command) {
         embedModel: process.env.TITEN_EMBED_MODEL,
         embedDims: process.env.TITEN_EMBED_DIMS,
         embedRevision: process.env.TITEN_EMBED_REVISION,
+        embedProfile: process.env.TITEN_EMBED_PROFILE,
+        embedMinCosine: process.env.TITEN_EMBED_MIN_COSINE,
         embedApiKey: process.env.TITEN_EMBED_API_KEY,
         maintenanceIntervalMs:
           process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined

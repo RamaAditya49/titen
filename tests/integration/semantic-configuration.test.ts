@@ -8,9 +8,20 @@ import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { migrate } from "../../src/core/migrations";
 import { serve } from "../../src/runtime/bun/server";
 import { tryCreateVectorize } from "../../src/runtime/cloudflare/vectors";
+import { embeddingPolicyFingerprint } from "../../src/core/vectors";
 import { fakeVectors, TEST_SECRET_CIPHER } from "../contract/harness";
 
 const directory = mkdtempSync(join(tmpdir(), "titen-semantic-config-"));
+const rawPolicy = {
+  embedRevision: "revision-1",
+  embedProfile: "raw-unit-v1",
+  embedMinCosine: 0.1,
+} as const;
+const workerRawPolicy = {
+  TITEN_EMBED_REVISION: "revision-1",
+  TITEN_EMBED_PROFILE: "raw-unit-v1",
+  TITEN_EMBED_MIN_COSINE: "0.1",
+} as const;
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
 test("Bun distinguishes absent, partial, unavailable, and healthy semantic configuration", () => {
@@ -32,6 +43,7 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
       embedBaseUrl: "http://127.0.0.1:11434/v1",
       embedModel: "model",
       embedDims: 4,
+      ...rawPolicy,
     }).readiness,
     {
       embedding: "enabled",
@@ -44,7 +56,7 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
     embedBaseUrl: "http://127.0.0.1:11434/v1",
     embedModel: "model",
     embedDims: 4,
-    embedRevision: "revision-1",
+    ...rawPolicy,
   });
   assert.deepEqual(healthy.readiness, { embedding: "enabled", vector: "enabled" });
   assert.equal(healthy.vectors?.indexEmpty, true);
@@ -53,8 +65,8 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
     model: "model",
     revision: "revision-1",
     dimensions: 4,
-    metric: "l2",
-    preprocessing: "text-v1",
+    metric: "cosine",
+    preprocessing: embeddingPolicyFingerprint("raw-unit-v1", 0.1),
     index_schema: "claims-scope-v1",
   });
   assert.match(
@@ -67,7 +79,7 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
     embedBaseUrl: "http://127.0.0.1:11435/v1",
     embedModel: "model",
     embedDims: 4,
-    embedRevision: "revision-1",
+    ...rawPolicy,
   });
   assert.notEqual(
     otherEndpoint.vectors?.fingerprint.provider,
@@ -78,7 +90,7 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
     embedBaseUrl: "http://127.0.0.1:11434/v1",
     embedModel: "model",
     embedDims: 4,
-    embedRevision: "revision-1",
+    ...rawPolicy,
   });
   assert.equal(reopened.vectors?.indexEmpty, true);
   const incompatible = tryCreateVectors({
@@ -86,6 +98,7 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
     embedBaseUrl: "http://127.0.0.1:11434/v1",
     embedModel: "model",
     embedDims: 8,
+    ...rawPolicy,
   });
   assert.equal(incompatible.readiness.vector, "configured_error");
   assert.equal(incompatible.readiness.diagnostic, "vector_initialization_failed");
@@ -106,6 +119,7 @@ test("Bun refuses canonical database aliases before vector schema mutation", () 
       embedBaseUrl: "http://127.0.0.1:11434/v1",
       embedModel: "model",
       embedDims: 4,
+      ...rawPolicy,
     });
     assert.deepEqual(result.readiness, {
       embedding: "enabled",
@@ -151,6 +165,7 @@ test("Bun rejects plain and wrong-module vec_claims lookalikes", () => {
       embedBaseUrl: "http://127.0.0.1:11434/v1",
       embedModel: "model",
       embedDims: 4,
+      ...rawPolicy,
     });
     assert.equal(result.readiness.vector, "configured_error");
     assert.equal(result.readiness.diagnostic, "vector_initialization_failed");
@@ -176,13 +191,18 @@ test("Cloudflare validates binding completeness without calling either binding",
     embedding: "disabled",
     vector: "disabled",
   });
-  assert.deepEqual(tryCreateVectorize({ AI: ai }).readiness, {
+  assert.deepEqual(tryCreateVectorize({ AI: ai, ...workerRawPolicy }).readiness, {
     embedding: "enabled",
     vector: "configured_error",
     diagnostic: "vector_initialization_failed",
   });
   assert.equal(
-    tryCreateVectorize({ AI: ai, VECTORIZE: vectorize, TITEN_EMBED_DIMS: "nope" })
+    tryCreateVectorize({
+      AI: ai,
+      VECTORIZE: vectorize,
+      TITEN_EMBED_DIMS: "nope",
+      ...workerRawPolicy,
+    })
       .readiness.diagnostic,
     "embedding_configuration_invalid",
   );
@@ -191,11 +211,66 @@ test("Cloudflare validates binding completeness without calling either binding",
     VECTORIZE: vectorize,
     TITEN_EMBED_MODEL: "@cf/example/model",
     TITEN_EMBED_DIMS: "4",
-    TITEN_EMBED_REVISION: "revision-1",
+    ...workerRawPolicy,
   });
   assert.equal(healthy.readiness.vector, "enabled");
   assert.equal(healthy.vectors?.fingerprint.provider, "workers-ai");
+  assert.equal(
+    healthy.vectors?.fingerprint.preprocessing,
+    embeddingPolicyFingerprint("raw-unit-v1", 0.1),
+  );
   assert.equal(calls, 0, "configuration and readiness must not call remote bindings");
+});
+
+test("both runtimes require the EmbeddingGemma retrieval profile", () => {
+  const vecDbPath = join(directory, "embeddinggemma-profile.db");
+  const bunBase = {
+    vecDbPath,
+    embedBaseUrl: "http://127.0.0.1:11434/v1",
+    embedModel: "tuf/embeddinggemma",
+    embedDims: 4,
+    embedRevision: "immutable-test-revision",
+    embedMinCosine: 0.7,
+  } as const;
+  assert.equal(
+    tryCreateVectors({ ...bunBase, embedProfile: "raw-unit-v1" }).readiness
+      .diagnostic,
+    "embedding_configuration_invalid",
+  );
+  assert.equal(
+    tryCreateVectors({
+      ...bunBase,
+      embedProfile: "embeddinggemma-retrieval-v1",
+    }).readiness.vector,
+    "enabled",
+  );
+
+  const AI = { run: async () => ({ data: [] }) };
+  const VECTORIZE = {
+    upsert: async () => {},
+    query: async () => ({ matches: [] }),
+    deleteByIds: async () => {},
+  };
+  const workerBase = {
+    AI,
+    VECTORIZE,
+    TITEN_EMBED_MODEL: "tuf/embeddinggemma",
+    TITEN_EMBED_DIMS: "4",
+    TITEN_EMBED_REVISION: "immutable-test-revision",
+    TITEN_EMBED_MIN_COSINE: "0.7",
+  } as const;
+  assert.equal(
+    tryCreateVectorize({ ...workerBase, TITEN_EMBED_PROFILE: "raw-unit-v1" })
+      .readiness.diagnostic,
+    "embedding_configuration_invalid",
+  );
+  assert.equal(
+    tryCreateVectorize({
+      ...workerBase,
+      TITEN_EMBED_PROFILE: "embeddinggemma-retrieval-v1",
+    }).readiness.vector,
+    "enabled",
+  );
 });
 
 test("Bun serves health but fails readiness for a partial semantic tuple", async () => {

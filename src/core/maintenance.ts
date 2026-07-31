@@ -2,8 +2,8 @@ import type { Db } from "./db";
 import { processWebhooks } from "./webhooks";
 import {
   completeSemanticIndexWork,
+  embedForRetrieval,
   recordSemanticDependencyFailure,
-  validateEmbeddingVectors,
   type VectorCapability,
 } from "./vectors";
 import type { WebhookSecurity } from "./webhook-security";
@@ -199,10 +199,10 @@ export async function indexPendingForOrg(
   if (eligible.length > 0) {
     let embeddings: Float32Array[];
     try {
-      embeddings = validateEmbeddingVectors(
-        await vectors.embedder.embed(eligible.map((entry) => entry.statement)),
-        eligible.length,
-        vectors.embedder.dimensions,
+      embeddings = await embedForRetrieval(
+        vectors,
+        "document",
+        eligible.map((entry) => entry.statement),
       );
     } catch (error) {
       await recordSemanticDependencyFailure(

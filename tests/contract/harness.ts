@@ -2,7 +2,10 @@ import { createApiKey, organizationStatement } from "../../src/core/auth";
 import { newId } from "../../src/core/ids";
 import type { Db, Param } from "../../src/core/db";
 import type { Trust } from "../../src/core/validate";
-import type { VectorCapability } from "../../src/core/vectors";
+import {
+  embeddingPolicyFingerprint,
+  type VectorCapability,
+} from "../../src/core/vectors";
 import { createSecretCipher } from "../../src/core/secrets";
 import type { WebhookSecurity } from "../../src/core/webhook-security";
 
@@ -206,7 +209,7 @@ export function fakeVectors(): VectorCapability & {
       revision: "v1",
       dimensions: 4,
       metric: "cosine",
-      preprocessing: "text-v1",
+      preprocessing: embeddingPolicyFingerprint("raw-unit-v1", 0.1),
       index_schema: "claims-scope-v1",
     },
     embedder: {

@@ -117,6 +117,8 @@ TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
 TITEN_EMBED_REVISION=<immutable-provider-revision>
+TITEN_EMBED_PROFILE=raw-unit-v1
+TITEN_EMBED_MIN_COSINE=<calibrated-cosine-floor>
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
@@ -125,11 +127,17 @@ TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
 Embedding variables are optional. Observations and lexical context work without
 them. Put `TITEN_EMBED_API_KEY` only in the mode-`0600` service environment; it
 is required only when the configured embedder requires bearer authentication.
-Base URL, model, and dimensions form one opt-in tuple. Supplying only part of
-that tuple, or supplying API-key/revision settings without it, returns
-`configured_error` and makes `/readyz` fail. If no immutable revision is
-available, omit `TITEN_EMBED_REVISION`; Titen records `unspecified`, and adding a
-revision later intentionally requires a reindex.
+Base URL, model, dimensions, immutable revision, named profile, and calibrated
+cosine floor form one opt-in contract. Supplying only part of that contract, or
+supplying an API key without it, returns `configured_error` and makes `/readyz`
+fail. A provider without an immutable revision remains FTS-only; Titen does not
+pretend an `unspecified` model is safe to calibrate.
+
+`raw-unit-v1` sends raw query/document text and fits models that explicitly use
+that contract. `embeddinggemma-retrieval-v1` applies EmbeddingGemma's asymmetric
+query/document prompts. Titen unit-normalizes both profiles. Select
+`TITEN_EMBED_MIN_COSINE` from a locked exact-model evaluation; no universal or
+pre-inspected threshold is bundled.
 
 The ADR-0004 implementation will add a separate opt-in tuple such as
 `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and
@@ -177,10 +185,11 @@ failure is `503 NOT_READY`, never a silent fallback.
 
 ### Explicit semantic reindex
 
-Migration 13 binds the claim-vector projection to provider, model, revision,
-dimensions, L2 metric, preprocessing `text-v1`, and index schema
-`claims-scope-v1`. A missing legacy fingerprint or any change fails readiness.
-Titen never rewrites this metadata or deletes vectors automatically.
+Migration 13 binds the claim-vector projection to provider, model, immutable
+revision, dimensions, cosine metric, the named role/normalization profile plus
+its calibrated floor, and index schema `claims-scope-v1`. A missing legacy
+fingerprint or any change fails readiness. Titen never rewrites this metadata or
+deletes vectors automatically.
 
 Migration 14 records only safe embedder/vector-store failure timestamps in
 semantic metadata. That local evidence fails `/readyz` without probing either
@@ -238,6 +247,9 @@ podman run -d --name titen --network host -v titen-data:/var/lib/titen \
   -e TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
   -e TITEN_EMBED_MODEL=embeddinggemma \
   -e TITEN_EMBED_DIMS=768 \
+  -e TITEN_EMBED_REVISION=<immutable-provider-revision> \
+  -e TITEN_EMBED_PROFILE=embeddinggemma-retrieval-v1 \
+  -e TITEN_EMBED_MIN_COSINE="$CALIBRATED_COSINE_FLOOR" \
   -e TITEN_VEC_DB_PATH=/var/lib/titen/vectors.db \
   titen:latest serve --db /var/lib/titen/titen.db --host 127.0.0.1 --port 8787
 
@@ -286,12 +298,14 @@ handler instead. Add a Cron Trigger to `wrangler.jsonc`:
 
 ### Verified behavior
 
-A containerized run against `embeddinggemma` (768 dimensions) served through
+A historical containerized run against `embeddinggemma` (768 dimensions) served through
 Ollama retrieved a claim that shared no keywords with the query, ranked it above
 a lexically similar decoy in the same order as the model's own cosine similarity,
 and preserved all memory across a container restart. Measured: index drain
 134.9 ms, context compile p50 104.8 ms, embedding 106.4 ms. Graceful shutdown
-completes in about 130 ms.
+completes in about 130 ms. That pre-profile smoke is deployment evidence, not a
+safe current threshold; a current semantic deployment must pass the explicit
+profile/floor contract and its own hard-negative query smoke.
 
 ## Rootless Quadlet
 

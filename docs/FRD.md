@@ -392,11 +392,13 @@ Required behavior:
 - bound candidate counts and canonical hydration;
 - repair vector mutations from a durable outbox.
 
-Current implementation note: adapters carry the configured embedding model and
-dimensions. Bun HTTP and Cloudflare Workers AI share validation for exact output
-cardinality, ordered provider indices when present, dense dimensions, and finite
-numeric coordinates. Titen persists and compares the configured semantic index
-fingerprint before exposing vector retrieval.
+Current implementation note: adapters carry an immutable model revision, named
+role-aware input profile, dimensions, and operator-calibrated cosine floor. Bun
+HTTP and Cloudflare Workers AI share the exact query/document transforms, unit
+normalization, and validation for output cardinality, ordered provider indices
+when present, dense dimensions, and finite numeric coordinates. Sub-threshold
+IDs are discarded before canonical hydration. Titen persists and compares that
+semantic contract before exposing vector retrieval.
 
 Implemented compatibility requirements:
 
@@ -404,6 +406,8 @@ Implemented compatibility requirements:
   preprocessing/template, and semantic-unit schema as a versioned fingerprint;
 - compare that fingerprint with the configured index before declaring semantic
   readiness or running indexing/querying.
+- reject a best available vector neighbor when its absolute cosine falls below
+  the fingerprinted model/profile calibration policy.
 
 Acceptance:
 

@@ -97,8 +97,16 @@ TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
 TITEN_EMBED_MODEL=embeddinggemma \
 TITEN_EMBED_DIMS=768 \
 TITEN_EMBED_REVISION=local-pinned \
+TITEN_EMBED_PROFILE=embeddinggemma-retrieval-v1 \
+TITEN_EMBED_MIN_COSINE="$CALIBRATED_COSINE_FLOOR" \
 bunx titen-memory serve
 ```
+
+Set `CALIBRATED_COSINE_FLOOR` from a locked evaluation of that exact provider,
+model revision, and profile. Titen ships no universal threshold: missing or
+incompatible policy values fail readiness instead of returning a best bad
+neighbor. Use `raw-unit-v1` only for models whose retrieval contract is raw
+text; EmbeddingGemma requires the role-aware profile shown above.
 
 The packaged vector path is verified on glibc Linux x64 with Bun 1.3.13.
 Other `sqlite-vec` prebuilt platforms need the same local ready/drain/query
