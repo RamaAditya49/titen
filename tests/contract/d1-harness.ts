@@ -110,12 +110,14 @@ export async function acquireD1Lane(port = D1_LANE_PORT): Promise<D1Lane> {
 
 function redact(value: string, secrets: readonly string[]) {
   let safe = value;
-  for (const secret of secrets) {
-    if (secret) safe = safe.replaceAll(secret, "[redacted]");
+  const normalizedSecrets = [...new Set(secrets.filter(Boolean))]
+    .sort((left, right) => right.length - left.length);
+  for (const secret of normalizedSecrets) {
+    safe = safe.replaceAll(secret, "[redacted]");
   }
   return safe
-    .replace(/(authorization\s*[:=]\s*)(?:bearer\s+)?[^\s,;]+/gi, "$1[redacted]")
-    .replace(/((?:api[_-]?key|secret|token)\s*[:=]\s*)[^\s,;}]+/gi, "$1[redacted]");
+    .replace(/((?:["']?\bauthorization\b["']?\s*[:=]\s*)["']?)(?:bearer\s+)?[^"'\s,;}]+/gi, "$1[redacted]")
+    .replace(/((?:["']?\b(?:api[_-]?key|secret|token)\b["']?\s*[:=]\s*)["']?)[^"'\s,;}]+/gi, "$1[redacted]");
 }
 
 /** Adds bounded, redacted workerd context without changing assertion objects. */

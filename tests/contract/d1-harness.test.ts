@@ -94,33 +94,73 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
   const cases = [
     {
       name: "configured secret",
-      sensitive: "SENSITIVE_CONFIGURED_9382",
       input: "context-before configured=SENSITIVE_CONFIGURED_9382 context-after",
       secrets: ["SENSITIVE_CONFIGURED_9382"],
+      forbidden: ["SENSITIVE_CONFIGURED_9382"],
+      expected: "configured=[redacted]",
+    },
+    {
+      name: "overlapping configured secrets",
+      input: "context-before configured=ABCDEF_OVERLAP_9382 context-after",
+      secrets: ["ABC", "ABCDEF_OVERLAP_9382", "ABCDEF_OVERLAP_9382"],
+      forbidden: ["ABCDEF_OVERLAP_9382", "DEF_OVERLAP_9382"],
+      expected: "configured=[redacted]",
     },
     {
       name: "bearer token",
-      sensitive: "SENSITIVE_BEARER_9382",
       input: "context-before Authorization: Bearer SENSITIVE_BEARER_9382 context-after",
       secrets: [],
+      forbidden: ["SENSITIVE_BEARER_9382"],
+      expected: "Authorization: [redacted]",
     },
     {
       name: "API key assignment",
-      sensitive: "SENSITIVE_API_KEY_9382",
       input: "context-before api_key=SENSITIVE_API_KEY_9382 context-after",
       secrets: [],
+      forbidden: ["SENSITIVE_API_KEY_9382"],
+      expected: "api_key=[redacted]",
     },
     {
       name: "token assignment",
-      sensitive: "SENSITIVE_TOKEN_9382",
       input: "context-before token: SENSITIVE_TOKEN_9382 context-after",
       secrets: [],
+      forbidden: ["SENSITIVE_TOKEN_9382"],
+      expected: "token: [redacted]",
     },
     {
       name: "secret assignment",
-      sensitive: "SENSITIVE_SECRET_9382",
       input: "context-before secret = SENSITIVE_SECRET_9382 context-after",
       secrets: [],
+      forbidden: ["SENSITIVE_SECRET_9382"],
+      expected: "secret = [redacted]",
+    },
+    {
+      name: "JSON bearer token",
+      input: 'context-before {"Authorization":"Bearer SENSITIVE_JSON_BEARER_9382"} context-after',
+      secrets: [],
+      forbidden: ["SENSITIVE_JSON_BEARER_9382"],
+      expected: '"Authorization":"[redacted]"',
+    },
+    {
+      name: "JSON API key",
+      input: 'context-before {"api_key":"SENSITIVE_JSON_API_KEY_9382"} context-after',
+      secrets: [],
+      forbidden: ["SENSITIVE_JSON_API_KEY_9382"],
+      expected: '"api_key":"[redacted]"',
+    },
+    {
+      name: "JSON token",
+      input: 'context-before {"token":"SENSITIVE_JSON_TOKEN_9382"} context-after',
+      secrets: [],
+      forbidden: ["SENSITIVE_JSON_TOKEN_9382"],
+      expected: '"token":"[redacted]"',
+    },
+    {
+      name: "JSON secret",
+      input: 'context-before {"secret":"SENSITIVE_JSON_SECRET_9382"} context-after',
+      secrets: [],
+      forbidden: ["SENSITIVE_JSON_SECRET_9382"],
+      expected: '"secret":"[redacted]"',
     },
   ];
 
@@ -145,14 +185,20 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
         (error) => {
           assert.equal(error, failure);
           const thrown = `${(error as Error).message}\n${(error as Error).stack}`;
-          assert.doesNotMatch(thrown, new RegExp(fixture.sensitive), `${fixture.name} leaked at split ${split}`);
+          for (const forbidden of fixture.forbidden) {
+            assert.doesNotMatch(thrown, new RegExp(forbidden), `${fixture.name} leaked at split ${split}`);
+          }
+          assert.ok(thrown.includes(fixture.expected), `${fixture.name} was not redacted at split ${split}`);
           assert.match(thrown, /context-before/);
           assert.match(thrown, /context-after/);
           return true;
         },
       );
       const output = emitted.join("");
-      assert.doesNotMatch(output, new RegExp(fixture.sensitive), `${fixture.name} emission leaked at split ${split}`);
+      for (const forbidden of fixture.forbidden) {
+        assert.doesNotMatch(output, new RegExp(forbidden), `${fixture.name} emission leaked at split ${split}`);
+      }
+      assert.ok(output.includes(fixture.expected), `${fixture.name} emission was not redacted at split ${split}`);
       assert.match(output, /context-before/);
       assert.match(output, /context-after/);
       assert.ok(Buffer.byteLength(output) <= 512);
