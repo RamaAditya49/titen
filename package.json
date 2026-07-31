@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/RamaAditya49/titen.git"
   },
-  "homepage": "https://github.com/RamaAditya49/titen#readme",
+  "homepage": "https://titen.dev",
   "bugs": "https://github.com/RamaAditya49/titen/issues",
   "keywords": [
     "agent-memory",
@@ -22,7 +22,7 @@
     "cloudflare-workers"
   ],
   "bin": {
-    "titen": "src/runtime/bun/cli.ts"
+    "titen": "src/runtime/bun/bin.mjs"
   },
   "exports": {
     ".": {
@@ -78,9 +78,7 @@
     "@playwright/test": "1.62.0",
     "astro": "7.1.4",
     "miniflare": "4.20260722.1",
-    "wrangler": "4.115.0"
-  },
-  "optionalDependencies": {
+    "wrangler": "4.115.0",
     "sqlite-vec": "0.1.9"
   }
 }

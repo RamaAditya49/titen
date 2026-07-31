@@ -8,6 +8,7 @@ import { SCHEMA_VERSION, schemaState } from "../../src/core/migrations";
 
 const root = mkdtempSync(join(tmpdir(), "titen-cli-"));
 const cli = join(import.meta.dir, "../../src/runtime/bun/cli.ts");
+const shim = join(import.meta.dir, "../../src/runtime/bun/bin.mjs");
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -42,6 +43,22 @@ test("help is side-effect free for every documented command", () => {
     assert.doesNotMatch(result.output, /api_key:|titen listening/);
     assert.deepEqual(result.files, [], `${name} help created state`);
   }
+});
+
+test("the installed Node shim explains a missing Bun runtime", () => {
+  const node = Bun.which("node");
+  assert.ok(node, "Node is required by the package engine contract");
+  const emptyPath = join(root, "empty-path");
+  mkdirSync(emptyPath, { recursive: true });
+  const result = Bun.spawnSync({
+    cmd: [node, shim, "--help"],
+    env: { ...process.env, PATH: emptyPath },
+  });
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+  assert.equal(result.exitCode, 127);
+  assert.match(output, /Titen CLI requires Bun \(it uses bun:sqlite\)\./);
+  assert.match(output, /https:\/\/bun\.sh\/docs\/installation/);
+  assert.doesNotMatch(output, /node_modules|\n\s+at /);
 });
 
 test("malformed flags fail before side effects for every command", () => {

@@ -17,11 +17,10 @@ bunx titen-memory serve
 curl http://127.0.0.1:8787/healthz
 ```
 
-The `titen` CLI runs on Bun: it uses `bun:sqlite`. `npx titen-memory` fails
-unless Bun is on `PATH`, because the published `bin` carries a
-`#!/usr/bin/env bun` shebang. The SDK (`import { TitenClient } from
-"titen-memory"`) is plain `fetch` and runs on Node 22+, Bun, Deno, and workers
-alike.
+The `titen` CLI runs on Bun because it uses `bun:sqlite`. The published Node
+shim starts Bun and prints an installation link instead of a raw `env` error
+when Bun is missing. The SDK (`import { TitenClient } from "titen-memory"`) is
+plain `fetch` and runs on Node 22+, Bun, Deno, and workers alike.
 
 ## Quick start from a clone
 
@@ -152,7 +151,13 @@ Reverse-proxy rules must not expose arbitrary `/v1` or `/mcp` paths through that
 public route.
 
 `sqlite-vec` stores and searches vectors; it does not generate them. Pin and
-probe the version because its public API remains pre-v1.
+probe the version because its public API remains pre-v1. It is deliberately not
+installed for SDK-only consumers; add it beside Titen only on a vector-enabled
+VPS:
+
+```bash
+bun add titen-memory sqlite-vec@0.1.9
+```
 
 ## Container install (verified)
 

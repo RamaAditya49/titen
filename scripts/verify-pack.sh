@@ -32,12 +32,23 @@ npm install "$tarball" >/dev/null
 echo "==> 3/7 dependency tree"
 installed="$(ls node_modules | grep -v '^\.' | sort | tr '\n' ' ')"
 echo "    $installed"
+if [ -d node_modules/sqlite-vec ]; then
+  echo "FAIL: SDK/default installs must not pull the optional vector extension" >&2
+  exit 1
+fi
 for toolchain in astro wrangler playwright miniflare vite esbuild; do
   if [ -d "node_modules/$toolchain" ]; then
     echo "FAIL: $toolchain reached consumers; it belongs in devDependencies" >&2
     exit 1
   fi
 done
+node_bin="$(command -v node)"
+mkdir "$work/empty-path"
+missing_bun="$(PATH="$work/empty-path" "$node_bin" node_modules/titen-memory/src/runtime/bun/bin.mjs --help 2>&1 || true)"
+printf '%s\n' "$missing_bun" | grep -q 'Titen CLI requires Bun (it uses bun:sqlite).' \
+  || { echo "FAIL: installed CLI did not explain its Bun requirement" >&2; exit 1; }
+printf '%s\n' "$missing_bun" | grep -q 'https://bun.sh/docs/installation' \
+  || { echo "FAIL: installed CLI omitted Bun installation guidance" >&2; exit 1; }
 
 echo "==> 4/7 titen bootstrap"
 bootstrap="$(./node_modules/.bin/titen bootstrap --db "$work/t.db" --org 'Pack Verify')"

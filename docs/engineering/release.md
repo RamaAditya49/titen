@@ -102,10 +102,11 @@ reaches `latest`.
 Not shipped: the Astro dashboard (`src/pages`, `src/styles`), the Cloudflare
 adapter (deploy that from a clone with `wrangler`), tests, and docs.
 
-Consumers install **three** packages — `titen-memory`, `sqlite-vec`, and its
-platform binary. `astro`, `wrangler`, `playwright`, and `miniflare` are
-devDependencies and must stay there; moving one into `dependencies` puts a build
-toolchain on every user's disk.
+SDK and lexical-only server consumers install only `titen-memory`. A
+vector-enabled VPS explicitly installs `sqlite-vec`, which brings its platform
+binary. The repository retains `sqlite-vec` as a devDependency for integration
+tests. `astro`, `wrangler`, `playwright`, and `miniflare` remain development-only;
+none belongs on a consumer's disk.
 
 ## Publishing
 

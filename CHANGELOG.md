@@ -67,6 +67,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   plus integrity and foreign keys, and atomically refreshes a fixed output path
   without exposing an internal stack. `titen schema` output is deterministic
   and safely repeatable.
+- The installed CLI now explains when Bun is missing, while SDK-only installs
+  no longer download the optional `sqlite-vec` native package.
 
 ## [0.2.1] — 2026-07-31
 
