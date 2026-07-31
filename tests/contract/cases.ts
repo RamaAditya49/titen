@@ -3953,6 +3953,20 @@ export const CASES: Case[] = [
             ttl_seconds: 600,
           },
         })));
+      const failedSaves = saves
+        .map((result, index) => ({
+          index,
+          status: result.status,
+          code: result.body?.error?.code,
+          message: result.body?.error?.message,
+          request_id: result.body?.meta?.request_id,
+        }))
+        .filter(({ status }) => status !== 200 && status !== 201);
+      assert.deepEqual(
+        failedSaves,
+        [],
+        `unexpected checkpoint responses: ${JSON.stringify(failedSaves)}`,
+      );
       assert.equal(saves.filter((result) => result.status === 201).length, 1);
       assert.equal(saves.filter((result) => result.status === 200).length, 11);
       assert.equal(new Set(saves.map((result) => result.body.data.checkpoint_id)).size, 1);

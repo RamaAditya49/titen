@@ -56,6 +56,13 @@ authenticated organization. The patch must make omission unscoped-only and
 reserve cross-project compilation for an explicit request backed by a separate
 credential capability.
 
+Issue #102 was reopened after one complete Cloudflare/D1 contract run returned
+only ten successful updates from twelve concurrent checkpoint saves. Isolated
+repetition did not reproduce the result, so the release gate must retain the
+status and safe error envelope of every loser, distinguish a product race from
+a Miniflare/runtime transient, and never hide an unexplained non-success behind
+an aggregate count.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -108,6 +115,9 @@ documentation, and an install smoke against the immutable npm artifact.
   broader compile, and report the effective project mode and grant reason.
 - Keep REST, SDK, MCP, and the portable OpenClaw-compatible skill aligned so a
   repository task resolves and supplies its canonical project by default.
+- Diagnose the reopened D1 checkpoint contention result from complete-suite
+  evidence; keep the one-head invariant and make expected concurrent outcomes
+  explicit without weakening the canonical integrity assertion.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -249,6 +259,11 @@ documentation, and an install smoke against the immutable npm artifact.
   OpenClaw distribution, shall resolve the active canonical project and pass its
   opaque ID for repository work; it shall use unscoped compilation only outside
   a project and shall not request cross-project mode by default.
+- **AC-SWP-023 — Event-driven:** When concurrent checkpoint saves are exercised
+  through the Cloudflare/D1 contract, every unexpected non-200/201 response
+  shall be retained in assertion-failure evidence, exact aggregate status
+  counts shall remain asserted, exactly one durable head shall remain, and no
+  unexplained non-success shall be hidden behind an aggregate count.
 
 ## Done conditions
 
