@@ -40,6 +40,10 @@ export const LIMITS = {
   label: 120,
   reasonCode: 64,
   maxTokens: 32_000,
+  // ponytail: a fixed candidate ceiling rather than one scaled to the corpus.
+  // The ceiling is that recall past this many lexical matches is unreachable
+  // no matter how the caller ranks or budgets. Upgrade path: make it a
+  // per-request option once retrieval is cheap enough to widen (#121).
   candidates: 200,
   claimsPerConsolidation: 50,
   sourcesPerClaim: 20,

@@ -18,6 +18,11 @@ interface StoredRow {
   expires_at: string;
 }
 
+// ponytail: a fixed 24-hour replay window, which is sized for a retry loop
+// rather than for a re-sync. The ceiling is that any bulk re-ingest run a day
+// later duplicates every record, and there is no content-level dedup behind it
+// to absorb that. Upgrade path: a statement/content hash uniqueness rule so
+// convergence does not depend on the caller replaying inside the window (#101).
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function idempotencyKey(request: Request): string | null {

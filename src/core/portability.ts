@@ -22,6 +22,15 @@ import {
 } from "./validate";
 
 export const EXPORT_FORMAT_VERSION = 1;
+/**
+ * ponytail: the portable format covers the memory surface only, not the whole
+ * deployment. The ceiling is that workspaces, memberships, checkpoints,
+ * feedback and version history do not survive an export/import roundtrip, so
+ * JSONL is an interchange format and `titen backup` is the durability
+ * boundary. Upgrade path: extend these types in dependency order, starting
+ * with workspaces and memberships, which team-scoped records already require
+ * on import (#111).
+ */
 export const EXPORT_TYPES = ["projects", "observations", "claims"] as const;
 export const EXPORT_DEPENDENCY_ORDER = [...EXPORT_TYPES];
 export const EXPORT_DEPENDENCIES: Record<(typeof EXPORT_TYPES)[number], string[]> = {
@@ -29,6 +38,12 @@ export const EXPORT_DEPENDENCIES: Record<(typeof EXPORT_TYPES)[number], string[]
   observations: ["projects"],
   claims: ["projects", "observations"],
 };
+// ponytail: both caps count rows, while the transport cap counts bytes. The
+// ceiling is that the two are not reconciled, so a page this endpoint is
+// willing to emit can exceed what the import endpoint will accept. Upgrade
+// path: cut export pages on accumulated byte length as well as row count and
+// set `next_cursor` accordingly, so any page is importable by construction
+// (#112).
 export const EXPORT_MAX_LIMIT = 2000;
 export const IMPORT_MAX_LINES = 2000;
 

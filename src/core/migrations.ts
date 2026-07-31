@@ -6,6 +6,12 @@ import type { Db } from "./db";
  * Rules for new entries: append only, one statement per array item, no PRAGMA
  * (D1 rejects most), parents before children so foreign keys hold, and no
  * destructive statement without its own work item.
+ *
+ * ponytail: forward-only, with no `down` statements. The ceiling is that
+ * recovery from a bad upgrade is restore-from-snapshot, which makes a verified
+ * backup a precondition of every deploy rather than a convenience. Upgrade
+ * path: none planned — instead, document the snapshot runbook and add a
+ * `migrate --dry-run` so the pending statements can be reviewed first (#116).
  */
 export const MIGRATIONS: { version: number; statements: string[] }[] = [
   {
@@ -55,6 +61,11 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ingested_at TEXT NOT NULL
        )`,
       `CREATE INDEX observations_scope ON observations (org_id, subject_id, ingested_at)`,
+      // ponytail: an unstemmed tokenizer with no prefix index. The ceiling is
+      // that morphological variants never match — a query for the singular
+      // misses a record holding the plural — which reads as an empty store
+      // rather than as a failed match. Upgrade path: add `porter` to the
+      // tokenizer in a new migration that rebuilds the index (#83).
       `CREATE VIRTUAL TABLE observations_fts USING fts5 (
          content,
          observation_id UNINDEXED,
@@ -79,6 +90,9 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          created_at TEXT NOT NULL
        )`,
       `CREATE INDEX claims_scope ON claims (org_id, subject_id, status)`,
+      // ponytail: same unstemmed tokenizer as observations_fts, and this is the
+      // index compilation actually reads. The ceiling and upgrade path are the
+      // same; change both together or recall diverges between the two (#83).
       `CREATE VIRTUAL TABLE claims_fts USING fts5 (
          statement,
          claim_id UNINDEXED,
@@ -254,6 +268,12 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
     version: 4,
     statements: [
       // Enterprise governance: policies, channel releases, customer assertions, audit log.
+      // ponytail: `policies` accepts a 'retention' kind that no code reads yet,
+      // so the schema anticipates retention while nothing enforces it. The
+      // ceiling is that every append-only satellite table — events,
+      // record_history, index_outbox, context_runs — grows without bound.
+      // Upgrade path: implement the 'retention' policy kind in
+      // `runMaintenance`, which is where the schema already expects it (#105).
       `CREATE TABLE policies (
          id TEXT PRIMARY KEY,
          org_id TEXT NOT NULL REFERENCES organizations(id),

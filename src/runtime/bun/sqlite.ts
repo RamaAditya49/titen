@@ -11,6 +11,12 @@ export function openDatabase(path: string): Database {
   database.run("PRAGMA wal_autocheckpoint = 1000");
   database.run("PRAGMA foreign_keys = ON");
   database.run("PRAGMA busy_timeout = 5000");
+  // ponytail: `synchronous` is left at SQLite's FULL default rather than set
+  // explicitly. The ceiling is an fsync on every commit, which dominates write
+  // latency; NORMAL in WAL mode risks only the last committed transaction on
+  // power loss and never corruption. Upgrade path: set it explicitly with an
+  // env override so the durability trade is a recorded decision rather than an
+  // inherited default (#124).
   return database;
 }
 

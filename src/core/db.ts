@@ -37,6 +37,12 @@ export function param(value: string | number | null | undefined): Param {
  * D1 caps bound parameters per statement at 100, so any dynamic `IN (...)` list
  * must be chunked. bun:sqlite is far more permissive, but the shared core keeps
  * the stricter limit so both runtimes execute the same statements.
+ *
+ * ponytail: a single global chunk size rather than one tuned per call site.
+ * The ceiling is that a wide `IN (...)` becomes several round trips, which
+ * multiplies the cost of any statement that is already expensive per
+ * execution. Upgrade path: none needed while the chunked statements are
+ * cheap; revisit if a hot path shows the multiplication in a profile (#121).
  */
 export const MAX_BOUND_PARAMS = 90;
 
