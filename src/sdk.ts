@@ -103,6 +103,25 @@ export interface HandoffOptions {
   message?: string;
 }
 
+export interface CreateKeyOptions {
+  label: string;
+  scopes: string[];
+  max_trust?: "unverified" | "asserted" | "verified" | "policy_approved";
+  principal_id?: string;
+  principal_kind?: "human" | "agent" | "service";
+}
+
+export interface CreatedKey {
+  key_id: string;
+  api_key: string;
+  principal_id: string;
+  principal_kind: "human" | "agent" | "service";
+  label: string;
+  scopes: string[];
+  max_trust: "unverified" | "asserted" | "verified" | "policy_approved";
+  warning: string;
+}
+
 /** Typed convenience methods intentionally kept to the common agent path. */
 export const TITEN_SDK_TYPED_ROUTES = [
   ["health", "GET /healthz"],
@@ -353,8 +372,8 @@ export class TitenClient {
 
   // --- Keys ---
 
-  async createKey(options: { label: string; scopes: string[]; max_trust?: string }) {
-    return this.request("POST", "/v1/keys", { json: options });
+  async createKey(options: CreateKeyOptions): Promise<CreatedKey> {
+    return this.request<CreatedKey>("POST", "/v1/keys", { json: options });
   }
 
   async listKeys() {

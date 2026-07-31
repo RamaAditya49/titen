@@ -17,6 +17,14 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Key creation now returns the canonical `principal_id`, so SDK callers can use
+  a newly generated agent identity for handoffs without confusing it with the
+  credential's `key_id`.
+- Contributor setup now documents a temporary writable `HOME` and
+  `XDG_CONFIG_HOME` for pnpm/Wrangler checks in restricted containers.
+
 ## [0.2.0] — 2026-07-30
 
 ### Added

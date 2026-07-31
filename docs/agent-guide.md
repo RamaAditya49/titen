@@ -213,7 +213,12 @@ const key = await titen.createKey({
   max_trust: "asserted",
 });
 // key.api_key → store this, it won't be shown again
+// key.principal_id → use this as handoff.to_principal; key_id identifies the credential
 ```
+
+Titen returns the caller-supplied or generated `principal_id` at creation so
+the new agent can receive a handoff immediately. Do not use `key_id` as an agent
+identity.
 
 ## Error handling
 
