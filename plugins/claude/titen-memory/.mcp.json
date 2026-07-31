@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "titen": {
+      "type": "http",
+      "url": "${TITEN_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${TITEN_API_KEY}"
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "titen",
+  "owner": {
+    "name": "Titen contributors"
+  },
+  "metadata": {
+    "description": "Evidence-grounded collaborative memory for coding agents."
+  },
+  "plugins": [
+    {
+      "name": "titen-memory",
+      "source": "plugins/cursor/titen-memory",
+      "description": "Connect Cursor to an operator-selected Titen MCP server."
+    }
+  ]
+}

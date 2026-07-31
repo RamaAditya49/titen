@@ -1,0 +1,4 @@
+name: titen-memory
+version: 0.1.0
+description: Evidence-grounded collaborative memory instructions for a configured Titen MCP server
+author: Titen contributors

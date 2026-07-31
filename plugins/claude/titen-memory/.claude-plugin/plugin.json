@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "titen-memory",
+  "displayName": "Titen Memory",
+  "version": "0.1.0",
+  "description": "Use Titen's evidence-grounded collaborative memory through its existing authenticated MCP server.",
+  "author": {
+    "name": "Titen contributors",
+    "url": "https://github.com/RamaAditya49/titen"
+  },
+  "homepage": "https://github.com/RamaAditya49/titen/blob/main/docs/agent-plugins.md",
+  "repository": "https://github.com/RamaAditya49/titen",
+  "license": "Apache-2.0",
+  "keywords": ["agent-memory", "collaboration", "mcp", "titen"]
+}

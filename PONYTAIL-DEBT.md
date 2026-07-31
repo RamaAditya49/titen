@@ -8,10 +8,10 @@ observed.
 
 | Location | Deliberate shortcut | Ceiling | Upgrade trigger |
 | --- | --- | --- | --- |
-| `docs/architecture/agent-integration.md:123` | Codex reference plugin has no automatic lifecycle hooks | No automatic recall or end-of-session flush | A measured workflow needs the behavior and a parity fixture covers failure paths |
-| `docs/architecture/agent-integration.md:124` | Pi uses REST/SDK instead of a native extension | Pi cannot consume Titen through built-in MCP | Pi becomes an active adopter; then ship the smallest reviewed npm extension |
-| `docs/architecture/agent-integration.md:125` | Claude, OpenClaw, and Hermes reuse the portable skill plus MCP recipes | Install/lifecycle UX remains host-specific | A host has a maintainer and an install smoke fixture |
-| `docs/architecture/agent-integration.md:126` | No public Codex/ChatGPT directory package or listing assets | Titen is installed from its repository marketplace, not a public directory | A public directory submission is scheduled |
+| `docs/architecture/agent-integration.md` | All host packages omit automatic lifecycle hooks | No automatic recall or end-of-session flush | A measured workflow needs the behavior and a parity fixture covers failure paths |
+| `docs/architecture/agent-integration.md` | Pi ships a skill package without an MCP client extension | Pi needs an operator-selected MCP adapter | The selected adapter is insufficient and a full process-authority review exists |
+| `plugins/claude/titen-memory/.clawhubignore` | ClawHub omits Claude's remote `.mcp.json` and OpenClaw uses a separate native config fragment | OpenClaw install needs one config merge after the skill bundle | OpenClaw compatible bundles natively import Streamable HTTP MCP servers with environment-backed headers |
+| `docs/architecture/agent-integration.md` | Vendor-owned public catalogs are not submitted | Repository marketplaces and ClawHub are the distribution surfaces | A maintainer schedules a specific vendor review and listing assets |
 
 ## Runtime and retrieval
 
@@ -34,5 +34,6 @@ observed.
 
 - Markers: 11.
 - Markers without an upgrade trigger: 0.
-- Native agent artifacts intentionally deferred: Codex lifecycle hooks, Pi
-  extension, other host packages, and public directory packaging.
+- Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
+  extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned
+  public catalog submissions.
