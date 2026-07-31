@@ -44,11 +44,12 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
     ["human", "agent", "service"] as const,
     "agent",
   );
+  const principalId = optionalString(body, "principal_id", LIMITS.identifier) ?? newId("agent");
 
   const created = await createApiKey(
     {
       orgId: principal.orgId,
-      principalId: optionalString(body, "principal_id", LIMITS.identifier) ?? newId("agent"),
+      principalId,
       principalKind,
       label,
       scopes,
@@ -64,6 +65,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       key_id: created.id,
       // The only time the raw key exists outside the client's hands.
       api_key: created.key,
+      principal_id: principalId,
       label,
       scopes,
       max_trust: maxTrust,

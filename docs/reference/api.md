@@ -68,6 +68,15 @@ features explicitly listed as proposed are not routes.
   `audit/events`, and channel-scoped context paths are not aliases. Use the
   implemented inventory above.
 
+## API keys
+
+`POST /v1/keys` accepts a label, scopes, and optional `max_trust`,
+`principal_id`, and `principal_kind`. Its one-time creation response includes
+the raw `api_key`, credential `key_id`, and the caller-supplied or generated
+`principal_id`. Use `principal_id` for handoff targets; `key_id` identifies the
+revocable credential and is not an agent identity. `GET /v1/keys` returns the
+same non-secret identity metadata but never returns the raw key.
+
 ## Webhook delivery
 
 `POST /v1/webhooks` accepts only a configured allowlisted HTTPS hostname. The

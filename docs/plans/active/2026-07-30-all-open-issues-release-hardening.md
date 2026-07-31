@@ -5,8 +5,8 @@ stage: implement
 outcome: pending
 complexity: complex
 created: 2026-07-30
-updated: 2026-07-30
-review_after: 2026-08-13
+updated: 2026-07-31
+review_after: 2026-08-14
 owner: CADIS
 spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 ---
@@ -45,7 +45,7 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
   typed-route capability matrix.
 - [x] Make README repository references absolute and simplify pack verification
   to public behavior: pack, install, inspect README, and execute the installed bin.
-- [ ] Check in the verified loopback-only rootless deployment unit, reconcile or
+- [x] Check in the verified loopback-only rootless deployment unit, reconcile or
   remove unverified helpers/limits, document remote access choices, and repeat
   current image/vector/WAL/live evidence.
 - [x] Serialize or isolate the workerd restart fixture so the documented clean
@@ -53,16 +53,22 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 - [x] Run focused adversarial/fault tests, `pnpm test:all`, browser on an available
   configured port, workflow checker+self-test, route/docs checks, Worker dry-run,
   normal/custom-prefix pack verification, and installed-tarball CLI/SDK smoke.
-- [ ] Request and execute the explicit operator window for the `rama-tuf` reboot;
+- [x] Request and execute the explicit operator window for the `rama-tuf` reboot;
   capture boot, service, health, data-preservation, journal, and full live evidence.
-- [ ] Commit with the required CADIS trailer, open/review/merge the PR, enumerate
-  exact branch/worktree cleanup targets, and remove only merged or superseded ones.
+- [ ] Commit the corrective diff with the required CADIS trailer, open, review,
+  and merge the PR; enumerate exact branch/worktree cleanup targets and remove
+  only merged or superseded ones.
 - [ ] Post a specific root-cause/fix/evidence comment to every cutoff issue before
   closing it; leave no issue silently closed and re-snapshot for late arrivals.
-- [ ] Prepare version `0.2.0` and changelog, verify the exact main commit, publish
+- [x] Prepare version `0.2.0` and changelog, verify the exact main commit, publish
   npm through the maintainer approval URL, create the matching GitHub release, and
   verify public registry, dist-tag, package README, CLI, tag, release, Actions-off,
   and zero-open-PR state.
+- [x] Reconcile #71 against the current lease contract, return `principal_id`
+  from key creation with dual-runtime coverage for #72, and add the smallest
+  sandbox HOME/XDG contributor guidance for #73.
+- [ ] Run focused and full regression gates, publish the exact verified `0.2.1`
+  patch to npm and GitHub, and smoke the public SDK/CLI artifact.
 - [ ] Record exact evidence, mark every item complete, and move this pair to
   `docs/specs/done/` and `docs/plans/done/` in the terminal evidence commit.
 
@@ -117,6 +123,38 @@ spec: docs/specs/active/2026-07-30-all-open-issues-release-hardening.md
 - AC-RH-026: invalid/same-origin/missing Origin cases, unsupported/current/legacy
   protocol headers, authenticated `GET /mcp` 405, tool annotation assertions,
   official host-source links, and a complete Ponytail marker ledger.
+- AC-RH-027: dual-runtime key-creation cases for caller-supplied and generated
+  principal IDs, plus SDK handoff setup using the returned identity.
+- AC-RH-028: contributor documentation check for an explicit temporary writable
+  tool home outside the repository, with no runtime code or dependency change.
+
+## Verification
+
+- Merged implementation/release commits: `3971e3a`, `2bcfdab`, and exact
+  release candidate `023fdd0fe2f78d9e67eb15ba66d35a4142e88b7a`.
+- Local gates: 71 D1, 90 Bun/vector/SDK, 63 integration, 10 browser, workflow
+  checker/self-test, route docs, dashboard adapter, Worker dry-build, and the
+  six-stage real-tarball verifier all passed.
+- Live gate: schema 10 and 4/4 wrapped federation secrets remained healthy;
+  the approved reboot changed boot ID, auto-started the rootless user service
+  with `NRestarts=0`, preserved 34 observations, 34 claims, 125 events and the
+  recorded event ID, produced no warning-or-higher boot journal entry, and
+  passed `scripts/verify-live.ts` with real `embeddinggemma` vectors.
+- Reconciliation progress: all original 34 cutoff issues were closed only after
+  individual explanatory comments. The late snapshot exposed #71-#73, which
+  remain subject to the corrective tasks above.
+  Remote branches contain only `main`; enumerated temporary worktrees and local
+  branches were removed without modifying the user's original dirty checkout.
+- Publication: tag `v0.2.0` resolves to `023fdd0`; npm `latest` resolves to
+  `0.2.0` with SHA-1 `fe6826cbdb3f0210fe3b4cf53ef51ec44ee04c55` and passed
+  clean registry SDK/CLI/README smokes; GitHub release
+  `https://github.com/RamaAditya49/titen/releases/tag/v0.2.0` is public.
+- Project policy remained intact: GitHub Actions stayed disabled and no
+  workflow was added as a release gate.
+- Late focused gates: the key response and handoff path passed 71 D1, 90
+  Bun/vector/SDK, and 63 integration tests. A clean temporary HOME/XDG setup
+  reached Wrangler's 221.73 KiB / 48.87 KiB dry-build successfully; workflow,
+  route-documentation, build, and diff checks passed.
 
 ## Security, migration, deployment, and rollback
 

@@ -54,6 +54,30 @@ pnpm check:workflow
 git diff --check
 ```
 
+### Restricted or read-only home directories
+
+pnpm and Wrangler need writable user data/configuration directories before
+Titen's checks can start. In an ephemeral container with an absent or read-only
+home, keep those tool writes outside the repository and scope the override to a
+subshell:
+
+```bash
+(
+  set -eu
+  titen_tool_home="$(mktemp -d)"
+  trap 'rm -rf -- "$titen_tool_home"' EXIT
+  export HOME="$titen_tool_home"
+  export XDG_CONFIG_HOME="$titen_tool_home/.config"
+  export WRANGLER_SEND_METRICS=false
+  mkdir -p "$XDG_CONFIG_HOME"
+
+  pnpm install
+  pnpm test:all
+)
+```
+
+This is contributor-tool setup, not a Titen runtime requirement.
+
 Use `pnpm dev` for local dashboard work and `pnpm screenshots` after a production
 build when an approved visual change needs refreshed README images. Also verify
 that every relative Markdown link points to an existing file.

@@ -5,34 +5,37 @@ stage: implement
 outcome: pending
 complexity: complex
 created: 2026-07-30
-updated: 2026-07-30
-review_after: 2026-08-13
+updated: 2026-07-31
+review_after: 2026-08-14
 owner: CADIS
 ---
 # All-open-issues release hardening
 
 ## Problem
 
-The public `0.1.2` surface has 34 open issues covering authorization, data
-integrity, runtime recovery, adapters, operator workflow, client safety,
-packaging, and deployment truth. Several features are advertised beyond their
-verified security boundary. The next release must resolve the open set from one
-fixed cutoff without hiding incomplete work behind issue closure.
+The public `0.1.2` surface and the terminal `0.2.0` snapshot exposed 37 issues
+covering authorization, data integrity, runtime recovery, adapters, operator
+workflow, client safety, packaging, and deployment truth. Several features are
+advertised beyond their verified security boundary. The next release must
+resolve the open set from one fixed cutoff without hiding incomplete work behind
+issue closure.
 
 ## Issue cutoff and classification
 
 The release cutoff is every issue open immediately before the release tag,
 starting with #9, #11, #13, #15-#18, #20-#24, #31-#41, #48, #54-#56,
-#59-#60, and #63-#67. New issues opened before tagging enter this spec through
-an updated issue matrix and acceptance mapping.
+#59-#60, #63-#67, and the late terminal snapshot #71-#73. New issues opened
+before tagging enter this spec through an updated issue matrix and acceptance
+mapping.
 
 The current batch groups the root causes as follows:
 
 - storage and recovery: #9, #11, #33, #40, #66;
-- authorization and integrity: #20-#22, #24, #35, #37-#39;
+- authorization and integrity: #20-#22, #24, #35, #37-#39, #71;
 - delivery security and durability: #23, #32, #41, #48;
 - retrieval and adapter parity: #31, #34, #36, #65;
-- CLI, SDK, and package safety: #54-#56, #59-#60, #63-#64, #67;
+- CLI, SDK, package, and contributor safety: #54-#56, #59-#60, #63-#64,
+  #67, #72-#73;
 - deployment evidence and test reliability: #13, #15-#18.
 
 ## Scope
@@ -58,7 +61,8 @@ The current batch groups the root causes as follows:
   root cause, fix or disposition, merged commit, and reproducible evidence.
 - Remove merged or explicitly obsolete branches after enumerating them; retain
   any branch or worktree with unique unabsorbed work.
-- Cut version `0.2.0`, publish the exact verified commit to npm and GitHub, and
+- Cut version `0.2.0`, then publish the minimum corrective `0.2.1` for valid
+  late-snapshot defects; publish exact verified commits to npm and GitHub and
   keep GitHub Actions disabled.
 
 ## Out of scope
@@ -194,12 +198,51 @@ The current batch groups the root causes as follows:
   it before tool execution; otherwise its stateless endpoint shall expose the
   current negotiated revision, safe tool annotations, and the required no-SSE
   `GET` response, while host-native packaging remains explicitly documented debt.
+- **AC-RH-027 — Event-driven:** When an authorized principal creates a key with
+  an explicit or generated principal identity, Titen shall return that
+  non-secret `principal_id` in the creation response so a caller can immediately
+  address handoffs without confusing it with `key_id`.
+- **AC-RH-028 — Optional feature:** Where contributors run pnpm, Wrangler, or
+  contract tests with a read-only or absent home directory, Titen shall document
+  the smallest temporary writable tool home outside the repository required to
+  reach the project checks without presenting it as a runtime requirement.
 
 ## Done conditions
 
 Every acceptance criterion has reproducible evidence; dual-runtime, integration,
 browser, workflow, package-install, migration/import fault, and applicable live
 smokes pass; all cutoff issues have explicit closure comments; no PR remains
-open; branch cleanup preserves unique work; the version/tag/GitHub/npm artifacts
-identify one commit; and this spec/plan pair moves to `done` with no unchecked
-work.
+open; branch cleanup preserves unique work; the final version/tag/GitHub/npm
+artifacts identify one commit; and this spec/plan pair moves to `done` with no
+unchecked work.
+
+## Progress evidence
+
+- PR #68 merged the issue hardening as `3971e3a`; PR #69 prepared version
+  `0.2.0` as `2bcfdab`; PR #70 corrected the live lifecycle verifier, leaving
+  the exact release candidate at `023fdd0fe2f78d9e67eb15ba66d35a4142e88b7a`.
+- The release candidate passed 71 Cloudflare D1, 90 Bun/vector/SDK, 63
+  integration, and 10 browser cases, plus workflow, route-documentation,
+  Worker dry-build, dashboard-adapter, normal install, plain-Node SDK, CLI, and
+  custom-prefix pack gates.
+- Live schema 10 migration preserved canonical data and wrapped all four
+  federation secrets. A real host reboot changed boot ID from
+  `7e6d5519-b2e6-43f4-be05-845be87c6b85` to
+  `221ce85e-cda2-4e00-a010-2e34e5d18bf1`; the rootless service returned
+  automatically with `NRestarts=0`, healthy schema/signing checks, unchanged
+  pre-reboot counts/event evidence, and a passing real-model live verifier.
+- Every one of the original 34 cutoff issues received a specific root-cause,
+  fix/disposition, and evidence comment before closure. Remote branch cleanup
+  left only `main`; temporary merged worktrees/branches were removed while the
+  user's original dirty checkout remained untouched.
+- Tag `v0.2.0` points to `023fdd0`. npm `latest` is `titen-memory@0.2.0` with
+  SHA-1 `fe6826cbdb3f0210fe3b4cf53ef51ec44ee04c55`; clean registry SDK/CLI,
+  side-effect-free help, and public README smokes passed. The matching GitHub
+  release is `https://github.com/RamaAditya49/titen/releases/tag/v0.2.0`.
+- The official-source host integration matrix is documented in
+  `docs/architecture/agent-integration.md`; speculative native adapters remain
+  explicit, trigger-based entries in `PONYTAIL-DEBT.md`.
+- The terminal snapshot then exposed #71-#73. Issue #71 is already fixed in
+  `0.2.0`; #72 is a valid response-contract omission and #73 is a valid
+  contributor-documentation gap. They remain active until individually
+  reconciled and the necessary `0.2.1` artifact is public.

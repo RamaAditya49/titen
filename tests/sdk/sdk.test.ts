@@ -156,10 +156,14 @@ test("claim lifecycle calls resolve through the client", async () => {
 test("key management round-trips and a scoped key is enforced", async () => {
   const created = await titen.createKey({
     label: "sdk-reader",
-    scopes: ["context:compile"],
+    scopes: ["context:compile", "handoffs:read", "handoffs:write"],
     max_trust: "asserted",
+    principal_id: "agent_sdk_reader",
+    principal_kind: "agent",
   });
   assert.match(created.api_key, /^titen_sk_/);
+  assert.equal(created.principal_id, "agent_sdk_reader");
+  assert.equal(created.principal_kind, "agent");
 
   const reader = new TitenClient({ url: running.url, key: created.api_key });
   const compiled = await reader.compile({
@@ -168,6 +172,16 @@ test("key management round-trips and a scoped key is enforced", async () => {
     max_tokens: 300,
   });
   assert.ok(compiled.context_id);
+
+  const handoff = await titen.createHandoff({
+    to_principal: created.principal_id,
+    subject_id: "user_sdk_handoff",
+    message: "Continue with the returned principal identity.",
+  });
+  const handoffs = await reader.listHandoffs("pending");
+  assert.ok(handoffs.handoffs.some((entry: any) => entry.handoff_id === handoff.handoff_id));
+  const accepted = await reader.resolveHandoff(handoff.handoff_id, "accepted");
+  assert.equal(accepted.status, "accepted");
 
   // The client must surface a refusal as a typed error, not a silent result.
   await assert.rejects(

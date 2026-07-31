@@ -931,11 +931,13 @@ export const CASES: Case[] = [
           label: "reader",
           scopes: ["context:compile", "evidence:read"],
           max_trust: "asserted",
+          principal_id: "agent_managed_reader",
         },
       });
       expectOk(created, 201);
       const child = created.body.data.api_key as string;
       assert.match(child, /^titen_sk_/);
+      assert.equal(created.body.data.principal_id, "agent_managed_reader");
       assert.match(created.body.data.warning, /cannot show it again/i);
 
       // The child key works for what it was granted and nothing else.
@@ -1475,7 +1477,20 @@ export const CASES: Case[] = [
     name: "handoffs transfer work between principals",
     async run(fx) {
       const sender = await fx.provision({ scopes: ["*"] });
-      const receiver = await fx.provision({ orgId: sender.orgId, scopes: ["*"] });
+      const createdReceiver = await fx.call("POST", "/v1/keys", {
+        key: sender.key,
+        body: {
+          label: "handoff receiver",
+          scopes: ["handoffs:read", "handoffs:write"],
+        },
+      });
+      expectOk(createdReceiver, 201);
+      const receiver = {
+        key: createdReceiver.body.data.api_key as string,
+        principalId: createdReceiver.body.data.principal_id as string,
+      };
+      assert.match(receiver.principalId, /^agent_/);
+      assert.notEqual(receiver.principalId, createdReceiver.body.data.key_id);
 
       const handoff = await fx.call("POST", "/v1/handoffs", {
         key: sender.key,
