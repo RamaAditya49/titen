@@ -108,25 +108,109 @@ export async function acquireD1Lane(port = D1_LANE_PORT): Promise<D1Lane> {
   };
 }
 
-function redact(value: string, secrets: readonly string[]) {
+function isSensitiveIdentifier(value: string) {
+  const parts = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .split(/[_$.-]+/)
+    .filter(Boolean);
+  const last = parts.at(-1);
+  const previous = parts.at(-2);
+  return last === "authorization" || last === "token" || last === "secret" ||
+    (last === "key" && (previous === "api" || previous === "secret")) ||
+    (parts.length === 1 && last === "apikey");
+}
+
+function findQuotedValueEnd(value: string, start: number, opener: string) {
+  const quote = opener.at(-1);
+  const escapedOuter = opener.length === 2;
+  for (let index = start; index < value.length; index++) {
+    const character = value[index];
+    if (character === "\r" || character === "\n") return -1;
+    if (character !== quote) continue;
+    let backslashes = 0;
+    for (let cursor = index - 1; cursor >= start && value[cursor] === "\\"; cursor--) {
+      backslashes++;
+    }
+    const closes = (!escapedOuter && backslashes % 2 === 0) ||
+      (escapedOuter && backslashes % 4 === 1);
+    if (closes && !/[A-Za-z0-9_$]/.test(value[index + 1] ?? "")) {
+      return index + 1;
+    }
+  }
+  return -1;
+}
+
+function redactQuotedAssignments(value: string) {
+  const assignments = /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?)([A-Za-z0-9_$.-]+)((?:\\?["'])?\s*[:=]\s*)((?:\\?["']))/gi;
+  let cursor = 0;
+  let safe = "";
+  for (let match = assignments.exec(value); match; match = assignments.exec(value)) {
+    if (!isSensitiveIdentifier(match[3])) continue;
+    const contentStart = match.index + match[0].length;
+    const closeEnd = findQuotedValueEnd(value, contentStart, match[5]);
+    safe += `${value.slice(cursor, contentStart)}[redacted]`;
+    if (closeEnd === -1) {
+      const carriage = value.indexOf("\r", contentStart);
+      const newline = value.indexOf("\n", contentStart);
+      const candidates = [carriage, newline].filter((index) => index !== -1);
+      cursor = candidates.length ? Math.min(...candidates) : value.length;
+    } else {
+      safe += match[5];
+      cursor = closeEnd;
+    }
+    assignments.lastIndex = cursor;
+  }
+  return `${safe}${value.slice(cursor)}`;
+}
+
+function redactStructured(value: string, secrets: readonly string[]) {
   let safe = value;
   const normalizedSecrets = [...new Set(secrets.filter(Boolean))]
     .sort((left, right) => right.length - left.length);
   for (const secret of normalizedSecrets) {
     safe = safe.replaceAll(secret, "[redacted]");
   }
-  safe = safe.replace(
-    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)((?:\\?["']))(?:(?!\3(?=$|[^A-Za-z0-9_$]))(?:\\.|[^\r\n]))*\3(?=$|[^A-Za-z0-9_$])/gi,
-    "$1$2$3[redacted]$3",
-  );
-  safe = safe.replace(
-    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)((?:\\?["']))(?!(?:(?!\3(?=$|[^A-Za-z0-9_$]))(?:\\.|[^\r\n]))*\3(?=$|[^A-Za-z0-9_$]))[^\r\n]*/gi,
-    "$1$2$3[redacted]",
-  );
+  safe = redactQuotedAssignments(safe);
   return safe.replace(
-    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*)(?:bearer\s+)?(?:\[redacted\]|[^\\\s"',;}\])>]+)/gi,
-    "$1$2[redacted]",
+    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?)([A-Za-z0-9_$.-]+)((?:\\?["'])?\s*[:=]\s*)(?:bearer\s+)?(?:\[redacted\]|[^\\\s"',;}\])>]+)/gi,
+    (match, boundary: string, keyQuote: string, identifier: string, assignment: string) =>
+      isSensitiveIdentifier(identifier)
+        ? `${boundary}${keyQuote}${identifier}${assignment}[redacted]`
+        : match,
   );
+}
+
+function redactLine(value: string, secrets: readonly string[], pendingSensitiveLabel: boolean) {
+  const carriage = value.endsWith("\r") ? "\r" : "";
+  const body = carriage ? value.slice(0, -1) : value;
+  if (pendingSensitiveLabel && /^[ \t]/.test(body)) {
+    return {
+      safe: `${body.match(/^[ \t]*/)?.[0] ?? ""}[redacted]${carriage}`,
+      pending: true,
+    };
+  }
+  const label = /^[ \t]*(?:\\?["'])?([A-Za-z0-9_$.-]+)(?:\\?["'])?[ \t]*:[ \t]*$/.exec(body);
+  return {
+    safe: redactStructured(value, secrets),
+    pending: Boolean(label && isSensitiveIdentifier(label[1])),
+  };
+}
+
+function redact(value: string, secrets: readonly string[]) {
+  let offset = 0;
+  let pending = false;
+  let safe = "";
+  while (offset < value.length) {
+    const newline = value.indexOf("\n", offset);
+    const end = newline === -1 ? value.length : newline;
+    const line = redactLine(value.slice(offset, end), secrets, pending);
+    safe += `${line.safe}${newline === -1 ? "" : "\n"}`;
+    pending = line.pending;
+    if (newline === -1) break;
+    offset = newline + 1;
+  }
+  return safe;
 }
 
 /** Adds bounded, redacted workerd context without changing assertion objects. */
@@ -136,6 +220,8 @@ export class D1RunDiagnostics {
   #stderr = Buffer.alloc(0);
   #line = "";
   #lineOverflow = false;
+  #pendingSensitiveLabel = false;
+  #decoders = new Map<Readable, { decoder: TextDecoder }>();
 
   constructor(
     readonly owner: D1LaneOwner,
@@ -145,8 +231,30 @@ export class D1RunDiagnostics {
   ) {
     this.handleRuntimeStdio = (stdout, stderr) => {
       stdout.resume();
-      stderr.on("data", (chunk) => this.recordStderr(String(chunk)));
+      const state = { decoder: new TextDecoder() };
+      this.#decoders.set(stderr, state);
+      stderr.on("data", (chunk) => {
+        const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+        const decoded = state.decoder.decode(bytes, { stream: true });
+        if (decoded) this.recordStderr(decoded);
+      });
+      const finish = () => {
+        if (this.#decoders.get(stderr) !== state) return;
+        const decoded = state.decoder.decode();
+        if (decoded) this.recordStderr(decoded);
+        this.#decoders.delete(stderr);
+      };
+      stderr.once("end", finish);
+      stderr.once("close", finish);
     };
+  }
+
+  #flushDecoders() {
+    for (const state of this.#decoders.values()) {
+      const decoded = state.decoder.decode();
+      if (decoded) this.recordStderr(decoded);
+      state.decoder = new TextDecoder();
+    }
   }
 
   recordStderr(value: string) {
@@ -173,27 +281,36 @@ export class D1RunDiagnostics {
 
   #appendOutput(value: string) {
     const combined = Buffer.concat([this.#stderr, Buffer.from(value)]);
-    this.#stderr = Buffer.from(combined.subarray(Math.max(0, combined.length - this.limit)));
+    let start = Math.max(0, combined.length - this.limit);
+    while (start < combined.length && (combined[start] & 0xc0) === 0x80) start++;
+    this.#stderr = Buffer.from(combined.subarray(start));
   }
 
   #flushLine(newline: boolean) {
     if (!newline && !this.#line && !this.#lineOverflow) return;
-    const safe = this.#lineOverflow
-      ? "[redacted oversized stderr line]"
-      : redact(this.#line, this.secrets);
+    const line = this.#lineOverflow
+      ? { safe: "[redacted oversized stderr line]", pending: this.#pendingSensitiveLabel }
+      : redactLine(this.#line, this.secrets, this.#pendingSensitiveLabel);
+    const safe = line.safe;
+    this.#pendingSensitiveLabel = line.pending;
     this.#appendOutput(`${safe}${newline ? "\n" : ""}`);
     this.#line = "";
     this.#lineOverflow = false;
   }
 
   async run<T>(phase: string, operation: () => T | Promise<T>): Promise<T> {
+    this.#flushDecoders();
     this.#phase = phase;
     this.#stderr = Buffer.alloc(0);
     this.#line = "";
     this.#lineOverflow = false;
+    this.#pendingSensitiveLabel = false;
     try {
-      return await operation();
+      const result = await operation();
+      this.#flushDecoders();
+      return result;
     } catch (error) {
+      this.#flushDecoders();
       this.#flushLine(false);
       const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${this.#stderr.toString("utf8").trim() || "<none captured>"}`;
       this.emit(`${context}\n`);

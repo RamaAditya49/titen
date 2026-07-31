@@ -1,5 +1,7 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
+import { once } from "node:events";
+import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 import { acquireD1Lane, D1RunDiagnostics, type D1LaneOwner } from "./d1-harness";
 
@@ -27,6 +29,22 @@ async function runLaneProbe(port: number) {
     new Response(child.stderr).text(),
   ]);
   return { exitCode, stdout, stderr };
+}
+
+function diagnosticOwner(run_id: string): D1LaneOwner {
+  return {
+    run_id,
+    pid: process.pid,
+    worktree: "fixture",
+    started_at: "2026-07-31T00:00:00.000Z",
+  };
+}
+
+function diagnosticBody(output: string) {
+  const marker = "workerd stderr (bounded):\n";
+  const start = output.indexOf(marker);
+  assert.notEqual(start, -1);
+  return output.slice(start + marker.length).replace(/\n$/, "");
 }
 
 test("D1 host lane rejects an overlapping process without disturbing its owner", async () => {
@@ -91,6 +109,7 @@ test("D1 diagnostics retain the original assertion and only bounded redacted std
 });
 
 test("D1 diagnostics redact sensitive stderr at every chunk split", async () => {
+  const slash = "\\";
   const cases = [
     {
       name: "configured secret",
@@ -325,6 +344,37 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
       expected: 'token="[redacted]"',
       redacted: 'context-before token="[redacted]" context-after',
     },
+    {
+      name: "escaped outer JSON with escaped inner quotes",
+      input: `context-before ${slash}{${slash}"token${slash}":${slash}"OUTER_SECRET_9382 ${slash.repeat(3)}"INNER_SECRET_9382${slash.repeat(3)}" TAIL_SECRET_9382${slash}"${slash}} context-after`,
+      secrets: [],
+      forbidden: ["OUTER_SECRET_9382", "INNER_SECRET_9382", "TAIL_SECRET_9382"],
+      expected: `${slash}"token${slash}":${slash}"[redacted]${slash}"`,
+      redacted: `context-before ${slash}{${slash}"token${slash}":${slash}"[redacted]${slash}"${slash}} context-after`,
+    },
+    {
+      name: "escaped outer JSON with seven and five slash runs",
+      input: `context-before ${slash}{${slash}"token${slash}":${slash}"RUN_HEAD_9382 ${slash.repeat(7)}"RUN_INNER_9382${slash.repeat(7)}" RUN_TAIL_9382${slash.repeat(5)}"${slash}} context-after`,
+      secrets: [],
+      forbidden: ["RUN_HEAD_9382", "RUN_INNER_9382", "RUN_TAIL_9382"],
+      expected: `${slash}"token${slash}":${slash}"[redacted]${slash}"`,
+      redacted: `context-before ${slash}{${slash}"token${slash}":${slash}"[redacted]${slash}"${slash}} context-after`,
+    },
+    {
+      name: "plain quote with trailing literal backslash",
+      input: `context-before token="TRAILING_BACKSLASH_SECRET_9382${slash.repeat(2)}" context-after`,
+      secrets: [],
+      forbidden: ["TRAILING_BACKSLASH_SECRET_9382"],
+      expected: 'token="[redacted]"',
+      redacted: 'context-before token="[redacted]" context-after',
+    },
+    {
+      name: "prefixed environment API key",
+      input: "context-before OPENAI_API_KEY=ENV_API_KEY_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["ENV_API_KEY_SECRET_9382"],
+      expected: "OPENAI_API_KEY=[redacted]",
+    },
   ];
 
   for (const fixture of cases) {
@@ -371,5 +421,143 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
       assert.ok(output.includes(expectedLine), `${fixture.name} emission lost context at split ${split}`);
       assert.ok(Buffer.byteLength(output) <= 512);
     }
+  }
+});
+
+test("D1 diagnostics decode and redact raw stderr bytes at every byte split", async () => {
+  const slash = "\\";
+  const unicodeSecret = "秘密鍵_UNICODE_SECRET_9382";
+  const cases = [
+    {
+      name: "unicode configured secret",
+      input: `context-before configured=${unicodeSecret} context-after`,
+      secrets: [unicodeSecret],
+      forbidden: [unicodeSecret, "UNICODE_SECRET_9382"],
+      expected: "context-before configured=[redacted] context-after",
+    },
+    {
+      name: "folded authorization CRLF",
+      input: "context-before\r\nAuthorization:\r\n Bearer FOLDED_CRLF_SECRET_9382\r\ncontext-after",
+      secrets: [],
+      forbidden: ["FOLDED_CRLF_SECRET_9382"],
+      expected: "Authorization:\r\n [redacted]\r\ncontext-after",
+    },
+    {
+      name: "folded authorization LF",
+      input: "context-before\nAuthorization:\n\tBearer FOLDED_LF_SECRET_9382\ncontext-after",
+      secrets: [],
+      forbidden: ["FOLDED_LF_SECRET_9382"],
+      expected: "Authorization:\n\t[redacted]\ncontext-after",
+    },
+    {
+      name: "escaped structured token",
+      input: `context-before ${slash}{${slash}"token${slash}":${slash}"BYTE_HEAD_9382 ${slash.repeat(3)}"BYTE_INNER_9382${slash.repeat(3)}" BYTE_TAIL_9382${slash}"${slash}} context-after`,
+      secrets: [],
+      forbidden: ["BYTE_HEAD_9382", "BYTE_INNER_9382", "BYTE_TAIL_9382"],
+      expected: `context-before ${slash}{${slash}"token${slash}":${slash}"[redacted]${slash}"${slash}} context-after`,
+    },
+    {
+      name: "compound credential key",
+      input: "context-before access_token=BYTE_ACCESS_TOKEN_9382 context-after",
+      secrets: [],
+      forbidden: ["BYTE_ACCESS_TOKEN_9382"],
+      expected: "context-before access_token=[redacted] context-after",
+    },
+  ];
+
+  for (const fixture of cases) {
+    const bytes = Buffer.from(fixture.input);
+    for (let split = 0; split <= bytes.length; split++) {
+      const emitted: string[] = [];
+      const diagnostics = new D1RunDiagnostics(
+        diagnosticOwner(`run-byte-${fixture.name.replaceAll(" ", "-")}-${split}`),
+        fixture.secrets,
+        512,
+        (value) => emitted.push(value),
+      );
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      diagnostics.handleRuntimeStdio(stdout, stderr);
+      const failure = new Error(`controlled ${fixture.name}: ${fixture.input}`);
+
+      await assert.rejects(
+        diagnostics.run(fixture.name, async () => {
+          const ended = once(stderr, "end");
+          stderr.write(bytes.subarray(0, split));
+          stderr.end(bytes.subarray(split));
+          await ended;
+          throw failure;
+        }),
+        (error) => {
+          assert.equal(error, failure);
+          const thrown = `${(error as Error).message}\n${(error as Error).stack}`;
+          for (const forbidden of fixture.forbidden) {
+            assert.ok(!thrown.includes(forbidden), `${fixture.name} error leaked at byte split ${split}`);
+          }
+          assert.ok(thrown.includes(fixture.expected));
+          return true;
+        },
+      );
+      stdout.destroy();
+      const output = emitted.join("");
+      for (const forbidden of fixture.forbidden) {
+        assert.ok(!output.includes(forbidden), `${fixture.name} emission leaked at byte split ${split}`);
+      }
+      assert.ok(output.includes(fixture.expected));
+      assert.ok(Buffer.byteLength(diagnosticBody(output)) <= 512);
+    }
+  }
+});
+
+test("D1 diagnostics preserve non-credential diagnostic controls", async () => {
+  const controls = [
+    "token_count=42",
+    "secretary=available",
+    "authorization_status=denied",
+    "api_key_rotation_state=ready",
+  ].join("\n");
+  const emitted: string[] = [];
+  const diagnostics = new D1RunDiagnostics(
+    diagnosticOwner("run-safe-controls"),
+    [],
+    256,
+    (value) => emitted.push(value),
+  );
+  const failure = new Error(`controlled safe control failure\n${controls}`);
+  await assert.rejects(
+    diagnostics.run("safe controls", () => {
+      diagnostics.recordStderr(controls);
+      throw failure;
+    }),
+    (error) => {
+      assert.equal(error, failure);
+      assert.ok((error as Error).message.includes(controls));
+      return true;
+    },
+  );
+  const output = emitted.join("");
+  assert.ok(output.includes(controls));
+  assert.ok(!output.includes("[redacted]"));
+});
+
+test("D1 diagnostics trim retained stderr on a valid UTF-8 boundary", async () => {
+  for (let limit = 1; limit <= 21; limit++) {
+    const emitted: string[] = [];
+    const diagnostics = new D1RunDiagnostics(
+      diagnosticOwner(`run-byte-limit-${limit}`),
+      [],
+      limit,
+      (value) => emitted.push(value),
+    );
+    await assert.rejects(
+      diagnostics.run("byte limit", () => {
+        diagnostics.recordStderr("é\n".repeat(12));
+        diagnostics.recordStderr("x");
+        throw new Error("controlled byte limit failure");
+      }),
+    );
+    const body = diagnosticBody(emitted.join(""));
+    assert.ok(Buffer.byteLength(body) <= limit, `body exceeded ${limit} bytes`);
+    assert.ok(!body.includes("�"));
   }
 });
