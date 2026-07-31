@@ -60,3 +60,16 @@ rollback is branch deletion. After merge, host artifacts can be removed in a
 normal revert; after ClawHub publication, an immutable version cannot be erased
 as a rollback mechanism, so a corrected superseding version or registry yank is
 required. The existing MCP and npm service remain independently usable.
+
+## Current external publication evidence
+
+- PRs #127 and #128 are merged; the package source is commit
+  `1cc8823282c8b660126c17a38a26a8c5452571b6`.
+- The standalone `titen-memory@0.1.0` ClawHub skill is public, installs with a
+  byte-identical `SKILL.md`, and passes `clawhub skill verify` with clean static,
+  SkillSpector, and VirusTotal results.
+- The bundle plugin passes local Plugin Inspector with zero breakages and zero
+  warnings; its exact merged-source dry-run contains five files and 5,074 bytes.
+- Live bundle publication is still blocked by the upstream ClawHub inspector
+  sandbox incident `openclaw/clawhub#3327`. Keep the publication and terminal
+  evidence items unchecked until the package itself is public and inspected.

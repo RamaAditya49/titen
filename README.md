@@ -146,11 +146,11 @@ claude plugin marketplace add RamaAditya49/titen
 claude plugin install titen-memory@titen
 ```
 
-OpenClaw installs the skill bundle from ClawHub and uses its native
-Streamable HTTP config for the connection:
+OpenClaw installs the public skill from ClawHub and uses its native Streamable
+HTTP config for the connection:
 
 ```bash
-openclaw plugins install clawhub:@ramaaditya49/titen-memory
+clawhub install titen-memory
 # Merge integrations/openclaw/openclaw.json into the OpenClaw config.
 openclaw mcp doctor titen --probe
 ```
@@ -158,7 +158,8 @@ openclaw mcp doctor titen --probe
 Set the complete MCP endpoint in `TITEN_MCP_URL` and the agent-specific key in
 `TITEN_API_KEY` outside the repository first. No package contains an instance
 URL, credential, automatic transcript capture, lifecycle hook, or second MCP
-server. See the [complete host installation matrix](https://github.com/RamaAditya49/titen/blob/main/docs/agent-plugins.md)
+server. See the [public ClawHub skill](https://clawhub.ai/ramaaditya49/skills/titen-memory),
+[complete host installation matrix](https://github.com/RamaAditya49/titen/blob/main/docs/agent-plugins.md),
 and [seven-tool security boundary](https://github.com/RamaAditya49/titen/blob/main/docs/agent-guide.md#mcp-integration).
 
 ### Agent SDK (any runtime)

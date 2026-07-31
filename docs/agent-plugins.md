@@ -21,7 +21,7 @@ agent its own narrow, revocable key. Never paste a key into a repository file.
 | Codex | Native repo-marketplace plugin | `.agents/plugins/marketplace.json` |
 | Claude Code | Native marketplace plugin | `.claude-plugin/marketplace.json` |
 | ZCode | Claude-compatible marketplace plugin | import `RamaAditya49/titen` |
-| OpenClaw | ClawHub skill bundle + native MCP config | ClawHub + `integrations/openclaw` |
+| OpenClaw | Public ClawHub skill, staged bundle plugin, and native MCP config | ClawHub + `integrations/openclaw` |
 | Cursor | Native marketplace plugin | `.cursor-plugin/marketplace.json` |
 | Hermes | Native Python skill plugin | `plugins/hermes/titen-memory` |
 | Pi | Native Pi skill package | `plugins/pi/titen-memory` |
@@ -75,11 +75,12 @@ so the key stays in the environment. See [ZCode plugins](https://zcode.z.ai/en/d
 
 ## OpenClaw and ClawHub
 
-After publication, install the OpenClaw-safe skill bundle from ClawHub:
+Install the verified public [Titen Memory skill](https://clawhub.ai/ramaaditya49/skills/titen-memory)
+from ClawHub:
 
 ```bash
-openclaw plugins install clawhub:@ramaaditya49/titen-memory
-openclaw plugins inspect titen-memory
+clawhub install titen-memory
+clawhub skill verify titen-memory
 ```
 
 Merge only the `mcp.servers.titen` entry from
@@ -97,6 +98,15 @@ therefore omits that Claude-only file and uses OpenClaw's native
 plugin code is loaded. Its exposed tool names use
 `titen__<canonical-name>`. See [OpenClaw bundles](https://docs.openclaw.ai/plugins/bundles)
 and [native MCP configuration](https://docs.openclaw.ai/cli/mcp).
+
+The repository also contains the validated bundle-plugin package intended for
+`openclaw plugins install clawhub:@ramaaditya49/titen-memory`. Its live package
+publication remains blocked by the ClawHub inspector sandbox incident
+[openclaw/clawhub#3327](https://github.com/openclaw/clawhub/issues/3327), even
+though local validation and the exact merged-source dry-run pass with no
+warnings. Until that incident is resolved, use the public skill plus the native
+config above. ClawHub publishes standalone skills under its platform-wide
+MIT-0 terms; the source repository and bundle package remain Apache-2.0.
 
 ## Cursor
 
