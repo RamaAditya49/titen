@@ -43,6 +43,8 @@ import {
 import { backgroundRepairState } from "./maintenance";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
+import type { ExtractionCapability } from "./extraction";
+import { drainEnrichmentRoute } from "./enrichment";
 
 export interface AppContext {
   db: Db;
@@ -58,6 +60,8 @@ export interface AppContext {
     extraction: CapabilityState;
     backgroundEnrichment: CapabilityState;
   };
+  /** Optional untrusted proposal boundary. Canonical writes never await it. */
+  extraction?: ExtractionCapability;
   /** Scheduler intent; readiness still derives state from canonical evidence. */
   backgroundRepair: { configured: boolean; staleAfterMs: number };
   /** False only after a required startup migration failed. */
@@ -232,6 +236,12 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/webhooks/:id/deliveries", scope: "webhooks:read", handler: listDeliveries },
   { method: "POST", path: "/v1/webhooks/deliver", scope: "webhooks:write", handler: drainWebhooks },
   { method: "POST", path: "/v1/index/drain", scope: "index:write", handler: drainIndex },
+  {
+    method: "POST",
+    path: "/v1/enrichment/drain",
+    scope: "enrichment:write",
+    handler: drainEnrichmentRoute,
+  },
 ];
 
 export const ROUTE_INVENTORY: RouteInventoryEntry[] = ROUTES.map(({ method, path, scope }) => ({ method, path, scope: scope ?? null }));
@@ -335,6 +345,7 @@ export function createApp(context: {
     extraction?: CapabilityState;
     backgroundEnrichment?: CapabilityState;
   };
+  extraction?: ExtractionCapability;
   backgroundRepair?: { configured: boolean; staleAfterMs: number };
   migrationsReady?: boolean;
   secretStorageReady?: boolean;
@@ -360,10 +371,12 @@ export function createApp(context: {
         : undefined,
     semanticReadiness: initialSemanticReadiness,
     modelCapabilities: {
-      extraction: context.modelCapabilities?.extraction ?? "disabled",
+      extraction:
+        context.modelCapabilities?.extraction ?? (context.extraction ? "enabled" : "disabled"),
       backgroundEnrichment:
         context.modelCapabilities?.backgroundEnrichment ?? "disabled",
     },
+    extraction: context.extraction,
     backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
     migrationsReady: context.migrationsReady ?? true,
     secretStorageReady: context.secretStorageReady ?? true,

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
-import { SCHEMA_VERSION, schemaState } from "../../src/core/migrations";
+import { MIGRATIONS, SCHEMA_VERSION, schemaState } from "../../src/core/migrations";
 
 const root = mkdtempSync(join(tmpdir(), "titen-cli-"));
 const cli = join(import.meta.dir, "../../src/runtime/bun/cli.ts");
@@ -149,7 +149,7 @@ test("migrate dry-run is read-only and schema output is deterministic", () => {
   const fresh = run("dry-run-fresh", ["migrate", "--db", "missing.db", "--dry-run"]);
   assert.equal(fresh.exitCode, 0, fresh.output);
   assert.match(fresh.output, /-- migration 1/);
-  assert.match(fresh.output, new RegExp(`-- ${SCHEMA_VERSION} migration\\(s\\) pending; database unchanged`));
+  assert.match(fresh.output, new RegExp(`-- ${MIGRATIONS.length} migration\\(s\\) pending; database unchanged`));
   assert.deepEqual(fresh.files, []);
 
   assert.equal(run("dry-run-current", ["bootstrap", "--db", "current.db"]).exitCode, 0);

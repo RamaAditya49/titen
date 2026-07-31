@@ -7,13 +7,14 @@ import { Miniflare } from "miniflare";
 import { createD1Db } from "../../src/runtime/cloudflare/d1";
 import type { Db } from "../../src/core/db";
 import type { Stmt } from "../../src/core/db";
-import { migrate, SCHEMA_VERSION } from "../../src/core/migrations";
+import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
 import { assertPopulatedV11IntegrityMigration } from "./integrity-migration";
 import { assertSemanticReadiness } from "./semantic-readiness";
 import { acquireD1Lane, D1RunDiagnostics } from "./d1-harness";
+import { assertEnrichmentContract } from "./enrichment";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -148,6 +149,10 @@ d1Test(
   60_000,
 );
 
+d1Test("D1 replays bounded model enrichment", async () => {
+  await assertEnrichmentContract(db, "cloudflare-d1");
+}, 30_000);
+
 d1Test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));
   const stale = runtime({
@@ -230,10 +235,13 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
       },
     };
     await assert.rejects(() => migrate(injected));
-    assert.equal(Number((await real.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations"))[0]!.version), SCHEMA_VERSION - 1);
+    assert.equal(
+      Number((await real.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations"))[0]!.version),
+      MIGRATIONS.at(-2)!.version,
+    );
     const integrity = await real.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
-        WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata')
+        WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata', 'enrichment_jobs')
         ORDER BY name`,
     );
     assert.deepEqual(

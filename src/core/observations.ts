@@ -7,6 +7,9 @@ import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
 import { authorizeRecordWorkspace } from "./authorization";
 import type { RequestContext, Result } from "./http";
+import { derivationJobStatement } from "./enrichment";
+import { historyStatement, outboxStatement } from "./writes";
+export { historyStatement, outboxStatement } from "./writes";
 import {
   LIMITS,
   OBSERVATION_KINDS,
@@ -37,50 +40,6 @@ export function isRedactedObservation(content: string, contentHash: string): boo
  * explicit workspace and active writer membership.
  */
 const DEFAULT_VISIBILITY = "private";
-
-export function historyStatement(
-  orgId: string,
-  recordType: string,
-  recordId: string,
-  version: number,
-  changeKind: string,
-  actorId: string,
-  snapshotHash: string,
-  at: string,
-): Stmt {
-  return {
-    sql: `INSERT INTO record_history
-            (id, org_id, record_type, record_id, version, change_kind, actor_id, snapshot_hash, changed_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [
-      newId("hist"),
-      orgId,
-      recordType,
-      recordId,
-      version,
-      changeKind,
-      actorId,
-      snapshotHash,
-      at,
-    ],
-  };
-}
-
-/** Durable work for a configured vector projection. */
-export function outboxStatement(
-  orgId: string,
-  recordType: string,
-  recordId: string,
-  operation: string,
-  at: string,
-): Stmt {
-  return {
-    sql: `INSERT INTO index_outbox
-            (id, org_id, record_type, record_id, operation, state, attempts, created_at)
-          VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)`,
-    params: [newId("obx"), orgId, recordType, recordId, operation, at],
-  };
-}
 
 export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
@@ -120,6 +79,20 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
       const id = newId("obs");
       const ingestedAt = ctx.app.now().toISOString();
       const contentHash = await sha256Hex(content);
+      const enrichment = ctx.app.extraction
+        ? [await derivationJobStatement(ctx.app.db, ctx.app.extraction, {
+            id,
+            orgId: principal.orgId,
+            subjectId,
+            projectId,
+            workspaceId,
+            actorId: principal.principalId,
+            contentHash,
+            trust,
+            visibility,
+            at: ingestedAt,
+          })]
+        : [];
       const data = {
         observation_id: id,
         subject_id: subjectId,
@@ -179,6 +152,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             contentHash,
             ingestedAt,
           ),
+          ...enrichment,
           ...(ctx.app.vectors
             ? [outboxStatement(principal.orgId, "observation", id, "upsert", ingestedAt)]
             : []),

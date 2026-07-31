@@ -47,10 +47,10 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
-    assert.equal(Number(version[0]!.version), SCHEMA_VERSION - 1);
+    assert.equal(Number(version[0]!.version), MIGRATIONS.at(-2)!.version);
     const integrity = await db.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
-        WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata')
+        WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata', 'enrichment_jobs')
         ORDER BY name`,
     );
     assert.deepEqual(
@@ -61,8 +61,17 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
     assert.deepEqual(
       (await db.all<{ name: string }>("PRAGMA table_info(semantic_index_metadata)"))
-        .filter(({ name }) => name.endsWith("_failure_at")),
-      [],
+        .filter(({ name }) => name.endsWith("_failure_at"))
+        .map(({ name }) => name)
+        .sort(),
+      ["embedder_failure_at", "vector_store_failure_at"],
+      `the completed migration 14 must survive failed migration 15 statement ${failureAfter + 1}`,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>("PRAGMA table_info(claims)"))
+        .some(({ name }) => name === "enrichment_job_id"),
+      false,
+      `migration must roll back the claims column after statement ${failureAfter + 1}`,
     );
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
@@ -76,7 +85,7 @@ test("concurrent migration callers converge on one complete schema", async () =>
   const rows = await db.all<{ version: number; count: number }>(
     "SELECT MAX(version) AS version, COUNT(*) AS count FROM titen_migrations",
   );
-  assert.deepEqual(rows[0], { version: SCHEMA_VERSION, count: SCHEMA_VERSION });
+  assert.deepEqual(rows[0], { version: SCHEMA_VERSION, count: MIGRATIONS.length });
   database.close();
 });
 

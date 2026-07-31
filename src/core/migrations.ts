@@ -761,6 +761,138 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE semantic_index_metadata ADD COLUMN vector_store_failure_at TEXT`,
     ],
   },
+  {
+    version: 15,
+    statements: [
+      `CREATE TABLE enrichment_jobs (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         lane TEXT NOT NULL CHECK (lane IN ('derivation', 'reflection')),
+         input_ids TEXT NOT NULL,
+         input_hash TEXT NOT NULL,
+         subject_id TEXT NOT NULL,
+         project_id TEXT REFERENCES projects(id),
+         workspace_id TEXT REFERENCES workspaces(id),
+         actor_id TEXT NOT NULL,
+         model_id TEXT NOT NULL,
+         model_fingerprint TEXT NOT NULL,
+         prompt_fingerprint TEXT NOT NULL,
+         schema_fingerprint TEXT NOT NULL,
+         policy_fingerprint TEXT NOT NULL,
+         state TEXT NOT NULL CHECK (state IN ('pending', 'leased', 'done', 'failed')),
+         attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0 AND attempts <= 4),
+         max_attempts INTEGER NOT NULL DEFAULT 4 CHECK (max_attempts >= 1 AND max_attempts <= 4),
+         next_attempt_at TEXT NOT NULL,
+         lease_token TEXT,
+         lease_expires_at TEXT,
+         error_class TEXT CHECK (error_class IN (
+           'provider_unavailable', 'provider_rejected', 'provider_protocol',
+           'invalid_output', 'unsafe_output', 'source_changed'
+         )),
+         result_ids TEXT,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         UNIQUE (
+           lane, input_hash, model_fingerprint, prompt_fingerprint,
+           schema_fingerprint, policy_fingerprint
+         ),
+         CHECK (
+           (state = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+           OR (state != 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL)
+         )
+       )`,
+      `CREATE INDEX enrichment_jobs_due
+         ON enrichment_jobs (state, next_attempt_at, lease_expires_at, created_at, id)`,
+      `CREATE INDEX enrichment_jobs_org
+         ON enrichment_jobs (org_id, lane, state, created_at)`,
+      `CREATE UNIQUE INDEX enrichment_jobs_org_identity
+         ON enrichment_jobs (id, org_id)`,
+      `CREATE TRIGGER enrichment_jobs_inputs_immutable
+         BEFORE UPDATE OF org_id, lane, input_ids, input_hash, subject_id,
+           project_id, workspace_id, actor_id, model_id, model_fingerprint,
+           prompt_fingerprint, schema_fingerprint, policy_fingerprint, created_at
+         ON enrichment_jobs
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_INPUT_IMMUTABLE');
+         END`,
+      `CREATE TABLE enrichment_commits (
+         job_id TEXT PRIMARY KEY REFERENCES enrichment_jobs(id),
+         lease_token TEXT NOT NULL,
+         result_kind TEXT NOT NULL CHECK (result_kind IN ('add', 'link', 'abstain')),
+         committed_at TEXT NOT NULL
+       )`,
+      `CREATE TRIGGER enrichment_commit_current_lease
+         BEFORE INSERT ON enrichment_commits
+         BEGIN
+           SELECT CASE WHEN NOT EXISTS (
+             SELECT 1 FROM enrichment_jobs j
+              WHERE j.id = NEW.job_id
+                AND j.state = 'leased'
+                AND j.lease_token = NEW.lease_token
+                AND j.lease_expires_at > NEW.committed_at
+           ) THEN RAISE(ABORT, 'ENRICHMENT_LEASE_LOST') END;
+         END`,
+      `CREATE TRIGGER enrichment_commit_write_authority
+         BEFORE INSERT ON enrichment_commits
+         WHEN EXISTS (
+           SELECT 1 FROM enrichment_jobs j
+            WHERE j.id = NEW.job_id AND j.workspace_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM memberships m
+                 WHERE m.org_id = j.org_id
+                   AND m.workspace_id = j.workspace_id
+                   AND m.principal_id = j.actor_id
+                   AND m.removed_at IS NULL
+                   AND m.role != 'reader'
+              )
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_AUTHORITY_LOST');
+         END`,
+      `ALTER TABLE claims ADD COLUMN enrichment_job_id TEXT REFERENCES enrichment_jobs(id)`,
+      `CREATE INDEX claims_enrichment_job ON claims (enrichment_job_id)`,
+      `CREATE TRIGGER claims_enrichment_job_org_insert
+         BEFORE INSERT ON claims
+         WHEN NEW.enrichment_job_id IS NOT NULL AND NOT EXISTS (
+           SELECT 1 FROM enrichment_jobs j
+            WHERE j.id = NEW.enrichment_job_id AND j.org_id = NEW.org_id
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_JOB_SCOPE');
+         END`,
+      `CREATE TRIGGER claims_enrichment_job_org_update
+         BEFORE UPDATE OF enrichment_job_id, org_id ON claims
+         WHEN NEW.enrichment_job_id IS NOT NULL AND NOT EXISTS (
+           SELECT 1 FROM enrichment_jobs j
+            WHERE j.id = NEW.enrichment_job_id AND j.org_id = NEW.org_id
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_JOB_SCOPE');
+         END`,
+      `CREATE UNIQUE INDEX claims_org_identity ON claims (id, org_id)`,
+      `CREATE TABLE claim_links (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         source_claim_id TEXT NOT NULL,
+         target_claim_id TEXT NOT NULL,
+         relation TEXT NOT NULL CHECK (relation IN (
+           'derived_from', 'related_to', 'duplicate_candidate',
+           'conflict_candidate', 'supersession_candidate'
+         )),
+         job_id TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         FOREIGN KEY (job_id, org_id) REFERENCES enrichment_jobs(id, org_id),
+         FOREIGN KEY (source_claim_id, org_id) REFERENCES claims(id, org_id),
+         FOREIGN KEY (target_claim_id, org_id) REFERENCES claims(id, org_id),
+         UNIQUE (job_id, source_claim_id, target_claim_id, relation),
+         CHECK (source_claim_id != target_claim_id)
+       )`,
+      `CREATE INDEX claim_links_source
+         ON claim_links (org_id, source_claim_id, relation, created_at)`,
+      `CREATE INDEX claim_links_target
+         ON claim_links (org_id, target_claim_id, relation, created_at)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
