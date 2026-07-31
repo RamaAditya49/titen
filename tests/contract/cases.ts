@@ -3957,6 +3957,7 @@ export const CASES: Case[] = [
         .map((result, index) => ({
           index,
           status: result.status,
+          body: typeof result.body === "string" ? result.body.slice(0, 200) : undefined,
           code: result.body?.error?.code,
           message: result.body?.error?.message,
           request_id: result.body?.meta?.request_id,

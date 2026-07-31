@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, test } from "bun:test";
+import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -70,29 +70,11 @@ const client = () =>
     return response as unknown as Response;
   }, origin);
 
-/**
- * Miniflare's D1 shim occasionally answers a batch with a non-JSON error
- * string, which its own response parser then throws on. It is a harness fault,
- * not a service fault, so provisioning retries once.
- *
- * ponytail: single retry, no backoff. The ceiling is a second consecutive shim
- * fault failing the case; upgrade path is dropping this once Miniflare's D1
- * parser handles its own error payloads.
- */
-async function provisionRetrying(options?: Parameters<typeof provisionWith>[1]) {
-  try {
-    return await provisionWith(db, options);
-  } catch (error) {
-    if (!/Unexpected identifier|JSON Parse error/.test(String(error))) throw error;
-    return provisionWith(db, options);
-  }
-}
-
 const fixture: Fixture = {
   runtime: "cloudflare-d1",
   call: (method, path, options) => client().call(method, path, options),
   callRaw: (method, path, options) => client().callRaw(method, path, options),
-  provision: (options) => provisionRetrying(options),
+  provision: (options) => provisionWith(db, options),
   revoke: (keyId) => revokeWith(db, keyId),
   query: (sql, params) => db.all(sql, params),
   async restart() {
@@ -101,8 +83,8 @@ const fixture: Fixture = {
   },
 };
 
-beforeAll(start);
-afterAll(async () => {
+before(start);
+after(async () => {
   await starting;
   await mf.dispose();
   rmSync(persist, { recursive: true, force: true });
@@ -112,9 +94,13 @@ test("batch writes are atomic on D1", async () => {
   await assertBatchAtomicity(db);
 });
 
-test("D1 semantic readiness persists and compares its fingerprint locally", async () => {
-  await assertSemanticReadiness(db, "cloudflare-d1");
-});
+test(
+  "D1 semantic readiness persists and compares its fingerprint locally",
+  { timeout: 60_000 },
+  async () => {
+    await assertSemanticReadiness(db, "cloudflare-d1");
+  },
+);
 
 test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));
@@ -262,7 +248,5 @@ test("a populated schema-v11 D1 database repairs collaboration integrity", async
 for (const contractCase of CASES) {
   const name = `cloudflare-d1: ${contractCase.name}`;
   const run = async () => contractCase.run(fixture);
-  if (contractCase.name === "committed memory survives a restart without a rebuild step")
-    test(name, run, 20_000);
-  else test(name, run);
+  test(name, run);
 }
