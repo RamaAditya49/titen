@@ -121,6 +121,9 @@ const context = await titen.compile({
 console.log(context.items);
 ```
 
+`max_tokens` accepts 128 through 32,000. Every returned memory item includes
+`untrusted: true`; the client still owns prompt boundaries and action policy.
+
 Typed methods cover common agent operations. `request()` and `requestRaw()`
 cover the remaining authenticated JSON and streaming routes. Mutations accept
 an `idempotencyKey` for safe retries.

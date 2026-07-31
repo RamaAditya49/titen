@@ -4,7 +4,8 @@ Titen stores agent and user memory, so confidentiality, integrity, provenance,
 and scope isolation are core security properties.
 
 The design-level assets, trust boundaries, attack paths, required controls, and
-residual risks are maintained in the [threat model](./docs/security/threat-model.md).
+residual risks are maintained in the
+[threat model](https://github.com/RamaAditya49/titen/blob/main/docs/security/threat-model.md).
 
 ## Reporting a vulnerability
 

@@ -83,6 +83,7 @@ export interface Claim {
 export interface CompileOptions {
   subject_id: string;
   task: string;
+  /** JSON token budget accepted by the server: 128 through 32,000. */
   max_tokens: number;
   project_id?: string;
   include_checkpoints?: boolean;
@@ -193,6 +194,7 @@ export interface ContextPack {
   scope: { subject_id: string; project_id: string | null };
   budget: { max_tokens: number; used_tokens: number };
   items: Array<{
+    untrusted: true;
     claim_id: string;
     claim: string;
     kind: string;
@@ -231,6 +233,7 @@ export interface FeedbackResult {
 }
 
 export interface EvidenceObservation {
+  untrusted: true;
   observation_id: string;
   kind: string;
   content: string;
@@ -244,6 +247,7 @@ export interface EvidenceObservation {
 
 export interface EvidenceResult {
   claim: {
+    untrusted: true;
     claim_id: string;
     subject_id: string;
     project_id: string | null;

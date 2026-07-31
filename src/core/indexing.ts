@@ -35,8 +35,9 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     id: string;
     record_type: string;
     record_id: string;
+    operation: string;
   }>(
-    `SELECT id, record_type, record_id FROM index_outbox
+    `SELECT id, record_type, record_id, operation FROM index_outbox
       WHERE org_id = ? AND state = 'pending'
       ORDER BY created_at, id LIMIT ?`,
     [principal.orgId, limitParam],
@@ -44,8 +45,9 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
   if (pending.length === 0)
     return { data: { drained: 0, indexed: 0, skipped: 0, remaining: 0 } };
 
-  const claimRows = pending.filter((row) => row.record_type === "claim");
-  const others = pending.filter((row) => row.record_type !== "claim");
+  const claimRows = pending.filter((row) => row.record_type === "claim" && row.operation !== "delete");
+  const removals = pending.filter((row) => row.operation === "delete");
+  const others = pending.filter((row) => row.record_type !== "claim" && row.operation !== "delete");
 
   // A claim may have been superseded or expired since it was queued; only
   // retrievable claims are worth an embedding call.
@@ -76,7 +78,19 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         subjectId: claim.subject_id,
         projectId: claim.project_id,
       });
-    else others.push(row);
+    else removals.push(row);
+  }
+
+  if (removals.length > 0) {
+    try {
+      await ctx.app.vectors.store.remove([...new Set(removals.map((row) => row.record_id))]);
+    } catch {
+      throw unavailable("Indexing dependency is unavailable.", {
+        dependency: "vector_store",
+        retryable: true,
+        pending: pending.length,
+      });
+    }
   }
 
   let indexed = 0;
@@ -118,7 +132,11 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
 
   // Marked done only after the index write succeeded, so a failed batch is
   // retried rather than silently dropped.
-  const done = [...eligible.map((entry) => entry.outboxId), ...others.map((row) => row.id)];
+  const done = [
+    ...eligible.map((entry) => entry.outboxId),
+    ...removals.map((row) => row.id),
+    ...others.map((row) => row.id),
+  ];
   const at = ctx.app.now().toISOString();
   for (let index = 0; index < done.length; index += 50) {
     const group = done.slice(index, index + 50);
@@ -140,6 +158,7 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     data: {
       drained: done.length,
       indexed,
+      removed: removals.length,
       skipped: others.length,
       remaining: Number(remaining?.count ?? 0),
       model: ctx.app.vectors.embedder.model,

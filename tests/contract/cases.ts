@@ -2885,6 +2885,221 @@ export const CASES: Case[] = [
       assert.equal(moved.body.meta.dropped_query_terms, compiled.body.meta.dropped_query_terms);
     },
   },
+  {
+    name: "JSON depth is rejected before checkpoint and idempotency serialization",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      let nested: unknown = 1;
+      for (let depth = 0; depth < 65; depth += 1) nested = [nested];
+
+      const checkpoint = await fx.call("POST", "/v1/checkpoints", {
+        key: agent.key,
+        body: { subject_id: "deep-json", kind: "cursor", state: nested, ttl_seconds: 600 },
+      });
+      expectError(checkpoint, 400, "VALIDATION_ERROR");
+      assert.match(checkpoint.body.error.message, /maximum JSON depth/);
+
+      const observed = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        headers: { "idempotency-key": "deep-json" },
+        body: observation({ pad: nested }),
+      });
+      expectError(observed, 400, "VALIDATION_ERROR");
+      const counts = await fx.query<{ observations: number; checkpoints: number }>(
+        `SELECT (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM checkpoints WHERE org_id = ?) AS checkpoints`,
+        [agent.orgId, agent.orgId],
+      );
+      assert.deepEqual(counts.map((row) => [Number(row.observations), Number(row.checkpoints)]), [[0, 0]]);
+    },
+  },
+  {
+    name: "validation distinguishes missing values and locates nested claim fields",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const missing = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "paths", task: "missing budget" },
+      });
+      expectError(missing, 400, "VALIDATION_ERROR");
+      assert.equal(missing.body.error.message, 'Field "max_tokens" is required.');
+
+      const wrong = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "paths", task: "wrong budget", max_tokens: "900" },
+      });
+      expectError(wrong, 400, "VALIDATION_ERROR");
+      assert.equal(wrong.body.error.message, 'Field "max_tokens" must be an integer.');
+
+      const observed = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({ subject_id: "paths" }),
+      });
+      expectOk(observed, 201);
+      const nested = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "paths",
+          claims: [
+            claim(observed.body.data.observation_id),
+            claim(observed.body.data.observation_id, {
+              sources: [{ observation_id: observed.body.data.observation_id, relation: "endorses" }],
+            }),
+          ],
+        },
+      });
+      expectError(nested, 400, "VALIDATION_ERROR");
+      assert.match(nested.body.error.message, /claims\[1\]\.sources\[0\]\.relation/);
+
+      const missingEvidence = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "paths",
+          claims: [claim("obs_missing")],
+        },
+      });
+      expectError(missingEvidence, 404, "NOT_FOUND");
+      assert.equal(missingEvidence.body.meta.field, "claims[0].sources[0].observation_id");
+    },
+  },
+  {
+    name: "unsafe text and non-sortable temporal claims fail before mutation",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      for (const content of ["nul\u0000byte", "ansi\u001b[31m", "bidi\u202esecret", "lone\ud800"]) {
+        const rejected = await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({ subject_id: "safe-text", content }),
+        });
+        expectError(rejected, 400, "VALIDATION_ERROR");
+      }
+      const safe = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({ subject_id: "safe-text", content: "line one\nline two\tvalue" }),
+      });
+      expectOk(safe, 201);
+
+      for (const dates of [
+        { valid_from: "+010000-01-01T00:00:00.000Z" },
+        { valid_from: "2030-01-01T00:00:00.000Z", valid_to: "2020-01-01T00:00:00.000Z" },
+      ]) {
+        const rejected = await fx.call("POST", "/v1/consolidations", {
+          key: agent.key,
+          body: {
+            subject_id: "safe-text",
+            claims: [claim(safe.body.data.observation_id, dates)],
+          },
+        });
+        expectError(rejected, 400, "VALIDATION_ERROR");
+      }
+      const claims = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM claims WHERE org_id = ?`,
+        [agent.orgId],
+      );
+      assert.equal(Number(claims[0]!.count), 0);
+    },
+  },
+  {
+    name: "observation purge is scoped, audited, idempotent, and removes readable projections",
+    async run(fx) {
+      const operator = await fx.provision({ scopes: ["*"] });
+      const limited = await fx.provision({ orgId: operator.orgId, scopes: ["evidence:read"] });
+      const foreign = await fx.provision({ scopes: ["observations:purge"] });
+      const canary = "PURGE_SECRET_CANARY_7319";
+      const seeded = await seedClaim(fx, operator.key, {
+        observation: { subject_id: "purge-subject", content: canary },
+        claim: { statement: `${canary} must never remain readable.` },
+      });
+
+      expectError(
+        await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: limited.key }),
+        403,
+        "FORBIDDEN",
+      );
+      expectError(
+        await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: foreign.key }),
+        404,
+        "NOT_FOUND",
+      );
+
+      const before = await fx.call("POST", "/v1/context/compile", {
+        key: operator.key,
+        body: { subject_id: "purge-subject", task: "purge secret canary", max_tokens: 900 },
+      });
+      expectOk(before);
+      assert.equal(before.body.data.items[0].untrusted, true);
+      const beforeEvidence = await fx.call("GET", `/v1/claims/${seeded.claimId}/evidence`, { key: operator.key });
+      expectOk(beforeEvidence);
+      assert.equal(beforeEvidence.body.data.claim.untrusted, true);
+      assert.equal(beforeEvidence.body.data.evidence.supporting[0].untrusted, true);
+
+      const purged = await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: operator.key });
+      expectOk(purged);
+      assert.equal(purged.body.data.already_purged, false);
+      assert.equal(purged.body.data.dependent_claims_redacted, 1);
+
+      const canonical = await fx.query<{
+        content: string; content_hash: string; statement: string; status: string; version: number;
+        observation_fts: number; claim_fts: number; observation_delete: number; claim_delete: number;
+        purge_history: number; claim_history: number; audits: number; events: number;
+      }>(
+        `SELECT o.content, o.content_hash, c.statement, c.status, c.version,
+                (SELECT COUNT(*) FROM observations_fts WHERE observation_id = o.id) AS observation_fts,
+                (SELECT COUNT(*) FROM claims_fts WHERE claim_id = c.id) AS claim_fts,
+                (SELECT COUNT(*) FROM index_outbox WHERE record_id = o.id AND operation = 'delete' AND state = 'pending') AS observation_delete,
+                (SELECT COUNT(*) FROM index_outbox WHERE record_id = c.id AND operation = 'delete' AND state = 'pending') AS claim_delete,
+                (SELECT COUNT(*) FROM record_history WHERE record_id = o.id AND change_kind = 'purge') AS purge_history,
+                (SELECT COUNT(*) FROM record_history WHERE record_id = c.id AND change_kind = 'evidence_purged') AS claim_history,
+                (SELECT COUNT(*) FROM audit_log WHERE org_id = o.org_id AND resource_id = o.id AND action = 'observation.purge') AS audits,
+                (SELECT COUNT(*) FROM events WHERE org_id = o.org_id AND resource_id = o.id AND kind = 'observation.purged') AS events
+           FROM observations o JOIN claim_sources s ON s.observation_id = o.id JOIN claims c ON c.id = s.claim_id
+          WHERE o.id = ? AND c.id = ?`,
+        [seeded.observationId, seeded.claimId],
+      );
+      assert.equal(canonical.length, 1);
+      const row = canonical[0]!;
+      assert.equal(row.content, `[redacted sha256:${row.content_hash}]`);
+      assert.equal(row.statement, "[redacted: purged evidence]");
+      assert.equal(row.status, "revoked");
+      assert.equal(Number(row.version), 2);
+      for (const count of [row.observation_fts, row.claim_fts]) assert.equal(Number(count), 0);
+      for (const count of [row.observation_delete, row.claim_delete, row.purge_history, row.claim_history, row.audits, row.events])
+        assert.equal(Number(count), 1);
+
+      const after = await fx.call("POST", "/v1/context/compile", {
+        key: operator.key,
+        body: { subject_id: "purge-subject", task: "purge secret canary", max_tokens: 900 },
+      });
+      expectOk(after);
+      assert.deepEqual(after.body.data.items, []);
+      const redactedEvidence = await fx.call("GET", `/v1/claims/${seeded.claimId}/evidence`, { key: operator.key });
+      expectOk(redactedEvidence);
+      assert.ok(!JSON.stringify(redactedEvidence.body).includes(canary));
+
+      const reuse = await fx.call("POST", "/v1/consolidations", {
+        key: operator.key,
+        body: { subject_id: "purge-subject", claims: [claim(seeded.observationId)] },
+      });
+      expectError(reuse, 404, "NOT_FOUND");
+      assert.equal(reuse.body.meta.field, "claims[0].sources[0].observation_id");
+
+      const repeated = await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: operator.key });
+      expectOk(repeated);
+      assert.equal(repeated.body.data.already_purged, true);
+      const proofs = await fx.query<{ audits: number; history: number }>(
+        `SELECT (SELECT COUNT(*) FROM audit_log WHERE org_id = ? AND resource_id = ? AND action = 'observation.purge') AS audits,
+                (SELECT COUNT(*) FROM record_history WHERE org_id = ? AND record_id = ? AND change_kind = 'purge') AS history`,
+        [operator.orgId, seeded.observationId, operator.orgId, seeded.observationId],
+      );
+      assert.deepEqual(proofs.map((proof) => [Number(proof.audits), Number(proof.history)]), [[1, 1]]);
+      const pendingDeletes = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM index_outbox
+          WHERE state = 'pending' AND operation = 'delete' AND record_id IN (?, ?)`,
+        [seeded.observationId, seeded.claimId],
+      );
+      assert.equal(Number(pendingDeletes[0]!.count), 2, "repeat purge must preserve vector deletes");
+    },
+  },
 ];
 
 /**

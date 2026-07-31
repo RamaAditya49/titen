@@ -27,6 +27,22 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   bundle-plugin package is staged while an upstream inspector incident blocks
   live package publication.
 
+- An explicitly scoped REST tombstone removes readable observation and
+  dependent-claim text while retaining hashes, provenance, and audit history.
+
+### Security
+
+- JSON depth, unsafe controls, malformed Unicode, non-sortable timestamps, and
+  inverted validity windows now fail before canonical mutation. Each returned
+  memory item is marked untrusted, and evidence purge removes FTS and vector
+  projections without exposing a general MCP deletion tool.
+
+### Fixed
+
+- Validation errors distinguish missing values, identify nested field paths,
+  and keep raced purge/consolidation and lifecycle writes fail-closed on both
+  SQLite and D1.
+
 ## [0.2.1] — 2026-07-31
 
 ### Fixed

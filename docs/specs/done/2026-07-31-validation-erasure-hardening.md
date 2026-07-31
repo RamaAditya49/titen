@@ -1,12 +1,11 @@
 ---
 work_id: validation-erasure-hardening-20260731
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Validation and erasure hardening
@@ -70,3 +69,17 @@ scope and organization, commit every canonical and derived change in one batch,
 and be idempotent after its tombstone history exists. Done requires focused and
 dual-runtime authorization/data-loss regressions, import checks, route/workflow
 validation, package inspection, and a clean diff check.
+
+## Closure evidence
+
+The Bun and Cloudflare D1 shared contracts reject deep JSON, unsafe text,
+unlocated nested input, invalid temporal intervals, missing purge authority, and
+cross-organization purge attempts. The same contract proves canonical
+tombstones, dependent-claim revocation, FTS removal, pending vector deletes,
+content-free audit/history/events, per-item untrusted markers, and idempotent
+repeat behavior. A deterministic interleaving proves that purge wins after
+consolidation preflight, and explicit plus background drains remove existing
+vectors without a repeat purge cancelling the delete. Integration, SDK, Worker
+dry-run, route/workflow, package,
+strict README prose, and diff checks pass. No production or registry mutation
+was performed in this slice.

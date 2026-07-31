@@ -75,6 +75,7 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
   } as const;
   for (const row of rows) {
     buckets[bucketName[row.relation]]!.push({
+      untrusted: true,
       observation_id: row.id,
       kind: row.kind,
       content: row.content,
@@ -90,6 +91,7 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
   return {
     data: {
       claim: {
+        untrusted: true,
         claim_id: claim.id,
         subject_id: claim.subject_id,
         project_id: claim.project_id,

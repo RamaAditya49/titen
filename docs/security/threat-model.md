@@ -86,7 +86,8 @@ Rules at every boundary:
 - Another agent's private memory is never eligible through semantic similarity.
 - A claim cannot exceed the trust of its visible evidence and caller authority.
 - An LLM cannot create a source link to an unknown or unauthorized observation.
-- Retrieved text cannot grant authority or become a system instruction.
+- Retrieved text cannot grant Titen authority. Responses mark each item as
+  untrusted; callers remain responsible for preserving prompt boundaries.
 - Revoked, expired, superseded, or deleted rows cannot return through a stale
   vector hit.
 - Checkpoints, leases, and handoffs are execution state, not factual evidence.
@@ -188,6 +189,10 @@ Rules at every boundary:
   deployed revision, migration compatibility, rollback, and cross-scope denial.
 - Backups are verified by restore, integrity check, and functional smoke—not by
   file existence alone.
+- Observation erasure is an explicitly scoped, audited tombstone that removes
+  readable canonical and derived text while retaining hashes and provenance.
+  Backups predating the tombstone can restore that text and require separate
+  operator expiry or replacement.
 - An optional Atlas web client uses the authenticated REST boundary, receives
   no direct database/binding access, applies a restrictive CSP, and is omitted
   without affecting service readiness.

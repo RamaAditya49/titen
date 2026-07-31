@@ -112,6 +112,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
 
   const entries = ranked.map((entry) => {
     const item = {
+      untrusted: true,
       claim_id: entry.candidate.id,
       claim: entry.candidate.statement,
       kind: entry.candidate.kind,

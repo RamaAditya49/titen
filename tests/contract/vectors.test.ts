@@ -303,6 +303,48 @@ test("index drain reports vector-store outages as retryable and preserves pendin
   assert.ok((await pendingCount()) < before);
 });
 
+test("purge drain removes an already indexed claim", async () => {
+  const client = withVectors();
+  const observation = await client.call("POST", "/v1/observations", {
+    key,
+    body: {
+      subject_id: "purge-vector",
+      kind: "tool_result",
+      content: "Vector purge canary evidence.",
+      source: { type: "tool", ref: "vector-purge" },
+      trust: "verified",
+    },
+  });
+  assert.equal(observation.status, 201);
+  const consolidated = await client.call("POST", "/v1/consolidations", {
+    key,
+    body: {
+      subject_id: "purge-vector",
+      claims: [{
+        kind: "procedural",
+        statement: "Vector purge canary claim.",
+        sources: [{ observation_id: observation.body.data.observation_id, relation: "supports" }],
+      }],
+    },
+  });
+  assert.equal(consolidated.status, 201);
+  const claimId = consolidated.body.data.claims[0].claim_id as string;
+
+  const indexed = await client.call("POST", "/v1/index/drain?limit=100", { key });
+  assert.equal(indexed.status, 200);
+  assert.ok(vectors.metadataFor(claimId), "fixture must prove the vector existed first");
+
+  const purged = await client.call("DELETE", `/v1/observations/${observation.body.data.observation_id}`, { key });
+  assert.equal(purged.status, 200);
+  const repeated = await client.call("DELETE", `/v1/observations/${observation.body.data.observation_id}`, { key });
+  assert.equal(repeated.status, 200);
+  assert.equal(repeated.body.data.already_purged, true);
+  const removed = await client.call("POST", "/v1/index/drain?limit=100", { key });
+  assert.equal(removed.status, 200);
+  assert.ok(removed.body.data.removed >= 1);
+  assert.equal(vectors.metadataFor(claimId), undefined);
+});
+
 test("an unavailable embedder degrades to lexical retrieval instead of failing", async () => {
   const lexicalOnly = await withoutVectors().call("POST", "/v1/context/compile", {
     key,

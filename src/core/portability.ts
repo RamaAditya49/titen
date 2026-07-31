@@ -14,7 +14,10 @@ import {
   TRUST_LEVELS,
   TRUST_RANK,
   VISIBILITIES,
+  assertJsonDepth,
+  assertTimestampOrder,
   isRecord,
+  optionalString,
   requireEnum,
   requireString,
   type Trust,
@@ -149,18 +152,17 @@ type Prepared = Record<string, unknown>;
 type PreparedClaim = Prepared & { sources: Source[] };
 
 const optionalText = (row: Record<string, unknown>, field: string, max: number): string | null => {
-  const value = row[field];
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string" || value.length > max || value.trim() === "")
-    throw validationError(`Imported field "${field}" is invalid.`);
-  return value;
+  return optionalString(row, field, max, `import.${field}`);
 };
 const timestamp = (row: Record<string, unknown>, field: string, required = true): string | null => {
   const value = row[field];
   if ((value === undefined || value === null) && !required) return null;
   if (typeof value !== "string" || Number.isNaN(Date.parse(value)))
     throw validationError(`Imported field "${field}" must be an ISO-8601 timestamp.`);
-  return new Date(value).toISOString();
+  const normalized = new Date(value).toISOString();
+  if (!/^\d{4}-/u.test(normalized))
+    throw validationError(`Imported field "${field}" must use a four-digit year.`);
+  return normalized;
 };
 const canonical = (value: unknown): string => JSON.stringify(value);
 
@@ -178,6 +180,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
   for (const line of lines) {
     let parsed: unknown;
     try { parsed = JSON.parse(line); } catch { throw validationError("Every import line must be valid JSON."); }
+    assertJsonDepth(parsed);
     if (!isRecord(parsed)) throw validationError("Every import line must be a JSON object.");
     if (parsed.type === "titen.export.header") {
       if (parsed.format_version !== EXPORT_FORMAT_VERSION)
@@ -258,6 +261,9 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     const status = requireString(row, "status", LIMITS.label);
     if (!["active", "disputed", "superseded", "expired", "revoked"].includes(status))
       throw validationError("Imported claim status is invalid.");
+    const validFrom = timestamp(row, "valid_from")!;
+    const validTo = timestamp(row, "valid_to", false);
+    assertTimestampOrder(validFrom, validTo, "valid_from", "valid_to");
     const prepared: PreparedClaim = {
       id: requireString(row, "id", LIMITS.identifier),
       subject_id: requireString(row, "subject_id", LIMITS.identifier),
@@ -272,8 +278,8 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
       visibility,
       status,
       version: Number(row.version),
-      valid_from: timestamp(row, "valid_from"),
-      valid_to: timestamp(row, "valid_to", false),
+      valid_from: validFrom,
+      valid_to: validTo,
       created_at: timestamp(row, "created_at"),
       sources,
     };

@@ -11,6 +11,7 @@ features explicitly listed as proposed are not routes.
 - `DELETE /v1/keys/:id`
 - `DELETE /v1/leases/:id`
 - `DELETE /v1/memberships/:id`
+- `DELETE /v1/observations/:id`
 - `DELETE /v1/webhooks/:id`
 - `GET /healthz`
 - `GET /readyz`
@@ -106,6 +107,8 @@ terminal `failed` after five attempts. The drain response includes
 - An idempotency key is bound to its credential plus canonical method, concrete
   path, normalized query, and JSON body; reuse for a different request is `409`.
 - Tenant/organization authority never comes from a request body.
+- JSON bodies may nest at most 64 object/array levels. Free text rejects unsafe
+  terminal and bidirectional controls while retaining tab and line feed.
 
 Success envelope:
 
@@ -172,6 +175,20 @@ Visibility defaults to `private`. `team` requires `workspace_id` and an active
 non-reader membership; this predicate is applied before retrieval, export,
 events, Atlas limits/counts, and webhook delivery.
 
+### `DELETE /v1/observations/:id`
+
+An operator credential with the explicit `observations:purge` scope can
+irreversibly tombstone readable evidence in its organization. The atomic write
+retains the observation ID, original content hash, source metadata, and history;
+removes FTS content; queues a vector delete; redacts and revokes dependent
+claims; and appends a content-free audit/event record. Foreign IDs return the
+same `404` as missing IDs. Ordinary agent and MCP keys should never receive this
+scope, and no MCP forget tool exists.
+
+The tombstone marker binds the retained SHA-256 and remains portable. A restore
+from a backup made before the purge can reintroduce the readable content, so an
+erasure runbook must identify and expire or replace affected backups separately.
+
 ### Proposed: `POST /v1/observations/batch`
 
 Append a bounded batch using the same item schema and authorization path as the
@@ -211,8 +228,10 @@ Compile a task-specific context pack.
 }
 ```
 
-The response includes selected claims, evidence IDs, trust, temporal validity,
-conflicts, score components, token usage, and a `context_id`.
+`max_tokens` accepts 128 through 32,000. The response includes selected claims,
+evidence IDs, trust, temporal validity, conflicts, score components, token usage,
+and a `context_id`. Each item carries `untrusted: true`; this is structured
+provenance for the caller, not an instruction-enforcement claim.
 
 Ranking is auditable and deterministic. Lexical BM25 and vector similarity are
 each min-max normalized inside the authorized candidate set; relevance is the

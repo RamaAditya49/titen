@@ -124,8 +124,8 @@ export async function indexPendingForOrg(
   vectors: VectorCapability,
   limit: number,
 ): Promise<number> {
-  const pending = await db.all<{ id: string; record_type: string; record_id: string }>(
-    `SELECT id, record_type, record_id FROM index_outbox
+  const pending = await db.all<{ id: string; record_type: string; record_id: string; operation: string }>(
+    `SELECT id, record_type, record_id, operation FROM index_outbox
       WHERE org_id = ? AND state = 'pending'
       ORDER BY created_at, id LIMIT ?`,
     [orgId, limit],
@@ -135,6 +135,7 @@ export async function indexPendingForOrg(
   // Only claims are retrievable, so only claims need an embedding. Anything else
   // is retired so the queue cannot grow without bound.
   const retire: string[] = [];
+  const removals: { outboxId: string; recordId: string }[] = [];
   const eligible: {
     outboxId: string;
     claimId: string;
@@ -143,6 +144,10 @@ export async function indexPendingForOrg(
     projectId: string | null;
   }[] = [];
   for (const row of pending) {
+    if (row.operation === "delete") {
+      removals.push({ outboxId: row.id, recordId: row.record_id });
+      continue;
+    }
     if (row.record_type !== "claim") {
       retire.push(row.id);
       continue;
@@ -167,8 +172,11 @@ export async function indexPendingForOrg(
         subjectId: found.subject_id,
         projectId: found.project_id,
       });
-    else retire.push(row.id);
+    else removals.push({ outboxId: row.id, recordId: row.record_id });
   }
+
+  if (removals.length > 0)
+    await vectors.store.remove([...new Set(removals.map((entry) => entry.recordId))]);
 
   let indexed = 0;
   if (eligible.length > 0) {
@@ -187,7 +195,7 @@ export async function indexPendingForOrg(
     indexed = eligible.length;
   }
 
-  const done = [...eligible.map((entry) => entry.outboxId), ...retire];
+  const done = [...eligible.map((entry) => entry.outboxId), ...removals.map((entry) => entry.outboxId), ...retire];
   for (let index = 0; index < done.length; index += 50)
     await db.batch(
       done.slice(index, index + 50).map((id) => ({

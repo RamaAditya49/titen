@@ -10,6 +10,7 @@ export const SCOPES = [
   "projects:resolve",
   "projects:create",
   "observations:write",
+  "observations:purge",
   "claims:write",
   "context:compile",
   "feedback:write",

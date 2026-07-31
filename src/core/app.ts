@@ -14,10 +14,11 @@ import { compileView } from "./atlas";
 import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
-import { appendObservation } from "./observations";
+import { appendObservation, purgeObservation } from "./observations";
 import { resolveProject } from "./projects";
 import { schemaState } from "./migrations";
 import { ApiError, forbidden, unavailable, validationError } from "./errors";
+import { assertJsonDepth } from "./validate";
 import {
   MAX_BODY_BYTES,
   compileRoutes,
@@ -92,6 +93,12 @@ export const ROUTES: RouteDef[] = [
     path: "/v1/observations",
     scope: "observations:write",
     handler: appendObservation,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/observations/:id",
+    scope: "observations:purge",
+    handler: purgeObservation,
   },
   {
     method: "POST",
@@ -325,11 +332,14 @@ export function createApp(context: {
         json: async <T>() => {
           const text = await rawBody();
           if (text.trim() === "") throw validationError("Request body is required.");
+          let parsed: T;
           try {
-            return JSON.parse(text) as T;
+            parsed = JSON.parse(text) as T;
           } catch {
             throw validationError("Request body must be valid JSON.");
           }
+          assertJsonDepth(parsed);
+          return parsed;
         },
       };
 

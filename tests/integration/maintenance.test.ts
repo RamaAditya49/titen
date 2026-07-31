@@ -142,6 +142,36 @@ test("a claim that stopped being retrievable is retired, not embedded forever", 
   assert.equal(await pendingCount(db), 0, "the queue must not stall on an ineligible claim");
 });
 
+test("background repair removes vectors queued by evidence purge", async () => {
+  const observation = await api("POST", "/v1/observations", {
+    subject_id: "user_maint_purge",
+    kind: "tool_result",
+    content: "Evidence whose indexed claim will be purged.",
+    source: { type: "tool", ref: "maint#purge" },
+    trust: "verified",
+  });
+  const consolidated = await api("POST", "/v1/consolidations", {
+    subject_id: "user_maint_purge",
+    claims: [{
+      kind: "procedural",
+      statement: "Background repair must remove this vector after purge.",
+      sources: [{ observation_id: observation.observation_id, relation: "supports" }],
+    }],
+  });
+  const claimId = consolidated.claims[0].claim_id as string;
+  let deadline = Date.now() + 5_000;
+  while (Date.now() < deadline && !vectors.metadataFor(claimId))
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.ok(vectors.metadataFor(claimId), "fixture must observe the indexed vector before purge");
+
+  await api("DELETE", `/v1/observations/${observation.observation_id}`);
+  deadline = Date.now() + 5_000;
+  while (Date.now() < deadline && vectors.metadataFor(claimId))
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(vectors.metadataFor(claimId), undefined);
+  assert.equal(await pendingCount(db), 0);
+});
+
 test("the queue drains again after new work arrives", async () => {
   const before = vectors.embedCalls();
   const observation = await api("POST", "/v1/observations", {
