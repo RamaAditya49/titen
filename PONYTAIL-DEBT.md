@@ -32,15 +32,9 @@ observed.
 | `src/core/migrations.ts:267` | Accept a retention policy kind without enforcing it | Governance users cannot set table-specific retention or legal holds | Accepted per-table semantics include erasure and recovery tests; never add a generic age delete (#105) |
 | `src/core/validate.ts:43` | Cap lexical candidates at 200 | Matches beyond the fixed pool are unreachable | Recall evaluation shows a quality miss that needs a request-scaled limit |
 
-## Test harness
-
-| Location | Deliberate shortcut | Ceiling | Upgrade trigger |
-| --- | --- | --- | --- |
-| `tests/contract/cloudflare-d1.test.ts:75` | Retry one Miniflare D1 shim parse failure without backoff | A second consecutive shim fault fails the case | Miniflare handles its own non-JSON error payload; remove the workaround |
-
 ## Summary
 
-- Markers: 19.
+- Markers: 18.
 - Markers without an upgrade trigger: 0.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned

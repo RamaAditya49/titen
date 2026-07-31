@@ -13,6 +13,7 @@ import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } f
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
 import { assertPopulatedV11IntegrityMigration } from "./integrity-migration";
 import { assertSemanticReadiness } from "./semantic-readiness";
+import { acquireD1Lane, D1RunDiagnostics } from "./d1-harness";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -20,16 +21,44 @@ if (!existsSync(scriptPath))
     "dist/worker/worker.js is missing. Run: pnpm build:worker (wrangler deploy --dry-run --outdir dist/worker)",
   );
 
-const persist = mkdtempSync(join(tmpdir(), "titen-d1-"));
 const origin = "http://titen.test";
+const CASE_TIMEOUT = 20_000;
 
+const lane = await acquireD1Lane();
+const diagnostics = new D1RunDiagnostics(lane.owner, [TEST_SECRET_KEY]);
+const persist = mkdtempSync(join(tmpdir(), `titen-d1-${lane.owner.run_id}-`));
+process.stderr.write(
+  `[d1-contract] acquired run=${lane.owner.run_id} pid=${lane.owner.pid} worktree=${lane.owner.worktree} persist=${persist}\n`,
+);
 let mf: Miniflare;
 let db: Db;
 let starting: Promise<void> | undefined;
+const runtimes = new Set<Miniflare>();
+
+function runtime(options: ConstructorParameters<typeof Miniflare>[0]) {
+  const instance = new Miniflare({
+    host: "127.0.0.1",
+    port: 0,
+    handleRuntimeStdio: diagnostics.handleRuntimeStdio,
+    ...options,
+  });
+  runtimes.add(instance);
+  return instance;
+}
+
+async function dispose(instance: Miniflare) {
+  await instance.dispose();
+  runtimes.delete(instance);
+}
+
+async function disposeAll() {
+  await Promise.all([...runtimes].map(dispose));
+  assert.equal(runtimes.size, 0, "every Miniflare owned by this D1 lane must be disposed");
+}
 
 /** Real workerd with a real local D1 database, the same bundle wrangler deploys. */
 async function start() {
-  const next = new Miniflare({
+  const next = runtime({
     modules: true,
     scriptPath,
     compatibilityDate: "2026-07-01",
@@ -44,12 +73,17 @@ async function start() {
     },
   });
   const ready = (async () => {
-    await next.ready;
-    const nextDb = createD1Db((await next.getD1Database("DB")) as never);
-    // Force the isolate to apply migrations before any case runs.
-    await next.dispatchFetch(`${origin}/readyz`);
-    mf = next;
-    db = nextDb;
+    try {
+      await next.ready;
+      const nextDb = createD1Db((await next.getD1Database("DB")) as never);
+      // Force the isolate to apply migrations before any case runs.
+      await next.dispatchFetch(`${origin}/readyz`);
+      mf = next;
+      db = nextDb;
+    } catch (error) {
+      await dispose(next);
+      throw error;
+    }
   })();
   starting = ready;
   try {
@@ -78,33 +112,45 @@ const fixture: Fixture = {
   revoke: (keyId) => revokeWith(db, keyId),
   query: (sql, params) => db.all(sql, params),
   async restart() {
-    await mf.dispose();
+    await dispose(mf);
     await start();
   },
 };
 
-before(start);
+before(async () => {
+  await diagnostics.run("startup", start);
+}, { timeout: CASE_TIMEOUT });
 after(async () => {
-  await starting;
-  await mf.dispose();
-  rmSync(persist, { recursive: true, force: true });
-});
+  try {
+    await diagnostics.run("teardown", async () => {
+      await starting?.catch(() => undefined);
+      await disposeAll();
+      rmSync(persist, { recursive: true, force: true });
+    });
+  } finally {
+    await lane.release();
+  }
+}, { timeout: CASE_TIMEOUT });
 
-test("batch writes are atomic on D1", async () => {
+function d1Test(name: string, run: () => void | Promise<void>, timeout = CASE_TIMEOUT) {
+  test(name, { timeout }, () => diagnostics.run(name, run));
+}
+
+d1Test("batch writes are atomic on D1", async () => {
   await assertBatchAtomicity(db);
 });
 
-test(
+d1Test(
   "D1 semantic readiness persists and compares its fingerprint locally",
-  { timeout: 60_000 },
   async () => {
     await assertSemanticReadiness(db, "cloudflare-d1");
   },
+  60_000,
 );
 
-test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
+d1Test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));
-  const stale = new Miniflare({
+  const stale = runtime({
     modules: true,
     scriptPath,
     compatibilityDate: "2026-07-01",
@@ -121,14 +167,14 @@ test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
     assert.equal(body.meta.schema.applied, 0);
     assert.equal((await stale.dispatchFetch(`${origin}/v1/observations`, { method: "POST" })).status, 503);
   } finally {
-    await stale.dispose();
+    await dispose(stale);
     rmSync(stalePersist, { recursive: true, force: true });
   }
 });
 
-test("partial Worker semantic configuration fails readiness without leaking it", async () => {
+d1Test("partial Worker semantic configuration fails readiness without leaking it", async () => {
   const partialPersist = mkdtempSync(join(tmpdir(), "titen-d1-partial-semantic-"));
-  const partial = new Miniflare({
+  const partial = runtime({
     modules: true,
     scriptPath,
     compatibilityDate: "2026-07-01",
@@ -151,14 +197,14 @@ test("partial Worker semantic configuration fails readiness without leaking it",
     assert.equal(body.meta.checks.semantic_index, "embedding_configuration_invalid");
     assert.doesNotMatch(JSON.stringify(body), /must-not-leak/);
   } finally {
-    await partial.dispose();
+    await dispose(partial);
     rmSync(partialPersist, { recursive: true, force: true });
   }
 });
 
-test("a D1 migration batch rolls back on fault and concurrent retries converge", async () => {
+d1Test("a D1 migration batch rolls back on fault and concurrent retries converge", async () => {
   const faultPersist = mkdtempSync(join(tmpdir(), "titen-d1-fault-"));
-  const fault = new Miniflare({
+  const fault = runtime({
     modules: true,
     script: "export default { fetch() { return new Response('ok') } }",
     compatibilityDate: "2026-07-01",
@@ -202,14 +248,14 @@ test("a D1 migration batch rolls back on fault and concurrent retries converge",
     );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
   } finally {
-    await fault.dispose();
+    await dispose(fault);
     rmSync(faultPersist, { recursive: true, force: true });
   }
 });
 
-test("a populated schema-v10 D1 database rebuilds scoped Porter FTS", async () => {
+d1Test("a populated schema-v10 D1 database rebuilds scoped Porter FTS", async () => {
   const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-retrieval-migration-"));
-  const migrationRuntime = new Miniflare({
+  const migrationRuntime = runtime({
     modules: true,
     script: "export default { fetch() { return new Response('ok') } }",
     compatibilityDate: "2026-07-01",
@@ -221,14 +267,14 @@ test("a populated schema-v10 D1 database rebuilds scoped Porter FTS", async () =
     const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
     await assertPopulatedV10RetrievalMigration(migrationDb);
   } finally {
-    await migrationRuntime.dispose();
+    await dispose(migrationRuntime);
     rmSync(migrationPersist, { recursive: true, force: true });
   }
 });
 
-test("a populated schema-v11 D1 database repairs collaboration integrity", async () => {
+d1Test("a populated schema-v11 D1 database repairs collaboration integrity", async () => {
   const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-integrity-migration-"));
-  const migrationRuntime = new Miniflare({
+  const migrationRuntime = runtime({
     modules: true,
     script: "export default { fetch() { return new Response('ok') } }",
     compatibilityDate: "2026-07-01",
@@ -240,7 +286,7 @@ test("a populated schema-v11 D1 database repairs collaboration integrity", async
     const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
     await assertPopulatedV11IntegrityMigration(migrationDb);
   } finally {
-    await migrationRuntime.dispose();
+    await dispose(migrationRuntime);
     rmSync(migrationPersist, { recursive: true, force: true });
   }
 });
@@ -248,5 +294,5 @@ test("a populated schema-v11 D1 database repairs collaboration integrity", async
 for (const contractCase of CASES) {
   const name = `cloudflare-d1: ${contractCase.name}`;
   const run = async () => contractCase.run(fixture);
-  test(name, run);
+  d1Test(name, run);
 }

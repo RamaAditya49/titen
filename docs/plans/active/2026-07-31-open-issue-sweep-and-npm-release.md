@@ -85,6 +85,32 @@ evidence.
   non-hydration, scope/provenance, malformed/zero-vector, configuration, and
   reindex regressions; integrate the immutable calibration evidence branch and
   run a second untouched holdout before publishing any bundled threshold.
+- [x] Acquire one atomic host-wide D1 lane before Miniflare starts, record safe
+  owner identity, retain unique temporary persistence and port-zero sockets,
+  await disposal of only the owning runtimes, and make an overlapping process
+  fail fast without signalling or deleting the owner.
+- [x] Remove the Miniflare provisioning retry, attach bounded redacted workerd
+  stderr plus run/case identity to harness failures, keep the 20-second case
+  bound except for the measured 60-second semantic-readiness case, and keep
+  every existing checkpoint, lease, migration, and contract assertion
+  unchanged.
+- [x] Reproduce the invalid RPC once in the isolated old emulator lane, then
+  update only the pinned Miniflare/Wrangler/workerd patch set to the current
+  official compatible release and keep pnpm's minimum-age exception exact.
+- [x] Prove the lane with an overlap regression and a controlled owner/contender
+  experiment, then run five predeclared complete isolated D1 files with no
+  retry.
+- [ ] Keep real Cloudflare D1 smoke separate and read-only. Current
+  `wrangler.jsonc` contains only `replace-with-your-d1-database-id`, and this
+  lane has no authority for a disposable remote database; no resource was
+  created, migrated, deployed, or deleted.
+- [x] Remove the D1 file-level parent timeout, apply 20-second bounds directly
+  to every ordinary case plus setup and teardown, and retain 60 seconds only
+  for the measured semantic-readiness case without changing any assertion or
+  adding a retry.
+- [x] Prove issue #166 on Node 22 and the default supported Node runtime, then
+  inject one controlled child failure and verify nonzero exit plus removal of
+  only that child's Miniflare persistence and workerd process.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -137,6 +163,8 @@ to its merged evidence or to the concrete decision recorded here.
 | #141 | Make omitted project scope select only unscoped claims; add explicit `cross_project` mode guarded by `context:compile:all`, report `project_mode` and the capability-backed broad reason, and make every distributed agent skill resolve a repository project before compile. |
 | #102 recurrence | Keep the atomic UPSERT and handoff fence; retain safe diagnostics for each unexpected D1 contention response, keep the issue open until isolated repeated evidence classifies the recurrence, and add no product retry without a reproducible database failure. |
 | #144, #155 | Use one explicit fingerprinted role-aware embedding policy and absolute cosine gate before the existing relative ranker; require operator calibration and never ship the inspected threshold as a universal default. |
+| #157 | Serialize the manual local D1 lane with a host-wide owner lock, remove the hidden provisioning retry, preserve bounded run/case/workerd diagnostics, and keep the still-required real D1 smoke distinct from emulator evidence and #102. |
+| #166 | Remove the Node 22 file-parent timeout conflict; retain 20-second ordinary case/hook bounds and only the measured 60-second semantic-readiness exception, then prove controlled-failure cleanup without changing product behavior. |
 
 ## Acceptance evidence mapping
 
@@ -206,6 +234,21 @@ to its merged evidence or to the concrete decision recorded here.
   status/error diagnostics for each unexpected response and one durable head;
   the unclassified #102 recurrence remains distinct from #157 emulator
   transport failures.
+- AC-SWP-040: atomic owner-lock regression plus a controlled overlapping process
+  showing safe owner metadata, immediate contender rejection, unchanged owner,
+  unique process persistence/port-zero configuration, and release only after
+  awaited Miniflare disposal with no owned workerd child remaining.
+- AC-SWP-041: direct inspection proving the retry is removed, injected harness-
+  failure coverage for bounded redacted stderr and run/case identity, the
+  20-second default plus the measured 60-second semantic-readiness bound,
+  old-versus-current pinned emulator evidence, unchanged product assertions,
+  five predeclared complete isolated D1 runs, and a separate read-only real D1
+  smoke or explicit external-authority blocker.
+- AC-SWP-042: manifest inspection proving no file-level timeout, direct source
+  inspection of 20-second ordinary case/setup/teardown bounds and the sole
+  60-second semantic-readiness exception, complete Node 22 and default-runtime
+  transcripts, and a controlled failing-child transcript proving nonzero exit,
+  persistence removal, and no owned workerd residue.
 - AC-SWP-050: shared policy unit tests plus Bun HTTP, Workers AI, injected-
   provider, fingerprint-mismatch, explicit-reindex, zero/non-finite-vector, and
   configuration regressions proving exact query/document transforms and unit
@@ -238,4 +281,6 @@ Before merge, rollback is branch deletion. After merge and before npm publish,
 rollback is a reviewed revert. After npm publish, a bad immutable artifact must
 be deprecated and replaced by a corrected patch; unpublish is not the rollback
 plan. The user's original dirty checkout is never a release source or rollback
-mechanism.
+mechanism. The D1 lane lock owns only its tokenized temporary directory and
+Miniflare instances; rollback removes the harness change, never a sibling lock,
+process, database, or remote Cloudflare resource.

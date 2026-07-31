@@ -56,6 +56,14 @@ pnpm check:workflow
 git diff --check
 ```
 
+Run the local workerd/D1 gate with `pnpm build:worker && pnpm test:d1`. It
+reserves one loopback lane across worktrees and fails immediately with the
+current owner identity if another D1 gate is active. Do not retry a red run:
+retain its run/case/workerd diagnostic and classify it separately from product
+assertions. This emulator gate is not a substitute for an explicitly authorized
+real Cloudflare D1 smoke. It stays a local manual gate: GitHub Actions are
+intentionally disabled so the repository has no hosted-automation cost.
+
 ### Restricted or read-only home directories
 
 pnpm and Wrangler need writable user data/configuration directories before
