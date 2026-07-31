@@ -241,6 +241,14 @@ test("both runtimes require the EmbeddingGemma retrieval profile", () => {
     tryCreateVectors({
       ...bunBase,
       embedProfile: "embeddinggemma-retrieval-v1",
+      embedMinCosine: "   ",
+    }).readiness.diagnostic,
+    "embedding_configuration_invalid",
+  );
+  assert.equal(
+    tryCreateVectors({
+      ...bunBase,
+      embedProfile: "embeddinggemma-retrieval-v1",
     }).readiness.vector,
     "enabled",
   );
@@ -262,6 +270,14 @@ test("both runtimes require the EmbeddingGemma retrieval profile", () => {
   assert.equal(
     tryCreateVectorize({ ...workerBase, TITEN_EMBED_PROFILE: "raw-unit-v1" })
       .readiness.diagnostic,
+    "embedding_configuration_invalid",
+  );
+  assert.equal(
+    tryCreateVectorize({
+      ...workerBase,
+      TITEN_EMBED_PROFILE: "embeddinggemma-retrieval-v1",
+      TITEN_EMBED_MIN_COSINE: "   ",
+    }).readiness.diagnostic,
     "embedding_configuration_invalid",
   );
   assert.equal(

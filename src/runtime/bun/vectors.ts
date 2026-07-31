@@ -238,7 +238,8 @@ export function tryCreateVectors(config: {
     return { readiness: { embedding: "disabled", vector: "disabled" } };
 
   const dimensions = Number(config.embedDims);
-  const minimumCosine = Number(config.embedMinCosine);
+  const rawMinimumCosine = String(config.embedMinCosine ?? "").trim();
+  const minimumCosine = Number(rawMinimumCosine);
   const profile = config.embedProfile?.trim() as EmbeddingProfile | undefined;
   let baseUrl: URL;
   try {
@@ -259,6 +260,7 @@ export function tryCreateVectors(config: {
     config.embedRevision.trim().length > 200 ||
     !profile ||
     !embeddingProfileMatchesModel(profile, config.embedModel.trim()) ||
+    !rawMinimumCosine ||
     !Number.isFinite(minimumCosine) ||
     minimumCosine < -1 ||
     minimumCosine > 1 ||

@@ -148,7 +148,7 @@ test("partial Worker semantic configuration fails readiness without leaking it",
     const body = await response.json() as any;
     assert.equal(body.meta.capabilities.embedding, "configured_error");
     assert.equal(body.meta.capabilities.vector, "configured_error");
-    assert.equal(body.meta.checks.semantic_index, "vector_initialization_failed");
+    assert.equal(body.meta.checks.semantic_index, "embedding_configuration_invalid");
     assert.doesNotMatch(JSON.stringify(body), /must-not-leak/);
   } finally {
     await partial.dispose();

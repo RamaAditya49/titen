@@ -81,7 +81,8 @@ export function tryCreateVectorize(env: {
   const dimensions = Number(env.TITEN_EMBED_DIMS ?? "768");
   const revision = env.TITEN_EMBED_REVISION?.trim();
   const profile = env.TITEN_EMBED_PROFILE?.trim() as EmbeddingProfile | undefined;
-  const minimumCosine = Number(env.TITEN_EMBED_MIN_COSINE);
+  const rawMinimumCosine = env.TITEN_EMBED_MIN_COSINE?.trim() ?? "";
+  const minimumCosine = Number(rawMinimumCosine);
   const aiReady = Boolean(env.AI && typeof env.AI.run === "function");
   const vectorReady = Boolean(
     env.VECTORIZE &&
@@ -96,6 +97,7 @@ export function tryCreateVectorize(env: {
     revision.length > 200 ||
     !profile ||
     !embeddingProfileMatchesModel(profile, model.trim()) ||
+    !rawMinimumCosine ||
     !Number.isFinite(minimumCosine) ||
     minimumCosine < -1 ||
     minimumCosine > 1 ||
