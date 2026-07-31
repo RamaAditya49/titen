@@ -105,6 +105,9 @@ documentation, and an install smoke against the immutable npm artifact.
 - Fix current correctness, security, data-integrity, portability, validation,
   and bounded performance defects at their shared root with focused regression
   evidence.
+- Resolve post-release P0 replacement blocker #136 with the accepted ADR-0004
+  background-enrichment design: optional derivation/reflection jobs, local
+  fail-closed validation, and no model dependency on canonical writes or recall.
 - Close exact duplicates against their surviving issue and close unsupported or
   speculative work as not planned only with a concrete current ceiling,
   conflict, or missing requirement.
