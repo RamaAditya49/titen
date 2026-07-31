@@ -1,14 +1,13 @@
 ---
 work_id: open-issue-sweep-and-npm-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
+spec: docs/specs/done/2026-07-31-open-issue-sweep-and-npm-release.md
 ---
 # Plan
 
@@ -146,13 +145,13 @@ evidence.
 - [x] Run focused checks after each integration, then the complete local manual
   gate: route/workflow checks, API/integration/browser tests, package smoke,
   production dependency audit, secret scan, and `git diff --check`.
-- [ ] Resolve every starting GitHub issue with its merged evidence, exact
+- [x] Resolve every starting GitHub issue with its merged evidence, exact
   duplicate, or concrete Ponytail not-planned reason; verify zero accidental
   closures and no open pull request.
-- [ ] Finalize the changelog and smallest valid SemVer version, merge the
+- [x] Finalize the changelog and smallest valid SemVer version, merge the
   reviewed release pull request with this pair still active, and verify the
   exact merge source before publication.
-- [ ] From a clean detached checkout of the release commit, run the irreversible
+- [x] From a clean detached checkout of the release commit, run the irreversible
   prepublish gate, publish npm manually, push the annotated tag, generate the
   GitHub release from the changelog, and smoke a clean registry install.
 - [x] After the issue #133 fix passes focused and package gates, record it in the
@@ -160,7 +159,7 @@ evidence.
   remains valid and unchanged because it does not store the root package version;
   the later breaking semantic configuration batch raises the final release to
   `0.4.0` under AC-SWP-007.
-- [ ] Close this spec/plan pair with exact terminal evidence, remove only merged
+- [x] Close this spec/plan pair with exact terminal evidence, remove only merged
   temporary branches/worktrees, re-audit GitHub/npm and the preserved original
   checkout, then record the durable non-secret handoff.
 
@@ -358,11 +357,13 @@ mechanism. The D1 lane lock owns only its tokenized temporary directory and
 Miniflare instances; rollback removes the harness change, never a sibling lock,
 process, database, or remote Cloudflare resource.
 
-## Current release evidence
+## Verification
 
 - Every issue open at sweep start is now closed with merged, duplicate,
-  not-planned, or real-runtime evidence. The only open pull request is the
-  release PR #180.
+  not-planned, or real-runtime evidence. Immediately before this terminal
+  evidence branch, GitHub reported zero open issues, zero open pull requests,
+  and only `main` at
+  `729ec078d4bdc4490904c5c243a6dfa3c0647def`.
 - The disposable Cloudflare gate applied schema 16 and returned
   health/readiness 200 plus unauthenticated 401. Twelve concurrent checkpoint
   saves produced one durable head; twelve concurrent handoff resolutions
@@ -370,3 +371,29 @@ process, database, or remote Cloudflare resource.
 - Direct D1 inspection found one checkpoint row, one resolution row, and one
   terminal event. The exact disposable Worker and D1 database were deleted and
   verified absent; no route or persistent deployment remains.
+- The exact clean detached merge commit passed the complete local gate:
+  D1 harness 9/9, Cloudflare/D1 98/98, Bun/vector/SDK 120/120, integration
+  164/164, dashboard adapter smoke, browser 10/10, workflow checks, package
+  verification, production audit with no known vulnerabilities, tracked-secret
+  scan, and strict README review with zero findings.
+- npm `latest` is `titen-memory@0.4.0`. Its 48-file tarball is 153,144
+  bytes with SHA-1
+  `df0ecc5d22c1261cde53ec6785b2f8c51de0897d` and integrity
+  `sha512-7FoqkEunVT06QoiNHooPAx+ZaNRylnhP/wd9WxnEqjR7LCr87/KpLtBmsdi8CjgjKJjg3oI7c2AfgxOv0yS1YQ==`.
+  A fresh registry install passed SDK root/subpath import, CLI version/help,
+  bootstrap, schema-16 readiness, and MCP negotiation with all nine tools.
+- Annotated tag `v0.4.0` peels to the release commit. The non-draft,
+  non-prerelease GitHub Release at
+  `https://github.com/RamaAditya49/titen/releases/tag/v0.4.0` matches the
+  changelog section. The published README retains `https://titen.dev` and the
+  rendered `Built with C.A.D.I.S Agent` credit; the website returns 200.
+- GitHub Actions remains disabled and `main` contains no workflow file.
+  Fifty-four clean temporary worktrees and 38 integrated or superseded local
+  branch refs were removed. The dirty primary checkout and five dirty auxiliary
+  worktrees were preserved; two `backup/*` refs remain as recovery points.
+- The primary checkout still has HEAD
+  `b19bd917e6dec493261109ad1693097fbb47d7dc`, tracked-diff SHA-256
+  `9a3fdfe6f36938bfed608fb30c93b37109bc13ada8f860c9c30612ab44347c88`,
+  original stash object
+  `d99c8e3a957f9e4b5d2629ad63f481f377e71421`, and all five recorded
+  untracked-file hashes unchanged.
