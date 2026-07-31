@@ -149,9 +149,9 @@ evidence.
 - [ ] Resolve every starting GitHub issue with its merged evidence, exact
   duplicate, or concrete Ponytail not-planned reason; verify zero accidental
   closures and no open pull request.
-- [ ] Finalize the changelog and smallest valid SemVer version, close this
-  spec/plan pair with exact evidence, merge the reviewed release pull request,
-  and verify the exact merge source before publication.
+- [ ] Finalize the changelog and smallest valid SemVer version, merge the
+  reviewed release pull request with this pair still active, and verify the
+  exact merge source before publication.
 - [ ] From a clean detached checkout of the release commit, run the irreversible
   prepublish gate, publish npm manually, push the annotated tag, generate the
   GitHub release from the changelog, and smoke a clean registry install.
@@ -160,8 +160,9 @@ evidence.
   remains valid and unchanged because it does not store the root package version;
   the later breaking semantic configuration batch raises the final release to
   `0.4.0` under AC-SWP-007.
-- [ ] Remove only merged temporary branches/worktrees, re-audit GitHub/npm and
-  the preserved original checkout, then record the durable non-secret handoff.
+- [ ] Close this spec/plan pair with exact terminal evidence, remove only merged
+  temporary branches/worktrees, re-audit GitHub/npm and the preserved original
+  checkout, then record the durable non-secret handoff.
 
 ## Issue disposition
 
