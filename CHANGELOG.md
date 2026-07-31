@@ -17,6 +17,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Bun HTTP and Cloudflare Workers AI embedding responses now require exact
+  output cardinality, ordered provider indices when present, dense configured
+  dimensions, and finite numeric coordinates before vector query or indexing.
+
 ## [0.3.1] — 2026-07-31
 
 ### Fixed

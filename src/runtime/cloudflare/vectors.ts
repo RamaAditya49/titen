@@ -1,3 +1,4 @@
+import { validateEmbeddingResponse } from "../../core/vectors";
 import type { VectorStore, VectorMatch, EmbeddingProvider, VectorCapability } from "../../core/vectors";
 
 /** Minimal Vectorize binding interface (no @cloudflare/workers-types needed). */
@@ -9,7 +10,7 @@ export interface VectorizeIndex {
 
 /** Minimal Workers AI binding interface. */
 export interface AiBinding {
-  run(model: string, input: { text: string[] }): Promise<{ data: number[][] }>;
+  run(model: string, input: { text: string[] }): Promise<unknown>;
 }
 
 export function createVectorizeStore(index: VectorizeIndex): VectorStore {
@@ -40,7 +41,7 @@ export function createWorkersAiEmbedder(ai: AiBinding, model: string, dimensions
     model,
     async embed(texts) {
       const result = await ai.run(model, { text: texts });
-      return result.data.map(d => new Float32Array(d));
+      return validateEmbeddingResponse(result, texts.length, dimensions);
     },
   };
 }

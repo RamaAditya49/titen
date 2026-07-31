@@ -27,6 +27,10 @@ evidence.
 - [x] Reproduce issue #133, trace every typed SDK caller through
   `requestWithMeta()`, add table-driven envelope-shape regressions, and reject
   invalid successful JSON at that one shared boundary without retry machinery.
+- [x] Trace every Bun HTTP and Cloudflare Workers AI embedding caller through a
+  shared output validator; reject malformed shape, cardinality, indices,
+  density, dimensions, and values before vector query/upsert, then prove outbox
+  retryability and FTS degradation behavior in both runtimes.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -73,6 +77,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #123 | Record and retain the single-process ceiling, then close worker pools/sharding until measured small-team demand breaches it. |
 | #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
 | #133 | Reject non-object 2xx JSON envelopes once in `requestWithMeta()`; cover every JSON top-level shape and typed callers, then publish the compatible correction as `0.3.1`. |
+| #137 | Validate all untrusted embedding output once in shared code; require exact cardinality, ordered unique contiguous provider indices when present, dense configured dimensions, and finite numeric coordinates before either runtime can query or mutate a vector index. |
 
 ## Acceptance evidence mapping
 
@@ -102,6 +107,10 @@ to its merged evidence or to the concrete decision recorded here.
 - AC-SWP-012: changelog and package version diff, frozen-lockfile verification,
   focused SDK and package gates, annotated-tag peel, npm/GitHub metadata, and
   clean `0.3.1` registry smoke against the exact reviewed source.
+- AC-SWP-013: table-driven shared-validator cases plus Bun HTTP and Cloudflare
+  Workers AI contract regressions for missing/extra/index/sparse/type/finite/
+  dimension failures, no vector writes, unchanged pending outbox rows,
+  sanitized `503` metadata, and successful authorized FTS-only compile.
 
 ## Security, migration, deployment, smoke, and rollback
 

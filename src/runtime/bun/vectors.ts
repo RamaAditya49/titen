@@ -5,6 +5,7 @@ import type {
   VectorCapability,
   VectorStore,
 } from "../../core/vectors";
+import { validateEmbeddingResponse } from "../../core/vectors";
 
 /**
  * A sqlite-vec backed vector store.
@@ -145,15 +146,11 @@ export function createHttpEmbedder(config: {
         body: JSON.stringify({ model: config.model, input: texts }),
       });
       if (!res.ok) throw new Error(`embedding request failed: ${res.status}`);
-      const json = (await res.json()) as { data: { embedding: number[] }[] };
-      const vectors = json.data.map((entry) => new Float32Array(entry.embedding));
-      // A dimension mismatch silently ruins retrieval quality, so fail loudly.
-      for (const vector of vectors)
-        if (vector.length !== config.dimensions)
-          throw new Error(
-            `embedding dimension mismatch: expected ${config.dimensions}, got ${vector.length}`,
-          );
-      return vectors;
+      return validateEmbeddingResponse(
+        await res.json(),
+        texts.length,
+        config.dimensions,
+      );
     },
   };
 }

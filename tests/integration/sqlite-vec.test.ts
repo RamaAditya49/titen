@@ -149,7 +149,7 @@ test("an embedder whose dimensions disagree fails loudly", async () => {
   });
   await assert.rejects(
     () => embedder.embed(["anything"]),
-    /dimension mismatch: expected 4, got 2/,
+    /Invalid embedding response/,
   );
   server.stop(true);
 });
