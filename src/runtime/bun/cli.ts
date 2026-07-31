@@ -13,7 +13,7 @@ import { basename, dirname, join, resolve } from "node:path";
 const USAGE = `titen — self-hosted memory service
 
 Usage:
-  titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev]
+  titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
   titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--label owner] [--print-sql]
   titen key create [--db titen.db] --org-id <id> [--principal <id>] [--kind agent]
@@ -35,7 +35,7 @@ function fail(message: string): never {
 }
 
 const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> = {
-  serve: { values: ["db", "port", "host", "revision"] },
+  serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
   bootstrap: { values: ["db", "org", "label"], booleans: ["print-sql"] },
   "key create": {
@@ -137,25 +137,41 @@ switch (command) {
     // file or the container environment rather than a shell history. Absent any
     // of them the service serves lexical retrieval and says so in readiness.
     const embedDims = Number(process.env.TITEN_EMBED_DIMS ?? "0");
-    const started = await serve({
-      dbPath,
-      port: port(flags.port),
-      hostname: text(flags.host, "127.0.0.1"),
-      revision: text(flags.revision, "dev"),
-      vecDbPath: process.env.TITEN_VEC_DB_PATH ?? `${dbPath}.vec`,
-      embedBaseUrl: process.env.TITEN_EMBED_BASE_URL,
-      embedModel: process.env.TITEN_EMBED_MODEL,
-      embedDims: Number.isInteger(embedDims) && embedDims > 0 ? embedDims : undefined,
-      embedApiKey: process.env.TITEN_EMBED_API_KEY,
-      maintenanceIntervalMs:
-        process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
-          ? undefined
-          : Number(process.env.TITEN_MAINTENANCE_INTERVAL_MS),
-      secretCipher: parseSecretCipher(process.env.TITEN_SECRET_KEYS),
-      webhookSecurity: createBunWebhookSecurity(process.env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES),
-      mcpOrigin: process.env.TITEN_MCP_ORIGIN,
-    });
-    console.log(`titen listening on ${started.url} (database ${dbPath})`);
+    const servePort = port(flags.port);
+    const quiet = flags.quiet === true;
+    let started: Awaited<ReturnType<typeof serve>>;
+    try {
+      started = await serve({
+        dbPath,
+        port: servePort,
+        hostname: text(flags.host, "127.0.0.1"),
+        revision: text(flags.revision, "dev"),
+        quiet,
+        vecDbPath: process.env.TITEN_VEC_DB_PATH ?? `${dbPath}.vec`,
+        embedBaseUrl: process.env.TITEN_EMBED_BASE_URL,
+        embedModel: process.env.TITEN_EMBED_MODEL,
+        embedDims: Number.isInteger(embedDims) && embedDims > 0 ? embedDims : undefined,
+        embedApiKey: process.env.TITEN_EMBED_API_KEY,
+        maintenanceIntervalMs:
+          process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
+            ? undefined
+            : Number(process.env.TITEN_MAINTENANCE_INTERVAL_MS),
+        secretCipher: parseSecretCipher(process.env.TITEN_SECRET_KEYS),
+        webhookSecurity: createBunWebhookSecurity(process.env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES),
+        mcpOrigin: process.env.TITEN_MCP_ORIGIN,
+      });
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "";
+      const detail = (error instanceof Error ? error.message : "unknown startup error")
+        .replace(/\s+/g, " ")
+        .slice(0, 300);
+      if (code === "EADDRINUSE" || /EADDRINUSE|address already in use/i.test(detail))
+        fail(`port ${servePort} is already in use`);
+      fail(`could not start server: ${detail}`);
+    }
+    if (!quiet) console.log(`titen listening on ${started.url} (database ${dbPath})`);
     break;
   }
 

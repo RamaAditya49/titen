@@ -1,5 +1,6 @@
 import { first } from "./db";
 import { recordAccessParams, recordAccessSql } from "./authorization";
+import { auditStatement } from "./audit";
 import type { Principal } from "./auth";
 import type { Db } from "./db";
 import { notFound, validationError, conflict } from "./errors";
@@ -54,7 +55,7 @@ export async function listWorkspaces(ctx: RequestContext): Promise<Result> {
 // --- Memberships ---
 
 export async function addMember(ctx: RequestContext): Promise<Result> {
-  const { orgId } = ctx.principal!;
+  const { orgId, principalId } = ctx.principal!;
   const body = requireObject(await ctx.json());
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   const memberPrincipalId = requireString(body, "principal_id", LIMITS.identifier);
@@ -72,11 +73,14 @@ export async function addMember(ctx: RequestContext): Promise<Result> {
     if (!workspace) throw notFound();
   }
 
-  await ctx.app.db.batch([{
-    sql: `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    params: [id, orgId, workspaceId, memberPrincipalId, principalKind, role, now],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [id, orgId, workspaceId, memberPrincipalId, principalKind, role, now],
+    },
+    auditStatement(orgId, principalId, "membership.add", "membership", now, id),
+  ]);
 
   return { status: 201, data: { membership_id: id } };
 }
@@ -97,7 +101,7 @@ export async function listMembers(ctx: RequestContext): Promise<Result> {
 }
 
 export async function removeMember(ctx: RequestContext): Promise<Result> {
-  const { orgId } = ctx.principal!;
+  const { orgId, principalId } = ctx.principal!;
   const id = ctx.params.id!;
   const row = await first<{ id: string }>(
     ctx.app.db,
@@ -106,10 +110,13 @@ export async function removeMember(ctx: RequestContext): Promise<Result> {
   );
   if (!row) throw notFound();
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([{
-    sql: `UPDATE memberships SET removed_at = ? WHERE id = ?`,
-    params: [now, id],
-  }]);
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE memberships SET removed_at = ? WHERE id = ?`,
+      params: [now, id],
+    },
+    auditStatement(orgId, principalId, "membership.remove", "membership", now, id),
+  ]);
   return { data: { membership_id: id, removed_at: now } };
 }
 
@@ -387,6 +394,7 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
     },
     eventStatement(orgId, "handoff.created", principalId, "handoff", id,
       { to_principal: toPrincipal, subject_id: subjectId }, now),
+    auditStatement(orgId, principalId, "handoff.create", "handoff", now, id),
   ]);
 
   return { status: 201, data: { handoff_id: id, status: "pending" } };
@@ -422,6 +430,7 @@ export async function resolveHandoff(ctx: RequestContext): Promise<Result> {
         params: [status, now, id, orgId, principalId],
       },
       eventStatement(orgId, `handoff.${status}`, principalId, "handoff", id, { status }, now),
+      auditStatement(orgId, principalId, "handoff.resolve", "handoff", now, id),
     ]);
   } catch (error) {
     if (error instanceof Error && /UNIQUE|PRIMARY KEY|constraint/i.test(error.message))

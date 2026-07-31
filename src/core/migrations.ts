@@ -264,12 +264,12 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
     version: 4,
     statements: [
       // Enterprise governance: policies, channel releases, customer assertions, audit log.
-      // ponytail: `policies` accepts a 'retention' kind that no code reads yet,
-      // so the schema anticipates retention while nothing enforces it. The
-      // ceiling is that every append-only satellite table — events,
-      // record_history, index_outbox, context_runs — grows without bound.
-      // Upgrade path: implement the 'retention' policy kind in
-      // `runMaintenance`, which is where the schema already expects it (#105).
+      // ponytail: `policies` accepts a 'retention' kind that no code reads yet.
+      // Current maintenance removes expired execution bookkeeping only;
+      // canonical evidence, history, and events remain append-only. The ceiling
+      // is a governance adopter that needs table-specific retention or a legal
+      // hold. Upgrade path: accept per-table policy semantics plus erasure and
+      // recovery tests; never add one generic age delete (#105).
       `CREATE TABLE policies (
          id TEXT PRIMARY KEY,
          org_id TEXT NOT NULL REFERENCES organizations(id),

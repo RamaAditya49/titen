@@ -173,6 +173,7 @@ async function exportPage(
   if (candidates.length > 0 && selected.length === 0)
     throw new Error("One export record exceeds the import request limit.");
 
+  const exportedAt = ctx.app.now().toISOString();
   const hasMore = selected.length < candidates.length || candidates.length === limit;
   const header = {
     type: "titen.export.header",
@@ -182,7 +183,7 @@ async function exportPage(
     depends_on: EXPORT_DEPENDENCIES[type as (typeof EXPORT_TYPES)[number]],
     org_id: ctx.principal!.orgId,
     scope: wholeDeployment ? "deployment" : "principal",
-    exported_at: ctx.app.now().toISOString(),
+    exported_at: exportedAt,
     count: selected.length,
     next_cursor: hasMore ? selected.at(-1)?.cursor ?? null : null,
     complete: !hasMore,
@@ -190,17 +191,24 @@ async function exportPage(
   const body = `${[JSON.stringify(header), ...selected.map(({ line }) => line)].join("\n")}\n`;
   if (encoder.encode(body).byteLength > MAX_BODY_BYTES)
     throw new Error("Export page exceeded the import request limit.");
-  if (wholeDeployment) {
-    await ctx.app.db.batch([auditStatement(
+  const audits = [auditStatement(
+    ctx.principal!.orgId,
+    ctx.principal!.principalId,
+    "records.export",
+    "export",
+    exportedAt,
+    type,
+  )];
+  if (wholeDeployment) audits.push(auditStatement(
       ctx.principal!.orgId,
       ctx.principal!.principalId,
       "portability.export_all",
       "export",
-      ctx.app.now().toISOString(),
+      exportedAt,
       null,
       JSON.stringify({ record_type: type, count: selected.length, complete: !hasMore }),
-    )]);
-  }
+  ));
+  await ctx.app.db.batch(audits);
   return {
     raw: new Response(body, {
       status: 200,
@@ -480,11 +488,16 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
             VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
       params: [row.content, row.id, principal.orgId, row.subject_id],
     });
-    statements.push(
-      await importHistory(principal.orgId, "observation", row.id as string, principal.principalId, at),
-      outboxStatement(principal.orgId, "observation", row.id as string, redacted ? "delete" : "upsert", at),
-      eventStatement(principal.orgId, "observation.imported", principal.principalId, "observation", row.id as string, {}, at),
-    );
+    statements.push(await importHistory(
+      principal.orgId, "observation", row.id as string, principal.principalId, at,
+    ));
+    if (ctx.app.vectors)
+      statements.push(outboxStatement(
+        principal.orgId, "observation", row.id as string, redacted ? "delete" : "upsert", at,
+      ));
+    statements.push(eventStatement(
+      principal.orgId, "observation.imported", principal.principalId, "observation", row.id as string, {}, at,
+    ));
   }
   for (const row of claims.values()) {
     const existing = existingClaims.get(row.id as string);
@@ -515,11 +528,16 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
             VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
       params: [row.statement, row.id, principal.orgId, row.subject_id],
     });
-    statements.push(
-      await importHistory(principal.orgId, "claim", row.id as string, principal.principalId, at),
-      outboxStatement(principal.orgId, "claim", row.id as string, indexable ? "upsert" : "delete", at),
-      eventStatement(principal.orgId, "claim.imported", principal.principalId, "claim", row.id as string, {}, at),
-    );
+    statements.push(await importHistory(
+      principal.orgId, "claim", row.id as string, principal.principalId, at,
+    ));
+    if (ctx.app.vectors)
+      statements.push(outboxStatement(
+        principal.orgId, "claim", row.id as string, indexable ? "upsert" : "delete", at,
+      ));
+    statements.push(eventStatement(
+      principal.orgId, "claim.imported", principal.principalId, "claim", row.id as string, {}, at,
+    ));
     for (const source of row.sources) statements.push({
       sql: `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at) VALUES (?, ?, ?, ?)`,
       params: [row.id, source.observation_id, source.relation, source.created_at],
@@ -547,9 +565,11 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
       claims: claims.size,
     }),
   ));
-
+  statements.push(auditStatement(
+    principal.orgId, principal.principalId, "records.import", "import", at,
+  ));
   try {
-    if (statements.length) await ctx.app.db.batch(statements);
+    await ctx.app.db.batch(statements);
   } catch (error) {
     if (error instanceof Error && /UNIQUE|constraint/i.test(error.message))
       throw conflict("Import collided with a concurrent write; retry after exporting current state.");

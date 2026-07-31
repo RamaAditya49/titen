@@ -66,16 +66,7 @@ export function historyStatement(
   };
 }
 
-/**
- * Every canonical write queues its own durable, asynchronously drained work.
- *
- * ponytail: the row is queued unconditionally, without asking whether this
- * deployment has a vector capability to consume it. The ceiling is that on the
- * default no-vector deployment the outbox is written on every canonical write
- * and never drained, so it grows without bound. Upgrade path: skip the enqueue
- * when no vector capability is configured, and retire stale pending rows in
- * `runMaintenance` (#105).
- */
+/** Durable work for a configured vector projection. */
 export function outboxStatement(
   orgId: string,
   recordType: string,
@@ -188,7 +179,9 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             contentHash,
             ingestedAt,
           ),
-          outboxStatement(principal.orgId, "observation", id, "upsert", ingestedAt),
+          ...(ctx.app.vectors
+            ? [outboxStatement(principal.orgId, "observation", id, "upsert", ingestedAt)]
+            : []),
           eventStatement(
             principal.orgId,
             "observation.appended",
@@ -249,18 +242,20 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
       sql: `DELETE FROM observations_fts WHERE observation_id = ?`,
       params: [observationId],
     },
-    {
-      sql: `UPDATE index_outbox SET state = 'done'
-             WHERE org_id = ? AND record_type = 'observation' AND record_id = ?
-               AND operation = 'upsert' AND state = 'pending'`,
-      params: [principal.orgId, observationId],
-    },
-    {
-      sql: `INSERT INTO index_outbox
-              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
-            SELECT ?, ?, 'observation', ?, 'delete', 'pending', 0, ? WHERE ${notPurged}`,
-      params: [newId("obx"), principal.orgId, observationId, at, principal.orgId, observationId],
-    },
+    ...(ctx.app.vectors ? [
+      {
+        sql: `UPDATE index_outbox SET state = 'done'
+               WHERE org_id = ? AND record_type = 'observation' AND record_id = ?
+                 AND operation = 'upsert' AND state = 'pending'`,
+        params: [principal.orgId, observationId],
+      },
+      {
+        sql: `INSERT INTO index_outbox
+                (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+              SELECT ?, ?, 'observation', ?, 'delete', 'pending', 0, ? WHERE ${notPurged}`,
+        params: [newId("obx"), principal.orgId, observationId, at, principal.orgId, observationId],
+      },
+    ] : []),
     {
       sql: `INSERT INTO events
               (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
@@ -307,25 +302,27 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
                AND (c.status != 'revoked' OR c.statement != ?)`,
       params: [principal.principalId, claimSnapshotHash, at, principal.orgId, observationId, REDACTED_CLAIM_STATEMENT],
     },
-    {
-      sql: `UPDATE index_outbox SET state = 'done'
-             WHERE org_id = ? AND record_type = 'claim' AND state = 'pending'
-               AND operation = 'upsert'
-               AND record_id IN (
-                 SELECT c.id FROM claims c WHERE c.org_id = ? AND ${dependentClaim}
-               )`,
-      params: [principal.orgId, principal.orgId, observationId],
-    },
-    {
-      sql: `INSERT INTO index_outbox
-              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
-            SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id,
-                   'delete', 'pending', 0, ?
-              FROM claims c
-             WHERE c.org_id = ? AND ${dependentClaim}
-               AND (c.status != 'revoked' OR c.statement != ?)`,
-      params: [at, principal.orgId, observationId, REDACTED_CLAIM_STATEMENT],
-    },
+    ...(ctx.app.vectors ? [
+      {
+        sql: `UPDATE index_outbox SET state = 'done'
+               WHERE org_id = ? AND record_type = 'claim' AND state = 'pending'
+                 AND operation = 'upsert'
+                 AND record_id IN (
+                   SELECT c.id FROM claims c WHERE c.org_id = ? AND ${dependentClaim}
+                 )`,
+        params: [principal.orgId, principal.orgId, observationId],
+      },
+      {
+        sql: `INSERT INTO index_outbox
+                (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+              SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id,
+                     'delete', 'pending', 0, ?
+                FROM claims c
+               WHERE c.org_id = ? AND ${dependentClaim}
+                 AND (c.status != 'revoked' OR c.statement != ?)`,
+        params: [at, principal.orgId, observationId, REDACTED_CLAIM_STATEMENT],
+      },
+    ] : []),
     {
       sql: `INSERT INTO events
               (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)

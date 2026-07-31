@@ -108,7 +108,7 @@ beforeAll(async () => {
   key = provisioned.key;
   orgId = provisioned.orgId;
   subjectId = "user_vectors";
-  await seed(withoutVectors());
+  await seed(withVectors());
 });
 
 afterAll(() => {
@@ -283,7 +283,7 @@ test("index drain reports embedder outages as retryable and preserves pending ro
 });
 
 test("index drain reports vector-store outages as retryable and preserves pending rows", async () => {
-  await seed(withoutVectors());
+  await seed(withVectors());
   const broken = fakeVectors();
   broken.breakStore();
   const app = clientVia(createApp({ db, revision: "test", runtime: "bun-sqlite", vectors: broken }), origin);

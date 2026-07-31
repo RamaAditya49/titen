@@ -163,6 +163,7 @@ test("the explicit WAL checkpoint policy stays bounded and survives restart", as
   const path = join(temporary(), "titen.db");
   const database = openDatabase(path);
   assert.equal(database.query("PRAGMA wal_autocheckpoint").get()?.wal_autocheckpoint, 1_000);
+  assert.equal(database.query("PRAGMA synchronous").get()?.synchronous, 2);
   database.run("CREATE TABLE writes (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
   const insert = database.query("INSERT INTO writes(value) VALUES (?)");
   const writeBatch = database.transaction((start: number) => {

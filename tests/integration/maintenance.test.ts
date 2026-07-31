@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Stmt } from "../../src/core/db";
+import { runMaintenance } from "../../src/core/maintenance";
+import { migrate } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { fakeVectors, provisionWith } from "../contract/harness";
@@ -201,4 +204,132 @@ test("the queue drains again after new work arrives", async () => {
     vectors.embedCalls() > before,
     "the embedder must have been called again for the new batch",
   );
+});
+
+test("maintenance deletes only one bounded page of expired execution state", async () => {
+  const handle = openDatabase(join(directory, "ephemeral.db"));
+  const isolated = createSqliteDb(handle);
+  await migrate(isolated);
+  const actor = await provisionWith(isolated, { scopes: ["*"] });
+  const now = new Date("2026-07-31T12:00:00.000Z");
+  const expired = [
+    "2026-07-30T00:00:00.000Z",
+    "2026-07-30T00:01:00.000Z",
+    "2026-07-30T00:02:00.000Z",
+  ];
+  const future = "2026-08-01T00:00:00.000Z";
+  const statements: Stmt[] = [];
+  for (let index = 0; index < expired.length; index += 1) {
+    statements.push(
+      {
+        sql: `INSERT INTO idempotency_v3
+                (org_id, principal_id, key_id, request_identity, key_hash, request_hash, status, response, created_at, expires_at)
+              VALUES (?, ?, ?, ?, ?, ?, 201, '{}', ?, ?)`,
+        params: [
+          actor.orgId, actor.principalId, actor.keyId, `POST /expired/${index}`, `expired-key-${index}`,
+          `request-${index}`, expired[index]!, expired[index]!,
+        ],
+      },
+      {
+        sql: `INSERT INTO checkpoints
+                (id, org_id, subject_id, agent_id, kind, state, state_hash, ttl_seconds,
+                 expires_at, created_at, updated_at)
+              VALUES (?, ?, ?, ?, 'cursor', '{}', 'hash', 60, ?, ?, ?)`,
+        params: [
+          `ckpt_expired_${index}`, actor.orgId, `cleanup-subject-${index}`, actor.principalId,
+          expired[index]!, expired[index]!, expired[index]!,
+        ],
+      },
+    );
+  }
+  statements.push(
+    {
+      sql: `INSERT INTO idempotency_v3
+              (org_id, principal_id, key_id, request_identity, key_hash, request_hash, status, response, created_at, expires_at)
+            VALUES (?, ?, ?, 'POST /active', 'active-key', 'active-request', 201, '{}', ?, ?)`,
+      params: [actor.orgId, actor.principalId, actor.keyId, now.toISOString(), future],
+    },
+    {
+      sql: `INSERT INTO checkpoints
+              (id, org_id, subject_id, agent_id, kind, state, state_hash, ttl_seconds,
+               expires_at, created_at, updated_at)
+            VALUES ('ckpt_active', ?, 'cleanup-subject-active', ?, 'cursor', '{}', 'hash', 60, ?, ?, ?)`,
+      params: [actor.orgId, actor.principalId, future, now.toISOString(), now.toISOString()],
+    },
+    {
+      sql: `INSERT INTO leases
+              (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds,
+               expires_at, created_at, released_at)
+            VALUES ('lease_released_first', ?, 'task', 'released-first', ?, 'test', 60, ?, ?, ?)`,
+      params: [actor.orgId, actor.principalId, future, expired[0]!, expired[0]!],
+    },
+    {
+      sql: `INSERT INTO leases
+              (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds,
+               expires_at, created_at, released_at)
+            VALUES ('lease_expired', ?, 'task', 'expired', ?, 'test', 60, ?, ?, NULL)`,
+      params: [actor.orgId, actor.principalId, expired[1]!, expired[1]!],
+    },
+    {
+      sql: `INSERT INTO leases
+              (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds,
+               expires_at, created_at, released_at)
+            VALUES ('lease_released_later', ?, 'task', 'released-later', ?, 'test', 60, ?, ?, ?)`,
+      params: [actor.orgId, actor.principalId, future, expired[2]!, expired[2]!],
+    },
+    {
+      sql: `INSERT INTO leases
+              (id, org_id, resource_type, resource_id, holder_id, purpose, ttl_seconds,
+               expires_at, created_at, released_at)
+            VALUES ('lease_active', ?, 'task', 'active', ?, 'test', 60, ?, ?, NULL)`,
+      params: [actor.orgId, actor.principalId, future, now.toISOString()],
+    },
+    {
+      sql: `INSERT INTO events
+              (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+            VALUES ('evt_cleanup_sentinel', ?, 'cleanup.sentinel', ?, 'test', 'sentinel', '{}', ?)`,
+      params: [actor.orgId, actor.principalId, expired[0]!],
+    },
+    {
+      sql: `INSERT INTO record_history
+              (id, org_id, record_type, record_id, version, change_kind, actor_id, snapshot_hash, changed_at)
+            VALUES ('hist_cleanup_sentinel', ?, 'test', 'sentinel', 1, 'append', ?, 'hash', ?)`,
+      params: [actor.orgId, actor.principalId, expired[0]!],
+    },
+  );
+  await isolated.batch(statements);
+
+  const result = await runMaintenance({
+    db: isolated,
+    now,
+    limit: 2,
+    deliverWebhooks: false,
+  });
+  assert.deepEqual(result.errors, []);
+  const counts = (await isolated.all<Record<string, number>>(
+    `SELECT
+       (SELECT COUNT(*) FROM idempotency_v3 WHERE expires_at <= ?) AS expired_idempotency,
+       (SELECT COUNT(*) FROM idempotency_v3 WHERE expires_at > ?) AS active_idempotency,
+       (SELECT COUNT(*) FROM checkpoints WHERE expires_at <= ?) AS expired_checkpoints,
+       (SELECT COUNT(*) FROM checkpoints WHERE expires_at > ?) AS active_checkpoints,
+       (SELECT COUNT(*) FROM leases WHERE released_at IS NOT NULL OR expires_at <= ?) AS inactive_leases,
+       (SELECT COUNT(*) FROM leases WHERE released_at IS NULL AND expires_at > ?) AS active_leases,
+       (SELECT COUNT(*) FROM events WHERE id = 'evt_cleanup_sentinel') AS events,
+       (SELECT COUNT(*) FROM record_history WHERE id = 'hist_cleanup_sentinel') AS history`,
+    [now.toISOString(), now.toISOString(), now.toISOString(), now.toISOString(), now.toISOString(), now.toISOString()],
+  ))[0]!;
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, Number(value)])),
+    {
+      expired_idempotency: 1,
+      active_idempotency: 1,
+      expired_checkpoints: 1,
+      active_checkpoints: 1,
+      inactive_leases: 1,
+      active_leases: 1,
+      events: 1,
+      history: 1,
+    },
+  );
+  handle.close();
 });

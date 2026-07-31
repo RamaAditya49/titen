@@ -83,7 +83,9 @@ Docker is not required.
   `--db /var/lib/titen/titen.db`; their bind address and port are also explicit
   CLI flags.
 - WAL mode, foreign keys enabled, bounded busy timeout, and an explicit
-  1,000-page auto-checkpoint. With 4 KiB pages, the tested steady-state WAL
+  1,000-page auto-checkpoint. [`PRAGMA synchronous = FULL`](https://www.sqlite.org/pragma.html#pragma_synchronous)
+  is explicit: an acknowledged write uses SQLite's FULL WAL durability mode
+  rather than a deployment-dependent default. With 4 KiB pages, the tested steady-state WAL
   stays below 5 MiB; the audited live WAL was about 4.0 MiB.
 - Service user: non-root `titen`.
 - Configuration/credential files: mode `0600`.
@@ -98,11 +100,15 @@ bunx titen-memory serve \
   --db /var/lib/titen/titen.db \
   --host 127.0.0.1 \
   --port 8787 \
-  --revision <deployed-revision>
+  --revision <deployed-revision> \
+  --quiet
 ```
 
-The current `serve` command accepts exactly `--db`, `--host`, `--port`, and
-`--revision`. Its supported environment configuration is:
+The current `serve` command accepts exactly `--db`, `--host`, `--port`,
+`--revision`, and `--quiet`. `--quiet` suppresses startup, request, and
+maintenance lines; use it when the service manager or ingress already owns
+operational logs. Startup failures still print one actionable error. Its
+supported environment configuration is:
 
 ```text
 TITEN_MCP_ORIGIN=https://titen.example.com
@@ -293,6 +299,39 @@ The production unit should use:
 - Graceful HTTP and SQLite shutdown.
 - Bounded shutdown flush for canonical/outbox state; remote model/vector or
   webhook completion is not required before process exit.
+
+## Capacity, rate limiting, and telemetry
+
+The Bun runtime intentionally serves one process with one synchronous SQLite
+handle. Its useful throughput is therefore bounded by one event loop/core;
+adding client concurrency does not add database workers. Keep this shape until
+an equivalent-quality, durability-preserving workload misses the accepted
+small-team latency or throughput objective. Measure that workload before adding
+a worker pool, read replicas, or sharding.
+
+Rate-limit at the authenticated ingress, not inside the Titen process. For
+example, Nginx provides the native [`limit_req`
+module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html). Apply a
+stricter burst budget to authenticated writes and return `429` (with a bounded
+`Retry-After` policy) before requests reach Titen. Do not use or log raw
+`Authorization` values as rate-limit keys, and do not grant authority from
+`X-Forwarded-For` or other forwarded headers. The existing trusted ingress may
+derive its own privacy-safe key; Titen still authenticates every request.
+
+Use the supervisor and host tools as the current telemetry surface; Titen does
+not need a logger framework or a `/metrics` endpoint for this deployment:
+
+```bash
+journalctl -u titen.service --since '15 minutes ago'
+systemctl show titen.service -p NRestarts -p MemoryCurrent -p CPUUsageNSec
+stat -c '%s' /var/lib/titen/titen.db
+curl --fail --silent http://127.0.0.1:8787/readyz
+```
+
+Run `serve --quiet` when the reverse proxy and supervisor already capture
+requests and failures. [`journalctl`](https://www.freedesktop.org/software/systemd/man/255/journalctl.html)
+provides time, unit, priority, and follow filters without changing application
+code.
 
 ## Backup and restore
 

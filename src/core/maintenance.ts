@@ -255,6 +255,37 @@ async function deliverPending(
   return { delivered, errors };
 }
 
+/** Delete only bounded, expired execution bookkeeping; canonical history stays append-only. */
+async function sweepEphemeral(db: Db, now: Date, limit: number): Promise<void> {
+  const at = now.toISOString();
+  await db.batch([
+    {
+      sql: `DELETE FROM idempotency_v3
+             WHERE (org_id, principal_id, key_hash) IN (
+               SELECT org_id, principal_id, key_hash FROM idempotency_v3
+                WHERE expires_at <= ?
+                ORDER BY expires_at, org_id, principal_id, key_hash LIMIT ?
+             )`,
+      params: [at, limit],
+    },
+    {
+      sql: `DELETE FROM checkpoints WHERE id IN (
+              SELECT id FROM checkpoints WHERE expires_at <= ?
+               ORDER BY expires_at, id LIMIT ?
+            )`,
+      params: [at, limit],
+    },
+    {
+      sql: `DELETE FROM leases WHERE id IN (
+              SELECT id FROM leases
+               WHERE released_at IS NOT NULL OR expires_at <= ?
+               ORDER BY COALESCE(released_at, expires_at), id LIMIT ?
+            )`,
+      params: [at, limit],
+    },
+  ]);
+}
+
 /** One maintenance pass. Never throws: a bad tenant must not stop the others. */
 export async function runMaintenance(options: {
   db: Db;
@@ -304,6 +335,12 @@ export async function runMaintenance(options: {
     } catch {
       result.errors.push("deliver:scan");
     }
+  }
+
+  try {
+    await sweepEphemeral(options.db, now, limit);
+  } catch {
+    result.errors.push("cleanup");
   }
 
   try {

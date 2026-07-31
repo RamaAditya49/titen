@@ -131,6 +131,31 @@ to infer support from a local test; refresh official limits before provisioning.
 - Use a distinct, revocable key per agent/service integration.
 - Never place API keys in Vectorize metadata or logs.
 
+## Rate limiting, telemetry, and rollback
+
+Keep rate limiting at Cloudflare's authenticated ingress. Use [WAF Rate
+Limiting Rules](https://developers.cloudflare.com/waf/rate-limiting-rules/) to
+match protected write routes, choose a plan-supported counting characteristic,
+and reject excess requests before Worker execution. Do not copy raw
+`Authorization` values into rule metadata, logs, or audits, and do not make
+Titen trust forwarded-address headers. An isolate-local token bucket would be
+inconsistent across isolates and is not an authorization boundary.
+
+The checked-in `observability.enabled` setting uses [Workers
+Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/)
+and native [Workers metrics and
+analytics](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/).
+Use those surfaces for request errors, CPU time, invocation volume, and tailing;
+no logger framework or Prometheus endpoint is required. Keep memory content,
+credentials, request bodies, and raw embeddings out of logs.
+
+Before a release, retain the previous Worker version and a verified pre-upgrade
+D1 backup/export. Roll back to that Worker version only when its code is known
+to accept the current schema. A Worker rollback does not reverse a forward D1
+migration; if the schema is incompatible, restore the verified database copy
+according to the deployment runbook, redeploy the compatible Worker, then smoke
+`/readyz` and one authenticated read.
+
 ## Verification gate
 
 - Unauthenticated protected request → JSON `401`.

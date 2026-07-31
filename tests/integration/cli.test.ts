@@ -174,3 +174,56 @@ test("migrate dry-run is read-only and schema output is deterministic", () => {
   assert.match(first.output, /INSERT OR IGNORE INTO titen_migrations/);
   assert.match(first.output, /1970-01-01T00:00:00\.000Z/);
 });
+
+test("serve reports a port collision without a stack trace", async () => {
+  const blocker = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () => new Response("busy"),
+  });
+  try {
+    const result = run("busy-port", ["serve", "--port", String(blocker.port)]);
+    assert.notEqual(result.exitCode, 0);
+    assert.equal(result.output, `error: port ${blocker.port} is already in use\n`);
+    assert.doesNotMatch(result.output, /node_modules|src\/runtime|\bat\s/);
+  } finally {
+    await blocker.stop(true);
+  }
+});
+
+test("serve --quiet accepts requests without startup or access output", async () => {
+  const reservation = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () => new Response("reserved"),
+  });
+  const port = reservation.port;
+  await reservation.stop(true);
+
+  const cwd = join(root, "quiet-serve");
+  mkdirSync(cwd);
+  const process = Bun.spawn({
+    cmd: ["bun", cli, "serve", "--port", String(port), "--quiet"],
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  try {
+    let response: Response | undefined;
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      try {
+        response = await fetch(`http://127.0.0.1:${port}/healthz`);
+        if (response.ok) break;
+      } catch {
+        await Bun.sleep(25);
+      }
+    }
+    assert.equal(response?.status, 200, "quiet server never became healthy");
+  } finally {
+    process.kill("SIGTERM");
+    await process.exited;
+  }
+  const output = `${await new Response(process.stdout).text()}${await new Response(process.stderr).text()}`;
+  assert.equal(output, "");
+});

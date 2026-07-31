@@ -278,7 +278,8 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
             at,
           ),
         );
-        statements.push(outboxStatement(principal.orgId, "claim", claim.id, "upsert", at));
+        if (ctx.app.vectors)
+          statements.push(outboxStatement(principal.orgId, "claim", claim.id, "upsert", at));
         statements.push(
           eventStatement(
             principal.orgId,

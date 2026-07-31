@@ -222,7 +222,7 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "an observation commits its canonical row, history, FTS row, and outbox entry together",
+    name: "an observation commits canonical evidence without unused vector work",
     async run(fx) {
       const agent = await fx.provision();
       const res = await fx.call("POST", "/v1/observations", {
@@ -243,7 +243,8 @@ export const CASES: Case[] = [
          UNION ALL SELECT 'outbox', COUNT(*) FROM index_outbox WHERE record_id = ?`,
         [id, id, id, id],
       );
-      for (const row of counts) assert.equal(Number(row.count), 1, `${row.label} row missing`);
+      for (const row of counts)
+        assert.equal(Number(row.count), row.label === "outbox" ? 0 : 1, `${row.label} row mismatch`);
     },
   },
   {
@@ -1137,6 +1138,12 @@ export const CASES: Case[] = [
       });
       const imported = await fx.callRaw("POST", "/v1/import", { key: target.key, body: `${actorMap}\n${migrated}` });
       expectOk(imported);
+      const importedOutbox = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM index_outbox
+          WHERE org_id = ? AND record_id IN (?, ?)`,
+        [target.orgId, migratedObservationId, migratedClaimId],
+      );
+      assert.equal(Number(importedOutbox[0]!.count), 0, "no-vector import must not queue index work");
       const compiled = await fx.call("POST", "/v1/context/compile", {
         key: target.key,
         body: { subject_id: "user_rama", task, max_tokens: 900 },
@@ -1342,8 +1349,8 @@ export const CASES: Case[] = [
       const projections = await fx.query<{
         observation_fts: number;
         claim_fts: number;
-        observation_operation: string;
-        claim_operation: string;
+        observation_operation: string | null;
+        claim_operation: string | null;
       }>(
         `SELECT
            (SELECT COUNT(*) FROM observations_fts WHERE observation_id = ?) AS observation_fts,
@@ -1355,8 +1362,8 @@ export const CASES: Case[] = [
       assert.deepEqual(projections, [{
         observation_fts: 0,
         claim_fts: 0,
-        observation_operation: "delete",
-        claim_operation: "delete",
+        observation_operation: null,
+        claim_operation: null,
       }]);
 
       const spoofed = {
@@ -2350,7 +2357,7 @@ export const CASES: Case[] = [
            (SELECT COUNT(*) FROM events WHERE resource_type = 'observation' AND resource_id = ?) AS events`,
         [observationId, observationId, observationId],
       );
-      assert.deepEqual(sideEffects[0], { histories: 1, outbox: 1, events: 1 });
+      assert.deepEqual(sideEffects[0], { histories: 1, outbox: 0, events: 1 });
 
       const consolidated = await fx.call("POST", "/v1/consolidations", {
         key: agent.key,
@@ -2635,6 +2642,134 @@ export const CASES: Case[] = [
       const foreign = await fx.call("GET", "/v1/audit", { key: intruder.key });
       expectOk(foreign);
       assert.equal(foreign.body.data.entries.length, 0);
+    },
+  },
+  {
+    name: "high-value operations write content-free authenticated audits",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const canaries = {
+        forwarded: "203.0.113.44",
+        key: "audit-secret-key-label",
+        member: "audit-target-principal",
+        handoff: "audit handoff message must not be copied",
+        webhook: "audit-webhook-private-path",
+        federation: "audit-federation-private-name",
+      };
+
+      const createdKey = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        headers: { "x-forwarded-for": canaries.forwarded },
+        body: { label: canaries.key, scopes: ["context:compile"] },
+      });
+      expectOk(createdKey, 201);
+      expectOk(await fx.call("DELETE", `/v1/keys/${createdKey.body.data.key_id}`, { key: owner.key }));
+
+      const exported = await fx.call("GET", "/v1/export?type=projects", { key: owner.key });
+      assert.equal(exported.status, 200);
+      expectOk(await fx.callRaw("POST", "/v1/import", {
+        key: owner.key,
+        body: `${JSON.stringify({
+          type: "titen.export.header",
+          format_version: 1,
+          record_type: "projects",
+        })}\n`,
+      }));
+
+      const membership = await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          principal_id: canaries.member,
+          principal_kind: "agent",
+          role: "member",
+        },
+      });
+      expectOk(membership, 201);
+      expectOk(await fx.call(
+        "DELETE",
+        `/v1/memberships/${membership.body.data.membership_id}`,
+        { key: owner.key },
+      ));
+
+      const handoff = await fx.call("POST", "/v1/handoffs", {
+        key: owner.key,
+        body: {
+          to_principal: owner.principalId,
+          subject_id: "audit-subject",
+          message: canaries.handoff,
+        },
+      });
+      expectOk(handoff, 201);
+      expectOk(await fx.call("POST", `/v1/handoffs/${handoff.body.data.handoff_id}/resolve`, {
+        key: owner.key,
+        body: { status: "accepted" },
+      }));
+
+      const webhook = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          url: `https://hooks.example.com/${canaries.webhook}`,
+          secret: "audit-webhook-secret-value",
+          events: ["claim.materialized"],
+        },
+      });
+      expectOk(webhook, 201);
+      expectOk(await fx.call("DELETE", `/v1/webhooks/${webhook.body.data.webhook_id}`, {
+        key: owner.key,
+      }));
+
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: owner.key,
+        body: {
+          name: canaries.federation,
+          endpoint: "https://peer.example.test/private-audit-path",
+          shared_secret: "audit-federation-secret-value",
+          direction: "push",
+        },
+      });
+      expectOk(peer, 201);
+      expectOk(await fx.call("POST", `/v1/federation/peers/${peer.body.data.peer_id}/suspend`, {
+        key: owner.key,
+        body: {},
+      }));
+
+      const rows = await fx.query<{
+        actor_id: string;
+        action: string;
+        resource_type: string;
+        resource_id: string | null;
+        detail: string | null;
+        ip_hint: string | null;
+      }>(
+        `SELECT actor_id, action, resource_type, resource_id, detail, ip_hint
+           FROM audit_log WHERE org_id = ? ORDER BY action`,
+        [owner.orgId],
+      );
+      assert.deepEqual(rows.map((row) => row.action), [
+        "federation.peer.register",
+        "federation.peer.suspend",
+        "handoff.create",
+        "handoff.resolve",
+        "key.create",
+        "key.revoke",
+        "membership.add",
+        "membership.remove",
+        "records.export",
+        "records.import",
+        "webhook.delete",
+        "webhook.register",
+      ]);
+      for (const row of rows) {
+        assert.equal(row.actor_id, owner.principalId);
+        assert.equal(row.detail, null);
+        assert.equal(row.ip_hint, null);
+        assert.ok(row.resource_type);
+      }
+      const serialized = JSON.stringify(rows);
+      for (const value of Object.values(canaries))
+        assert.ok(!serialized.includes(value), `audit copied content: ${value}`);
+      assert.ok(!serialized.includes("audit-webhook-secret-value"));
+      assert.ok(!serialized.includes("audit-federation-secret-value"));
     },
   },
   {
@@ -3809,6 +3944,11 @@ export const CASES: Case[] = [
         observation: { subject_id: "purge-subject", content: canary },
         claim: { statement: `${canary} must never remain readable.` },
       });
+      const queuedBeforePurge = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM index_outbox WHERE record_id IN (?, ?)`,
+        [seeded.observationId, seeded.claimId],
+      );
+      assert.equal(Number(queuedBeforePurge[0]!.count), 0, "no-vector writes must not queue index work");
 
       expectError(
         await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, { key: limited.key }),
@@ -3823,9 +3963,15 @@ export const CASES: Case[] = [
 
       const before = await fx.call("POST", "/v1/context/compile", {
         key: operator.key,
-        body: { subject_id: "purge-subject", task: "purge secret canary", max_tokens: 900 },
+        body: {
+          subject_id: "purge-subject",
+          task: "purge secret canary",
+          max_tokens: 900,
+          include_checkpoints: true,
+        },
       });
       expectOk(before);
+      assert.equal(before.body.meta.degraded.checkpoints, "unavailable");
       assert.equal(before.body.data.items[0].untrusted, true);
       const beforeEvidence = await fx.call("GET", `/v1/claims/${seeded.claimId}/evidence`, { key: operator.key });
       expectOk(beforeEvidence);
@@ -3862,7 +4008,8 @@ export const CASES: Case[] = [
       assert.equal(row.status, "revoked");
       assert.equal(Number(row.version), 2);
       for (const count of [row.observation_fts, row.claim_fts]) assert.equal(Number(count), 0);
-      for (const count of [row.observation_delete, row.claim_delete, row.purge_history, row.claim_history, row.audits, row.events])
+      for (const count of [row.observation_delete, row.claim_delete]) assert.equal(Number(count), 0);
+      for (const count of [row.purge_history, row.claim_history, row.audits, row.events])
         assert.equal(Number(count), 1);
 
       const after = await fx.call("POST", "/v1/context/compile", {
@@ -3896,7 +4043,7 @@ export const CASES: Case[] = [
           WHERE state = 'pending' AND operation = 'delete' AND record_id IN (?, ?)`,
         [seeded.observationId, seeded.claimId],
       );
-      assert.equal(Number(pendingDeletes[0]!.count), 2, "repeat purge must preserve vector deletes");
+      assert.equal(Number(pendingDeletes[0]!.count), 0, "no-vector purge must not queue deletes");
     },
   },
 ];

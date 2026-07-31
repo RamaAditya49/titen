@@ -16,17 +16,16 @@ export function openDatabase(
   const database = new Database(path, open);
   if (readonly) return database;
   database.run("PRAGMA journal_mode = WAL");
+  // A successful response means its canonical transaction survived process,
+  // OS, and power loss. Keep that durability choice explicit rather than
+  // inheriting a host/library default; NORMAL is an operator-visible contract
+  // change, not a hidden latency optimization.
+  database.run("PRAGMA synchronous = FULL");
   // SQLite's 1,000-page checkpoint keeps a 4 KiB-page WAL near 4.2 MiB when
   // no long-lived reader prevents recycling. Keep it explicit and tested.
   database.run("PRAGMA wal_autocheckpoint = 1000");
   database.run("PRAGMA foreign_keys = ON");
   database.run("PRAGMA busy_timeout = 5000");
-  // ponytail: `synchronous` is left at SQLite's FULL default rather than set
-  // explicitly. The ceiling is an fsync on every commit, which dominates write
-  // latency; NORMAL in WAL mode risks only the last committed transaction on
-  // power loss and never corruption. Upgrade path: set it explicitly with an
-  // env override so the durability trade is a recorded decision rather than an
-  // inherited default (#124).
   return database;
 }
 

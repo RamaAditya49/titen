@@ -1,4 +1,5 @@
 import { first } from "./db";
+import { auditStatement } from "./audit";
 import type { Db, Stmt } from "./db";
 import { notFound, validationError, forbidden, unavailable } from "./errors";
 import { newId, sha256Hex } from "./ids";
@@ -74,6 +75,9 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
         now,
       ],
     },
+    auditStatement(
+      principal.orgId, principal.principalId, "webhook.register", "webhook", now, id,
+    ),
   ]);
 
   return {
@@ -138,6 +142,10 @@ export async function deleteWebhook(ctx: RequestContext): Promise<Result> {
   await ctx.app.db.batch([
     { sql: `DELETE FROM webhook_deliveries WHERE webhook_id = ?`, params: [webhookId] },
     { sql: `DELETE FROM webhooks WHERE id = ?`, params: [webhookId] },
+    auditStatement(
+      principal.orgId, principal.principalId, "webhook.delete", "webhook",
+      ctx.app.now().toISOString(), webhookId,
+    ),
   ]);
 
   return { data: { id: webhookId, deleted: true } };

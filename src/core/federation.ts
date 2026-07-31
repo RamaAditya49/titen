@@ -1,4 +1,5 @@
 import { first } from "./db";
+import { auditStatement } from "./audit";
 import type { Db } from "./db";
 import { notFound, validationError, conflict, forbidden, unavailable } from "./errors";
 import { eventAccessParams, eventAccessSql, resolveEventCursor } from "./events";
@@ -36,6 +37,9 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
       params: [id, principal.orgId, principal.principalId, name, endpoint, hash, encrypted, direction, now],
     },
+    auditStatement(
+      principal.orgId, principal.principalId, "federation.peer.register", "federation_peer", now, id,
+    ),
   ]);
 
   return { status: 201, data: { peer_id: id, name, endpoint, direction, status: "active", created_at: now } };
@@ -79,6 +83,10 @@ export async function suspendPeer(ctx: RequestContext): Promise<Result> {
       sql: `UPDATE federation_peers SET status = 'suspended' WHERE id = ? AND org_id = ? AND principal_id = ?`,
       params: [peerId, principal.orgId, principal.principalId],
     },
+    auditStatement(
+      principal.orgId, principal.principalId, "federation.peer.suspend", "federation_peer",
+      ctx.app.now().toISOString(), peerId,
+    ),
   ]);
 
   return { data: { id: peerId, status: "suspended" } };
