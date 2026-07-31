@@ -1,0 +1,7 @@
+{
+  "name": "@ramaaditya49/titen-memory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Titen memory skill bundle for Claude-compatible and OpenClaw hosts.",
+  "license": "Apache-2.0"
+}
