@@ -72,6 +72,10 @@ An agent's memory loop:
 observe → consolidate → compile → act → feedback
 ```
 
+This is the current explicit path: the agent or integration supplies the claim
+to `consolidate`. Automatic observation classification/reflection is a planned
+background capability and does not happen merely because `observe` succeeded.
+
 ### 1. Observe
 
 Record evidence from tools, users, or decisions:
@@ -120,6 +124,10 @@ const result = await titen.consolidate("user_rama", [
 ]);
 // result.claims[0].claim_id → "claim_..."
 ```
+
+The server returns `model_used: false` on this path. After ADR-0004 is
+implemented, optional asynchronous enrichment may propose additional claims,
+but it will not replace this immediate authoritative direct-claim workflow.
 
 ### 3. Compile context
 

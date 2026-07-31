@@ -1,41 +1,57 @@
 # Cloudflare deployment
 
-Status: **verified** — P0 memory service operational on Cloudflare Workers with D1.
+Status: **implemented and verified locally** through workerd/D1. A provisioned
+live Worker/D1 deployment and live Vectorize/Workers AI bindings are not current
+repository evidence.
 
-## Quick start
+## Local preview
 
 Prerequisites: Node 22+, pnpm 10+, Cloudflare account with D1.
 
 ```bash
-# 1. Install
 pnpm install
 
-# 2. Create D1 database
+# Apply schema and bootstrap to Wrangler's local D1 state
+pnpm titen schema | wrangler d1 execute titen --local --file=-
+pnpm titen bootstrap --org 'My Org' --print-sql | \
+  wrangler d1 execute titen --local --file=-
+
+# Start a local Worker preview
+pnpm exec wrangler dev
+```
+
+Local D1 state is separate from the production database. Use the `--remote`
+commands below for every production schema or credential write.
+
+## Production deployment
+
+```bash
+# 1. Create the production D1 database
 wrangler d1 create titen
 # Copy the database_id from output into wrangler.jsonc
 
-# 3. Apply schema
-pnpm titen schema | wrangler d1 execute titen --file=-
+# 2. Apply schema to production
+pnpm titen schema | wrangler d1 execute titen --remote --file=-
 
-# 4. Bootstrap first org credential (save the printed key)
-pnpm titen bootstrap --org 'My Org' --print-sql | wrangler d1 execute titen --file=-
+# 3. Bootstrap the first production org credential (save the printed key)
+pnpm titen bootstrap --org 'My Org' --print-sql | \
+  wrangler d1 execute titen --remote --file=-
 
-# 5. Deploy
+# 4. Deploy
 pnpm deploy:worker
 
-# 6. (Optional) Enable auto-migrate on deploy
+# 5. (Optional) Enable auto-migrate on deploy
 # Set TITEN_AUTO_MIGRATE to "1" in wrangler.jsonc vars
 # or: wrangler secret put TITEN_AUTO_MIGRATE
 
-# 7. Verify
+# 6. Verify
 curl https://titen.<your-subdomain>.workers.dev/healthz
 ```
 
-## Verified P0 behavior
+## Locally verified behavior
 
-- Worker bundle: 68.90 KiB / 16.67 KiB gzip.
-- 32 contract tests pass through Miniflare with real D1.
-- Loop latency p50: 45.6 ms (local D1, not production).
+- 2026-07-31 dry-build upload: 221.73 KiB / 48.87 KiB gzip.
+- The shared contract suite passes through workerd/Miniflare with real D1.
 - Data survives isolate disposal and fresh cold start.
 - No Vectorize, Workers AI, Cron, KV, R2, Queue, DO, or `nodejs_compat` required.
 
@@ -67,21 +83,41 @@ Actual `wrangler.jsonc`:
 `TITEN_REVISION` is stamped at build/deploy; `TITEN_AUTO_MIGRATE` controls
 whether the Worker applies pending migrations on cold start.
 
-## Planned (not yet active)
+## Optional capability truth
 
-These bindings will be added when their P0 work items begin:
+The Worker contains vector adapters and a `scheduled()` maintenance handler,
+but checked-in `wrangler.jsonc` configures only D1. It has no AI, Vectorize, or
+Cron binding, so those capabilities are not active by default or live-verified.
 
 - **Vectorize** — rebuildable semantic index for vector retrieval.
-- **Workers AI** — embeddings and structured extraction.
-- **Cron Trigger** — bounded consolidation, enrichment, event delivery.
+- **Workers AI** — embedding adapter support; automatic extraction is not
+  implemented.
+- **Cron Trigger** — handler support for bounded indexing/delivery maintenance;
+  trigger provisioning is operator work.
 - **Channel serving** — CRM/chatbot gateway via scoped service credential.
 - **Memory Atlas** — read-only browser client against authenticated REST.
 
 Readiness and `/healthz` will report when optional capabilities are unavailable.
 
+ADR-0004's model-assisted target adds a separate leased D1 enrichment job. A
+Cron Trigger drains it in bounded passes and is the durability guarantee.
+Workers AI or an allowlisted authenticated HTTPS/VPC OpenAI-compatible endpoint
+may implement the same proposal contract. Local schema and ID validation remains
+mandatory for either provider.
+
+Cloudflare Queue is not required. Add it only as an opaque job-ID wake-up path
+after measured backlog age or semantic-ready latency exceeds the accepted
+objective; D1 remains authoritative and Cron remains the reconciler.
+
+Do not advertise the model-assisted scheduled profile on the Workers Free plan
+without a real smoke. Current Free Cron CPU and D1 query limits are too narrow
+to infer support from a local test; refresh official limits before provisioning.
+
 ## Secrets
 
-- Store bootstrap/model secrets with `wrangler secret put`, never in `wrangler.jsonc`.
+- Store external model secrets with `wrangler secret put`, never in
+  `wrangler.jsonc`; native Workers AI bindings need no account API token inside
+  the Worker.
 - Use a distinct, revocable key per agent/service integration.
 - Never place API keys in Vectorize metadata or logs.
 

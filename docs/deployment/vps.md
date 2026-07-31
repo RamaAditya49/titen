@@ -50,7 +50,8 @@ pnpm titen key create --org-id <org_id> --label 'my agent'
 - All P0 endpoints operational: `healthz`, `readyz`, `observations`,
   `consolidations`, `context/compile`, `feedback`, `claims/:id/evidence`,
   `keys`, `export`, `import`.
-- 60 shared contract cases pass independently on Bun/SQLite and Cloudflare/D1.
+- The shared contract suite passes independently on Bun/SQLite and
+  workerd/D1.
 - Data survives restart without rebuild.
 - FTS5 lexical retrieval works without a model.
 - Loop latency p50: 12 ms.
@@ -63,8 +64,10 @@ pnpm titen key create --org-id <org_id> --label 'my agent'
 - One SQLite database using `bun:sqlite`.
 - FTS5 in the canonical database.
 - Optional `sqlite-vec` extension for semantic retrieval.
-- Optional OpenAI-compatible embedding/extraction endpoint.
-- systemd timer or in-process bounded timer for repair/consolidation.
+- Optional OpenAI-compatible embedding endpoint (implemented).
+- Automatic extraction/reflection endpoint and enrichment jobs (planned, not
+  accepted by the current binary).
+- In-process startup/timer drain for current index and delivery repair.
 - REST under `/v1`; Streamable HTTP MCP at `/mcp`.
 - An external CRM/chatbot gateway may call protected channel-context operations;
   the Titen process itself does not expose anonymous memory search.
@@ -75,8 +78,11 @@ Docker is not required.
 
 ## Defaults
 
-- Bind: `127.0.0.1`.
-- Database: `/var/lib/titen/titen.db`.
+- CLI defaults: database `./titen.db`, bind `127.0.0.1:8787`, and revision
+  `dev`.
+- The checked-in systemd, container, and Quadlet profiles pass an explicit
+  `--db /var/lib/titen/titen.db`; their bind address and port are also explicit
+  CLI flags.
 - WAL mode, foreign keys enabled, bounded busy timeout, and an explicit
   1,000-page auto-checkpoint. With 4 KiB pages, the tested steady-state WAL
   stays below 5 MiB; the audited live WAL was about 4.0 MiB.
@@ -86,19 +92,40 @@ Docker is not required.
 
 ## Configuration
 
+Process location and identity are CLI flags, not environment variables:
+
+```bash
+bunx titen-memory serve \
+  --db /var/lib/titen/titen.db \
+  --host 127.0.0.1 \
+  --port 8787 \
+  --revision <deployed-revision>
+```
+
+The current `serve` command accepts exactly `--db`, `--host`, `--port`, and
+`--revision`. Its supported environment configuration is:
+
 ```text
-TITEN_HOST=127.0.0.1
-TITEN_PORT=8787
-TITEN_DB_PATH=/var/lib/titen/titen.db
 TITEN_MCP_ORIGIN=https://titen.example.com
+TITEN_VEC_DB_PATH=/var/lib/titen/titen.db.vec
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
 TITEN_EMBED_MODEL=bge-m3
 TITEN_EMBED_DIMS=1024
+TITEN_EMBED_API_KEY=<optional-bearer-secret>
+TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
 ```
 
-Model variables are optional. Observations and lexical context work without them.
+Embedding variables are optional. Observations and lexical context work without
+them. Put `TITEN_EMBED_API_KEY` only in the mode-`0600` service environment; it
+is required only when the configured embedder requires bearer authentication.
+
+The ADR-0004 implementation will add a separate opt-in tuple such as
+`TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and
+`TITEN_EXTRACT_API_KEY`. These names are a target contract, not current CLI
+options. Endpoint plus model is sufficient opt-in; do not add a second enable
+flag or expose provider credentials through readiness.
 
 Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
 is the exact external origin (scheme, host, and optional port), with no trailing
@@ -108,6 +135,15 @@ private-network access; the request URL origin remains the default.
 
 Local agents connect to `http://127.0.0.1:8787`. Remote agents use a TLS
 reverse proxy or private network with distinct revocable credentials.
+
+### Local-computer profile
+
+A local computer is the same Bun/SQLite runtime, not a third implementation.
+Keep Titen on loopback and point optional embedding/model URLs at a local engine
+or an explicitly configured remote provider. For a rootless container, the
+container's `127.0.0.1` is not the host: use host networking where supported,
+`host.containers.internal`, or an explicit shared network. Keep all credentials
+outside the image and source tree.
 
 For customer-facing use, route public traffic to the CRM/chatbot application,
 not directly to Titen. The application holds a gateway credential pinned to its
@@ -272,6 +308,9 @@ The production unit should use:
 - `sqlite-vec` semantic vector retrieval when configured.
 - Streamable HTTP MCP at `/mcp`.
 - Signed, allowlisted Bun webhook delivery with durable at-least-once retries.
+
+Automatic claim extraction, reflection, enrichment leases/backoff, and
+extraction readiness are not implemented optional capabilities yet.
 
 The `rama-tuf` reboot validation remains unverified until the operator approves
 a reboot window. Do not close that gate from a service restart alone.

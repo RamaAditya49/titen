@@ -25,10 +25,11 @@ delivery evidence and may preserve superseded decisions.
 
 The repository contains a verified P0 memory service with a shared TypeScript
 core, a Cloudflare Worker/D1 adapter, and a Bun/SQLite adapter. The
-dual-runtime contract suite (32 cases) passes on both runtimes. The Astro
-dashboard preview continues to use a synthetic fixture independently of the
-memory API. Do not present the dashboard as live service evidence; it uses a
-synthetic fixture, not the memory API.
+dual-runtime contract suite passes on both runtimes. Automatic model-assisted
+derivation/reflection is not implemented; the current model capability is the
+optional embedder. The Astro dashboard preview continues to use a synthetic
+fixture independently of the memory API. Do not present either planned
+enrichment or the synthetic dashboard as live service evidence.
 
 ## Required work lifecycle
 
@@ -53,7 +54,7 @@ Run `node scripts/check-workflow-docs.mjs` before handoff.
 ## Coding constraints
 
 - Current dashboard: Astro, TypeScript, Node 22+, and pnpm.
-- Planned VPS memory runtime: Bun and SQLite.
+- Current VPS/local memory runtime: Bun and SQLite.
 - One package until measured ownership/build boundaries require more.
 - Web Standards APIs in shared code.
 - Cloudflare entrypoint uses native bindings; no account API token inside the

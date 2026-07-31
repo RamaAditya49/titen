@@ -501,28 +501,38 @@ slow or unavailable.
 
 ## Asynchronous enrichment path
 
-After canonical commit, a background worker drains durable outbox work:
+This is the ADR-0004 target, not current shipped behavior. Current maintenance
+drains claim indexing and webhook work; observation rows are not classified.
+After implementation, a background worker drains a separate durable enrichment
+job:
 
 ```mermaid
 flowchart LR
-    O[Committed observation] --> D[Deterministic rules]
-    D --> P[Optional structured model proposal]
+    O[Committed observation + job] --> L[Persistent lease]
+    L --> D[Deterministic rules]
+    D --> R[Authorized FTS/vector candidates]
+    R --> P[Structured derivation proposal]
     P --> V[Schema scope source trust validation]
-    V --> C[Claim/version/source transaction]
+    V --> C[ADD-only claim/source transaction]
     C --> E[Embed eligible active claim]
-    E --> X[Upsert derived vector]
-    C --> N[Append domain event]
-    N --> W[Deliver subscribed webhook]
+    S[Scheduled/manual bounded selector] --> Q[Snapshot-bound reflection job]
+    Q --> P2[Pattern duplicate conflict proposal]
+    P2 --> V2[Same deterministic validation boundary]
+    V2 --> C2[ADD-only claim/link transaction]
 ```
 
-Deterministic classification runs first. An optional model proposes only what
-cannot be derived safely. Every model proposal must cite accessible source IDs
-and pass schema, scope, trust, temporal, and bounded-output validation.
+Deterministic classification runs first. A model proposes only what cannot be
+derived safely. Every proposal cites supplied source or premise IDs and passes
+schema, scope, trust, temporal, authority, and bounded-output validation. Model
+confidence does not set trust or decide whether a dispute is resolved.
+Derivation enqueue is atomic with its observation. Reflection enqueue is a
+separate idempotent scheduler transaction over ordered premise versions and a
+policy snapshot; an ordinary claim commit does not automatically create it.
 
 Embedding targets the active compact claim version by default, not every raw
-turn or tool response. This lowers model calls, index size, semantic noise, and
-time-to-acknowledgement. FTS keeps new observations discoverable while semantic
-work is pending.
+turn or tool response. The observation FTS projection exists, but the current
+context compiler retrieves claims only; pending enrichment must therefore be
+reported as not claim-ready rather than silently treated as recalled memory.
 
 ## Memory attribution: who, what, and where
 
@@ -552,16 +562,17 @@ Classification answers different questions with different fields:
 | Axis             | Initial values                                                                                     | Purpose                   |
 | ---------------- | -------------------------------------------------------------------------------------------------- | ------------------------- |
 | Observation kind | `user_statement`, `tool_result`, `imported_source`, `decision`, `system_event`                     | what evidence arrived     |
-| Claim kind       | `semantic_fact`, `episodic_event`, `preference`, `procedural_guidance`, `decision`, `relationship` | what durable memory means |
+| Claim kind       | `semantic_fact`, `episodic_event`, `preference`, `procedural`, `decision`, `relationship` | what durable memory means |
 | Trust            | `unverified`, `asserted`, `verified`, `policy_approved`                                            | evidence authority        |
 | Lifecycle        | `active`, `disputed`, `superseded`, `expired`, `revoked`                                           | current eligibility       |
 | Visibility       | `private`, `team`, `organization`                                                                  | who may retrieve it       |
 | Validity         | `valid_from`, `valid_to`                                                                           | when it applies           |
 | Subject type     | `human`, `agent`, `service`, `organization`, `repository`, `artifact`, `system`, `concept`         | what the subject is       |
 
-The caller supplies the known kind and scope. Titen validates it. Automatic
-classification fills missing proposals asynchronously; it never silently
-widens visibility, raises trust, changes project, or resolves a dispute.
+The caller supplies the known kind and scope on the current direct path. Titen
+validates it. The planned automatic path fills claim proposals asynchronously;
+it never widens visibility, raises trust, changes project, publishes memory,
+deletes evidence, or resolves a dispute.
 
 ### Tags
 
