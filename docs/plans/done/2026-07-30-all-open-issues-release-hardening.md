@@ -144,7 +144,8 @@ spec: docs/specs/done/2026-07-30-all-open-issues-release-hardening.md
 - Reconciliation: every original and late issue, including #71-#73, #75, and
   #77, was closed only after an individual explanatory comment. #75 required no
   fix; #77 was closed as not planned with its delivered, future, and trigger-based
-  debt scopes separated. The terminal snapshot has zero open issues and PRs.
+  debt scopes separated. Before terminal-documentation PR #78 opened, the final
+  release snapshot had zero open issues and PRs; #78 was its sole temporary PR.
 - Publication: tag `v0.2.0` resolves to `023fdd0`, and its public npm/GitHub
   artifacts remain available. Annotated tag `v0.2.1` peels to the exact release
   commit `a6c9edf`; npm `latest` resolves to `0.2.1` with SHA-1
@@ -154,8 +155,10 @@ spec: docs/specs/done/2026-07-30-all-open-issues-release-hardening.md
 - Project policy remained intact: GitHub Actions is disabled, current `main` has
   no workflow, and no workflow was used as a release gate. GitHub retains one
   failed historical run from the deleted `ci/issue-8-guardrail` branch.
-- Remote branch cleanup left only `main`. Enumerated temporary topic branches
-  were removed without modifying the user's original dirty checkout.
+- Before opening PR #78, remote branch cleanup left only `main`; its
+  `docs/complete-v0.2.1-release` head was the sole temporary branch exception.
+  Earlier enumerated topic branches were removed without modifying the user's
+  original dirty checkout.
 - Late focused gates: the key response and handoff path passed 71 D1, 90
   Bun/vector/SDK, and 63 integration tests. A clean temporary HOME/XDG setup
   reached Wrangler's 221.73 KiB / 48.87 KiB dry-build successfully; workflow,

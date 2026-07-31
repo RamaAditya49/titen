@@ -262,7 +262,9 @@ unchecked work.
   `7b1fd4f9893a94153b303e191d4f7281e122524f`; clean registry SDK/CLI smokes
   passed. The public, non-draft GitHub release is
   `https://github.com/RamaAditya49/titen/releases/tag/v0.2.1`.
-- The final snapshot has zero open issues, zero open pull requests, and only the
-  remote `main` branch. GitHub Actions is disabled and current `main` contains no
-  workflow; one failed run from the deleted historical `ci/issue-8-guardrail`
-  branch remains GitHub metadata and is not release evidence.
+- Before opening terminal-documentation PR #78, the final release snapshot had
+  zero open issues, zero open pull requests, and only remote `main`; #78 and its
+  `docs/complete-v0.2.1-release` head were the sole temporary finalization
+  exception. GitHub Actions is disabled and current `main` contains no workflow;
+  one failed run from the deleted historical `ci/issue-8-guardrail` branch
+  remains GitHub metadata and is not release evidence.
