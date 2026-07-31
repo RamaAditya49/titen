@@ -221,8 +221,10 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
           ],
         });
         statements.push({
-          sql: `INSERT INTO claims_fts (statement, claim_id) VALUES (?, ?)`,
-          params: [claim.statement, claim.id],
+          sql: `INSERT INTO claims_fts
+                  (statement, claim_id, org_scope, subject_scope)
+                VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
+          params: [claim.statement, claim.id, principal.orgId, subjectId],
         });
         for (const source of claim.sources)
           statements.push({

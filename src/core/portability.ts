@@ -310,7 +310,12 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
                content_hash, source_type, source_ref, trust, visibility, occurred_at, ingested_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: observationValues(principal.orgId, row),
-    }, { sql: `INSERT INTO observations_fts (content, observation_id) VALUES (?, ?)`, params: [row.content, row.id] },
+    }, {
+      sql: `INSERT INTO observations_fts
+              (content, observation_id, org_scope, subject_scope)
+            VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
+      params: [row.content, row.id, principal.orgId, row.subject_id],
+    },
     await importHistory(principal.orgId, "observation", row.id as string, principal.principalId, at),
     outboxStatement(principal.orgId, "observation", row.id as string, "upsert", at),
     eventStatement(principal.orgId, "observation.imported", principal.principalId, "observation", row.id as string, {}, at));
@@ -330,7 +335,12 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
                confidence, trust, visibility, status, version, valid_from, valid_to, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: claimValues(principal.orgId, row),
-    }, { sql: `INSERT INTO claims_fts (statement, claim_id) VALUES (?, ?)`, params: [row.statement, row.id] },
+    }, {
+      sql: `INSERT INTO claims_fts
+              (statement, claim_id, org_scope, subject_scope)
+            VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
+      params: [row.statement, row.id, principal.orgId, row.subject_id],
+    },
     await importHistory(principal.orgId, "claim", row.id as string, principal.principalId, at),
     outboxStatement(principal.orgId, "claim", row.id as string, "upsert", at),
     eventStatement(principal.orgId, "claim.imported", principal.principalId, "claim", row.id as string, {}, at));

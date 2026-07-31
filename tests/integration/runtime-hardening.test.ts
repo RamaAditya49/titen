@@ -46,11 +46,17 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
     assert.equal(Number(version[0]!.version), SCHEMA_VERSION - 1);
-    assert.deepEqual(
-      await db.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state'"),
-      [],
-      `migration must roll back after statement ${failureAfter + 1}`,
+    const fts = await db.all<{ sql: string }>(
+      `SELECT sql FROM sqlite_master
+        WHERE name IN ('observations_fts', 'claims_fts') ORDER BY name`,
     );
+    assert.equal(fts.length, 2);
+    for (const table of fts)
+      assert.doesNotMatch(
+        table.sql,
+        /org_scope/,
+        `migration must roll back after statement ${failureAfter + 1}`,
+      );
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
   }
@@ -76,7 +82,7 @@ test("migration retires unowned federation peers and releases their endpoint", a
        applied_at TEXT NOT NULL
      )`,
   );
-  for (const migration of MIGRATIONS.slice(0, -1)) {
+  for (const migration of MIGRATIONS.filter(({ version }) => version < 10)) {
     await db.batch([
       ...migration.statements.map((sql) => ({ sql })),
       {

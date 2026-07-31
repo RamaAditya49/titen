@@ -225,6 +225,21 @@ signal is assigned `1` for each matched candidate; absent lexical or vector
 signals, including vector similarity `0`, are `0`. Confidence is therefore an
 explicit weighted factor, not a hidden multiplier.
 
+Lexical planning removes Unicode format characters, preserves combining marks,
+normalizes to NFC, and drops a bounded English/Indonesian function-word set;
+an all-function-word task falls back to its original terms. Porter stemming
+handles common word forms. The FTS MATCH includes encoded organization and
+subject scope before BM25, then canonical SQL repeats every authorization and
+lifecycle check. `meta.degraded.lexical` is `no_terms` when normalization leaves
+no searchable term and `used` otherwise. The existing `remove_diacritics 2`
+tradeoff remains: diacritic-only distinctions fold together, while separate
+letters such as `ł` and `ß` do not.
+
+Packing selects one fitting claim per available kind before filling the
+remaining token budget in deterministic rank order. Byte-identical active claim
+statements appear at most once in a context pack; canonical claims and their
+evidence remain unchanged.
+
 ### `POST /v1/context/:id/feedback`
 
 Record used/useful/irrelevant/incorrect/harmful outcomes for the context or

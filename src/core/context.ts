@@ -125,7 +125,14 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       score: entry.score,
       score_components: entry.components,
     };
-    return { value: { item, entry }, kind: entry.candidate.kind, tokens: estimateJsonTokens(item) };
+    return {
+      value: { item, entry },
+      kind: entry.candidate.kind,
+      tokens: estimateJsonTokens(item),
+      ...(entry.candidate.status === "active"
+        ? { dedupeKey: entry.candidate.statement }
+        : {}),
+    };
   });
 
   // The envelope is reserved out of the budget but not reported as content, so
@@ -143,6 +150,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }));
 
   const degraded = {
+    lexical: lexical.match ? "used" : "no_terms",
     semantic: false,
     vector: ctx.app.vectors ? (vectorUsed ? "used" : "error") : "disabled",
     model: ctx.app.vectors ? "enabled" : "disabled",

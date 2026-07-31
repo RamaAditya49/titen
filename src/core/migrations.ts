@@ -61,11 +61,8 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ingested_at TEXT NOT NULL
        )`,
       `CREATE INDEX observations_scope ON observations (org_id, subject_id, ingested_at)`,
-      // ponytail: an unstemmed tokenizer with no prefix index. The ceiling is
-      // that morphological variants never match — a query for the singular
-      // misses a record holding the plural — which reads as an empty store
-      // rather than as a failed match. Upgrade path: add `porter` to the
-      // tokenizer in a new migration that rebuilds the index (#83).
+      // Historical v1 projection; migration 11 rebuilds it with Porter and
+      // indexed scope terms without changing canonical observations.
       `CREATE VIRTUAL TABLE observations_fts USING fts5 (
          content,
          observation_id UNINDEXED,
@@ -90,9 +87,8 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          created_at TEXT NOT NULL
        )`,
       `CREATE INDEX claims_scope ON claims (org_id, subject_id, status)`,
-      // ponytail: same unstemmed tokenizer as observations_fts, and this is the
-      // index compilation actually reads. The ceiling and upgrade path are the
-      // same; change both together or recall diverges between the two (#83).
+      // Historical v1 projection; migration 11 rebuilds both FTS tables
+      // together so observation and claim tokenization cannot drift.
       `CREATE VIRTUAL TABLE claims_fts USING fts5 (
          statement,
          claim_id UNINDEXED,
@@ -524,6 +520,38 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       // Vector schemas now enforce subject/project metadata before top-k. The
       // projection is rebuildable, so every canonical claim is safely requeued.
       `UPDATE index_outbox SET state = 'pending', attempts = 0 WHERE record_type = 'claim'`,
+    ],
+  },
+  {
+    version: 11,
+    statements: [
+      // FTS is derived data: rebuild it once with stemming and scope terms that
+      // the MATCH expression can apply before ranking. The trailing digit keeps
+      // Porter from stemming the reversible hexadecimal scope token.
+      `DROP TABLE observations_fts`,
+      `CREATE VIRTUAL TABLE observations_fts USING fts5 (
+         content,
+         observation_id UNINDEXED,
+         org_scope,
+         subject_scope,
+         tokenize = 'porter unicode61 remove_diacritics 2'
+       )`,
+      `INSERT INTO observations_fts
+         (content, observation_id, org_scope, subject_scope)
+       SELECT content, id, lower(hex(org_id)) || '0', lower(hex(subject_id)) || '0'
+         FROM observations`,
+      `DROP TABLE claims_fts`,
+      `CREATE VIRTUAL TABLE claims_fts USING fts5 (
+         statement,
+         claim_id UNINDEXED,
+         org_scope,
+         subject_scope,
+         tokenize = 'porter unicode61 remove_diacritics 2'
+       )`,
+      `INSERT INTO claims_fts
+         (statement, claim_id, org_scope, subject_scope)
+       SELECT statement, id, lower(hex(org_id)) || '0', lower(hex(subject_id)) || '0'
+         FROM claims`,
     ],
   },
 ];

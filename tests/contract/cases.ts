@@ -2689,6 +2689,137 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "Porter recall and Unicode query normalization are runtime-identical",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const testing = await seedClaim(fx, agent.key, {
+        claim: { statement: "Tests live next to the source file they cover." },
+      });
+      const istanbul = await seedClaim(fx, agent.key, {
+        claim: { statement: "The Turkish İstanbul plan is current." },
+      });
+      const quartz = await seedClaim(fx, agent.key, {
+        claim: { statement: "Quartz rotation protects the signing material." },
+      });
+
+      for (const [task, claimId] of [
+        ["testing conventions", testing.claimId],
+        ["İstanbul", istanbul.claimId],
+        ["q\u200du\u200da\u200dr\u200dt\u200dz", quartz.claimId],
+      ]) {
+        const compiled = await fx.call("POST", "/v1/context/compile", {
+          key: agent.key,
+          body: { subject_id: "user_rama", task, max_tokens: 900 },
+        });
+        expectOk(compiled);
+        assert.ok(compiled.body.data.items.some((item: any) => item.claim_id === claimId));
+      }
+
+      const noTerms = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_rama", task: "...\u200d...", max_tokens: 900 },
+      });
+      expectOk(noTerms);
+      assert.equal(noTerms.body.meta.degraded.lexical, "no_terms");
+      assert.equal(noTerms.body.meta.query_terms_used, 0);
+    },
+  },
+  {
+    name: "natural query planning removes stopword noise and retains old and new",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      await seedClaim(fx, agent.key, { claim: { statement: "to" } });
+      const noise = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_rama", task: "ship to prod safely", max_tokens: 900 },
+      });
+      expectOk(noise);
+      assert.deepEqual(noise.body.data.items, []);
+      assert.equal(noise.body.meta.query_terms_used, 3);
+      assert.equal(noise.body.meta.dropped_query_terms, 1);
+
+      const oldClaim = await seedClaim(fx, agent.key, { claim: { statement: "old" } });
+      const newClaim = await seedClaim(fx, agent.key, { claim: { statement: "new" } });
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          task: "Could you please remind me what our team decided about whether we should keep using the old formatter or move to a new one for all of the frontend repositories",
+          max_tokens: 900,
+        },
+      });
+      expectOk(compiled);
+      const ids = new Set(compiled.body.data.items.map((item: any) => item.claim_id));
+      assert.ok(ids.has(oldClaim.claimId));
+      assert.ok(ids.has(newClaim.claimId));
+      assert.ok(compiled.body.meta.query_terms_used <= 16);
+      assert.ok(compiled.body.meta.dropped_query_terms > 0);
+    },
+  },
+  {
+    name: "a large budget fills past three same-kind claims without duplicate statements",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const obs = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({
+          subject_id: "user_budgetfill",
+          content: "Budgetfill marker evidence supports all procedural variants.",
+        }),
+      });
+      expectOk(obs, 201);
+      const statements = [
+        ...Array.from({ length: 5 }, (_unused, index) =>
+          `Budgetfill marker procedure ${index} remains active.`),
+        "Budgetfill marker duplicate remains active.",
+        "Budgetfill marker duplicate remains active.",
+      ];
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_budgetfill",
+          claims: statements.map((statement) =>
+            claim(obs.body.data.observation_id, { statement, kind: "procedural" })),
+        },
+      });
+      expectOk(consolidated, 201);
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_budgetfill", task: "budgetfill marker", max_tokens: 32_000 },
+      });
+      expectOk(compiled);
+      const returned = compiled.body.data.items.map((item: any) => item.claim as string);
+      assert.ok(returned.length > 3);
+      assert.equal(returned.length, 6);
+      assert.equal(new Set(returned).size, returned.length);
+    },
+  },
+  {
+    name: "lexical candidates stay inside the requested subject before ranking",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      await seedClaim(fx, agent.key, {
+        observation: { subject_id: "subject_foreign" },
+        claim: { statement: "Scopeproof marker belongs to the foreign subject." },
+      });
+      const target = await seedClaim(fx, agent.key, {
+        observation: { subject_id: "subject_target" },
+        claim: { statement: "Scopeproof marker belongs to the target subject." },
+      });
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "subject_target", task: "scopeproof marker", max_tokens: 900 },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.meta.candidates, 1);
+      assert.deepEqual(
+        compiled.body.data.items.map((item: any) => item.claim_id),
+        [target.claimId],
+      );
+    },
+  },
+  {
     name: "lexical planning preserves an exact marker after sixteen query terms",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });

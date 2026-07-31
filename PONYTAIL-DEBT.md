@@ -31,13 +31,10 @@ observed.
 | `src/core/idempotency.ts:21` | Keep a fixed 24-hour retry window | Later re-ingest can duplicate records | Re-sync behavior is required; add content-level convergence (#101) |
 | `src/core/mcp.ts:45` | Expose only the common seven-tool agent path | REST-only capabilities remain unreachable over MCP | Consolidation/search is approved for ordinary agents (#88, #89) |
 | `src/core/migrations.ts:10` | Keep migrations forward-only | Failed upgrades recover from a snapshot | Deployment review needs preview; document snapshots and add `migrate --dry-run` (#116) |
-| `src/core/migrations.ts:64,93` | Use the same unstemmed FTS tokenizer for observations and claims | Morphological variants can miss | Recall quality requires stemming; migrate and rebuild both indexes together (#83) |
-| `src/core/migrations.ts:271` | Accept a retention policy kind without enforcing it | Append-only satellite tables grow indefinitely | Retention policy is implemented in maintenance (#105) |
+| `src/core/migrations.ts:267` | Accept a retention policy kind without enforcing it | Append-only satellite tables grow indefinitely | Retention policy is implemented in maintenance (#105) |
 | `src/core/observations.ts:63` | Enqueue indexing work without checking vector capability | Default no-vector deployments accumulate an undrained outbox | Skip or retire rows when vector indexing is unavailable (#105) |
 | `src/core/portability.ts:26` | Export only the memory interchange surface | Export/import is not a full deployment backup | Full portability is required; add dependent tables in authority order (#111) |
 | `src/core/portability.ts:41` | Limit export/import by rows independently of transport bytes | A valid export page can exceed the import cap | Cut export pages by accumulated bytes (#112) |
-| `src/core/rank.ts:16` | Cap every memory kind at three items | Large token budgets cannot increase same-kind recall | Budget-aware diversity is measured to improve recall (#85) |
-| `src/core/retrieval.ts:21` | Select terms by shape without corpus statistics or stopwords | Common words can dominate retrieval | Add IDF plus a stopword fallback (#84) |
 | `src/core/validate.ts:43` | Cap lexical candidates at 200 | Matches beyond the fixed pool are unreachable | Retrieval becomes cheap enough for a request-scaled limit (#121) |
 
 ## Test harness
@@ -48,7 +45,7 @@ observed.
 
 ## Summary
 
-- Markers: 28.
+- Markers: 24.
 - Markers without an upgrade trigger: 0.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned

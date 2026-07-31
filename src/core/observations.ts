@@ -165,8 +165,10 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             ],
           },
           {
-            sql: `INSERT INTO observations_fts (content, observation_id) VALUES (?, ?)`,
-            params: [content, id],
+            sql: `INSERT INTO observations_fts
+                    (content, observation_id, org_scope, subject_scope)
+                  VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
+            params: [content, id, principal.orgId, subjectId],
           },
           historyStatement(
             principal.orgId,

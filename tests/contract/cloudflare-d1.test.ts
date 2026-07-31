@@ -10,6 +10,7 @@ import type { Stmt } from "../../src/core/db";
 import { migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
+import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -162,11 +163,35 @@ test("a D1 migration batch rolls back on fault and concurrent retries converge",
     };
     await assert.rejects(() => migrate(injected));
     assert.equal(Number((await real.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations"))[0]!.version), SCHEMA_VERSION - 1);
-    assert.deepEqual(await real.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'maintenance_state'"), []);
+    const fts = await real.all<{ sql: string }>(
+      `SELECT sql FROM sqlite_master
+        WHERE name IN ('observations_fts', 'claims_fts') ORDER BY name`,
+    );
+    assert.equal(fts.length, 2);
+    for (const table of fts) assert.doesNotMatch(table.sql, /org_scope/);
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
   } finally {
     await fault.dispose();
     rmSync(faultPersist, { recursive: true, force: true });
+  }
+});
+
+test("a populated schema-v10 D1 database rebuilds scoped Porter FTS", async () => {
+  const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-retrieval-migration-"));
+  const migrationRuntime = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-retrieval-migration" },
+    d1Persist: migrationPersist,
+  });
+  try {
+    await migrationRuntime.ready;
+    const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
+    await assertPopulatedV10RetrievalMigration(migrationDb);
+  } finally {
+    await migrationRuntime.dispose();
+    rmSync(migrationPersist, { recursive: true, force: true });
   }
 });
 
