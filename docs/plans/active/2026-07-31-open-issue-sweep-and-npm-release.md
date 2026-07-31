@@ -1,7 +1,7 @@
 ---
 work_id: open-issue-sweep-and-npm-release
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-07-31
@@ -12,7 +12,7 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
 ---
 # Plan
 
-- [ ] Capture the immutable starting inventory: local WIP/stash, remote heads,
+- [x] Capture the immutable starting inventory: local WIP/stash, remote heads,
   open issues and pull requests, tags/releases, npm metadata, and Actions state.
 - [ ] Review and integrate or explicitly supersede every remote topic branch;
   validate its completed workflow artifacts and remove only a merged branch.

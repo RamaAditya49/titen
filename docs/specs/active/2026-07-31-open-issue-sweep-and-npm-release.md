@@ -1,7 +1,7 @@
 ---
 work_id: open-issue-sweep-and-npm-release
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-07-31
