@@ -12,6 +12,14 @@ export const RANK_WEIGHTS = {
 /** Feedback only moves ranking once enough signals exist (FRD CTX-002). */
 export const UTILITY_MIN_SIGNALS = 3;
 export const RECENCY_HALF_LIFE_DAYS = 90;
+/**
+ * ponytail: a fixed per-kind quota instead of budget-aware diversity. The
+ * ceiling is that a compiled pack can never exceed six kinds times this
+ * number of items however large `max_tokens` is, so a subject whose memory
+ * is concentrated in one kind cannot buy recall with budget. Upgrade path:
+ * derive the quota from the remaining budget, or apply it only below a
+ * relevance floor so a strong match is never displaced (#85).
+ */
 export const MAX_ITEMS_PER_KIND = 3;
 
 export interface RankInput {

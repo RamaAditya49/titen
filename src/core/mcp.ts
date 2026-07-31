@@ -41,6 +41,13 @@ const OUTCOMES = ["used", "useful", "irrelevant", "incorrect", "harmful"];
  * `name:?` a free-form value, and `name=a|b` an enum. One builder expands them
  * into JSON Schema so adding a tool is one line, not a nested literal.
  */
+/**
+ * ponytail: the common agent path only, expressed as data. The ceiling is that
+ * a tool absent here is unreachable over MCP even when its REST route exists —
+ * which today means an MCP client can append evidence but cannot derive a
+ * claim from it, so nothing it writes is retrievable. Upgrade path: add a
+ * combined remember-fact tool plus a plain-text search tool (#88, #89).
+ */
 const TOOL_SPECS: [name: string, description: string, args: string][] = [
   ["titen_remember", "Append an observation to memory.",
     "subject_id! kind! content! source_type! source_ref! trust visibility workspace_id project_id agent_id run_id occurred_at idempotency_key"],

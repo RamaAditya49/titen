@@ -17,6 +17,16 @@ export interface FtsQueryPlan {
   termsDropped: number;
 }
 
+/**
+ * ponytail: term selection by shape (digits, then punctuation, then length)
+ * instead of corpus statistics, and no stopword list. The ceiling is that a
+ * natural-language task is mostly function words, so a single common term can
+ * drive the whole match set, and terms past `LIMITS.queryTerms` are dropped by
+ * character length rather than by how much they discriminate. Upgrade path:
+ * rank terms by inverse document frequency read from `claims_fts`, subtracting
+ * a stopword set, and fall back to the unfiltered list when filtering empties
+ * the query (#84).
+ */
 function termSignal(term: string): number {
   return (/[0-9]/u.test(term) ? 10_000 : 0)
     + (/[_'-]/u.test(term) ? 5_000 : 0)
