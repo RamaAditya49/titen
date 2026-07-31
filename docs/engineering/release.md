@@ -151,7 +151,8 @@ git tag -a "v$(node -p 'require("./package.json").version')" \
   -m "titen-memory $(node -p 'require("./package.json").version')"
 git push origin "v$(node -p 'require("./package.json").version')"
 gh release create "v$(node -p 'require("./package.json").version')" \
-  --title "…" --notes-file <(scripts/changelog-section.sh)
+  --title "titen-memory $(node -p 'require("./package.json").version')" \
+  --notes-file <(scripts/changelog-section.sh)
 ```
 
 `npm publish` is the right command even though the repo uses pnpm: `pnpm
@@ -165,11 +166,55 @@ the GitHub release body is generated from it by
 [`scripts/changelog-section.sh`](../../scripts/changelog-section.sh) so the two
 can never drift. Do not hand-write a release body.
 
+Keep each released changelog section easy to scan:
+
+1. begin with a one- or two-sentence summary when the release needs context;
+2. put `### Upgrade notes` first when an operator must migrate or reconfigure;
+3. use the applicable Keep a Changelog headings: `Added`, `Changed`,
+   `Deprecated`, `Removed`, `Fixed`, and `Security`;
+4. omit empty headings; and
+5. prefix every incompatible change with **`Breaking:`** and describe the
+   required migration in the same item.
+
+The generator adds the exact install command and links to the install guide,
+the matching titen.dev page, and the versioned npm package. These presentation
+lines are derived from the version; the release content still comes only from
+`CHANGELOG.md`.
+
 Every published version needs a `vN.N.N` tag and a GitHub release. The one
 exception on record is **0.1.0**, published from a staging tree before the
 packaging work was committed — no commit represents it, so it has no tag.
 Do not retrofit one onto a later commit; that would point the tag at code the
 release never contained.
+
+### Website handoff
+
+A stable release is not complete until its static discovery surface is live.
+After npm `latest`, the annotated tag, and the non-draft GitHub Release agree,
+update a clean `titen-web` branch:
+
+```bash
+pnpm release:sync <version>
+pnpm release:sync <version> --check
+pnpm build
+```
+
+`release:sync` reads the public GitHub Release, the package and Codex-plugin
+manifests at that exact tag, and npm `latest`. It writes a reviewable Markdown
+snapshot plus `src/data/release.json`; the website build itself remains offline
+and deterministic. If the plugin version did not change, its previous release
+date and notes link stay unchanged.
+
+Merge and deploy the reviewed `titen-web` change manually, then smoke
+`/version.json`, `/releases/<version>`, the homepage release badge, and both
+`titen.dev` hostnames. Do not announce the release as complete before those
+checks pass. If published notes need a correction, update `CHANGELOG.md`,
+replace the GitHub Release body with regenerated output, then sync and deploy
+the website again.
+
+This handoff does not use GitHub Actions, a webhook, a scheduled job, or a
+runtime GitHub API request. Roll back a bad website deployment to its previous
+Cloudflare Worker version; do not republish an unchanged npm release.
 
 ### Where published links live
 
