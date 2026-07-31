@@ -115,9 +115,10 @@ function redact(value: string, secrets: readonly string[]) {
   for (const secret of normalizedSecrets) {
     safe = safe.replaceAll(secret, "[redacted]");
   }
-  return safe
-    .replace(/((?:["']?\bauthorization\b["']?\s*[:=]\s*)["']?)(?:bearer\s+)?[^"'\s,;}]+/gi, "$1[redacted]")
-    .replace(/((?:["']?\b(?:api[_-]?key|secret|token)\b["']?\s*[:=]\s*)["']?)[^"'\s,;}]+/gi, "$1[redacted]");
+  return safe.replace(
+    /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?[A-Za-z0-9_$.-]*(?:authorization|api[_-]?key|secret|token)[A-Za-z0-9_$.-]*(?:\\?["'])?\s*[:=]\s*(?:\\?["'])?)(?:bearer\s+)?(?:\[redacted\]|[^\\\s"',;}\])>]+)/gi,
+    "$1$2[redacted]",
+  );
 }
 
 /** Adds bounded, redacted workerd context without changing assertion objects. */

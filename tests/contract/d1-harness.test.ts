@@ -162,9 +162,47 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
       forbidden: ["SENSITIVE_JSON_SECRET_9382"],
       expected: '"secret":"[redacted]"',
     },
+    {
+      name: "access token assignment",
+      input: "context-before access_token=SENSITIVE_ACCESS_TOKEN_9382 context-after",
+      secrets: [],
+      forbidden: ["SENSITIVE_ACCESS_TOKEN_9382"],
+      expected: "access_token=[redacted]",
+    },
+    {
+      name: "client secret assignment",
+      input: "context-before client_secret=SENSITIVE_CLIENT_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["SENSITIVE_CLIENT_SECRET_9382"],
+      expected: "client_secret=[redacted]",
+    },
+    {
+      name: "API token assignment",
+      input: "context-before api_token=SENSITIVE_API_TOKEN_9382 context-after",
+      secrets: [],
+      forbidden: ["SENSITIVE_API_TOKEN_9382"],
+      expected: "api_token=[redacted]",
+    },
+    {
+      name: "secret key assignment",
+      input: "context-before secret_key=SENSITIVE_SECRET_KEY_9382 context-after",
+      secrets: [],
+      forbidden: ["SENSITIVE_SECRET_KEY_9382"],
+      expected: "secret_key=[redacted]",
+    },
+    {
+      name: "escaped JSON token",
+      input: 'context-before \\{\\"token\\":\\"SENSITIVE_ESCAPED_JSON_TOKEN_9382\\"\\} context-after',
+      secrets: [],
+      forbidden: ["SENSITIVE_ESCAPED_JSON_TOKEN_9382"],
+      expected: '\\"token\\":\\"[redacted]\\"',
+    },
   ];
 
   for (const fixture of cases) {
+    const expectedLine = fixture.input
+      .replace(fixture.forbidden[0], "[redacted]")
+      .replace("Bearer [redacted]", "[redacted]");
     for (let split = 0; split <= fixture.input.length; split++) {
       const owner: D1LaneOwner = {
         run_id: `run-${fixture.name.replaceAll(" ", "-")}-${split}`,
@@ -174,7 +212,9 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
       };
       const emitted: string[] = [];
       const diagnostics = new D1RunDiagnostics(owner, fixture.secrets, 256, (value) => emitted.push(value));
-      const failure = new Error(`controlled ${fixture.name} failure at split ${split}`);
+      const failure = new Error(
+        `controlled ${fixture.name} failure at split ${split}: ${fixture.input}`,
+      );
 
       await assert.rejects(
         diagnostics.run(fixture.name, () => {
@@ -189,8 +229,7 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
             assert.doesNotMatch(thrown, new RegExp(forbidden), `${fixture.name} leaked at split ${split}`);
           }
           assert.ok(thrown.includes(fixture.expected), `${fixture.name} was not redacted at split ${split}`);
-          assert.match(thrown, /context-before/);
-          assert.match(thrown, /context-after/);
+          assert.ok(thrown.includes(expectedLine), `${fixture.name} lost context at split ${split}`);
           return true;
         },
       );
@@ -199,8 +238,7 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
         assert.doesNotMatch(output, new RegExp(forbidden), `${fixture.name} emission leaked at split ${split}`);
       }
       assert.ok(output.includes(fixture.expected), `${fixture.name} emission was not redacted at split ${split}`);
-      assert.match(output, /context-before/);
-      assert.match(output, /context-after/);
+      assert.ok(output.includes(expectedLine), `${fixture.name} emission lost context at split ${split}`);
       assert.ok(Buffer.byteLength(output) <= 512);
     }
   }
