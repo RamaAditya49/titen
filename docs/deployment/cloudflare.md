@@ -50,7 +50,7 @@ curl https://titen.<your-subdomain>.workers.dev/healthz
 
 ## Locally verified behavior
 
-- 2026-07-31 dry-build upload: 221.73 KiB / 48.87 KiB gzip.
+- 2026-07-31 dry-build upload: 223.06 KiB / 49.49 KiB gzip.
 - The shared contract suite passes through workerd/Miniflare with real D1.
 - Data survives isolate disposal and fresh cold start.
 - No Vectorize, Workers AI, Cron, KV, R2, Queue, DO, or `nodejs_compat` required.

@@ -1,12 +1,11 @@
 ---
 work_id: model-assisted-memory-management-docs
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Model-assisted memory management documentation
