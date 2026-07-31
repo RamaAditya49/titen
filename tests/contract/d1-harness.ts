@@ -108,12 +108,20 @@ export async function acquireD1Lane(port = D1_LANE_PORT): Promise<D1Lane> {
   };
 }
 
-function isSensitiveIdentifier(value: string) {
-  const parts = value
+function identifierParts(value: string) {
+  return value
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toLowerCase()
     .split(/[_$.-]+/)
     .filter(Boolean);
+}
+
+function isAuthorizationIdentifier(value: string) {
+  return identifierParts(value).at(-1) === "authorization";
+}
+
+function isSensitiveIdentifier(value: string) {
+  const parts = identifierParts(value);
   const last = parts.at(-1);
   const previous = parts.at(-2);
   return last === "authorization" || last === "token" || last === "secret" ||
@@ -164,6 +172,26 @@ function redactQuotedAssignments(value: string) {
   return `${safe}${value.slice(cursor)}`;
 }
 
+function redactAuthorizationAssignments(value: string) {
+  const assignments = /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?)([A-Za-z0-9_$.-]+)((?:\\?["'])?\s*[:=]\s*)/gi;
+  let cursor = 0;
+  let safe = "";
+  for (let match = assignments.exec(value); match; match = assignments.exec(value)) {
+    if (!isAuthorizationIdentifier(match[3])) continue;
+    const valueStart = match.index + match[0].length;
+    const carriage = value.indexOf("\r", valueStart);
+    const newline = value.indexOf("\n", valueStart);
+    const candidates = [carriage, newline].filter((index) => index !== -1);
+    const valueEnd = candidates.length ? Math.min(...candidates) : value.length;
+    const credential = value.slice(valueStart, valueEnd);
+    if (!credential.trim() || /^(?:\\?["'])/.test(credential)) continue;
+    safe += `${value.slice(cursor, valueStart)}[redacted]`;
+    cursor = valueEnd;
+    assignments.lastIndex = cursor;
+  }
+  return `${safe}${value.slice(cursor)}`;
+}
+
 function redactStructured(value: string, secrets: readonly string[]) {
   let safe = value;
   const normalizedSecrets = [...new Set(secrets.filter(Boolean))]
@@ -172,6 +200,7 @@ function redactStructured(value: string, secrets: readonly string[]) {
     safe = safe.replaceAll(secret, "[redacted]");
   }
   safe = redactQuotedAssignments(safe);
+  safe = redactAuthorizationAssignments(safe);
   return safe.replace(
     /(^|[^A-Za-z0-9_$.-])((?:\\?["'])?)([A-Za-z0-9_$.-]+)((?:\\?["'])?\s*[:=]\s*)(?:bearer\s+)?(?:\[redacted\]|[^\\\s"',;}\])>]+)/gi,
     (match, boundary: string, keyQuote: string, identifier: string, assignment: string) =>
