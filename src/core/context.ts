@@ -51,6 +51,10 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     optionalString(body, "project_id", LIMITS.identifier),
   );
 
+  // ponytail: compilation is always anchored to now, with no caller-supplied
+  // `at`. The ceiling is that point-in-time recall is impossible even though
+  // `valid_from`/`valid_to` are stored and indexed to support it. Upgrade path:
+  // accept an optional `at` and thread it through the retrieval scope (#118).
   const now = ctx.app.now();
   const at = now.toISOString();
   const scope = { subjectId, projectId, at };

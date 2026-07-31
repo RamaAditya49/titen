@@ -57,7 +57,16 @@ export function historyStatement(
   };
 }
 
-/** Every canonical write queues its own durable, asynchronously drained work. */
+/**
+ * Every canonical write queues its own durable, asynchronously drained work.
+ *
+ * ponytail: the row is queued unconditionally, without asking whether this
+ * deployment has a vector capability to consume it. The ceiling is that on the
+ * default no-vector deployment the outbox is written on every canonical write
+ * and never drained, so it grows without bound. Upgrade path: skip the enqueue
+ * when no vector capability is configured, and retire stale pending rows in
+ * `runMaintenance` (#105).
+ */
 export function outboxStatement(
   orgId: string,
   recordType: string,

@@ -84,6 +84,12 @@ export async function serve(options: ServeOptions) {
   });
 
   // @ts-ignore - Bun global is provided by the runtime.
+  // ponytail: one process, one database handle, synchronous bun:sqlite calls on
+  // the main thread. The ceiling is that throughput is set by a single core and
+  // does not improve with client concurrency; the SQLite writer lock is never
+  // the constraint, the event loop is. Upgrade path: move database work to a
+  // worker pool, or serve read-heavy routes from additional processes over
+  // SO_REUSEPORT with one designated writer (#123).
   const server = Bun.serve({
     port: options.port,
     hostname: options.hostname,
