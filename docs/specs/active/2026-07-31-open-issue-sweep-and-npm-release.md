@@ -29,9 +29,11 @@ verified publication evidence.
 Issue #137 subsequently demonstrated that both embedding adapters trust
 successful provider payloads too far: missing or extra outputs, invalid
 provider indices, and sparse or non-finite vectors can reach the rebuildable
-semantic-index path. The same patch candidate must reject malformed embedding
-output at one shared boundary while retaining canonical SQL, FTS, and retryable
-index work.
+semantic-index path. Post-merge review also proved that the documented injected
+`EmbeddingProvider` boundary can bypass adapter validation. The same patch
+candidate must validate normalized provider results in shared core immediately
+before query or mutation while retaining canonical SQL, FTS, and retryable index
+work.
 
 Issue #138 then demonstrated that a configured semantic deployment can report
 ready while silently falling back to FTS because invalid embedding settings,
@@ -77,8 +79,9 @@ documentation, and an install smoke against the immutable npm artifact.
 - Reject non-object successful SDK envelopes at the shared response boundary,
   preserve diagnostic status, request ID, and safe response metadata in the
   resulting `TitenError`, and publish the verified correction as `0.3.1`.
-- Validate Bun HTTP and Cloudflare Workers AI embedding output through one
-  shared boundary before any vector query or mutation can consume it.
+- Validate Bun HTTP, Cloudflare Workers AI, and injected embedding-provider
+  output through shared adapter parsing plus one normalized core boundary before
+  any vector query or mutation can consume it.
 - Make semantic readiness fail closed when embedding or vector operation is
   requested but cannot be initialized safely; persist and compare the minimum
   compatible index fingerprint while preserving intentional FTS-only startup.
@@ -188,10 +191,11 @@ documentation, and an install smoke against the immutable npm artifact.
 - **AC-SWP-013 — Unwanted behavior:** If an embedding provider returns anything
   other than exactly one dense configured-dimension vector per input containing
   only finite JavaScript numbers, or supplies indices that are not unique,
-  contiguous, and in input order, then the shared Bun/Cloudflare validator shall
-  reject the output as a sanitized retryable embedder dependency failure, write
-  no vector, leave selected index work pending, and keep authorized FTS recall
-  available.
+  contiguous, and in input order, then shared adapter parsing and the normalized
+  core consumer boundary shall reject the output as a sanitized retryable
+  embedder dependency failure, write or query no vector, leave selected index
+  work pending, and keep authorized FTS recall available. The rule shall also
+  hold for a caller-supplied `EmbeddingProvider` that bypasses built-in adapters.
 - **AC-SWP-014 — Optional feature:** Where no embedding or vector capability is
   configured, Titen shall keep `/readyz` ready with FTS `enabled` and semantic
   capabilities explicitly `disabled`.

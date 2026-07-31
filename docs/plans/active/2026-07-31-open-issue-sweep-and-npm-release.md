@@ -31,6 +31,10 @@ evidence.
   shared output validator; reject malformed shape, cardinality, indices,
   density, dimensions, and values before vector query/upsert, then prove outbox
   retryability and FTS degradation behavior in both runtimes.
+- [x] Validate the normalized result at every shared-core `EmbeddingProvider`
+  consumer so an injected provider cannot send missing, wrong-dimension, or
+  non-finite vectors to query/upsert or mark index work done; cover manual drain,
+  background maintenance, and lexical degradation without duplicating adapters.
 - [x] Trace semantic configuration, vector initialization, index metadata,
   readiness, and maintenance through both runtime adapters; add migration 13
   for the minimal index fingerprint and fail configured semantic startup closed
@@ -139,10 +143,11 @@ to its merged evidence or to the concrete decision recorded here.
 - AC-SWP-012: changelog and package version diff, frozen-lockfile verification,
   focused SDK and package gates, annotated-tag peel, npm/GitHub metadata, and
   clean `0.3.1` registry smoke against the exact reviewed source.
-- AC-SWP-013: table-driven shared-validator cases plus Bun HTTP and Cloudflare
-  Workers AI contract regressions for missing/extra/index/sparse/type/finite/
-  dimension failures, no vector writes, unchanged pending outbox rows,
-  sanitized `503` metadata, and successful authorized FTS-only compile.
+- AC-SWP-013: table-driven adapter and normalized-core validator cases plus Bun
+  HTTP, Cloudflare Workers AI, and injected-provider regressions for missing/
+  extra/index/sparse/type/finite/dimension failures, no vector query or write,
+  unchanged pending outbox rows, sanitized `503` metadata, and successful
+  authorized FTS-only compile.
 - AC-SWP-014: dual-runtime FTS-only readiness tests plus a clean production
   install without `sqlite-vec` or semantic configuration.
 - AC-SWP-015: table-driven partial/invalid configuration, missing

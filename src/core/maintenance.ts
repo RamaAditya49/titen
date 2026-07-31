@@ -1,6 +1,6 @@
 import type { Db } from "./db";
 import { processWebhooks } from "./webhooks";
-import type { VectorCapability } from "./vectors";
+import { validateEmbeddingVectors, type VectorCapability } from "./vectors";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
 import { eventAccessSql } from "./events";
@@ -180,7 +180,11 @@ export async function indexPendingForOrg(
 
   let indexed = 0;
   if (eligible.length > 0) {
-    const embeddings = await vectors.embedder.embed(eligible.map((entry) => entry.statement));
+    const embeddings = validateEmbeddingVectors(
+      await vectors.embedder.embed(eligible.map((entry) => entry.statement)),
+      eligible.length,
+      vectors.embedder.dimensions,
+    );
     await vectors.store.upsert(
       eligible.map((entry, index) => ({
         id: entry.claimId,

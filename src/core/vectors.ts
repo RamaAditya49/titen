@@ -46,6 +46,25 @@ function invalidEmbeddingResponse(): never {
   throw new Error("Invalid embedding response.");
 }
 
+/** Validate the normalized extension boundary used by every core consumer. */
+export function validateEmbeddingVectors(
+  response: unknown,
+  expectedCount: number,
+  dimensions: number,
+): Float32Array[] {
+  if (!Array.isArray(response) || response.length !== expectedCount)
+    invalidEmbeddingResponse();
+  for (let position = 0; position < response.length; position += 1) {
+    if (!Object.hasOwn(response, position)) invalidEmbeddingResponse();
+    const vector = response[position];
+    if (!(vector instanceof Float32Array) || vector.length !== dimensions)
+      invalidEmbeddingResponse();
+    for (const value of vector)
+      if (!Number.isFinite(value)) invalidEmbeddingResponse();
+  }
+  return response;
+}
+
 /** Validate untrusted provider output before it can reach a vector backend. */
 export function validateEmbeddingResponse(
   response: unknown,
@@ -96,7 +115,7 @@ export function validateEmbeddingResponse(
     }
     vectors.push(vector);
   }
-  return vectors;
+  return validateEmbeddingVectors(vectors, expectedCount, dimensions);
 }
 
 /**

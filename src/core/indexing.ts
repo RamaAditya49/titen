@@ -1,6 +1,7 @@
 import { first } from "./db";
 import { unavailable, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
+import { validateEmbeddingVectors } from "./vectors";
 
 /**
  * Drains the indexing outbox into the vector store.
@@ -98,8 +99,12 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     // One embedding request for the batch, then one index write.
     let vectors;
     try {
-      vectors = await ctx.app.vectors.embedder.embed(
-        eligible.map((entry) => entry.statement),
+      vectors = validateEmbeddingVectors(
+        await ctx.app.vectors.embedder.embed(
+          eligible.map((entry) => entry.statement),
+        ),
+        eligible.length,
+        ctx.app.vectors.embedder.dimensions,
       );
     } catch {
       throw unavailable("Indexing dependency is unavailable.", {
