@@ -122,6 +122,12 @@ test("native marketplaces and host kits use the correct secret interpolation", (
   });
   for (const executable of ["extensions", "providers", "hooks"])
     assert.equal(executable in openClawManifest, false, `${executable} must stay absent`);
+  const packageManifest = json(join(claudeRoot, "package.json"));
+  assert.equal(packageManifest.name, "@ramaaditya49/titen-memory");
+  assert.equal(packageManifest.version, openClawManifest.version);
+  assert.equal(packageManifest.private, true);
+  for (const executable of ["scripts", "dependencies", "devDependencies"])
+    assert.equal(executable in packageManifest, false, `${executable} must stay absent`);
   assertRemoteConfig(
     json(join(claudeRoot, ".mcp.json")),
     "${TITEN_MCP_URL}",
