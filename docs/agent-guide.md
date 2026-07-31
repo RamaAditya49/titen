@@ -252,16 +252,41 @@ endpoint uses the stable `INVALID_RESPONSE` code.
 Titen speaks MCP over HTTP at `/mcp`, so an agent host can use it without the
 SDK. The endpoint is authenticated: pass the API key as a bearer token.
 
-```json
-{
-  "mcpServers": {
-    "titen": {
-      "url": "http://127.0.0.1:8787/mcp",
-      "headers": { "Authorization": "Bearer titen_sk_..." }
-    }
-  }
-}
+### Codex reference plugin
+
+The repository marketplace ships one skills-only reference plugin. Codex cannot
+interpolate a self-hosted URL inside a plugin `.mcp.json`, so the connection stays
+in user-level configuration rather than choosing an instance on the operator's
+behalf:
+
+```bash
+codex plugin marketplace add RamaAditya49/titen --ref main \
+  --sparse .agents/plugins --sparse plugins/titen-memory
+codex plugin add titen-memory@titen
+codex mcp add titen --url "${TITEN_URL%/}/mcp" \
+  --bearer-token-env-var TITEN_API_KEY
 ```
+
+Set `TITEN_URL` and `TITEN_API_KEY` in the host's secret-aware environment
+before running the connection command. Then keep the ordinary-agent allowlist
+and write approval in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.titen]
+enabled_tools = [
+  "titen_remember",
+  "titen_compile",
+  "titen_feedback",
+  "titen_checkpoint_save",
+  "titen_checkpoint_get",
+  "titen_lease_acquire",
+  "titen_handoff",
+]
+default_tools_approval_mode = "writes"
+```
+
+Start a new Codex thread after installation and invoke `$titen-memory`. The
+plugin contains no endpoint, credential, hook, proxy, or duplicate memory logic.
 
 Tools: `titen_remember`, `titen_compile`, `titen_feedback`,
 `titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`,
@@ -270,8 +295,9 @@ Tools: `titen_remember`, `titen_compile`, `titen_feedback`,
 Protocol notes, verified against a real handshake:
 
 - the response body is the JSON-RPC object itself, with no wrapper;
-- `initialize` echoes your `protocolVersion` when it is one of `2025-06-18`,
-  `2025-03-26`, or `2024-11-05`, so an older client is not forced forward;
+- `initialize` echoes your `protocolVersion` when it is one of `2025-11-25`,
+  `2025-06-18`, `2025-03-26`, or `2024-11-05`, so an older client is not forced
+  forward;
 - notifications such as `notifications/initialized` receive `202` with an empty
   body and never a reply;
 - `ping` is supported, and request batches are answered per id;
