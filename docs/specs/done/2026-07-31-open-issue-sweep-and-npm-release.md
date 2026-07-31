@@ -1,12 +1,11 @@
 ---
 work_id: open-issue-sweep-and-npm-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
 ---
 # Open issue sweep and npm release
@@ -38,8 +37,9 @@ documentation, and an install smoke against the immutable npm artifact.
   through a reviewed pull request or document why it is superseded before
   removing the remote branch.
 - Rewrite the public README for an international open-source audience, link
-  `https://titen.dev` prominently, preserve shipped-package link constraints,
-  and run the `seng-jelas` prose checker.
+  `https://titen.dev` prominently, retain the `Built with C.A.D.I.S Agent`
+  credit, preserve shipped-package link constraints, and run the `seng-jelas`
+  prose checker.
 - Select the smallest SemVer release justified by the merged batch, publish the
   exact verified candidate to npm, create the matching annotated tag and GitHub
   release, and smoke the registry artifact.
@@ -67,8 +67,9 @@ documentation, and an install smoke against the immutable npm artifact.
   must be packed, installed, and exercised before publication.
 - Parallel agents work in isolated worktrees and commit with the repository's
   required attribution. Integration happens once on the release branch.
-- Titen does not use GitHub Actions; issue #117 cannot override that project
-  decision without a new direct maintainer decision.
+- Titen does not use GitHub Actions so the repository incurs no hosted
+  automation cost; issue #117 cannot override that project decision without a
+  new direct maintainer decision and budget.
 - The dashboard remains synthetic where current docs say it is synthetic. A
   polished website is not runtime evidence for the memory API.
 
@@ -90,15 +91,16 @@ documentation, and an install smoke against the immutable npm artifact.
 - **AC-SWP-004 — Event-driven:** When a reader opens the repository or the npm
   package README, Titen shall present a concise English open-source entrypoint,
   a working `https://titen.dev` link, runnable installation and first-use steps,
-  truthful runtime and maturity boundaries, and absolute links for files omitted
-  from the npm tarball.
+  truthful runtime and maturity boundaries, the `Built with C.A.D.I.S Agent`
+  credit, and absolute links for files omitted from the npm tarball.
 - **AC-SWP-005 — Unwanted behavior:** If the README contains a `seng-jelas`
   strict finding, a repository-relative packaged link, or an unsupported live
   capability claim, then the release candidate shall fail its documentation or
   package gate.
 - **AC-SWP-006 — Ubiquitous:** Titen shall keep GitHub Actions disabled and
   shall perform verification, integration, publication, and release evidence
-  through the documented manual workflow.
+  through the documented manual workflow so the repository has no hosted
+  automation cost.
 - **AC-SWP-007 — Event-driven:** When the merged batch is ready to release,
   Titen shall choose the smallest SemVer bump allowed by the highest public API
   impact, move the exact `Unreleased` entries under that version, and make
@@ -125,3 +127,19 @@ match the shipped artifact; every mapped gate passes; npm `latest`, the
 annotated tag, the GitHub release, and the release commit agree; a clean install
 smoke passes; the original dirty checkout is unchanged; and this spec and its
 paired plan move to `done` with terminal evidence.
+
+## Closure evidence
+
+All 44 issues that were open at sweep start received a public resolution.
+Reviewed pull requests #131 and #132 merged the implementation and restored the
+C.A.D.I.S credit; the two merged remote topic branches were then removed. The
+release commit `9f10bfd625ba947897056f1dbc0ab7bfc4ce6304` passed the complete
+manual gate and was published as npm `titen-memory@0.3.0`, annotated tag
+`v0.3.0`, and the public GitHub release. A clean registry install exercised
+both SDK exports, the installed CLI, schema 12, all nine MCP tools, and a custom
+global npm prefix.
+
+The final GitHub audit found zero open issues, zero open pull requests, Actions
+disabled, and only `main` as a persistent remote head. The original checkout,
+tracked diff, stash objects, and five named untracked files retained their
+starting hashes.

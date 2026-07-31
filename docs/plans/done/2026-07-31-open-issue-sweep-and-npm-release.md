@@ -1,20 +1,19 @@
 ---
 work_id: open-issue-sweep-and-npm-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-07-31
 updated: 2026-07-31
-review_after: 2026-08-14
 owner: CADIS
-spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
+spec: docs/specs/done/2026-07-31-open-issue-sweep-and-npm-release.md
 ---
 # Plan
 
 - [x] Capture the immutable starting inventory: local WIP/stash, remote heads,
   open issues and pull requests, tags/releases, npm metadata, and Actions state.
-- [ ] Review and integrate or explicitly supersede every remote topic branch;
+- [x] Review and integrate or explicitly supersede every remote topic branch;
   validate its completed workflow artifacts and remove only a merged branch.
 - [x] Build an issue resolution matrix, group shared root causes, and update this
   spec first if a verified issue requires scope outside its current boundaries.
@@ -25,16 +24,16 @@ spec: docs/specs/active/2026-07-31-open-issue-sweep-and-npm-release.md
 - [x] Run focused checks after each integration, then the complete local manual
   gate: route/workflow checks, API/integration/browser tests, package smoke,
   production dependency audit, secret scan, and `git diff --check`.
-- [ ] Resolve every starting GitHub issue with its merged evidence, exact
+- [x] Resolve every starting GitHub issue with its merged evidence, exact
   duplicate, or concrete Ponytail not-planned reason; verify zero accidental
   closures and no open pull request.
-- [ ] Finalize the changelog and smallest valid SemVer version, close this
+- [x] Finalize the changelog and smallest valid SemVer version, close this
   spec/plan pair with exact evidence, merge the reviewed release pull request,
   and verify the exact merge source before publication.
-- [ ] From a clean detached checkout of the release commit, run the irreversible
+- [x] From a clean detached checkout of the release commit, run the irreversible
   prepublish gate, publish npm manually, push the annotated tag, generate the
   GitHub release from the changelog, and smoke a clean registry install.
-- [ ] Remove only merged temporary branches/worktrees, re-audit GitHub/npm and
+- [x] Remove only merged temporary branches/worktrees, re-audit GitHub/npm and
   the preserved original checkout, then record the durable non-secret handoff.
 
 ## Issue disposition
@@ -59,7 +58,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #96 | Close as duplicate of #80. |
 | #80, #81, #87, #90 | Close not planned: explicit conflict evidence, the current remote MCP boundary, full explainability, and host support remain deliberate until their recorded triggers occur. |
 | #115 | Close the in-core token-bucket proposal not planned; rate limits stay at authenticated ingress where Cloudflare and VPS controls are authoritative. |
-| #117 | Close not planned because manual npm publication and disabled GitHub Actions are an explicit project decision. |
+| #117 | Close not planned because Actions are intentionally disabled to keep the repository free of hosted automation cost; publication remains manual. |
 | #123 | Record and retain the single-process ceiling, then close worker pools/sharding until measured small-team demand breaches it. |
 | #124 | Make FULL durability explicit and retain synchronous context-run evidence; close NORMAL/async persistence as incompatible with acknowledged-write and feedback provenance requirements. |
 
@@ -98,3 +97,54 @@ rollback is a reviewed revert. After npm publish, a bad immutable artifact must
 be deprecated and replaced by a corrected patch; unpublish is not the rollback
 plan. The user's original dirty checkout is never a release source or rollback
 mechanism.
+
+## Verification evidence
+
+- Integration: PR
+  [#131](https://github.com/RamaAditya49/titen/pull/131) merged the issue
+  sweep; PR [#132](https://github.com/RamaAditya49/titen/pull/132) restored the
+  requested C.A.D.I.S credit. Their merge commits carry the required CADIS
+  trailer.
+- GitHub disposition: all 44 starting issues were closed with a merged fix,
+  duplicate/meta closure, or explicit not-planned reason. Final queries returned
+  zero open issues and zero open pull requests. The two merged remote topic
+  branches were deleted and the release audit found only `refs/heads/main`.
+- Release identity: npm `titen-memory@0.3.0`, annotated tag `v0.3.0`, and
+  [GitHub Release v0.3.0](https://github.com/RamaAditya49/titen/releases/tag/v0.3.0)
+  all identify release commit
+  `9f10bfd625ba947897056f1dbc0ab7bfc4ce6304`. Tag object
+  `7ff8b3d5a802d68e4af8403d27174824712c3f11` peels to that commit.
+- Registry identity: npm `latest` is `0.3.0`; SHA-1 is
+  `568d56175257f515ee3c79c7672d62bc39c07dda`; integrity is
+  `sha512-R49HwOllKtfn3psuNz4WBW0vVrqJteuGwjatH25djqh4RA5hqbyM5hbd+nlNFtkvlkhuAMmiXrARFodp/wTR/w==`.
+  The registry tarball contains 46 files.
+- Registry smoke: a fresh `npm install titen-memory@0.3.0` installed no runtime
+  dependency, imported `TitenClient` and `TitenError` from the root and SDK
+  subpath, explained the missing-Bun path, bootstrapped and served a schema-12
+  database, negotiated MCP revision `2025-11-25`, listed all nine tools, and
+  ran from a custom global prefix.
+- Final manual gate: D1 contract 91 passed; Bun/vector/SDK 112 passed;
+  integration 82 passed; browser 10 passed; the live dashboard adapter,
+  workflow checker/self-test (44 artifacts), 56-route checker, package smoke,
+  production audit, secret scan, and diff check passed. The first loaded-host
+  run exposed one Miniflare shim flake; isolated targeted D1 ran 30/30, a full
+  API run passed 203/203, and the final clean `pnpm test:all` passed without
+  weakening the concurrency contract or adding a retry.
+- Documentation: `https://titen.dev` and `https://cadis.digital/` returned
+  HTTP 200. The published README prominently links Titen's website, retains
+  `Built with C.A.D.I.S Agent`, and reports zero strict `seng-jelas`
+  findings.
+- Cost policy: repository Actions permission is `enabled: false` and there is
+  no workflow. Manual local gates are deliberate because the maintainer wants
+  the repository to incur no hosted automation cost.
+- Preservation: the original checkout stayed on
+  `b19bd917e6dec493261109ad1693097fbb47d7dc`; its tracked diff SHA-256 remained
+  `9a3fdfe6f36938bfed608fb30c93b37109bc13ada8f860c9c30612ab44347c88`.
+  Stash objects remained `d99c8e3a957f9e4b5d2629ad63f481f377e71421`,
+  `fd9181b0fc62221849300c85e071fe8fd7b7c547`,
+  `104a17d4e7a0d496b091c746eea7f222d77f516a`, and
+  `9f2a2fc918f5af4ba4093ba8752d8832539616be`; all five named untracked-file
+  hashes also matched the starting inventory.
+- Durable handoff: the verified release outcome and the maintainer's zero-cost
+  Actions rationale were stored in repository-scoped `mem0-coding`. No
+  credential, prompt, memory content, or raw command transcript was stored.
