@@ -394,8 +394,10 @@ Required behavior:
 - repair vector mutations from a durable outbox.
 
 Current implementation note: adapters carry the configured embedding model and
-dimensions, and the Bun HTTP embedder rejects a returned vector with the wrong
-length. Titen does not yet persist or compare a complete index fingerprint.
+dimensions. Bun HTTP and Cloudflare Workers AI share validation for exact output
+cardinality, ordered provider indices when present, dense dimensions, and finite
+numeric coordinates. Titen does not yet persist or compare a complete index
+fingerprint.
 
 Proposed compatibility requirements:
 

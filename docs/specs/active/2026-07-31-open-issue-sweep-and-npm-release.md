@@ -26,6 +26,13 @@ smallest compatible patch release, `0.3.1`. Any terminal closure drafted for
 the `0.3.0` sweep is withdrawn; this pair remains active until the patch has
 verified publication evidence.
 
+Issue #137 subsequently demonstrated that both embedding adapters trust
+successful provider payloads too far: missing or extra outputs, invalid
+provider indices, and sparse or non-finite vectors can reach the rebuildable
+semantic-index path. The same patch candidate must reject malformed embedding
+output at one shared boundary while retaining canonical SQL, FTS, and retryable
+index work.
+
 Treating every report as a feature request would add speculative machinery;
 closing every report without checking it would hide real defects. The release
 needs an issue-by-issue resolution, current branch integration, accurate public
@@ -53,6 +60,8 @@ documentation, and an install smoke against the immutable npm artifact.
 - Reject non-object successful SDK envelopes at the shared response boundary,
   preserve diagnostic status, request ID, and safe response metadata in the
   resulting `TitenError`, and publish the verified correction as `0.3.1`.
+- Validate Bun HTTP and Cloudflare Workers AI embedding output through one
+  shared boundary before any vector query or mutation can consume it.
 - Preserve the user's dirty original checkout and existing stash byte-for-byte.
 
 ## Out of scope
@@ -136,6 +145,13 @@ documentation, and an install smoke against the immutable npm artifact.
   Titen shall publish the same verified source as the backward-compatible
   `0.3.1` npm patch, annotated tag, and GitHub release; valid object envelopes
   shall retain their current behavior.
+- **AC-SWP-013 — Unwanted behavior:** If an embedding provider returns anything
+  other than exactly one dense configured-dimension vector per input containing
+  only finite JavaScript numbers, or supplies indices that are not unique,
+  contiguous, and in input order, then the shared Bun/Cloudflare validator shall
+  reject the output as a sanitized retryable embedder dependency failure, write
+  no vector, leave selected index work pending, and keep authorized FTS recall
+  available.
 
 ## Done conditions
 
@@ -147,4 +163,5 @@ annotated tag, the GitHub release, and the release commit agree; a clean install
 smoke passes; the original dirty checkout is unchanged; and this spec and its
 paired plan move to `done` with terminal evidence. The post-release issue #133
 is resolved by the verified `0.3.1` patch rather than by altering the immutable
-`0.3.0` artifact.
+`0.3.0` artifact. Issue #137 is resolved only after malformed-output regressions
+pass against the shared validator and both runtime paths.

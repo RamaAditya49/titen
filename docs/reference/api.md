@@ -283,6 +283,12 @@ store. If embedding or vector-store upsert is unavailable, the response is
 by the bounded request. No selected outbox row advances on either dependency
 failure, so the same batch can be retried after recovery.
 
+Both built-in embedding adapters require exactly one dense, configured-length
+vector per input and reject non-numeric or non-finite coordinates. Provider
+indices, when present, must be the ordered contiguous range starting at zero.
+Malformed successful provider output follows the same safe retryable embedder
+failure path before any vector upsert; canonical SQL and FTS remain available.
+
 ### `GET /v1/claims/:id/evidence`
 
 Return an authorized claim and its supporting, contradicting, and qualifying

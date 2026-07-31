@@ -595,11 +595,13 @@ instead of hiding the delay.
 
 ### Proposed embedding fingerprint contract
 
-Current adapters carry a configured model identifier and dimensions. The Bun
-HTTP embedder rejects returned vectors with the wrong length, while current
-readiness reports only the generic embedder/vector capability state. Titen does
-not yet persist or compare a complete index fingerprint, probe the provider at
-startup, or fail readiness on a fingerprint mismatch.
+Current adapters carry a configured model identifier and dimensions. Bun HTTP
+and Cloudflare Workers AI share one validator for exact output cardinality,
+ordered provider indices when present, dense dimensions, and finite numeric
+coordinates. Current readiness still reports only the generic embedder/vector
+capability state. Titen does not yet persist or compare a complete index
+fingerprint, probe the provider at startup, or fail readiness on a fingerprint
+mismatch.
 
 The proposed contract binds every semantic index to a fingerprint containing at
 least:
