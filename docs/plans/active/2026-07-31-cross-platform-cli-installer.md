@@ -1,7 +1,7 @@
 ---
 work_id: cross-platform-cli-installer
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-07-31
@@ -12,7 +12,7 @@ spec: docs/specs/active/2026-07-31-cross-platform-cli-installer.md
 ---
 # Plan
 
-- [ ] Replace the Node launcher with the existing Bun CLI entrypoint, add a read-only exact `--version` response, request Yarn unpacking, and remove only the obsolete shim.
+- [ ] Replace the Node launcher with the existing Bun CLI entrypoint, add a read-only exact `--version` response, and remove only the obsolete shim.
 - [ ] Extend the CLI and packed-artifact checks for version/help side effects, Bun global execution without Node, npm/pnpm global prefixes, and supported one-off runners.
 - [ ] Update package, release, README, and deployment documentation without changing runtime semantics or adding dependencies.
 - [ ] Rebase onto current `origin/main`, run focused CLI/package checks and the full required local gate, review the packed tarball, and merge the Titen change.
@@ -29,7 +29,7 @@ spec: docs/specs/active/2026-07-31-cross-platform-cli-installer.md
 - AC-INS-002: Bash syntax/self-checks and isolated clean-prefix install against the published artifact.
 - AC-INS-003: PowerShell parser/self-checks and native Windows evidence when a reachable Windows host is available; otherwise the endpoint shall not be claimed complete.
 - AC-INS-004: table-driven invalid-version self-checks for both installers with package-manager invocation guards.
-- AC-INS-005: `scripts/verify-pack.sh` and exact registry one-off/global runner transcript.
+- AC-INS-005: `scripts/verify-pack.sh`, exact registry one-off/global runner transcript, and an explicit Yarn CLI boundary in the install guide.
 - AC-INS-006: clean install directory inventory and absence of Titen database/key/server side effects.
 - AC-INS-007: source/deployed SHA-256, GET/HEAD status, redirect count, content type, cache, ETag, and `nosniff` on both hostnames.
 - AC-INS-008: docs gate, static build, generated Markdown/llms checks, and rendered production command markers.

@@ -21,6 +21,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ### Fixed
 
+- Global CLI installs now run directly on Bun and report `titen --version`
+  instead of requiring a Node shim.
 - Successful SDK responses now reject array, `null`, and primitive JSON
   envelopes with an `INVALID_RESPONSE` `TitenError` while preserving the HTTP
   status, request ID, and safe response metadata.

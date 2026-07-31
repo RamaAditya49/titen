@@ -17,10 +17,10 @@ bunx titen-memory serve
 curl http://127.0.0.1:8787/healthz
 ```
 
-The `titen` CLI runs on Bun because it uses `bun:sqlite`. The published Node
-shim starts Bun and prints an installation link instead of a raw `env` error
-when Bun is missing. The SDK (`import { TitenClient } from "titen-memory"`) is
-plain `fetch` and runs on Node 22+, Bun, Deno, and workers alike.
+The published `titen` executable runs directly on Bun because it uses
+`bun:sqlite`; npm and pnpm installation paths still require Bun on `PATH`. The
+SDK (`import { TitenClient } from "titen-memory"`) is plain `fetch` and runs on
+Node 22+, Bun, Deno, and workers alike.
 
 ## Quick start from a clone
 

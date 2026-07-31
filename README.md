@@ -62,14 +62,22 @@ The server requires [Bun 1.2 or newer](https://bun.sh/). Bootstrap the first
 organization from the npm package:
 
 ```bash
-bunx titen-memory bootstrap --org "My Org"
+bun add --global titen-memory@latest
+titen --version
+titen bootstrap --org "My Org"
 ```
+
+`npm install --global titen-memory@latest` and
+`pnpm add --global titen-memory@latest` expose the same command when Bun is on
+`PATH`. For a one-off run use `bunx --bun titen-memory@latest`; Yarn remains a
+supported SDK dependency manager, but its Node-owned `dlx` runner does not run
+the Bun TypeScript CLI.
 
 Save the printed API key when it appears. Titen stores only its hash and cannot
 show the key again. Start the service from the same directory:
 
 ```bash
-bunx titen-memory serve
+titen serve
 ```
 
 The default listener is `http://127.0.0.1:8787`. Check it from another shell:

@@ -1,7 +1,7 @@
 ---
 work_id: cross-platform-cli-installer
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-07-31
@@ -23,8 +23,9 @@ one-off commands but no verified persistent cross-platform installation path.
 
 - Make the published `titen` executable run directly on Bun and report its
   package version without creating state.
-- Keep one npm package and verify its executable through Bun, npm, pnpm, and
-  Yarn's supported one-off path.
+- Keep one npm package and verify its executable through Bun, npm, and pnpm;
+  document that Yarn users run the Bun-owned CLI path rather than a Node-owned
+  `yarn dlx` shim.
 - Serve a small Bash installer for macOS/Linux/WSL and a PowerShell installer
   for native Windows from `titen.dev`.
 - Install current-user CLI tooling only, bootstrap Bun from its official
@@ -41,6 +42,8 @@ one-off commands but no verified persistent cross-platform installation path.
   Scheduled Tasks, or database deletion.
 - A self-updater, compiled standalone binaries, Docker changes, Homebrew, apt,
   WinGet, Scoop, Chocolatey, or separate package-manager wrappers.
+- A compiled JavaScript launcher solely for `yarn dlx`; Yarn remains supported
+  for SDK dependencies while the Bun CLI uses `bunx --bun`.
 - GitHub Actions or automated npm/Cloudflare deployment.
 
 ## Constraints and risks
@@ -62,7 +65,7 @@ one-off commands but no verified persistent cross-platform installation path.
 - **AC-INS-002 — Event-driven:** When a macOS, Linux, or WSL user runs `install.sh` with no compatible Bun on `PATH`, the installer shall install Bun for the current user, install `titen-memory` at `latest` or the requested exact SemVer, verify the exact `titen --version` result, and use no elevated privilege.
 - **AC-INS-003 — Event-driven:** When a native Windows user runs `install.ps1` from Windows PowerShell 5.1 or PowerShell 7, the installer shall perform the same current-user Bun and Titen installation contract and shall not change execution policy.
 - **AC-INS-004 — Unwanted behavior:** If an installer receives a version other than `latest` or an exact stable SemVer, then it shall exit non-zero before invoking a package manager or creating Titen state.
-- **AC-INS-005 — Ubiquitous:** Titen shall expose one `titen` package executable that passes packed-artifact smoke through Bun global install, npm global install, pnpm global install, `bunx --bun`, `npx`, `pnpm dlx`, and Yarn `dlx` when Yarn uses its supported unpacked package contract.
+- **AC-INS-005 — Ubiquitous:** Titen shall expose one `titen` package executable that passes packed-artifact smoke through Bun global install, npm global install, pnpm global install, `bunx --bun`, `npx`, and `pnpm dlx`; documentation shall not claim that Node-owned `yarn dlx` can execute the Bun TypeScript CLI.
 - **AC-INS-006 — Ubiquitous:** Installing or reinstalling the CLI shall not bootstrap an organization, print an API key, start a server, install a service, or delete a database, backup, or configuration.
 - **AC-INS-007 — Event-driven:** When `titen.dev` is deployed, `/install.sh` and `/install.ps1` shall return the reviewed source bytes with `200`, a non-HTML text content type, `nosniff`, revalidation caching, and no redirect on both canonical hostnames.
 - **AC-INS-008 — Event-driven:** When a reader opens the landing page, Quickstart, generated Markdown, `llms.txt`, or the install guide, Titen shall present discoverable OS and package-manager commands without hard-coding the mutable npm latest version and shall distinguish CLI installation from SDK dependency installation.
