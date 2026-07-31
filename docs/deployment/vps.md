@@ -292,9 +292,14 @@ yourself:
 ```bash
 curl -sX POST http://127.0.0.1:8787/v1/index/drain?limit=50 \
   -H "authorization: Bearer $TITEN_KEY"
+curl -sX POST http://127.0.0.1:8787/v1/enrichment/drain?limit=1 \
+  -H "authorization: Bearer $TITEN_KEY"
 curl -sX POST http://127.0.0.1:8787/v1/webhooks/deliver \
   -H "authorization: Bearer $TITEN_KEY"
 ```
+
+The key used for the enrichment command requires `enrichment:write`. Keep the
+extraction tuple absent when automatic enrichment is not intended.
 
 On Cloudflare there is no in-process timer, so the Worker exposes a `scheduled`
 handler instead. Add a Cron Trigger to `wrangler.jsonc`:

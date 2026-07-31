@@ -81,12 +81,28 @@ model boundary and trigger the same bounded maintenance drain.
 - Refuse reflection ADD over any unresolved disputed premise. Model output may
   not select one side of an existing conflict or discard contradicting and
   qualifying source relations (#172).
+- Require every reflection ADD to cite the complete ordered job-input snapshot.
+  A model may not create a derived assertion whose durable provenance omits one
+  of the premises supplied to that model (#176).
 - Revoke any current reflection ADD result in the same atomic lifecycle batch
   when one of its exact premises is superseded, revoked, or expired. A stale
   derived result must not remain recallable or make Titen's own logical export
   impossible to restore.
 - Freeze Indonesian, English, and Javanese-in-Indonesian derivation/reflection
   fixtures and replay the same core contract on SQLite and D1.
+- Keep the bundled D1 contract self-contained with its tracked multilingual
+  fixture and a case timeout that covers measured local workerd execution
+  without weakening semantic assertions (#174).
+- Expose only content-free categorical enrichment health on unauthenticated
+  readiness; do not expose deployment-wide job counts or add a new numeric
+  operator endpoint without a requirement (#177).
+- Keep current operator and contributor documentation aligned on implemented
+  opt-in behavior versus uncompleted production activation, including the
+  external scheduler drain command and an explicit supersession note on the
+  historical model-evaluation record (#175).
+- Maintain the Ponytail debt ledger as an exact local/manual inventory of live
+  tracked marker locations and their source-owned ceilings, triggers, or
+  explicit no-trigger status, without adding hosted automation (#173).
 
 ## Out of scope
 
@@ -136,6 +152,12 @@ model boundary and trigger the same bounded maintenance drain.
 - Disputed status is canonical conflict evidence. Reflection may abstain or add
   non-authoritative candidate links, but it cannot turn a disputed premise or a
   mixed active/disputed cluster into a clean active assertion.
+- A reflection prompt is one immutable snapshot. Accepting only a subset of its
+  premises creates provenance that cannot be revoked or ported safely, so ADD
+  validation must compare the proposal against the complete ordered input before
+  any semantic mutation.
+- Readiness is public deployment metadata. Exact enrichment queue counts are
+  operational data and must not cross the unauthenticated boundary.
 - Migrations 13 and 14 belong to semantic-index readiness work in issue #138;
   this feature owns additive migration 15.
 
@@ -268,6 +290,33 @@ model boundary and trigger the same bounded maintenance drain.
   logical import/export shall reject reflection-generated claims as nested
   reflection premises, so this bounded direct cascade is complete and the
   resulting historical provenance remains self-restorable.
+- **AC-ENR-026 — Unwanted behavior:** If a reflection ADD proposal omits,
+  duplicates, reorders, or adds any premise relative to the complete authorized
+  job-input snapshot, or if any required premise is foreign, stale, or no longer
+  authorized at commit time, then Titen shall terminally reject the proposal
+  before semantic mutation. A valid reflection ADD shall persist exactly one
+  `derived_from` link for every ordered input premise, and any input lifecycle
+  transition shall continue to revoke the result atomically (#176).
+- **AC-ENR-027 — Ubiquitous:** The repository-owned bundled D1 contract shall
+  include the frozen enrichment fixture without relying on an untracked output
+  path and shall declare a per-case timeout above the measured enrichment-case
+  duration. Removing the fixture shall fail the build or test deterministically
+  on supported Node runtimes (#174).
+- **AC-ENR-028 — Ubiquitous:** Unauthenticated `/readyz` shall expose only a
+  categorical enrichment state and no pending, leased, failed, due, total, or
+  other numeric job count. Changing another organization's queue cardinality
+  without changing the category shall not change the public response, and no
+  new count-bearing endpoint shall be introduced (#177).
+- **AC-ENR-029 — Ubiquitous:** Current repository and deployment documentation
+  shall describe enrichment as implemented and opt-in, distinguish that state
+  from production activation, document `POST /v1/enrichment/drain` for external
+  VPS scheduling, and label the dated pre-implementation research status as
+  superseded without rewriting its historical findings (#175).
+- **AC-ENR-030 — Ubiquitous:** A local Ponytail debt audit shall map every live
+  tracked `ponytail:` marker to exactly one current `file:line` ledger entry,
+  derive ceilings and triggers only from source text, identify markers with no
+  source trigger explicitly, and require no GitHub Actions or other hosted
+  automation (#173).
 
 ## Done conditions
 

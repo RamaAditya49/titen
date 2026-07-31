@@ -301,37 +301,24 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   if (canonicalReady && schemaReady && ctx.app.migrationsReady) {
     try {
       const [jobs] = await ctx.app.db.all<{
-        pending: number;
-        leased: number;
         failed: number;
-        due: number;
+        backlog: number;
       }>(
         `SELECT
-           SUM(CASE WHEN state = 'pending' THEN 1 ELSE 0 END) AS pending,
-           SUM(CASE WHEN state = 'leased' THEN 1 ELSE 0 END) AS leased,
-           SUM(CASE WHEN state = 'failed' THEN 1 ELSE 0 END) AS failed,
-           SUM(CASE WHEN state = 'pending' AND next_attempt_at <= ? THEN 1 ELSE 0 END) AS due
-         FROM enrichment_jobs`,
-        [ctx.app.now().toISOString()],
+           EXISTS(SELECT 1 FROM enrichment_jobs WHERE state = 'failed') AS failed,
+           EXISTS(SELECT 1 FROM enrichment_jobs
+                   WHERE state IN ('pending', 'leased')) AS backlog`,
       );
-      const pending = Number(jobs?.pending ?? 0);
-      const leased = Number(jobs?.leased ?? 0);
-      const failed = Number(jobs?.failed ?? 0);
-      const due = Number(jobs?.due ?? 0);
       checks.enrichment_jobs = {
         state: ctx.app.modelCapabilities.extraction === "configured_error"
           ? "configured_error"
-          : failed > 0
+          : Number(jobs?.failed ?? 0) > 0
             ? "terminal_error"
-            : pending + leased > 0
+            : Number(jobs?.backlog ?? 0) > 0
               ? "backlog"
               : ctx.app.modelCapabilities.extraction === "enabled"
                 ? "idle"
                 : "disabled",
-        pending,
-        leased,
-        failed,
-        due,
       };
     } catch {
       checks.enrichment_jobs = { state: "unavailable" };

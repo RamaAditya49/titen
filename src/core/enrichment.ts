@@ -1222,6 +1222,13 @@ function additions(
       input.allowedIds,
       idField === "evidence_ids" ? 1 : ENRICHMENT_MAX_PREMISES,
     );
+    if (
+      input.lane === "reflection"
+      && (
+        citations.length !== input.premiseRows.length
+        || citations.some((id, index) => id !== input.premiseRows[index]!.id)
+      )
+    ) throw new EnrichmentFailure("unsafe_output");
     const proposedValidFrom = timestamp(entry, "valid_from");
     const validFrom = proposedValidFrom ?? (
       input.lane === "reflection"

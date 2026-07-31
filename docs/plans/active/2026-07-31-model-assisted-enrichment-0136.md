@@ -60,6 +60,23 @@ spec: docs/specs/active/2026-07-31-model-assisted-enrichment-0136.md
   revoke, or expire; remove FTS/vector projections, reject nested reflection
   premises at logical boundaries, and prove exact self-round-trip afterward.
   (AC-ENR-025; #150)
+- [ ] Require a reflection ADD to cite the complete ordered job-input snapshot,
+  reject partial/duplicate/reordered/foreign/stale inputs before mutation, and
+  prove exact provenance plus lifecycle propagation on both runtime contracts.
+  (AC-ENR-026; #176)
+- [x] Bundle the tracked multilingual fixture into the D1 contract artifact and
+  give the measured enrichment case a truthful explicit timeout, with a
+  deterministic missing-fixture build failure. (AC-ENR-027; #174)
+- [ ] Remove deployment-wide enrichment counts from public readiness and add an
+  adversarial cardinality test that proves the categorical response has no
+  numeric count influence. Do not add an unrequested operator-count surface.
+  (AC-ENR-028; #177)
+- [x] Align repository, deployment, scheduler, and historical evaluation docs
+  on implemented opt-in enrichment versus still-blocked production activation.
+  (AC-ENR-029; #175)
+- [x] Rebuild the Ponytail debt ledger from live tracked marker identities and
+  add the smallest local/manual exactness check; keep hosted automation absent.
+  (AC-ENR-030; #173)
 - [x] Implement one native-fetch OpenAI-compatible extraction adapter with
   explicit endpoint/model/fingerprint/timeout configuration and strict local
   response-size handling; wire it into Bun timer/manual drain and Cloudflare
@@ -136,14 +153,30 @@ spec: docs/specs/active/2026-07-31-model-assisted-enrichment-0136.md
 - AC-ENR-025: dual-runtime premise supersede/revoke/expire propagation, FTS and
   vector-delete projection assertions, nested-reflection import/export
   rejection, and post-transition exact export/import replay.
+- AC-ENR-026: dual-runtime partial, duplicate, reordered, foreign, stale, and
+  complete reflection ADD cases; unchanged semantic tables on rejection; exact
+  `derived_from` rows and lifecycle propagation for every accepted premise.
+- AC-ENR-027: a bundled-D1 artifact inspection proving fixture data is embedded,
+  a missing-fixture build failure, and the held D1 contract on supported Node
+  versions once the shared Miniflare lane is released.
+- AC-ENR-028: public readiness snapshots before and after another organization
+  changes queue cardinality, with identical categorical JSON and no numeric job
+  fields, replayed through SQLite and D1.
+- AC-ENR-029: claim audit across `AGENTS.md`, deployment docs, external scheduler
+  examples, and the dated model-evaluation record.
+- AC-ENR-030: exact live-marker-to-ledger identity comparison, source-derived
+  ceiling/trigger inspection, explicit no-trigger count, and a clean local
+  workflow run without GitHub Actions.
 
 ## Current verification
 
-- Bun/SQLite contract: 90 passed, 0 failed.
-- Integration suite: 160 passed, 0 failed.
-- Worker dry-build: 446.21 KiB upload / 95.07 KiB gzip.
-- npm build and package dry-run, Astro build, 57-route documentation check,
-  50-artifact workflow check plus self-test, and `git diff --check`: passed.
+- Bun/SQLite contract: 90 passed, 0 failed; focused vector/SDK unit suite:
+  28 passed, 0 failed.
+- Integration suite: 164 passed, 0 failed.
+- Worker dry-build: 446.02 KiB upload / 95.03 KiB gzip.
+- npm build and package dry-run, bundled-D1 artifact with embedded tracked
+  fixture, 57-route documentation check, 52-artifact workflow check plus
+  self-test, exact 19-marker Ponytail audit, and `git diff --check`: passed.
 - Independent source/Bun review: passed. D1/workerd execution remains held for
   the shared redaction gate; locked evaluation and real Cloudflare Paid D1,
   VPS, and local-computer smokes remain incomplete activation evidence.

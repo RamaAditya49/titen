@@ -26,10 +26,12 @@ delivery evidence and may preserve superseded decisions.
 The repository contains a verified P0 memory service with a shared TypeScript
 core, a Cloudflare Worker/D1 adapter, and a Bun/SQLite adapter. The
 dual-runtime contract suite passes on both runtimes. Automatic model-assisted
-derivation/reflection is not implemented; the current model capability is the
-optional embedder. The Astro dashboard preview continues to use a synthetic
-fixture independently of the memory API. Do not present either planned
-enrichment or the synthetic dashboard as live service evidence.
+derivation/reflection is implemented as an optional durable enrichment pipeline
+and remains disabled unless its complete extraction configuration is present.
+It is not production-activated until the locked evaluation and real runtime
+smokes are complete. The Astro dashboard preview continues to use a synthetic
+fixture independently of the memory API. Do not present opt-in enrichment or
+the synthetic dashboard as production activation evidence.
 
 ## Required work lifecycle
 

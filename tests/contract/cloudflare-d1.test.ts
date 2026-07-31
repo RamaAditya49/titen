@@ -154,7 +154,7 @@ d1Test(
 
 d1Test("D1 replays bounded model enrichment", async () => {
   await assertEnrichmentContract(db, "cloudflare-d1");
-}, 30_000);
+}, 120_000);
 
 d1Test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));

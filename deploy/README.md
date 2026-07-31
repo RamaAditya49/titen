@@ -118,8 +118,26 @@ Revision, profile, and cosine floor are required for semantic readiness. Choose
 the floor from a locked evaluation of the exact model/profile; Titen has no
 universal default. EmbeddingGemma uses `embeddinggemma-retrieval-v1`, not the
 raw profile.
-This config enables retrieval/indexing only. Automatic LLM extraction and
-reflection are planned and the current service has no `TITEN_EXTRACT_*`
-configuration. In rootless containers, use `host.containers.internal`, host
-networking, or a shared network when the endpoint runs on the host; container
-loopback is not host loopback.
+This config enables retrieval/indexing only. In rootless containers, use
+`host.containers.internal`, host networking, or a shared network when the
+endpoint runs on the host; container loopback is not host loopback.
+
+## Automatic enrichment (optional)
+
+Automatic extraction and reflection are implemented but disabled by default.
+Enable the shared durable pipeline only with a complete extraction tuple:
+
+```text
+TITEN_EXTRACT_BASE_URL=http://127.0.0.1:11434/v1
+TITEN_EXTRACT_MODEL=<model-id>
+TITEN_EXTRACT_MODEL_FINGERPRINT=<64-lowercase-hex-revision>
+TITEN_EXTRACT_API_KEY=<optional-bearer-key>
+TITEN_EXTRACT_TIMEOUT_MS=30000
+TITEN_MAINTENANCE_INTERVAL_MS=15000
+```
+
+An absent tuple reports the capability as disabled; a partial or invalid tuple
+fails configuration closed. The maintenance timer drains bounded work, or an
+operator key with `enrichment:write` may call
+`POST /v1/enrichment/drain?limit=1`. This is opt-in implementation guidance,
+not evidence that production activation gates have passed.

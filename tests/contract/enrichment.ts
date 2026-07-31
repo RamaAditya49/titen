@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import frozenData from "../fixtures/enrichment-multilingual.json";
 import { createApp } from "../../src/core/app";
 import type { Db } from "../../src/core/db";
 import { sha256Hex } from "../../src/core/ids";
@@ -33,10 +33,7 @@ interface FrozenCase {
   query: string;
 }
 
-const frozen = JSON.parse(readFileSync(
-  new URL("../fixtures/enrichment-multilingual.json", import.meta.url),
-  "utf8",
-)) as {
+const frozen = frozenData as {
   version: number;
   derivation: FrozenCase[];
   reflection: { add_statement: string; link_relation: string };
@@ -79,6 +76,32 @@ function proposalFor(request: ExtractionRequest): unknown {
           premise_ids: partial
             ? [active?.claim_id ?? premises[0]!.claim_id]
             : premises.map((premise) => premise.claim_id),
+          valid_from: null,
+          valid_to: null,
+        }],
+        links: null,
+      };
+    }
+    const incomplete = premises.find((premise) =>
+      /(?:PARTIAL|REORDERED|DUPLICATE|FOREIGN)_REFLECTION_ADD/.test(premise.statement));
+    if (incomplete) {
+      const ids = premises.map((premise) => premise.claim_id);
+      const mode = incomplete.statement.match(
+        /(PARTIAL|REORDERED|DUPLICATE|FOREIGN)_REFLECTION_ADD/,
+      )![1];
+      const premiseIds = mode === "PARTIAL"
+        ? ids.slice(0, -1)
+        : mode === "REORDERED"
+          ? [...ids].reverse()
+          : mode === "DUPLICATE"
+            ? [ids[0]!, ids[0]!]
+            : [ids[0]!, "claim_foreign"];
+      return {
+        action: "add",
+        claims: [{
+          kind: "semantic_fact",
+          statement: "Incomplete reflection provenance must not commit.",
+          premise_ids: premiseIds,
           valid_from: null,
           valid_to: null,
         }],
@@ -1154,6 +1177,37 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     [primary.orgId, reflected[0]!.id],
   );
   assert.equal(Number(derivedLinks[0]!.count), 2);
+
+  const rejectIncompleteReflection = async (
+    mode: "PARTIAL" | "REORDERED" | "DUPLICATE" | "FOREIGN",
+  ) => {
+    const target = await createClient();
+    const marker = `${mode}_REFLECTION_ADD`;
+    await observe(target, `subject_${marker}`, `${marker} first active premise.`);
+    await observe(target, `subject_${marker}`, `${marker} second active premise.`);
+    await drainHttp(target, 2);
+    current = new Date(current.getTime() + 1_000);
+    const rejected = await drainHttp(target, 1);
+    assert.equal(rejected.body.data.failed, 1);
+    assert.equal(rejected.body.data.added, 0);
+    assert.deepEqual(await db.all<{ state: string; error_class: string }>(
+      `SELECT state, error_class FROM enrichment_jobs
+        WHERE org_id = ? AND lane = 'reflection'`,
+      [target.orgId],
+    ), [{ state: "failed", error_class: "unsafe_output" }]);
+    assert.equal(Number((await db.all<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM claims
+        WHERE org_id = ? AND statement = 'Incomplete reflection provenance must not commit.'`,
+      [target.orgId],
+    ))[0]!.count), 0);
+    assert.equal(Number((await db.all<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM claim_links
+        WHERE org_id = ? AND relation = 'derived_from'`,
+      [target.orgId],
+    ))[0]!.count), 0);
+  };
+  for (const mode of ["PARTIAL", "REORDERED", "DUPLICATE", "FOREIGN"] as const)
+    await rejectIncompleteReflection(mode);
 
   const rejectDisputedReflection = async (marker: string) => {
     const target = await createClient();
@@ -2728,6 +2782,27 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       WHERE org_id = ? AND subject_id = 'subject_expired_lease'`,
     [expired.orgId],
   ))[0]!.count), 1);
+
+  const readinessNoise = await createClient();
+  assert.notEqual(readinessNoise.orgId, primary.orgId);
+  await observe(
+    readinessNoise,
+    "subject_readiness_privacy",
+    "One pending job must not expose a deployment-wide count.",
+  );
+  const readinessWithOne = await primary.client.call("GET", "/readyz");
+  assert.equal(readinessWithOne.status, 200);
+  const publicEnrichmentState = readinessWithOne.body.data.checks.enrichment_jobs;
+  assert.deepEqual(Object.keys(publicEnrichmentState), ["state"]);
+  assert.equal(typeof publicEnrichmentState.state, "string");
+  await observe(
+    readinessNoise,
+    "subject_readiness_privacy",
+    "A second pending job must not change public queue cardinality metadata.",
+  );
+  const readinessWithTwo = await primary.client.call("GET", "/readyz");
+  assert.equal(readinessWithTwo.status, 200);
+  assert.deepEqual(readinessWithTwo.body.data.checks.enrichment_jobs, publicEnrichmentState);
 
   const immutable = (await db.all<{ id: string }>(
     `SELECT id FROM enrichment_jobs WHERE org_id = ? LIMIT 1`,

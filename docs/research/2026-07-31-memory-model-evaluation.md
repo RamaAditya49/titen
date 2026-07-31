@@ -1,5 +1,12 @@
 # Memory model and embedding evaluation — 2026-07-31
 
+> **Historical status:** This dated evaluation predates the enrichment
+> implementation. Automatic derivation/reflection is now implemented as an
+> opt-in capability, but it is not production-activated until the locked
+> evaluation and real Cloudflare, VPS, and local-computer smokes pass. Statements
+> below that say the pipeline was not implemented describe the evidence snapshot
+> at the time and are intentionally preserved.
+
 ## Decision summary
 
 - The embedding pilot indicates that vectors can improve semantic candidate
