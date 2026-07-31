@@ -11,7 +11,10 @@ import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
-import { assertPopulatedV11IntegrityMigration } from "./integrity-migration";
+import {
+  assertPopulatedV11IntegrityMigration,
+  assertPopulatedV14SemanticOutageMigration,
+} from "./integrity-migration";
 import { assertSemanticReadiness } from "./semantic-readiness";
 import { acquireD1Lane, D1RunDiagnostics } from "./d1-harness";
 import { assertEnrichmentContract } from "./enrichment";
@@ -251,8 +254,9 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
     assert.match(integrity.find(({ name }) => name === "checkpoints_scope")!.sql, /UNIQUE/);
     assert.deepEqual(
       (await real.all<{ name: string }>("PRAGMA table_info(semantic_index_metadata)"))
-        .filter(({ name }) => name.endsWith("_failure_at")),
-      [],
+        .filter(({ name }) => name.endsWith("_failure_at"))
+        .map(({ name }) => name),
+      ["embedder_failure_at", "vector_store_failure_at"],
     );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
   } finally {
@@ -295,6 +299,25 @@ d1Test("a populated schema-v11 D1 database repairs collaboration integrity", asy
     await assertPopulatedV11IntegrityMigration(migrationDb);
   } finally {
     await dispose(migrationRuntime);
+    rmSync(migrationPersist, { recursive: true, force: true });
+  }
+});
+
+test("a populated schema-v14 D1 database preserves genuine semantic outage evidence", async () => {
+  const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-semantic-outage-migration-"));
+  const migrationRuntime = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-semantic-outage-migration" },
+    d1Persist: migrationPersist,
+  });
+  try {
+    await migrationRuntime.ready;
+    const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
+    await assertPopulatedV14SemanticOutageMigration(migrationDb);
+  } finally {
+    await migrationRuntime.dispose();
     rmSync(migrationPersist, { recursive: true, force: true });
   }
 });

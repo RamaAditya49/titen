@@ -1,7 +1,7 @@
 # Titen functional requirements document
 
-- Status: feature baseline; memory service verified locally, automatic
-  model-assisted enrichment planned
+- Status: feature baseline; memory service and opt-in model-assisted enrichment
+  verified locally, production enrichment activation gated
 - Product: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers/D1 and Bun/SQLite
@@ -65,9 +65,9 @@ The minimum useful path must work without an LLM or vector database.
 | v1      | signed federation event exchange                                                                                                                                                                      | authorized scopes exchange signed events without losing provenance or conflicts    |
 
 No feature in a later release is required to implement an earlier gate.
-Automatic model-assisted derivation/reflection is a separately gated planned
-capability; the implemented `v0.1` route accepts caller-supplied claims and does
-not prove automatic extraction.
+Automatic model-assisted derivation/reflection is a separately gated optional
+capability; its implementation does not change the `v0.1` caller-supplied claim
+path or prove production extraction activation.
 
 ## 4. Actors and authority
 
@@ -170,13 +170,13 @@ Implemented P0 behavior:
   invalid configuration, vector initialization failure, missing legacy
   fingerprint evidence, or fingerprint mismatch;
 - responses include a non-secret request ID and deployed revision/build value.
+- a transient optional embedding/vector/extraction outage is visible under its
+  own capability while canonical FTS-only operation remains available.
 
 Remaining proposed readiness extensions:
 
 - when channel serving is enabled, readiness also checks release FTS schema and
   configured customer-assertion issuer/key references without exposing them;
-- a transient optional embedding/vector/extraction outage is visible under its
-  own capability while canonical FTS-only operation remains available.
 
 Acceptance:
 
@@ -282,17 +282,17 @@ Acceptance:
 
 ### MEM-003 — Derive and reflect over memory
 
-**Release:** Future
+**Release:** Optional, independently activated
 
-**Status:** Proposed; no enrichment job, extraction provider, or proposal
-validator is present in the current runtime.
+**Status:** Implemented and dual-runtime tested; disabled by default and not
+production-activated before the locked evaluation and real runtime smokes.
 
 The implemented `POST /v1/consolidations` path validates claims supplied by an
-authorized caller and performs no model call. The proposed automatic capability
+authorized caller and performs no model call. The optional automatic capability
 uses separate asynchronous derivation and reflection jobs; it does not change
 that route's acknowledgement semantics.
 
-Proposed required behavior:
+Required behavior:
 
 - atomically enqueue one versioned derivation job with an accepted observation
   when automatic enrichment is enabled;
@@ -318,7 +318,7 @@ Proposed required behavior:
   conflict, pattern, procedure, and supersession outputs as proposals;
 - never autonomously delete canonical evidence.
 
-Proposed acceptance gate:
+Activation gate:
 
 - replaying the same direct consolidation or enrichment job is idempotent;
 - malformed/model-hallucinated source IDs create no claims;
@@ -1111,7 +1111,7 @@ until measured concurrent/offline mutation cases prove they are necessary.
 | duplicate idempotency key, same payload       | return original result                                                                 |
 | duplicate idempotency key, different payload  | `409`                                                                                  |
 | embedding/vector unavailable                  | canonical path succeeds where possible and reports semantic degradation                |
-| proposed extraction/background enrichment unavailable | canonical path succeeds; retain bounded work and report extraction degradation |
+| optional extraction/background enrichment unavailable | canonical path succeeds; retain bounded work and report extraction degradation |
 | webhook destination unavailable               | canonical path succeeds; delivery retries or terminates visibly                        |
 | release is pending/revoked/expired/ineligible | omit or return non-disclosing `404`; never fall back to source claim                   |
 | stale release claim version                   | `409`; require a new reviewed release snapshot                                         |

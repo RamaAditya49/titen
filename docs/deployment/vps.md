@@ -64,8 +64,9 @@ pnpm titen key create --org-id <org_id> --label 'my agent'
 - FTS5 in the canonical database.
 - Optional `sqlite-vec` extension for semantic retrieval.
 - Optional OpenAI-compatible embedding endpoint (implemented).
-- Automatic extraction/reflection endpoint and enrichment jobs (planned, not
-  accepted by the current binary).
+- Optional OpenAI-compatible extraction/reflection with durable enrichment
+  jobs, bounded leases, and the same shared validator used by D1 (implemented,
+  disabled by default, not production-activated).
 - In-process startup/timer drain for current index and delivery repair.
 - REST under `/v1`; Streamable HTTP MCP at `/mcp`.
 - An external CRM/chatbot gateway may call protected channel-context operations;
@@ -119,6 +120,11 @@ TITEN_EMBED_DIMS=1024
 TITEN_EMBED_REVISION=<immutable-provider-revision>
 TITEN_EMBED_PROFILE=raw-unit-v1
 TITEN_EMBED_MIN_COSINE=<calibrated-cosine-floor>
+TITEN_EXTRACT_BASE_URL=http://127.0.0.1:11434/v1
+TITEN_EXTRACT_MODEL=<model-id>
+TITEN_EXTRACT_MODEL_FINGERPRINT=<64-lowercase-hex-revision>
+TITEN_EXTRACT_API_KEY=<optional-bearer-key>
+TITEN_EXTRACT_TIMEOUT_MS=30000
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
@@ -139,11 +145,12 @@ query/document prompts. Titen unit-normalizes both profiles. Select
 `TITEN_EMBED_MIN_COSINE` from a locked exact-model evaluation; no universal or
 pre-inspected threshold is bundled.
 
-The ADR-0004 implementation will add a separate opt-in tuple such as
-`TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and
-`TITEN_EXTRACT_API_KEY`. These names are a target contract, not current CLI
-options. Endpoint plus model is sufficient opt-in; do not add a second enable
-flag or expose provider credentials through readiness.
+Extraction uses the separate `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`,
+and immutable 64-hex `TITEN_EXTRACT_MODEL_FINGERPRINT` tuple. The API key and
+timeout are optional. A partial or invalid tuple reports `configured_error`;
+an absent tuple remains `disabled`. A positive maintenance interval drains one
+shared bounded queue in the background, while `POST /v1/enrichment/drain`
+provides an authorized manual path. Do not expose credentials through readiness.
 
 Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
 is the exact external origin (scheme, host, and optional port), with no trailing
@@ -434,18 +441,24 @@ code.
 - `UNRESOLVED_REFERENCE` means the logical export lacks a required workspace,
   actor mapping, project, observation, or replacement claim. It is not a write
   conflict. Re-import is idempotent.
-- Logical JSONL omits operational and learning state such as keys, integration
-  secrets, checkpoints, leases, context feedback, audit/history, and derived
-  indexes. Only the verified SQLite snapshot is the full VPS recovery boundary.
+- Format-v3 logical JSONL includes committed enrichment jobs, hashes, result
+  mappings, and claim links inline with claims. Imported observations do not
+  become implicit new model inputs. It still omits keys, integration secrets,
+  checkpoints, live leases, context feedback, audit/history, and rebuildable
+  indexes; only the verified SQLite snapshot is the full VPS recovery boundary.
 
 ## Implemented optional capabilities
 
 - `sqlite-vec` semantic vector retrieval when configured.
 - Streamable HTTP MCP at `/mcp`.
 - Signed, allowlisted Bun webhook delivery with durable at-least-once retries.
+- Automatic claim extraction/reflection with durable leases/backoff and
+  separate readiness when the complete extraction tuple is configured.
 
-Automatic claim extraction, reflection, enrichment leases/backoff, and
-extraction readiness are not implemented optional capabilities yet.
+The implementation remains opt-in and is not production-activated until the
+locked multilingual evaluation and real VPS, Cloudflare Paid D1, and local
+computer smokes are recorded. Repository verification is manual/local. GitHub
+Actions remains disabled so the repository incurs no hosted automation cost.
 
 The `rama-tuf` reboot validation remains unverified until the operator approves
 a reboot window. Do not close that gate from a service restart alone.

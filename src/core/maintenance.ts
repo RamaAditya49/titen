@@ -9,6 +9,8 @@ import {
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
 import { eventAccessSql } from "./events";
+import type { ExtractionCapability } from "./extraction";
+import { drainEnrichment } from "./enrichment";
 
 /**
  * Background maintenance: the work that must happen for configured features to
@@ -26,6 +28,7 @@ import { eventAccessSql } from "./events";
  * schema already supports.
  */
 export interface MaintenanceResult {
+  enriched: number;
   indexed: number;
   delivered: number;
   errors: string[];
@@ -334,6 +337,7 @@ async function sweepEphemeral(db: Db, now: Date, limit: number): Promise<void> {
 export async function runMaintenance(options: {
   db: Db;
   vectors?: VectorCapability;
+  extraction?: ExtractionCapability;
   limit?: number;
   now?: Date;
   webhookSecurity?: WebhookSecurity;
@@ -342,8 +346,31 @@ export async function runMaintenance(options: {
   expectedIntervalMs?: number;
 }): Promise<MaintenanceResult> {
   const limit = options.limit ?? 50;
-  const now = options.now ?? new Date();
-  const result: MaintenanceResult = { indexed: 0, delivered: 0, errors: [] };
+  const startedAt = options.now ?? new Date();
+  const result: MaintenanceResult = { enriched: 0, indexed: 0, delivered: 0, errors: [] };
+
+  if (options.extraction) {
+    try {
+      const enrichment = await drainEnrichment({
+        db: options.db,
+        capability: options.extraction,
+        // Five provider calls per automatic pass is the cost ceiling. Operators
+        // may explicitly request a larger bounded batch through the drain route.
+        limit: Math.min(limit, 5),
+        // Production must re-read time after a potentially slow provider call
+        // so the SQL lease fence cannot compare against a stale tick timestamp.
+        now: options.now ? () => startedAt : () => new Date(),
+        vectors: options.vectors,
+      });
+      result.enriched = enrichment.completed;
+      result.errors.push(...enrichment.errors);
+    } catch {
+      result.errors.push("enrichment:scan");
+    }
+  }
+
+  // A slow provider must not make subsequent leases and readiness evidence stale.
+  const maintenanceNow = options.now ?? new Date();
 
   if (options.vectors) {
     try {
@@ -354,7 +381,7 @@ export async function runMaintenance(options: {
             orgId,
             options.vectors,
             limit,
-            now.toISOString(),
+            maintenanceNow.toISOString(),
           );
         } catch (error) {
           // Named by organization, without the message, which can carry content.
@@ -371,7 +398,7 @@ export async function runMaintenance(options: {
       const delivery = await deliverPending(
         options.db,
         limit,
-        now,
+        maintenanceNow,
         options.webhookSecurity,
         options.secretCipher,
       );
@@ -383,7 +410,7 @@ export async function runMaintenance(options: {
   }
 
   try {
-    await sweepEphemeral(options.db, now, limit);
+    await sweepEphemeral(options.db, maintenanceNow, limit);
   } catch {
     result.errors.push("cleanup");
   }
@@ -392,7 +419,7 @@ export async function runMaintenance(options: {
     await recordMaintenance(
       options.db,
       result,
-      now,
+      maintenanceNow,
       options.expectedIntervalMs ?? 60_000,
     );
   } catch {

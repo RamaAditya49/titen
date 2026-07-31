@@ -23,10 +23,11 @@ and an explicit cost budget.
 
 **Titen stays on `0.x` until the API stops moving.** SemVer clause 4 is explicit:
 *"Major version zero (0.y.z) is for initial development. Anything MAY change at
-any time."* That is an accurate description of Titen today — model-driven claim
-extraction is still planned and consolidation is deterministic. `1.0.0` is a
-promise of stability, not a maturity badge; cut it when breaking changes stop,
-not when the project feels finished.
+any time."* That is an accurate description of Titen today: optional model-
+driven claim enrichment is implemented but not production-activated, and
+consolidation is deterministic. `1.0.0` is a promise of stability, not a
+maturity badge; cut it when breaking changes stop, not when the project feels
+finished.
 
 While below `1.0.0`:
 

@@ -207,6 +207,59 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
 
   await db.batch([
     {
+      sql: `UPDATE semantic_index_metadata
+               SET embedder_failure_at = '2026-07-31T00:00:05.000Z'
+             WHERE id = 'claims'`,
+    },
+    {
+      sql: `INSERT INTO organizations (id, name, created_at)
+            VALUES ('org_semantic_unowned_recovery', 'Unowned recovery org',
+                    '2026-07-31T00:00:00.000Z')`,
+    },
+    {
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+            VALUES
+              ('idx_semantic_superseded_failure', 'org_semantic_backfill',
+               'claim', 'clm_semantic_superseded_failure', 'upsert', 'done', 1,
+               '2026-07-31T00:00:00.000Z'),
+              ('idx_semantic_delete_only', 'org_semantic_backfill',
+               'claim', 'clm_semantic_superseded_failure', 'delete', 'pending', 0,
+               '2026-07-31T00:00:01.000Z'),
+              ('idx_semantic_unowned_success', 'org_semantic_unowned_recovery',
+               'claim', 'clm_semantic_unowned_success', 'upsert', 'pending', 0,
+               '2026-07-31T00:00:02.000Z')`,
+    },
+  ]);
+  await completeSemanticIndexWork(db, ["idx_semantic_delete_only"], false);
+  assert.equal((await readyWith(db, runtime, vectors)).status, 503,
+    "delete-only completion is not dependency recovery");
+  await completeSemanticIndexWork(db, ["idx_semantic_unowned_success"], true);
+  assert.equal((await readyWith(db, runtime, vectors)).status, 503,
+    "unowned success without a failed attempt cannot erase outage evidence");
+  await db.batch([{
+    sql: `INSERT INTO index_outbox
+            (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+          VALUES ('idx_semantic_owned_retry', 'org_semantic_backfill', 'claim',
+                  'clm_semantic_owned_retry', 'upsert', 'pending', 1,
+                  '2026-07-31T00:00:03.000Z')`,
+  }]);
+  await completeSemanticIndexWork(db, ["idx_semantic_owned_retry"], true);
+  assert.equal((await readyWith(db, runtime, vectors)).status, 200,
+    "a successful retry of previously failed work proves recovery");
+  await db.batch([
+    {
+      sql: `DELETE FROM index_outbox
+             WHERE id IN ('idx_semantic_superseded_failure',
+                          'idx_semantic_delete_only',
+                          'idx_semantic_unowned_success',
+                          'idx_semantic_owned_retry')`,
+    },
+    { sql: `DELETE FROM organizations WHERE id = 'org_semantic_unowned_recovery'` },
+  ]);
+
+  await db.batch([
+    {
       sql: `INSERT INTO claims
               (id, org_id, subject_id, project_id, workspace_id, observer_id,
                actor_id, kind, statement, confidence, trust, visibility, status,

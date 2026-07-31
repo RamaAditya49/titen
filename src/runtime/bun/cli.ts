@@ -5,6 +5,7 @@ import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { serve } from "./server";
+import { configureHttpExtraction } from "../../core/extraction";
 import { parseSecretCipher } from "../../core/secrets";
 import { createBunWebhookSecurity } from "./webhooks";
 import { chmodSync, existsSync, readFileSync, renameSync, rmSync } from "node:fs";
@@ -147,6 +148,15 @@ switch (command) {
     // of them the service serves lexical retrieval and says so in readiness.
     const servePort = port(flags.port);
     const quiet = flags.quiet === true;
+    const extraction = configureHttpExtraction({
+      baseUrl: process.env.TITEN_EXTRACT_BASE_URL,
+      model: process.env.TITEN_EXTRACT_MODEL,
+      modelFingerprint: process.env.TITEN_EXTRACT_MODEL_FINGERPRINT,
+      apiKey: process.env.TITEN_EXTRACT_API_KEY,
+      timeoutMs: process.env.TITEN_EXTRACT_TIMEOUT_MS === undefined
+        ? undefined
+        : Number(process.env.TITEN_EXTRACT_TIMEOUT_MS),
+    });
     let started: Awaited<ReturnType<typeof serve>>;
     try {
       started = await serve({
@@ -163,6 +173,8 @@ switch (command) {
         embedProfile: process.env.TITEN_EMBED_PROFILE,
         embedMinCosine: process.env.TITEN_EMBED_MIN_COSINE,
         embedApiKey: process.env.TITEN_EMBED_API_KEY,
+        extraction: extraction.capability,
+        extractionState: extraction.state,
         maintenanceIntervalMs:
           process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
             ? undefined

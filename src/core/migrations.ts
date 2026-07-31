@@ -768,6 +768,12 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          id TEXT PRIMARY KEY,
          org_id TEXT NOT NULL REFERENCES organizations(id),
          lane TEXT NOT NULL CHECK (lane IN ('derivation', 'reflection')),
+         derivation_key TEXT CHECK (
+           (lane = 'derivation' AND derivation_key IS NOT NULL
+             AND length(derivation_key) = 64
+             AND derivation_key NOT GLOB '*[^0-9a-f]*')
+           OR (lane = 'reflection' AND derivation_key IS NULL)
+         ),
          input_ids TEXT NOT NULL,
          input_hash TEXT NOT NULL,
          subject_id TEXT NOT NULL,
@@ -789,6 +795,12 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
            'provider_unavailable', 'provider_rejected', 'provider_protocol',
            'invalid_output', 'unsafe_output', 'source_changed'
          )),
+         output_hash TEXT CHECK (
+           output_hash IS NULL OR (
+             length(output_hash) = 64
+             AND output_hash NOT GLOB '*[^0-9a-f]*'
+           )
+         ),
          result_ids TEXT,
          created_at TEXT NOT NULL,
          updated_at TEXT NOT NULL,
@@ -805,20 +817,34 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON enrichment_jobs (state, next_attempt_at, lease_expires_at, created_at, id)`,
       `CREATE INDEX enrichment_jobs_org
          ON enrichment_jobs (org_id, lane, state, created_at)`,
+      `CREATE INDEX enrichment_jobs_derivation_key
+         ON enrichment_jobs (derivation_key, state, created_at, id)`,
       `CREATE UNIQUE INDEX enrichment_jobs_org_identity
          ON enrichment_jobs (id, org_id)`,
       `CREATE TRIGGER enrichment_jobs_inputs_immutable
-         BEFORE UPDATE OF org_id, lane, input_ids, input_hash, subject_id,
+         BEFORE UPDATE OF org_id, lane, derivation_key, input_ids, input_hash, subject_id,
            project_id, workspace_id, actor_id, model_id, model_fingerprint,
            prompt_fingerprint, schema_fingerprint, policy_fingerprint, created_at
          ON enrichment_jobs
          BEGIN
            SELECT RAISE(ABORT, 'ENRICHMENT_INPUT_IMMUTABLE');
          END`,
+      `CREATE TRIGGER enrichment_jobs_output_immutable
+         BEFORE UPDATE OF output_hash ON enrichment_jobs
+         WHEN OLD.output_hash IS NOT NULL AND NEW.output_hash IS NOT OLD.output_hash
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_OUTPUT_IMMUTABLE');
+         END`,
+      `CREATE TABLE enrichment_schedule_cursors (
+         id TEXT PRIMARY KEY,
+         cursor_created_at TEXT NOT NULL,
+         cursor_id TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+       )`,
       `CREATE TABLE enrichment_commits (
          job_id TEXT PRIMARY KEY REFERENCES enrichment_jobs(id),
          lease_token TEXT NOT NULL,
-         result_kind TEXT NOT NULL CHECK (result_kind IN ('add', 'link', 'abstain')),
+         result_kind TEXT NOT NULL CHECK (result_kind IN ('add', 'link', 'abstain', 'reuse')),
          committed_at TEXT NOT NULL
        )`,
       `CREATE TRIGGER enrichment_commit_current_lease
@@ -850,7 +876,62 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
            SELECT RAISE(ABORT, 'ENRICHMENT_AUTHORITY_LOST');
          END`,
       `ALTER TABLE claims ADD COLUMN enrichment_job_id TEXT REFERENCES enrichment_jobs(id)`,
+      `ALTER TABLE claims ADD COLUMN enrichment_key TEXT CHECK (
+         enrichment_key IS NULL OR (
+           length(enrichment_key) = 64
+           AND enrichment_key NOT GLOB '*[^0-9a-f]*'
+         )
+       )`,
+      `ALTER TABLE claims ADD COLUMN enrichment_key_archived INTEGER NOT NULL DEFAULT 0
+         CHECK (enrichment_key_archived IN (0, 1))`,
       `CREATE INDEX claims_enrichment_job ON claims (enrichment_job_id)`,
+      `CREATE UNIQUE INDEX claims_current_enrichment_key
+         ON claims (org_id, actor_id, enrichment_key)
+        WHERE enrichment_key IS NOT NULL AND status IN ('active', 'disputed')`,
+      `CREATE TRIGGER claims_enrichment_key_immutable
+         BEFORE UPDATE OF enrichment_key, enrichment_key_archived ON claims
+         WHEN (
+           NEW.enrichment_key IS NOT OLD.enrichment_key
+           OR NEW.enrichment_key_archived != OLD.enrichment_key_archived
+         ) AND NOT (
+           OLD.enrichment_key IS NOT NULL
+           AND NEW.enrichment_key IS NOT NULL
+           AND OLD.enrichment_key_archived = 0
+           AND NEW.enrichment_key_archived = 1
+           AND OLD.status IN ('active', 'disputed')
+           AND (SELECT COUNT(*) FROM claim_sources source
+                 WHERE source.claim_id = OLD.id) >= 19
+           AND NEW.version = OLD.version + 1
+           AND EXISTS (
+             SELECT 1 FROM enrichment_jobs job
+              WHERE job.id = OLD.enrichment_job_id
+                AND job.org_id = OLD.org_id
+                AND job.lane = 'derivation'
+           )
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_KEY_IMMUTABLE');
+         END`,
+      `CREATE TRIGGER claims_enrichment_key_provenance
+         BEFORE INSERT ON claims
+         WHEN (
+           NEW.enrichment_key IS NOT NULL AND NOT EXISTS (
+             SELECT 1 FROM enrichment_jobs job
+             JOIN enrichment_commits ec ON ec.job_id = job.id
+            WHERE job.id = NEW.enrichment_job_id AND job.org_id = NEW.org_id
+              AND job.lane = 'derivation' AND ec.result_kind = 'add'
+           )
+         ) OR (
+           NEW.enrichment_key IS NULL AND EXISTS (
+             SELECT 1 FROM enrichment_jobs job
+             JOIN enrichment_commits ec ON ec.job_id = job.id
+            WHERE job.id = NEW.enrichment_job_id AND job.org_id = NEW.org_id
+              AND job.lane = 'derivation' AND ec.result_kind = 'add'
+           )
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_KEY_PROVENANCE');
+         END`,
       `CREATE TRIGGER claims_enrichment_job_org_insert
          BEFORE INSERT ON claims
          WHEN NEW.enrichment_job_id IS NOT NULL AND NOT EXISTS (
@@ -891,6 +972,13 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON claim_links (org_id, source_claim_id, relation, created_at)`,
       `CREATE INDEX claim_links_target
          ON claim_links (org_id, target_claim_id, relation, created_at)`,
+      `CREATE TRIGGER claim_links_duplicate_guard
+         BEFORE INSERT ON claim_links
+         WHEN NEW.source_claim_id = NEW.target_claim_id
+           AND NEW.relation = 'duplicate_candidate'
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_DUPLICATE_CHANGED');
+         END`,
     ],
   },
 ];

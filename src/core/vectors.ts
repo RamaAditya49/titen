@@ -330,21 +330,33 @@ export async function completeSemanticIndexWork(
   recovered: boolean,
 ): Promise<void> {
   for (let index = 0; index < outboxIds.length; index += 50) {
-    const statements = outboxIds.slice(index, index + 50).map((id) => ({
-      sql: `UPDATE index_outbox SET state = 'done', attempts = attempts + 1 WHERE id = ?`,
-      params: [id],
-    }));
-    if (recovered && index + 50 >= outboxIds.length)
+    const group = outboxIds.slice(index, index + 50);
+    const statements = [];
+    if (recovered)
       statements.push({
+        // Recovery is proven by work that entered this transaction as a failed
+        // upsert retry. Clearing first is safe because the batch is atomic.
         sql: `UPDATE semantic_index_metadata
                  SET embedder_failure_at = NULL, vector_store_failure_at = NULL
                WHERE id = 'claims'
+                 AND EXISTS (
+                   SELECT 1 FROM index_outbox recovered
+                    WHERE recovered.state = 'pending'
+                      AND recovered.operation = 'upsert'
+                      AND recovered.attempts > 0
+                      AND recovered.id IN (${group.map(() => "?").join(", ")})
+                 )
                  AND NOT EXISTS (
                    SELECT 1 FROM index_outbox
                     WHERE state = 'pending' AND attempts > 0
+                      AND id NOT IN (${group.map(() => "?").join(", ")})
                  )`,
-        params: [],
+        params: [...group, ...group],
       });
+    statements.push(...group.map((id) => ({
+      sql: `UPDATE index_outbox SET state = 'done', attempts = attempts + 1 WHERE id = ?`,
+      params: [id],
+    })));
     await db.batch(statements);
   }
 }

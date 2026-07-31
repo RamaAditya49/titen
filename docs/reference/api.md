@@ -42,6 +42,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/consolidations`
 - `POST /v1/context/:id/feedback`
 - `POST /v1/context/compile`
+- `POST /v1/enrichment/drain`
 - `POST /v1/federation/peers`
 - `POST /v1/federation/peers/:id/filters`
 - `POST /v1/federation/peers/:id/suspend`
@@ -69,8 +70,6 @@ features explicitly listed as proposed are not routes.
 
 - Observation batch ingestion (`POST /v1/observations/batch`).
 - Channel CRUD (`/v1/channels`).
-- Automatic derivation/reflection has no public route. It is a planned
-  background capability; `POST /v1/consolidations` is not its queue endpoint.
 - The old `webhook-subscriptions`, `webhook-deliveries`, `knowledge-releases`,
   `audit/events`, and channel-scoped context paths are not aliases. Use the
   implemented inventory above.
@@ -212,8 +211,25 @@ and performs no automatic extraction or classification. Every claim needs
 supporting evidence from the same subject, project, and workspace, with no trust
 or visibility widening.
 
-ADR-0004 defines a future background derivation/reflection path. It will not
-silently add model latency or change this route's direct-claim semantics.
+The separately configured background derivation/reflection path does not add
+model latency to this request or change its direct-claim semantics.
+
+### `POST /v1/enrichment/drain`
+
+An operator credential with `enrichment:write` may drain the optional durable
+derivation/reflection ledger. The route exists even though extraction is
+disabled by default; without a valid extraction tuple it returns a validation
+error and canonical observation/direct-claim paths remain available. Bun accepts
+`limit=1..50`; Cloudflare accepts only `limit=1` to preserve its declared Paid
+D1 invocation budget. Bun timers and a provisioned Cloudflare Cron Trigger call
+the same shared core automatically.
+
+Jobs keep immutable input, model, prompt, schema, and policy fingerprints plus
+an output hash and result IDs, never raw prompts or model responses. Imported
+observations are provenance restores and are excluded from automatic recovery
+backfill; submit a new observation explicitly if restored v1/v2 evidence should
+be considered new enrichment input. Format-v3 restores carry their original
+enrichment provenance instead.
 
 ### Claim lifecycle routes
 
@@ -607,8 +623,10 @@ derived cache/vector or release-status maintenance job is stale.
 
 `capabilities.model` and `meta.degraded.model` are deprecated `0.3.x` aliases
 for embedding. `embedding`, `extraction`, and `background_enrichment` are
-separate fields; planned extraction/enrichment remain `disabled` until their
-own implementation and evidence ship.
+separate fields. Extraction/enrichment code is implemented but remains
+`disabled` until a complete opt-in tuple is supplied; malformed configuration
+reports `configured_error`. Production activation remains gated on the locked
+evaluation and real Cloudflare, VPS, and local-computer smoke evidence.
 
 When semantic retrieval is configured, readiness compares credential-free
 provider identity, model, immutable revision, dimensions, cosine metric, named
@@ -719,8 +737,8 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Compatibility
 
-- Export format v2 is versioned independently from HTTP API v1. Import still
-  accepts v1 files; because v1 carried no transferable actor authority, their
+- Export format v3 is versioned independently from HTTP API v1. Import still
+  accepts v1/v2 files; because v1 carried no transferable actor authority, its
   observations and claims are owned by the authenticated importing principal.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
@@ -730,12 +748,22 @@ authorized operator clients use its read-only REST endpoint.
 
 `GET /v1/export?type=workspaces|memberships|projects|observations|claims`
 returns one canonical NDJSON stream. Retain all five streams and headers for a
-logical migration. Headers declare format v2, source organization, scope,
+logical migration. Headers declare format v3, source organization, scope,
 deterministic dependency order, count, completion state, and the next opaque
 cursor. Pages contain at most 2,000 records and are cut on UTF-8 byte length so
 the complete response remains within the import request limit. Follow
 `next_cursor` until it is `null`; IDs are stable pagination cursors, not a
 change feed.
+
+Claim pages are ordered by actual restore dependencies: replacement claims and
+reflection premises/endpoints precede their dependents. A strongly connected
+dependency component is never split. If the requested `limit` is too small,
+export returns a content-free `400` with the minimum required limit; retry up to
+2,000. A component above 2,000 records or the request byte boundary cannot use
+logical export and requires an operator backup/restore path. A non-empty claim
+cursor that is no longer eligible also returns a generic `400` instead of
+restarting from page one. Evidence, supersession, and attached enrichment
+provenance are revalidated before the cursor advances.
 
 Ordinary export is principal-scoped: private records belong to the caller,
 team records require active membership, workspace export includes only joined
@@ -751,6 +779,12 @@ records; claims preserve source links and `superseded_by`. Missing parents
 return `422 UNRESOLVED_REFERENCE` with only `record_type`, `field`, and
 `dependency_type`; no foreign record or content is disclosed. Cross-organization
 ID collisions fail closed, every request is atomic, and re-import is idempotent.
+Generated claims carry their committed enrichment job, output hash, result
+mapping, and claim links inline. Non-current generated claims and historical
+LINK jobs remain portable when their cited evidence is still authorized; they
+restore outside FTS/vector projections. LINK history is capped at 16 jobs per
+deterministic export-owner claim so one canonical JSONL record cannot grow
+without bound.
 An exact self-authenticating redaction marker retains its original content hash
 but is not re-added to FTS or vector projections; non-current claims are likewise
 restored canonically with delete, rather than upsert, projection work. If purge

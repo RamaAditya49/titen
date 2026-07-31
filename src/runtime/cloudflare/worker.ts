@@ -2,10 +2,12 @@ import { createApp } from "../../core/app";
 import { migrate, schemaState } from "../../core/migrations";
 import { createD1Db, type D1Database } from "./d1";
 import { runMaintenance } from "../../core/maintenance";
-import { prepareSemanticReadiness } from "../../core/vectors";
+import { prepareSemanticReadiness, type CapabilityState } from "../../core/vectors";
 import { tryCreateVectorize } from "./vectors";
 import { parseSecretCipher, prepareSigningSecrets } from "../../core/secrets";
 import type { WebhookSecurity } from "../../core/webhook-security";
+import { configureHttpExtraction } from "../../core/extraction";
+import { withD1Budget } from "./d1-budget";
 
 export interface Env {
   DB: D1Database;
@@ -20,11 +22,46 @@ export interface Env {
   TITEN_EMBED_REVISION?: string;
   TITEN_EMBED_PROFILE?: string;
   TITEN_EMBED_MIN_COSINE?: string;
+  TITEN_EXTRACT_BASE_URL?: string;
+  TITEN_EXTRACT_MODEL?: string;
+  TITEN_EXTRACT_MODEL_FINGERPRINT?: string;
+  TITEN_EXTRACT_API_KEY?: string;
+  TITEN_EXTRACT_TIMEOUT_MS?: string;
+  /** Explicit declared D1 plan required before enrichment can mutate. */
+  TITEN_D1_PLAN?: string;
+  /** Set to "1" only when an enrichment Cron Trigger is provisioned. */
+  TITEN_ENRICHMENT_BACKGROUND?: string;
   /** Secret JSON keyring; keep in a Worker secret, never vars or D1. */
   TITEN_SECRET_KEYS?: string;
   /** Test-only fixed resolution; production has no generic address-pinned fetch. */
   TITEN_WEBHOOK_ALLOWED_HOSTNAMES?: string;
   TITEN_WEBHOOK_TEST_ADDRESSES?: string;
+}
+
+function extraction(env: Env): ReturnType<typeof configureHttpExtraction> {
+  const configured = configureHttpExtraction({
+    baseUrl: env.TITEN_EXTRACT_BASE_URL,
+    model: env.TITEN_EXTRACT_MODEL,
+    modelFingerprint: env.TITEN_EXTRACT_MODEL_FINGERPRINT,
+    apiKey: env.TITEN_EXTRACT_API_KEY,
+    timeoutMs: env.TITEN_EXTRACT_TIMEOUT_MS === undefined
+      ? undefined
+      : Number(env.TITEN_EXTRACT_TIMEOUT_MS),
+  });
+  if (
+    configured.state === "enabled"
+    && (env.TITEN_D1_PLAN !== "paid" || env.TITEN_AUTO_MIGRATE === "1")
+  ) return { state: "configured_error" as const };
+  return configured;
+}
+
+export function backgroundEnrichment(env: Env, state: CapabilityState): CapabilityState {
+  if (state === "configured_error") return state;
+  if (env.TITEN_ENRICHMENT_BACKGROUND === undefined || env.TITEN_ENRICHMENT_BACKGROUND === "0")
+    return "disabled";
+  return env.TITEN_ENRICHMENT_BACKGROUND === "1" && state === "enabled"
+    ? "enabled"
+    : "configured_error";
 }
 
 function testWebhookSecurity(env: Env): WebhookSecurity | undefined {
@@ -59,7 +96,9 @@ let secretPreparation: Promise<boolean> | undefined;
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const db = createD1Db(env.DB);
+    const extractionConfig = extraction(env);
+    const unbudgeted = createD1Db(env.DB);
+    const db = extractionConfig.capability ? withD1Budget(unbudgeted).db : unbudgeted;
     let migrationsReady = false;
     try {
       if (env.TITEN_AUTO_MIGRATE === "1") {
@@ -97,6 +136,11 @@ export default {
       runtime: "cloudflare-d1",
       vectors: vectorInitialization.vectors,
       semanticReadiness: vectorInitialization.readiness,
+      extraction: extractionConfig.capability,
+      modelCapabilities: {
+        extraction: extractionConfig.state,
+        backgroundEnrichment: backgroundEnrichment(env, extractionConfig.state),
+      },
       backgroundRepair: { configured: true, staleAfterMs: 180_000 },
       migrationsReady,
       secretStorageReady,
@@ -113,7 +157,10 @@ export default {
    * and webhook delivery must be driven by calling their endpoints.
    */
   async scheduled(_event: unknown, env: Env, context: { waitUntil(p: Promise<unknown>): void }) {
-    const db = createD1Db(env.DB);
+    const extractionConfig = extraction(env);
+    const backgroundState = backgroundEnrichment(env, extractionConfig.state);
+    const unbudgeted = createD1Db(env.DB);
+    const db = backgroundState === "enabled" ? withD1Budget(unbudgeted).db : unbudgeted;
     const vectorInitialization = tryCreateVectorize(env as never);
     const semanticReadiness = await prepareSemanticReadiness(
       db,
@@ -131,13 +178,15 @@ export default {
       runMaintenance({
         db,
         vectors,
+        extraction: backgroundState === "enabled" ? extractionConfig.capability : undefined,
+        limit: 1,
         secretCipher,
         webhookSecurity: testWebhookSecurity(env),
         expectedIntervalMs: 60_000,
       }).then((result) => {
-        if (result.indexed || result.delivered || result.errors.length)
+        if (result.enriched || result.indexed || result.delivered || result.errors.length)
           console.log(
-            `maintenance indexed=${result.indexed} delivered=${result.delivered}${
+            `maintenance enriched=${result.enriched} indexed=${result.indexed} delivered=${result.delivered}${
               result.errors.length ? ` errors=${result.errors.join(",")}` : ""
             }`,
           );

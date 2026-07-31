@@ -1365,7 +1365,7 @@ export const CASES: Case[] = [
       const observationLines = String(observations.body).trim().split("\n");
       const header = JSON.parse(observationLines[0]!);
       assert.equal(header.type, "titen.export.header");
-      assert.equal(header.format_version, 2);
+      assert.equal(header.format_version, 3);
       assert.equal(header.complete, true);
       assert.deepEqual(header.dependency_order, ["workspaces", "memberships", "projects", "observations", "claims"]);
       assert.deepEqual(header.depends_on, ["workspaces", "memberships", "projects"]);

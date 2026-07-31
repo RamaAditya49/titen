@@ -76,9 +76,10 @@ An agent's memory loop:
 observe → consolidate → compile → act → feedback
 ```
 
-This is the current explicit path: the agent or integration supplies the claim
-to `consolidate`. Automatic observation classification/reflection is a planned
-background capability and does not happen merely because `observe` succeeded.
+This explicit path always remains available: the agent or integration supplies
+the claim to `consolidate`. Optional automatic derivation/reflection runs only
+after a deployment configures extraction and a background timer/Cron or an
+authorized operator drains its ledger; `observe` itself never waits for a model.
 
 ### 1. Observe
 
@@ -132,9 +133,9 @@ const result = await titen.consolidate("user_rama", [
 // result.claims[0].claim_id → "claim_..."
 ```
 
-The server returns `model_used: false` on this path. After ADR-0004 is
-implemented, optional asynchronous enrichment may propose additional claims,
-but it will not replace this immediate authoritative direct-claim workflow.
+The server returns `model_used: false` on this path. Configured asynchronous
+enrichment may propose additional unverified claims, but it never replaces this
+immediate authoritative direct-claim workflow.
 
 `consolidate` keeps this positional form for compatibility. Object-style JavaScript
 misuse is rejected locally before a request is sent.

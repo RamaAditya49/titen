@@ -1,5 +1,3 @@
-import { sha256Hex } from "./ids";
-
 export type EnrichmentLane = "derivation" | "reflection";
 
 export interface ExtractionRequest {
@@ -16,6 +14,45 @@ export interface ExtractionCapability {
   /** Non-secret provider identity folded into durable job provenance. */
   providerIdentity?: string;
   generate(request: ExtractionRequest): Promise<unknown>;
+}
+
+/** Runtime guard for capabilities injected by embedders rather than config parsers. */
+export function isExtractionCapability(value: unknown): value is ExtractionCapability {
+  if (!value || typeof value !== "object") return false;
+  const capability = value as Partial<ExtractionCapability>;
+  return typeof capability.modelId === "string"
+    && capability.modelId.trim().length > 0
+    && capability.modelId.length <= 200
+    && typeof capability.modelFingerprint === "string"
+    && /^[a-f0-9]{64}$/u.test(capability.modelFingerprint)
+    && (capability.providerIdentity === undefined
+      || (typeof capability.providerIdentity === "string"
+        && capability.providerIdentity.length > 0
+        && capability.providerIdentity.length <= 2_048))
+    && typeof capability.generate === "function";
+}
+
+/** Copy mutable/embedder-owned configuration into one immutable startup snapshot. */
+export function snapshotExtractionCapability(value: unknown): ExtractionCapability | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  try {
+    const source = value as ExtractionCapability;
+    const generate = source.generate;
+    let snapshot!: ExtractionCapability;
+    snapshot = {
+      modelId: source.modelId,
+      modelFingerprint: source.modelFingerprint,
+      ...(source.providerIdentity === undefined
+        ? {}
+        : { providerIdentity: source.providerIdentity }),
+      generate(request) {
+        return generate.call(snapshot, request);
+      },
+    };
+    return isExtractionCapability(snapshot) ? Object.freeze(snapshot) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export type ExtractionConfigurationState = "disabled" | "enabled" | "configured_error";
@@ -160,16 +197,20 @@ export function createHttpExtraction(config: {
       } catch {
         throw new ExtractionProviderError("provider_unavailable", true);
       }
-      if (!response.ok)
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
         throw new ExtractionProviderError(
           response.status === 408 || response.status === 429 || response.status >= 500
             ? "provider_unavailable"
             : "provider_rejected",
           response.status === 408 || response.status === 429 || response.status >= 500,
         );
+      }
       const declared = Number(response.headers.get("content-length") ?? "0");
-      if (declared > MAX_PROVIDER_BYTES)
+      if (declared > MAX_PROVIDER_BYTES) {
+        await response.body?.cancel().catch(() => undefined);
         throw new ExtractionProviderError("provider_protocol", false);
+      }
       const text = await boundedResponseText(response);
       let body: unknown;
       try {
@@ -199,7 +240,9 @@ export function configureHttpExtraction(config: {
   fetch?: typeof fetch;
 }): { capability?: ExtractionCapability; state: ExtractionConfigurationState } {
   const required = [config.baseUrl, config.model, config.modelFingerprint];
-  if (required.every((value) => value === undefined || value === ""))
+  const supplied = [...required, config.apiKey, config.timeoutMs]
+    .some((value) => value !== undefined && value !== "");
+  if (!supplied)
     return { state: "disabled" };
   if (required.some((value) => value === undefined || value === ""))
     return { state: "configured_error" };
@@ -218,9 +261,4 @@ export function configureHttpExtraction(config: {
   } catch {
     return { state: "configured_error" };
   }
-}
-
-/** Stable identity helper for fixtures and native model bindings. */
-export async function extractionModelFingerprint(identity: string): Promise<string> {
-  return sha256Hex(identity);
 }

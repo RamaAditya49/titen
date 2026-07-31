@@ -8,7 +8,11 @@ import { backgroundRepairState, runMaintenance } from "../../src/core/maintenanc
 import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
-import { assertPopulatedV11IntegrityMigration } from "../contract/integrity-migration";
+import { observedSemanticReadiness } from "../../src/core/vectors";
+import {
+  assertPopulatedV11IntegrityMigration,
+  assertPopulatedV14SemanticOutageMigration,
+} from "../contract/integrity-migration";
 import { fakeVectors } from "../contract/harness";
 
 const directories: string[] = [];
@@ -35,6 +39,30 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
         const marker = batch.at(-1);
         if (inject && marker?.params?.[0] === SCHEMA_VERSION) {
           inject = false;
+          await db.batch([
+            {
+              sql: `INSERT INTO organizations (id, name, created_at)
+                    VALUES ('org_fault_outage', 'Fault outage', '2026-07-31T00:00:00.000Z')`,
+            },
+            {
+              sql: `INSERT INTO semantic_index_metadata
+                      (id, provider, model, revision, dimensions, metric,
+                       preprocessing, index_schema, created_at,
+                       embedder_failure_at, vector_store_failure_at)
+                    VALUES ('claims', 'contract', 'contract-stub', 'v1', 4,
+                            'cosine', 'text-v1', 'claims-scope-v1',
+                            '2026-07-31T00:00:00.000Z',
+                            '2026-07-31T00:01:00.000Z', NULL)`,
+            },
+            {
+              sql: `INSERT INTO index_outbox
+                      (id, org_id, record_type, record_id, operation, state,
+                       attempts, created_at)
+                    VALUES ('idx_fault_outage', 'org_fault_outage', 'claim',
+                            'claim_fault_outage', 'upsert', 'done', 1,
+                            '2026-07-31T00:00:00.000Z')`,
+            },
+          ]);
           await db.batch([
             ...batch.slice(0, failureAfter + 1),
             { sql: "INSERT INTO deliberately_missing_table(value) VALUES (1)" },
@@ -73,6 +101,25 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       false,
       `migration must roll back the claims column after statement ${failureAfter + 1}`,
     );
+    assert.deepEqual(await db.all(
+      `SELECT embedder_failure_at, vector_store_failure_at
+         FROM semantic_index_metadata WHERE id = 'claims'`,
+    ), [{
+      embedder_failure_at: "2026-07-31T00:01:00.000Z",
+      vector_store_failure_at: null,
+    }]);
+    assert.deepEqual(await db.all(
+      `SELECT operation, state, attempts FROM index_outbox
+        WHERE id = 'idx_fault_outage'`,
+    ), [{ operation: "upsert", state: "done", attempts: 1 }]);
+    assert.deepEqual(await observedSemanticReadiness(db, {
+      embedding: "enabled",
+      vector: "enabled",
+    }), {
+      embedding: "configured_error",
+      vector: "enabled",
+      diagnostic: "embedding_dependency_unavailable",
+    });
     assert.equal(await migrate(db), SCHEMA_VERSION);
     database.close();
   }
@@ -137,6 +184,13 @@ test("a populated schema-v11 SQLite database repairs collaboration integrity", a
   const database = openDatabase(join(temporary(), "titen.db"));
   const db = createSqliteDb(database);
   await assertPopulatedV11IntegrityMigration(db);
+  database.close();
+});
+
+test("a populated schema-v14 SQLite database preserves genuine semantic outage evidence", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await assertPopulatedV14SemanticOutageMigration(db);
   database.close();
 });
 

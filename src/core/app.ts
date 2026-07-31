@@ -43,7 +43,7 @@ import {
 import { backgroundRepairState } from "./maintenance";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
-import type { ExtractionCapability } from "./extraction";
+import { snapshotExtractionCapability, type ExtractionCapability } from "./extraction";
 import { drainEnrichmentRoute } from "./enrichment";
 
 export interface AppContext {
@@ -247,7 +247,7 @@ export const ROUTES: RouteDef[] = [
 export const ROUTE_INVENTORY: RouteInventoryEntry[] = ROUTES.map(({ method, path, scope }) => ({ method, path, scope: scope ?? null }));
 
 async function readiness(ctx: RequestContext): Promise<Result> {
-  const checks: Record<string, string> = {};
+  const checks: Record<string, unknown> = {};
   let ready = true;
   let canonicalReady = true;
   try {
@@ -298,6 +298,46 @@ async function readiness(ctx: RequestContext): Promise<Result> {
     ready = false;
   checks.extraction = ctx.app.modelCapabilities.extraction;
   checks.background_enrichment = ctx.app.modelCapabilities.backgroundEnrichment;
+  if (canonicalReady && schemaReady && ctx.app.migrationsReady) {
+    try {
+      const [jobs] = await ctx.app.db.all<{
+        pending: number;
+        leased: number;
+        failed: number;
+        due: number;
+      }>(
+        `SELECT
+           SUM(CASE WHEN state = 'pending' THEN 1 ELSE 0 END) AS pending,
+           SUM(CASE WHEN state = 'leased' THEN 1 ELSE 0 END) AS leased,
+           SUM(CASE WHEN state = 'failed' THEN 1 ELSE 0 END) AS failed,
+           SUM(CASE WHEN state = 'pending' AND next_attempt_at <= ? THEN 1 ELSE 0 END) AS due
+         FROM enrichment_jobs`,
+        [ctx.app.now().toISOString()],
+      );
+      const pending = Number(jobs?.pending ?? 0);
+      const leased = Number(jobs?.leased ?? 0);
+      const failed = Number(jobs?.failed ?? 0);
+      const due = Number(jobs?.due ?? 0);
+      checks.enrichment_jobs = {
+        state: ctx.app.modelCapabilities.extraction === "configured_error"
+          ? "configured_error"
+          : failed > 0
+            ? "terminal_error"
+            : pending + leased > 0
+              ? "backlog"
+              : ctx.app.modelCapabilities.extraction === "enabled"
+                ? "idle"
+                : "disabled",
+        pending,
+        leased,
+        failed,
+        due,
+      };
+    } catch {
+      checks.enrichment_jobs = { state: "unavailable" };
+      ready = false;
+    }
+  }
   if (
     ctx.app.modelCapabilities.extraction === "configured_error" ||
     ctx.app.modelCapabilities.backgroundEnrichment === "configured_error"
@@ -360,6 +400,21 @@ export function createApp(context: {
       ? { embedding: "enabled", vector: "enabled" }
       : SEMANTIC_DISABLED);
   const semanticPrepared = context.semanticPrepared === true;
+  const suppliedExtraction = context.extraction;
+  const extractionSnapshot = snapshotExtractionCapability(suppliedExtraction);
+  const validExtraction = suppliedExtraction === undefined || extractionSnapshot !== undefined;
+  const requestedExtractionState = context.modelCapabilities?.extraction;
+  const extractionState = !validExtraction
+      || (requestedExtractionState === "enabled" && !suppliedExtraction)
+    ? "configured_error"
+    : requestedExtractionState ?? (suppliedExtraction ? "enabled" : "disabled");
+  const extraction = extractionState === "enabled" && extractionSnapshot
+    ? extractionSnapshot
+    : undefined;
+  const requestedBackgroundState = context.modelCapabilities?.backgroundEnrichment ?? "disabled";
+  const backgroundEnrichmentState = requestedBackgroundState === "enabled" && !extraction
+    ? "configured_error"
+    : requestedBackgroundState;
   const app: AppContext = {
     db: context.db,
     now: context.now ?? (() => new Date()),
@@ -371,12 +426,10 @@ export function createApp(context: {
         : undefined,
     semanticReadiness: initialSemanticReadiness,
     modelCapabilities: {
-      extraction:
-        context.modelCapabilities?.extraction ?? (context.extraction ? "enabled" : "disabled"),
-      backgroundEnrichment:
-        context.modelCapabilities?.backgroundEnrichment ?? "disabled",
+      extraction: extractionState,
+      backgroundEnrichment: backgroundEnrichmentState,
     },
-    extraction: context.extraction,
+    extraction,
     backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
     migrationsReady: context.migrationsReady ?? true,
     secretStorageReady: context.secretStorageReady ?? true,

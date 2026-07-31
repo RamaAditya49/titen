@@ -87,9 +87,11 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             projectId,
             workspaceId,
             actorId: principal.principalId,
+            kind,
             contentHash,
             trust,
             visibility,
+            occurredAt,
             at: ingestedAt,
           })]
         : [];

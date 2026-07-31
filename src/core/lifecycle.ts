@@ -1,4 +1,4 @@
-import { first } from "./db";
+import { first, type Stmt } from "./db";
 import { recordAccessParams, recordAccessSql, authorizeRecordWorkspace } from "./authorization";
 import { conflict, notFound, validationError } from "./errors";
 import { sha256Hex } from "./ids";
@@ -70,6 +70,7 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
 
   const at = ctx.app.now().toISOString();
   const version = expectedVersion + 1;
+  const dependentStatements = await revokeReflectionDependents(ctx, claimId, at);
   await lifecycleBatch(ctx, claimId, expectedVersion, [
     {
       sql: `UPDATE claims SET status = 'superseded', superseded_by = ?, version = ?
@@ -88,6 +89,7 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
     auditStatement(
       principal.orgId, principal.principalId, "claim.supersede", "claim", at, claimId, reason,
     ),
+    ...dependentStatements,
   ]);
 
   return {
@@ -125,6 +127,7 @@ export async function revokeClaim(ctx: RequestContext): Promise<Result> {
 
   const at = ctx.app.now().toISOString();
   const version = expectedVersion + 1;
+  const dependentStatements = await revokeReflectionDependents(ctx, claimId, at);
   await lifecycleBatch(ctx, claimId, expectedVersion, [
     {
       sql: `UPDATE claims SET status = 'revoked', version = ?
@@ -143,6 +146,7 @@ export async function revokeClaim(ctx: RequestContext): Promise<Result> {
     auditStatement(
       principal.orgId, principal.principalId, "claim.revoke", "claim", at, claimId, reason,
     ),
+    ...dependentStatements,
   ]);
 
   return {
@@ -178,6 +182,7 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
 
   const at = ctx.app.now().toISOString();
   const version = expectedVersion + 1;
+  const dependentStatements = await revokeReflectionDependents(ctx, claimId, at);
   await lifecycleBatch(ctx, claimId, expectedVersion, [
     {
       sql: `UPDATE claims SET status = 'expired', valid_to = ?, version = ?
@@ -196,11 +201,91 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
     auditStatement(
       principal.orgId, principal.principalId, "claim.expire", "claim", at, claimId, reason,
     ),
+    ...dependentStatements,
   ]);
 
   return {
     data: { claim_id: claimId, status: "expired", valid_to: at, version, reason },
   };
+}
+
+async function revokeReflectionDependents(
+  ctx: RequestContext,
+  premiseId: string,
+  at: string,
+): Promise<Stmt[]> {
+  const principal = ctx.principal!;
+  const dependent = `c.status IN ('active', 'disputed') AND EXISTS (
+    SELECT 1 FROM claim_links link
+    JOIN enrichment_jobs job
+      ON job.id = link.job_id AND job.org_id = link.org_id
+    JOIN enrichment_commits commit_row ON commit_row.job_id = job.id
+   WHERE link.org_id = c.org_id
+     AND link.source_claim_id = c.id
+     AND link.target_claim_id = ?
+     AND link.relation = 'derived_from'
+     AND job.id = c.enrichment_job_id
+     AND job.lane = 'reflection'
+     AND job.state = 'done'
+     AND commit_row.result_kind = 'add'
+  )`;
+  const snapshotHash = await sha256Hex(`${premiseId}|reflection_premise_noncurrent|${at}`);
+  return [
+    {
+      sql: `INSERT INTO lifecycle_fences (claim_id, expected_version, created_at)
+            SELECT c.id, c.version, ? FROM claims c
+             WHERE c.org_id = ? AND ${dependent}`,
+      params: [at, principal.orgId, premiseId],
+    },
+    {
+      sql: `INSERT INTO record_history
+              (id, org_id, record_type, record_id, version, change_kind,
+               actor_id, snapshot_hash, changed_at)
+            SELECT 'hist_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id,
+                   c.version + 1, 'revoke', ?, ?, ?
+              FROM claims c WHERE c.org_id = ? AND ${dependent}`,
+      params: [principal.principalId, snapshotHash, at, principal.orgId, premiseId],
+    },
+    ...(ctx.app.vectors ? [
+      {
+        sql: `UPDATE index_outbox SET state = 'done'
+               WHERE org_id = ? AND record_type = 'claim' AND state = 'pending'
+                 AND operation = 'upsert' AND record_id IN (
+                   SELECT c.id FROM claims c WHERE c.org_id = ? AND ${dependent}
+                 )`,
+        params: [principal.orgId, principal.orgId, premiseId],
+      },
+      {
+        sql: `INSERT INTO index_outbox
+                (id, org_id, record_type, record_id, operation, state, attempts,
+                 created_at)
+              SELECT 'obx_' || lower(hex(randomblob(16))), c.org_id, 'claim', c.id,
+                     'delete', 'pending', 0, ?
+                FROM claims c WHERE c.org_id = ? AND ${dependent}`,
+        params: [at, principal.orgId, premiseId],
+      },
+    ] satisfies Stmt[] : []),
+    {
+      sql: `INSERT INTO events
+              (id, org_id, kind, actor_id, resource_type, resource_id, payload,
+               created_at)
+            SELECT 'evt_' || lower(hex(randomblob(16))), c.org_id, 'claim.revoked', ?,
+                   'claim', c.id, '{"reason":"premise_noncurrent"}', ?
+              FROM claims c WHERE c.org_id = ? AND ${dependent}`,
+      params: [principal.principalId, at, principal.orgId, premiseId],
+    },
+    {
+      sql: `DELETE FROM claims_fts WHERE claim_id IN (
+              SELECT c.id FROM claims c WHERE c.org_id = ? AND ${dependent}
+            )`,
+      params: [principal.orgId, premiseId],
+    },
+    {
+      sql: `UPDATE claims AS c SET status = 'revoked', version = version + 1
+             WHERE c.org_id = ? AND ${dependent}`,
+      params: [principal.orgId, premiseId],
+    },
+  ];
 }
 
 async function lifecycleBatch(

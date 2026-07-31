@@ -5,6 +5,7 @@ import {
   configureHttpExtraction,
   createHttpExtraction,
 } from "../../src/core/extraction";
+import { backgroundEnrichment } from "../../src/runtime/cloudflare/worker";
 
 const fingerprint = "c".repeat(64);
 
@@ -46,6 +47,12 @@ test("HTTP extraction configuration fails closed without stopping canonical SQL"
   assert.deepEqual(configureHttpExtraction({ baseUrl: "https://models.example.test/v1" }), {
     state: "configured_error",
   });
+  assert.deepEqual(configureHttpExtraction({ apiKey: "orphan-secret" }), {
+    state: "configured_error",
+  });
+  assert.deepEqual(configureHttpExtraction({ timeoutMs: 1_000 }), {
+    state: "configured_error",
+  });
   assert.deepEqual(configureHttpExtraction({
     baseUrl: "http://models.example.test/v1",
     model: "sol",
@@ -64,12 +71,24 @@ test("HTTP extraction configuration fails closed without stopping canonical SQL"
   }), /without credentials/u);
 });
 
+test("Cloudflare background enrichment treats an explicit flag as operator intent", () => {
+  assert.equal(backgroundEnrichment({} as any, "disabled"), "disabled");
+  assert.equal(backgroundEnrichment({ TITEN_ENRICHMENT_BACKGROUND: "0" } as any, "disabled"), "disabled");
+  assert.equal(backgroundEnrichment({ TITEN_ENRICHMENT_BACKGROUND: "1" } as any, "disabled"), "configured_error");
+  assert.equal(backgroundEnrichment({ TITEN_ENRICHMENT_BACKGROUND: "invalid" } as any, "disabled"), "configured_error");
+  assert.equal(backgroundEnrichment({ TITEN_ENRICHMENT_BACKGROUND: "1" } as any, "enabled"), "enabled");
+  assert.equal(backgroundEnrichment({} as any, "configured_error"), "configured_error");
+});
+
 test("HTTP extraction classifies provider failures without response text", async () => {
+  let cancelled = false;
   const capability = createHttpExtraction({
     baseUrl: "http://127.0.0.1:11434/v1",
     model: "sol",
     modelFingerprint: fingerprint,
-    fetch: (async () => new Response("private provider failure", { status: 429 })) as typeof fetch,
+    fetch: (async () => new Response(new ReadableStream({
+      cancel() { cancelled = true; },
+    }), { status: 429 })) as typeof fetch,
   });
   await assert.rejects(
     () => capability.generate({
@@ -86,6 +105,28 @@ test("HTTP extraction classifies provider failures without response text", async
       return true;
     },
   );
+  assert.equal(cancelled, true);
+});
+
+test("HTTP extraction cancels a response whose declared size exceeds the ceiling", async () => {
+  let cancelled = false;
+  const capability = createHttpExtraction({
+    baseUrl: "http://127.0.0.1:11434/v1",
+    model: "sol",
+    modelFingerprint: fingerprint,
+    fetch: (async () => new Response(new ReadableStream({
+      cancel() { cancelled = true; },
+    }), { headers: { "content-length": String(128 * 1024 + 1) } })) as typeof fetch,
+  });
+  await assert.rejects(
+    () => capability.generate({ lane: "derivation", system: "contract", input: {}, schema: {} }),
+    (error: unknown) => {
+      assert.ok(error instanceof ExtractionProviderError);
+      assert.equal(error.failureClass, "provider_protocol");
+      return true;
+    },
+  );
+  assert.equal(cancelled, true);
 });
 
 test("HTTP extraction stops a chunked response at the byte ceiling", async () => {

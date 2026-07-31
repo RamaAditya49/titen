@@ -9,6 +9,11 @@ import { createSqliteDb, openDatabase } from "./sqlite";
 import { tryCreateVectors } from "./vectors";
 import type { WebhookSecurity } from "../../core/webhook-security";
 import { prepareSigningSecrets, type SecretCipher } from "../../core/secrets";
+import {
+  snapshotExtractionCapability,
+  type ExtractionCapability,
+  type ExtractionConfigurationState,
+} from "../../core/extraction";
 
 export interface ServeOptions {
   dbPath: string;
@@ -24,6 +29,8 @@ export interface ServeOptions {
    * Lets a caller embedding this server supply its own store or model.
    */
   vectors?: VectorCapability;
+  extraction?: ExtractionCapability;
+  extractionState?: ExtractionConfigurationState;
   vecDbPath?: string;
   embedBaseUrl?: string;
   embedModel?: string;
@@ -86,6 +93,14 @@ export async function serve(options: ServeOptions) {
     : undefined;
   const intervalMs = options.maintenanceIntervalMs ?? 15_000;
   const backgroundRepair = intervalMs > 0 && migrationsReady && secretStorageReady;
+  const extractionSnapshot = snapshotExtractionCapability(options.extraction);
+  const extractionValid = options.extraction === undefined || extractionSnapshot !== undefined;
+  const extractionState = options.extractionState === "configured_error"
+    || !extractionValid
+    || (options.extractionState === "enabled" && !options.extraction)
+    ? "configured_error"
+    : options.extractionState ?? (options.extraction ? "enabled" : "disabled");
+  const extraction = extractionState === "enabled" ? extractionSnapshot : undefined;
   const app = createApp({
     db,
     revision: options.revision ?? "dev",
@@ -93,6 +108,15 @@ export async function serve(options: ServeOptions) {
     vectors,
     semanticReadiness,
     semanticPrepared: true,
+    extraction,
+    modelCapabilities: {
+      extraction: extractionState,
+      backgroundEnrichment: extractionState === "configured_error"
+        ? "configured_error"
+        : extractionState === "enabled" && intervalMs > 0
+          ? "enabled"
+          : "disabled",
+    },
     backgroundRepair: {
       configured: backgroundRepair,
       staleAfterMs: Math.max(1_000, intervalMs * 3),
@@ -155,13 +179,16 @@ export async function serve(options: ServeOptions) {
       const result = await runMaintenance({
         db,
         vectors,
+        extraction,
         webhookSecurity: options.webhookSecurity,
         secretCipher: options.secretCipher,
         expectedIntervalMs: intervalMs,
       });
-      if (!options.quiet && (result.indexed > 0 || result.delivered > 0 || result.errors.length))
+      if (!options.quiet && (
+        result.enriched > 0 || result.indexed > 0 || result.delivered > 0 || result.errors.length
+      ))
         console.log(
-          `maintenance indexed=${result.indexed} delivered=${result.delivered}${
+          `maintenance enriched=${result.enriched} indexed=${result.indexed} delivered=${result.delivered}${
             result.errors.length ? ` errors=${result.errors.join(",")}` : ""
           }`,
         );

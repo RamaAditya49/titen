@@ -12,34 +12,60 @@ spec: docs/specs/active/2026-07-31-model-assisted-enrichment-0136.md
 ---
 # Plan
 
-- [ ] Add migration 14 for the durable enrichment ledger, immutable-input
+- [x] Add migration 15 for the durable enrichment ledger, immutable-input
   trigger, current-lease commit fence, non-authoritative claim links, indexes,
   and exact job/result provenance. (AC-ENR-003, AC-ENR-004, AC-ENR-008,
   AC-ENR-009, AC-ENR-010)
-- [ ] Implement one shared enrichment module that enqueues derivation with the
+- [x] Implement one shared enrichment module that enqueues derivation with the
   observation batch, schedules bounded reflection snapshots, leases due work,
   builds bounded prompts, validates proposals, commits ADD/link/abstain, and
   applies bounded retry/backoff with fixed failure classes. (AC-ENR-001 through
   AC-ENR-010)
-- [ ] Make leasing pipeline-compatible for zero-downtime rollout, persist only a
+- [x] Make leasing pipeline-compatible for zero-downtime rollout, persist only a
   deterministic output hash after provider return, isolate stale-authority
   anchors per tenant, advance a durable scheduler cursor, acquire a fresh lease
   per sequential provider call, reuse exact duplicate derivations, and cancel
   redirect/rejected response bodies. (AC-ENR-003, AC-ENR-010, AC-ENR-014,
   AC-ENR-015, AC-ENR-018 through AC-ENR-020; #148)
-- [ ] Compact per-claim source and premise links into bounded multi-row SQL,
+- [x] Compact per-claim source and premise links into bounded multi-row SQL,
   cap semantic ADD at one atomic claim, enforce a Cloudflare invocation budget
   with a safe job ceiling, and fail readiness closed for any unsupported/unproven
   D1 activation. (AC-ENR-016; #149)
-- [ ] Version the portable stream to include enrichment jobs, commits, output
+- [x] Version the portable stream to include enrichment jobs, commits, output
   hashes, and generated-claim links; add atomic preflight and idempotent
-  dual-runtime round-trip/rejection coverage. (AC-ENR-017; #150)
-- [ ] Implement one native-fetch OpenAI-compatible extraction adapter with
+  dual-runtime round-trip/rejection coverage, lifecycle-safe historical
+  snapshots, dependency-topological paging with atomic strongly connected
+  components, unavailable-cursor and incomplete-authorized-provenance rejection,
+  deployment-wide evidence/provenance validation, export-time input-hash and
+  commit/result/link-shape validation, and a 16-job deterministic export-owner
+  bound for LINK provenance; propagate premise supersede, revoke, and expire
+  transitions to current reflection ADD results in the same batch.
+  (AC-ENR-017; #150)
+- [x] Bind proposed validity bounds to canonical or explicitly cited normalized
+  RFC 3339 instants and cover unsupported future dates, inverted intervals,
+  offsets, and explicit future windows. (AC-ENR-021; #160)
+- [x] Classify malformed optional extraction before traffic, preserve canonical
+  writes without enqueue, and add bounded idempotent observation backfill after
+  corrected startup while excluding logical imports from implicit model input.
+  (AC-ENR-022; #161)
+- [x] Preserve genuine or ambiguous semantic outage markers across migration
+  15, clear only provably stale loser state, and prove readiness cannot recover
+  through migration, delete-only completion, retirement, purge, expiry, or
+  another organization's work. (AC-ENR-023; #168)
+- [x] Reject reflection ADD whenever any cited premise is disputed at proposal
+  validation or commit time; retain idempotent LINK/abstain behavior and cover
+  mixed active/disputed premise ordering without laundering source conflict.
+  (AC-ENR-024; #172)
+- [x] Revoke direct reflection ADD dependents atomically on premise supersede,
+  revoke, or expire; remove FTS/vector projections, reject nested reflection
+  premises at logical boundaries, and prove exact self-round-trip afterward.
+  (AC-ENR-025; #150)
+- [x] Implement one native-fetch OpenAI-compatible extraction adapter with
   explicit endpoint/model/fingerprint/timeout configuration and strict local
   response-size handling; wire it into Bun timer/manual drain and Cloudflare
   Cron/manual drain without a provider factory. (AC-ENR-002, AC-ENR-005,
   AC-ENR-006, AC-ENR-011)
-- [ ] Add separate readiness and a minimal authorized manual drain surface,
+- [x] Add separate readiness and a minimal authorized manual drain surface,
   update route/API/deployment documentation, and keep the capability disabled
   unless the complete opt-in tuple is valid. (AC-ENR-002, AC-ENR-011,
   AC-ENR-013)
@@ -83,19 +109,48 @@ spec: docs/specs/active/2026-07-31-model-assisted-enrichment-0136.md
 - AC-ENR-015: valid, invalid, unsafe, source-drift, and provider-failure job rows
   proving a deterministic 64-hex hash only when output existed and no raw body.
 - AC-ENR-016: statement/parameter counter at maximum proposal bounds, saturated
-  due queue, fail-closed readiness matrix, and real Free/Paid D1 smoke evidence.
+  due queue, fail-closed Free-plan/invalid-Cron readiness matrix, and real Paid
+  D1 smoke evidence below the full-invocation budget.
 - AC-ENR-017: versioned Bun/D1 export-import round trip, re-import, missing-job,
-  conflicting-hash, foreign-scope, tombstoned-source, and atomic rollback cases.
+  conflicting-hash, foreign-scope, tombstoned-source, unavailable cursor,
+  inaccessible supersession, dependency-order/SCC boundary, corrupt whole-export
+  evidence/provenance, premise-lifecycle propagation/self-round-trip, atomic
+  rollback, and real-D1 2,000-claim dependency-chain duration cases.
 - AC-ENR-018: stale private workspace anchor ordered before a healthy tenant and
   a healthy reflection job still scheduled on both SQL adapters.
 - AC-ENR-019: fetch-init redirect assertion and response-stream cancellation
   hooks for rejected and oversized declared responses.
 - AC-ENR-020: same-domain duplicate observation replay proving one model call,
-  one canonical claim, both exact evidence sources, and non-duplicate eligibility.
+  one canonical claim, explicit reuse mappings, bounded evidence-source append,
+  fresh bounded generation after source saturation, and non-duplicate eligibility.
+- AC-ENR-021: dual-runtime 2026-to-2099 rejection, inverted interval, normalized
+  timezone-offset, explicit future interval, exact snapshot, and output-hash rows.
+- AC-ENR-022: invalid injected/runtime capability readiness, successful canonical
+  write without a job, corrected restart backfill, idempotent replay, and drain.
+- AC-ENR-023: populated schema-v14 Bun/D1 migration with genuine, stale-loser,
+  delete-only, cross-organization, and fault-injected marker states; readiness
+  remains local and changes only after an owned embed-plus-vector success.
+- AC-ENR-024: dual-runtime disputed-only and mixed-premise ADD rejection before
+  semantic mutation, provider-call status/version drift rejection, and unchanged
+  idempotent LINK/abstain replay.
+- AC-ENR-025: dual-runtime premise supersede/revoke/expire propagation, FTS and
+  vector-delete projection assertions, nested-reflection import/export
+  rejection, and post-transition exact export/import replay.
+
+## Current verification
+
+- Bun/SQLite contract: 90 passed, 0 failed.
+- Integration suite: 160 passed, 0 failed.
+- Worker dry-build: 446.21 KiB upload / 95.07 KiB gzip.
+- npm build and package dry-run, Astro build, 57-route documentation check,
+  50-artifact workflow check plus self-test, and `git diff --check`: passed.
+- Independent source/Bun review: passed. D1/workerd execution remains held for
+  the shared redaction gate; locked evaluation and real Cloudflare Paid D1,
+  VPS, and local-computer smokes remain incomplete activation evidence.
 
 ## Security, migration, deployment, smoke, and rollback
 
-Migration 14 is additive. Back up canonical SQL before applying it; a pre-merge
+Migration 15 is additive. Back up canonical SQL before applying it; a pre-merge
 rollback deletes the isolated branch, while a post-migration rollback deploys a
 compatible build that leaves the unused ledger intact. Never down-migrate by
 dropping canonical provenance.
