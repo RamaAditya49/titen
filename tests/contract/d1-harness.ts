@@ -108,18 +108,14 @@ export async function acquireD1Lane(port = D1_LANE_PORT): Promise<D1Lane> {
   };
 }
 
-function redact(value: string, secrets: readonly string[], flush = false) {
+function redact(value: string, secrets: readonly string[]) {
   let safe = value;
   for (const secret of secrets) {
     if (secret) safe = safe.replaceAll(secret, "[redacted]");
   }
-  safe = safe
-    .replace(/(authorization\s*[:=]\s*)bearer\s+[^\s,;]+/gi, "$1[redacted]")
-    .replace(/(authorization\s*[:=]\s*)(?!bearer(?:\s|$))[^\s,;]+/gi, "$1[redacted]")
+  return safe
+    .replace(/(authorization\s*[:=]\s*)(?:bearer\s+)?[^\s,;]+/gi, "$1[redacted]")
     .replace(/((?:api[_-]?key|secret|token)\s*[:=]\s*)[^\s,;}]+/gi, "$1[redacted]");
-  return flush
-    ? safe.replace(/(authorization\s*[:=]\s*)bearer[^\S\r\n]*(?=\r?$)/gim, "$1[redacted]")
-    : safe;
 }
 
 /** Adds bounded, redacted workerd context without changing assertion objects. */
@@ -127,6 +123,8 @@ export class D1RunDiagnostics {
   readonly handleRuntimeStdio: (stdout: Readable, stderr: Readable) => void;
   #phase = "startup";
   #stderr = Buffer.alloc(0);
+  #line = "";
+  #lineOverflow = false;
 
   constructor(
     readonly owner: D1LaneOwner,
@@ -141,27 +139,59 @@ export class D1RunDiagnostics {
   }
 
   recordStderr(value: string) {
-    const combined = `${this.#stderr.toString("utf8")}${value}`;
-    const safe = Buffer.from(redact(combined, this.secrets));
-    this.#stderr = Buffer.from(safe.subarray(Math.max(0, safe.length - this.limit)));
+    let offset = 0;
+    while (offset < value.length) {
+      const newline = value.indexOf("\n", offset);
+      const end = newline === -1 ? value.length : newline;
+      this.#appendLine(value.slice(offset, end));
+      if (newline === -1) return;
+      this.#flushLine(true);
+      offset = newline + 1;
+    }
+  }
+
+  #appendLine(value: string) {
+    if (this.#lineOverflow) return;
+    if (Buffer.byteLength(this.#line) + Buffer.byteLength(value) > this.limit) {
+      this.#line = "";
+      this.#lineOverflow = true;
+      return;
+    }
+    this.#line += value;
+  }
+
+  #appendOutput(value: string) {
+    const combined = Buffer.concat([this.#stderr, Buffer.from(value)]);
+    this.#stderr = Buffer.from(combined.subarray(Math.max(0, combined.length - this.limit)));
+  }
+
+  #flushLine(newline: boolean) {
+    if (!newline && !this.#line && !this.#lineOverflow) return;
+    const safe = this.#lineOverflow
+      ? "[redacted oversized stderr line]"
+      : redact(this.#line, this.secrets);
+    this.#appendOutput(`${safe}${newline ? "\n" : ""}`);
+    this.#line = "";
+    this.#lineOverflow = false;
   }
 
   async run<T>(phase: string, operation: () => T | Promise<T>): Promise<T> {
     this.#phase = phase;
     this.#stderr = Buffer.alloc(0);
+    this.#line = "";
+    this.#lineOverflow = false;
     try {
       return await operation();
     } catch (error) {
-      const safe = Buffer.from(redact(this.#stderr.toString("utf8"), this.secrets, true));
-      const stderr = safe.subarray(Math.max(0, safe.length - this.limit)).toString("utf8");
-      const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${stderr.trim() || "<none captured>"}`;
+      this.#flushLine(false);
+      const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${this.#stderr.toString("utf8").trim() || "<none captured>"}`;
       this.emit(`${context}\n`);
       if (error instanceof Error) {
-        error.message = `${redact(error.message, this.secrets, true)}\n${context}`;
-        if (error.stack) error.stack = `${redact(error.stack, this.secrets, true)}\n${context}`;
+        error.message = `${redact(error.message, this.secrets)}\n${context}`;
+        if (error.stack) error.stack = `${redact(error.stack, this.secrets)}\n${context}`;
         throw error;
       }
-      throw new Error(`${redact(String(error), this.secrets, true)}\n${context}`);
+      throw new Error(`${redact(String(error), this.secrets)}\n${context}`);
     }
   }
 }

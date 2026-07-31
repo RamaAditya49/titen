@@ -67,7 +67,7 @@ test("D1 diagnostics retain the original assertion and only bounded redacted std
 
   await assert.rejects(
     diagnostics.run("checkpoint contention", async () => {
-      diagnostics.recordStderr("x".repeat(180));
+      diagnostics.recordStderr(`${"x".repeat(180)}\n`);
       diagnostics.recordStderr("private-");
       diagnostics.recordStderr("test-key Authoriza");
       diagnostics.recordStderr("tion: Bearer raw-auth-");
@@ -90,31 +90,72 @@ test("D1 diagnostics retain the original assertion and only bounded redacted std
   assert.doesNotMatch(output, /raw-auth-token|private-test-key/);
 });
 
-test("D1 diagnostics hold an incomplete bearer prefix until the token chunk arrives", async () => {
-  const owner: D1LaneOwner = {
-    run_id: "run-bearer-boundary-test",
-    pid: process.pid,
-    worktree: "fixture",
-    started_at: "2026-07-31T00:00:00.000Z",
-  };
-  const emitted: string[] = [];
-  const diagnostics = new D1RunDiagnostics(owner, [], 128, (value) => emitted.push(value));
-  const failure = new Error("controlled bearer boundary failure");
-
-  await assert.rejects(
-    diagnostics.run("bearer boundary", () => {
-      diagnostics.recordStderr("Authorization: Bearer ");
-      diagnostics.recordStderr("SENSITIVE_BEARER_9382");
-      throw failure;
-    }),
-    (error) => {
-      assert.equal(error, failure);
-      assert.match((error as Error).message, /Authorization: \[redacted\]/);
-      assert.doesNotMatch(`${(error as Error).message}\n${(error as Error).stack}`, /SENSITIVE_BEARER_9382/);
-      return true;
+test("D1 diagnostics redact sensitive stderr at every chunk split", async () => {
+  const cases = [
+    {
+      name: "configured secret",
+      sensitive: "SENSITIVE_CONFIGURED_9382",
+      input: "context-before configured=SENSITIVE_CONFIGURED_9382 context-after",
+      secrets: ["SENSITIVE_CONFIGURED_9382"],
     },
-  );
-  const output = emitted.join("");
-  assert.match(output, /Authorization: \[redacted\]/);
-  assert.doesNotMatch(output, /SENSITIVE_BEARER_9382/);
+    {
+      name: "bearer token",
+      sensitive: "SENSITIVE_BEARER_9382",
+      input: "context-before Authorization: Bearer SENSITIVE_BEARER_9382 context-after",
+      secrets: [],
+    },
+    {
+      name: "API key assignment",
+      sensitive: "SENSITIVE_API_KEY_9382",
+      input: "context-before api_key=SENSITIVE_API_KEY_9382 context-after",
+      secrets: [],
+    },
+    {
+      name: "token assignment",
+      sensitive: "SENSITIVE_TOKEN_9382",
+      input: "context-before token: SENSITIVE_TOKEN_9382 context-after",
+      secrets: [],
+    },
+    {
+      name: "secret assignment",
+      sensitive: "SENSITIVE_SECRET_9382",
+      input: "context-before secret = SENSITIVE_SECRET_9382 context-after",
+      secrets: [],
+    },
+  ];
+
+  for (const fixture of cases) {
+    for (let split = 0; split <= fixture.input.length; split++) {
+      const owner: D1LaneOwner = {
+        run_id: `run-${fixture.name.replaceAll(" ", "-")}-${split}`,
+        pid: process.pid,
+        worktree: "fixture",
+        started_at: "2026-07-31T00:00:00.000Z",
+      };
+      const emitted: string[] = [];
+      const diagnostics = new D1RunDiagnostics(owner, fixture.secrets, 256, (value) => emitted.push(value));
+      const failure = new Error(`controlled ${fixture.name} failure at split ${split}`);
+
+      await assert.rejects(
+        diagnostics.run(fixture.name, () => {
+          diagnostics.recordStderr(fixture.input.slice(0, split));
+          diagnostics.recordStderr(fixture.input.slice(split));
+          throw failure;
+        }),
+        (error) => {
+          assert.equal(error, failure);
+          const thrown = `${(error as Error).message}\n${(error as Error).stack}`;
+          assert.doesNotMatch(thrown, new RegExp(fixture.sensitive), `${fixture.name} leaked at split ${split}`);
+          assert.match(thrown, /context-before/);
+          assert.match(thrown, /context-after/);
+          return true;
+        },
+      );
+      const output = emitted.join("");
+      assert.doesNotMatch(output, new RegExp(fixture.sensitive), `${fixture.name} emission leaked at split ${split}`);
+      assert.match(output, /context-before/);
+      assert.match(output, /context-after/);
+      assert.ok(Buffer.byteLength(output) <= 512);
+    }
+  }
 });
