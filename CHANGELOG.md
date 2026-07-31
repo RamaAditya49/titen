@@ -17,6 +17,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-07-31
+
 ### Fixed
 
 - Key creation now returns the canonical `principal_id`, so SDK callers can use
