@@ -48,6 +48,16 @@ pnpm deploy:worker
 curl https://titen.<your-subdomain>.workers.dev/healthz
 ```
 
+Schema migrations are forward-only. Before changing production schema, record
+the current [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
+bookmark with `wrangler d1 time-travel info titen` and retain the previous
+Worker artifact. Logical cross-runtime migration uses the five versioned NDJSON
+streams documented in the
+[API reference](../reference/api.md#portability-and-backup-restore); it is not a
+replacement for point-in-time rollback because it excludes credentials,
+operational coordination, feedback, audit/history, and derived state. After
+deployment or restore, gate traffic on `/readyz`, not `/healthz`.
+
 ## Locally verified behavior
 
 - 2026-07-31 dry-build upload: 223.06 KiB / 49.49 KiB gzip.

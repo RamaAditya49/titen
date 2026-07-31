@@ -291,17 +291,36 @@ The production unit should use:
 
 ## Backup and restore
 
-- Use SQLite backup API or `VACUUM INTO`; do not copy a live database file.
-- Write timestamped backups with mode `0600` and checksum.
-- Restore into a new file, run SQLite integrity checks, then point the service
-  at the verified file.
+- Create an online, verified snapshot with
+  `bunx titen-memory backup --db /var/lib/titen/titen.db --out /var/backups/titen/pre-upgrade.db`.
+  The source must already exist. Titen writes an adjacent temporary file,
+  verifies integrity, foreign keys, non-empty schema, and the exact schema
+  version, sets mode `0600`, then atomically replaces a fixed output path. A
+  failure leaves an existing output untouched and prints no internal stack.
+- Do not copy a live WAL database file. Keep timestamped snapshots and an
+  independently verified checksum outside the service state directory.
 - Vector indexes are rebuildable and do not block canonical restore.
-- For portable application-level backup, retain all three NDJSON streams from
-  `GET /v1/export` (`projects`, `observations`, `claims`) and their headers.
-  Restore may combine the streams in any line order: `POST /v1/import` preflights
-  dependencies before mutation and writes in canonical dependency order.
-- `UNRESOLVED_REFERENCE` means the backup is missing a required project or
-  observation stream; it is not a write conflict. Re-import is idempotent.
+- Before an upgrade, run
+  `bunx titen-memory migrate --db /var/lib/titen/titen.db --dry-run`; it prints
+  pending forward-only SQL without creating or changing the database. Take the
+  snapshot, apply the migration, restart, and require `/readyz` rather than
+  `/healthz` to report success.
+- Rollback is snapshot restore, not a down migration. Stop the service, preserve
+  the failed database for diagnosis, restore the verified pre-upgrade snapshot
+  into a new mode-`0600` file, start the previous binary against that file, and
+  require `/readyz` before returning traffic.
+- For logical migration between deployments, retain all five NDJSON streams
+  from `GET /v1/export` (`workspaces`, `memberships`, `projects`,
+  `observations`, `claims`) and their headers. Use an `export:all` key and
+  `all=true` only for an audited whole-organization export. Restore with
+  `POST /v1/import` and explicit actor mappings where source and destination
+  principals differ.
+- `UNRESOLVED_REFERENCE` means the logical export lacks a required workspace,
+  actor mapping, project, observation, or replacement claim. It is not a write
+  conflict. Re-import is idempotent.
+- Logical JSONL omits operational and learning state such as keys, integration
+  secrets, checkpoints, leases, context feedback, audit/history, and derived
+  indexes. Only the verified SQLite snapshot is the full VPS recovery boundary.
 
 ## Implemented optional capabilities
 

@@ -29,6 +29,19 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Handoff recipients can read the exact delegated checkpoint and currently
   authorized context pack; operators can page organization leases and active
   organization-level owners/admins can force-release a failed agent's lease.
+- `titen migrate --dry-run` prints the pending forward-only SQL without creating
+  or changing the SQLite database.
+
+### Security
+
+- JSON depth, unsafe controls, malformed Unicode, non-sortable timestamps, and
+  inverted validity windows now fail before canonical mutation. Each returned
+  memory item is marked untrusted, and evidence purge removes FTS and vector
+  projections without exposing a general MCP deletion tool.
+- Whole-organization export now requires the separate `export:all` scope and
+  writes a metadata-only audit record. Portable actor ownership survives only
+  through explicit, preflighted source-to-destination mappings; importing on
+  behalf of another principal additionally requires `keys:manage`.
 
 ### Fixed
 
@@ -41,22 +54,19 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Event polling and federation pulls now page by a database-assigned monotonic
   sequence without changing public event-ID cursors, preventing equal-timestamp
   UUID ordering from skipping committed events.
-
 - An explicitly scoped REST tombstone removes readable observation and
   dependent-claim text while retaining hashes, provenance, and audit history.
-
-### Security
-
-- JSON depth, unsafe controls, malformed Unicode, non-sortable timestamps, and
-  inverted validity windows now fail before canonical mutation. Each returned
-  memory item is marked untrusted, and evidence purge removes FTS and vector
-  projections without exposing a general MCP deletion tool.
-
-### Fixed
-
 - Validation errors distinguish missing values, identify nested field paths,
   and keep raced purge/consolidation and lifecycle writes fail-closed on both
   SQLite and D1.
+- Versioned JSONL v2 restores workspaces, active memberships, team-scoped
+  records, actor provenance, claim evidence, and supersession pointers. Export
+  pages are UTF-8 byte-bounded so every emitted page fits the import boundary;
+  v1 imports remain supported.
+- `titen backup` refuses a missing source, verifies a non-empty current schema
+  plus integrity and foreign keys, and atomically refreshes a fixed output path
+  without exposing an internal stack. `titen schema` output is deterministic
+  and safely repeatable.
 
 ## [0.2.1] — 2026-07-31
 

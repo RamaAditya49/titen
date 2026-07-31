@@ -1,18 +1,20 @@
 #!/usr/bin/env bun
 import { createApiKey, organizationStatement, SCOPES } from "../../core/auth";
-import { MIGRATIONS, migrate } from "../../core/migrations";
+import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { serve } from "./server";
 import { parseSecretCipher } from "../../core/secrets";
 import { createBunWebhookSecurity } from "./webhooks";
+import { chmodSync, existsSync, renameSync, rmSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
 const USAGE = `titen — self-hosted memory service
 
 Usage:
   titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev]
-  titen migrate    [--db titen.db]
+  titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--label owner] [--print-sql]
   titen key create [--db titen.db] --org-id <id> [--principal <id>] [--kind agent]
                    [--scopes "a,b"] [--trust asserted] [--label name] [--print-sql]
@@ -34,7 +36,7 @@ function fail(message: string): never {
 
 const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> = {
   serve: { values: ["db", "port", "host", "revision"] },
-  migrate: { values: ["db"] },
+  migrate: { values: ["db"], booleans: ["dry-run"] },
   bootstrap: { values: ["db", "org", "label"], booleans: ["print-sql"] },
   "key create": {
     values: ["db", "org-id", "principal", "kind", "scopes", "trust", "label"],
@@ -112,8 +114,12 @@ function printKey(raw: string, id: string) {
   console.log("Store this key now. Titen keeps only its hash and cannot show it again.");
 }
 
-async function withDb<T>(path: string, run: (db: ReturnType<typeof createSqliteDb>) => Promise<T>) {
-  const database = openDatabase(path);
+async function withDb<T>(
+  path: string,
+  run: (db: ReturnType<typeof createSqliteDb>) => Promise<T>,
+  options?: Parameters<typeof openDatabase>[1],
+) {
+  const database = openDatabase(path, options);
   try {
     return await run(createSqliteDb(database));
   } finally {
@@ -154,6 +160,18 @@ switch (command) {
   }
 
   case "migrate": {
+    if (flags["dry-run"]) {
+      const pending = existsSync(dbPath)
+        ? await withDb(dbPath, (db) => pendingMigrations(db), { create: false, readonly: true })
+        : MIGRATIONS;
+      for (const migration of pending) {
+        console.log(`-- migration ${migration.version}`);
+        for (const statement of migration.statements)
+          console.log(`${statement.replace(/\s+/g, " ").trim()};`);
+      }
+      console.log(`-- ${pending.length} migration(s) pending; database unchanged`);
+      break;
+    }
     const version = await withDb(dbPath, (db) => migrate(db));
     console.log(`schema version ${version} applied to ${dbPath}`);
     break;
@@ -265,26 +283,48 @@ switch (command) {
   case "backup": {
     const out = text(flags.out, "");
     if (!out) fail("--out <file> is required");
+    const sourcePath = resolve(dbPath);
+    const outPath = resolve(out);
+    if (sourcePath === outPath) fail("--out must differ from --db");
+    if (!existsSync(sourcePath)) fail(`database does not exist: ${dbPath}`);
+    const temporary = join(
+      dirname(outPath),
+      `.${basename(outPath)}.tmp-${process.pid}-${crypto.randomUUID()}`,
+    );
     // VACUUM INTO writes a compacted, self-contained copy and is safe against a
-    // live WAL database, so the service does not need to stop. The copy is then
-    // verified here rather than by the caller: a backup that cannot pass its own
-    // integrity check must not be left behind looking usable.
-    const database = openDatabase(dbPath);
+    // live WAL database. Only a verified adjacent temp file replaces the target,
+    // so a failed run cannot leave a stale or empty file looking successful.
     try {
-      database.run(`VACUUM INTO ?`, out);
-    } finally {
-      database.close();
+      const database = openDatabase(sourcePath, { create: false });
+      try {
+        database.run(`VACUUM INTO ?`, temporary);
+      } finally {
+        database.close();
+      }
+      const copy = openDatabase(temporary, { create: false });
+      try {
+        const integrity = copy.query(`PRAGMA integrity_check`).all() as { integrity_check: string }[];
+        if (integrity.length !== 1 || integrity[0]?.integrity_check !== "ok")
+          throw new Error(`integrity check returned ${integrity[0]?.integrity_check ?? "no result"}`);
+        const foreignKeys = copy.query(`PRAGMA foreign_key_check`).all();
+        if (foreignKeys.length) throw new Error("foreign key check failed");
+        const objects = copy.query(
+          `SELECT COUNT(*) AS count FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'`,
+        ).get() as { count: number };
+        if (Number(objects.count) === 0) throw new Error("schema is empty");
+        const schema = await schemaState(createSqliteDb(copy));
+        if (!schema.verified || schema.applied !== schema.expected)
+          throw new Error(`schema verification failed (${schema.applied}/${schema.expected})`);
+      } finally {
+        copy.close();
+      }
+      chmodSync(temporary, 0o600);
+      renameSync(temporary, outPath);
+    } catch (error) {
+      rmSync(temporary, { force: true });
+      fail(`backup failed: ${error instanceof Error ? error.message : "unknown error"}`);
     }
-    const copy = openDatabase(out);
-    let result = "unknown";
-    try {
-      const rows = copy.query(`PRAGMA integrity_check`).all() as { integrity_check: string }[];
-      result = rows[0]?.integrity_check ?? "unknown";
-    } finally {
-      copy.close();
-    }
-    if (result !== "ok") fail(`backup failed integrity check: ${result}`);
-    console.log(`backup verified: ${out}`);
+    console.log(`backup verified: ${outPath}`);
     break;
   }
 
@@ -298,9 +338,9 @@ switch (command) {
         console.log(`${statement.replace(/\s+/g, " ").trim()};`);
     }
     console.log(
-      `INSERT INTO titen_migrations (version, applied_at) VALUES (${
+      `INSERT OR IGNORE INTO titen_migrations (version, applied_at) VALUES (${
         MIGRATIONS[MIGRATIONS.length - 1]!.version
-      }, '${new Date().toISOString()}');`,
+      }, '1970-01-01T00:00:00.000Z');`,
     );
     break;
   }

@@ -330,7 +330,7 @@ export function createApp(context: {
         if (declared > MAX_BODY_BYTES)
           throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
         const text = await request.text();
-        if (text.length > MAX_BODY_BYTES)
+        if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES)
           throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
         cachedBody = text;
         return text;

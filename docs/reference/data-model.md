@@ -546,13 +546,17 @@ outbox work.
   cleanup completes.
 - Evidence history is not autonomously deleted.
 - Expiry and retrieval eligibility are separate from physical purge.
-- Export excludes keys, vectors, ephemeral context content, and secrets by
-  default.
-- Export excludes Memory Atlas cache, layout, cluster, and community data;
-  destinations rebuild views from canonical records.
-- Channel/release rows and history are portable, but imported releases are
-  suspended until destination gateway, policy, and customer-assertion key
-  references are explicitly rebound and verified.
+- Portable JSONL v2 contains workspaces, active memberships, projects,
+  observations, and claims with their evidence links and supersession pointers.
+  This is the canonical memory/team migration surface, not a physical backup.
+- Portable JSONL excludes credentials, secrets, external integration bindings,
+  checkpoints, leases, handoffs, context runs and feedback, audit/event/history
+  rows, index outboxes, FTS projections, vectors, and Memory Atlas derived data.
+  Rebuildable views are regenerated; use a database snapshot when excluded
+  operational or learning state must survive disaster recovery.
+- Proposed channel/release portability must keep imported releases suspended
+  until destination gateway, policy, and customer-assertion key references are
+  explicitly rebound and verified.
 - Legal hold and physical purge arrive with v0.3 policy; their migration must
   preserve existing tombstones and provenance.
 - Revoking or expiring a release removes channel eligibility before derived

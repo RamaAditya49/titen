@@ -666,18 +666,58 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Compatibility
 
-- v1 export format is versioned independently from the HTTP API.
+- Export format v2 is versioned independently from HTTP API v1. Import still
+  accepts v1 files; because v1 carried no transferable actor authority, their
+  observations and claims are owned by the authenticated importing principal.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
   complete Mem0 API compatibility.
 
 ## Portability and backup restore
 
-`GET /v1/export?type=projects|observations|claims` returns canonical NDJSON. Each
-header includes deterministic `dependency_order` (`projects`, `observations`,
-`claims`) and `depends_on`. Backups should retain all three streams and their
-headers. `POST /v1/import` preflights the complete request before mutation,
-accepts canonical records independent of NDJSON line order, and writes in
-canonical dependency order. Missing parents return `422 UNRESOLVED_REFERENCE`
-with only `record_type`, `field`, and `dependency_type`; no foreign record or
-content is disclosed. Re-import is idempotent.
+`GET /v1/export?type=workspaces|memberships|projects|observations|claims`
+returns one canonical NDJSON stream. Retain all five streams and headers for a
+logical migration. Headers declare format v2, source organization, scope,
+deterministic dependency order, count, completion state, and the next opaque
+cursor. Pages contain at most 2,000 records and are cut on UTF-8 byte length so
+the complete response remains within the import request limit. Follow
+`next_cursor` until it is `null`; IDs are stable pagination cursors, not a
+change feed.
+
+Ordinary export is principal-scoped: private records belong to the caller,
+team records require active membership, workspace export includes only joined
+workspaces, and membership export includes only the caller. `all=true` requires
+the separate `export:all` scope, exports the whole authenticated organization,
+and appends a metadata-only audit entry for each page. It never crosses the
+organization derived from the API key.
+
+`POST /v1/import` preflights the complete request before mutation, accepts
+canonical records independent of NDJSON line order, and writes in dependency
+order. Workspaces and active memberships restore team authority before team
+records; claims preserve source links and `superseded_by`. Missing parents
+return `422 UNRESOLVED_REFERENCE` with only `record_type`, `field`, and
+`dependency_type`; no foreign record or content is disclosed. Cross-organization
+ID collisions fail closed, every request is atomic, and re-import is idempotent.
+An exact self-authenticating redaction marker retains its original content hash
+but is not re-added to FTS or vector projections; non-current claims are likewise
+restored canonically with delete, rather than upsert, projection work.
+
+Format v2 never trusts a foreign `actor_id` as local authority. Before records
+from another principal, add an explicit noncanonical control line:
+
+```json
+{"type":"titen.import.actor_map","source_org_id":"org_source","source_actor_id":"agent_source","destination_actor_id":"agent_destination"}
+```
+
+Mapping to the authenticated importer needs no extra scope. Mapping to another
+destination principal additionally requires `keys:manage`; missing, conflicting,
+foreign, or unused mappings fail before mutation. Canonical records retain the
+mapped actor, while import history records the authenticated importer. That
+administrative scope may restore team records on behalf of mapped members;
+without it, the importer must be an active non-reader in each workspace.
+
+Logical JSONL is not a full deployment snapshot. It deliberately excludes API
+keys, encrypted integration bindings, checkpoints, leases, context runs and
+feedback, audit/event/history rows, and rebuildable indexes or vectors. Use
+`titen backup` for complete Bun/SQLite disaster recovery and a provider-native
+database snapshot for Cloudflare rollback.

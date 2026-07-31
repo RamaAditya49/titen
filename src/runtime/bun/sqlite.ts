@@ -3,8 +3,18 @@ import { Database } from "bun:sqlite";
 import type { Db, Param, Stmt } from "../../core/db";
 
 /** Opens a canonical database with the durability settings a VPS needs. */
-export function openDatabase(path: string): Database {
-  const database = new Database(path, { create: true });
+export function openDatabase(
+  path: string,
+  options: { create?: boolean; readonly?: boolean } = {},
+): Database {
+  const readonly = options.readonly ?? false;
+  const open = readonly
+    ? { readonly: true }
+    : options.create === false
+      ? { readwrite: true }
+      : { create: true };
+  const database = new Database(path, open);
+  if (readonly) return database;
   database.run("PRAGMA journal_mode = WAL");
   // SQLite's 1,000-page checkpoint keeps a 4 KiB-page WAL near 4.2 MiB when
   // no long-lived reader prevents recycling. Keep it explicit and tested.

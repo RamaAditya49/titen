@@ -37,6 +37,7 @@ export const SCOPES = [
   "index:write",
   "keys:manage",
   "export:read",
+  "export:all",
   "import:write",
 ] as const;
 export type Scope = (typeof SCOPES)[number];

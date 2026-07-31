@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
+import { MAX_BODY_BYTES } from "../../src/core/http";
 import { signPayload } from "../../src/core/webhooks";
 import type { Fixture, Res } from "./harness";
 
@@ -1082,10 +1083,10 @@ export const CASES: Case[] = [
       const observationLines = String(observations.body).trim().split("\n");
       const header = JSON.parse(observationLines[0]!);
       assert.equal(header.type, "titen.export.header");
-      assert.equal(header.format_version, 1);
+      assert.equal(header.format_version, 2);
       assert.equal(header.complete, true);
-      assert.deepEqual(header.dependency_order, ["projects", "observations", "claims"]);
-      assert.deepEqual(header.depends_on, ["projects"]);
+      assert.deepEqual(header.dependency_order, ["workspaces", "memberships", "projects", "observations", "claims"]);
+      assert.deepEqual(header.depends_on, ["workspaces", "memberships", "projects"]);
       assert.equal(observationLines.length, 2);
       assert.ok(!String(observations.body).includes("titen_sk_"), "export must carry no key");
 
@@ -1128,7 +1129,13 @@ export const CASES: Case[] = [
         .replaceAll(seeded.observationId, migratedObservationId)
         .replaceAll(seeded.claimId, migratedClaimId);
       const target = await fx.provision({ scopes: ["*"] });
-      const imported = await fx.callRaw("POST", "/v1/import", { key: target.key, body: migrated });
+      const actorMap = JSON.stringify({
+        type: "titen.import.actor_map",
+        source_org_id: owner.orgId,
+        source_actor_id: owner.principalId,
+        destination_actor_id: target.principalId,
+      });
+      const imported = await fx.callRaw("POST", "/v1/import", { key: target.key, body: `${actorMap}\n${migrated}` });
       expectOk(imported);
       const compiled = await fx.call("POST", "/v1/context/compile", {
         key: target.key,
@@ -1147,7 +1154,7 @@ export const CASES: Case[] = [
       // Importing an id owned elsewhere fails loudly instead of silently.
       const collision = await fx.callRaw("POST", "/v1/import", {
         key: target.key,
-        body: `${observationLines.join("\n")}\n`,
+        body: `${actorMap}\n${observationLines.join("\n")}\n`,
       });
       expectError(collision, 409, "CONFLICT");
     },
@@ -1216,6 +1223,320 @@ export const CASES: Case[] = [
       );
       assert.ok(!JSON.stringify(failedClaim.body).includes(missingObservationId), "diagnostic must not disclose referenced ids");
       assert.deepEqual(await canonicalCounts(), beforeFailure, "failed source preflight must not partially mutate");
+    },
+  },
+  {
+    name: "v2 import preflights temporal bounds and preserves redacted evidence markers",
+    async run(fx) {
+      const target = await fx.provision({ principalId: "portability_temporal_owner", scopes: ["*"] });
+      const header = {
+        type: "titen.export.header",
+        format_version: 2,
+        record_type: "observations",
+        org_id: target.orgId,
+      };
+      const baseObservation = {
+        type: "observation",
+        id: "obs_temporal_import_base_00000000",
+        subject_id: "user_temporal_import",
+        project_id: null,
+        workspace_id: null,
+        agent_id: null,
+        run_id: null,
+        actor_id: target.principalId,
+        kind: "imported_source",
+        content: "Temporal import evidence.",
+        source_type: "import",
+        source_ref: null,
+        trust: "asserted",
+        visibility: "private",
+        occurred_at: null,
+        ingested_at: "2026-07-31T00:00:00.000Z",
+      };
+      const counts = async () => (await fx.query<{ observations: number; claims: number }>(
+        `SELECT (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims`,
+        [target.orgId, target.orgId],
+      ))[0]!;
+
+      for (const [field, value, suffix] of [
+        ["ingested_at", "+010000-01-01T00:00:00.000Z", "extended"],
+        ["ingested_at", "999-01-01T00:00:00.000Z", "short"],
+      ] as const) {
+        const row = { ...baseObservation, id: `${baseObservation.id}_${suffix}`, [field]: value };
+        const failed = await fx.callRaw("POST", "/v1/import", {
+          key: target.key,
+          body: `${JSON.stringify(header)}\n${JSON.stringify(row)}\n`,
+        });
+        expectError(failed, 400, "VALIDATION_ERROR");
+        assert.deepEqual(await counts(), { observations: 0, claims: 0 });
+      }
+
+      const invalidClaim = {
+        type: "claim",
+        id: "claim_invalid_interval_0000000000",
+        subject_id: baseObservation.subject_id,
+        project_id: null,
+        workspace_id: null,
+        observer_id: null,
+        actor_id: target.principalId,
+        kind: "procedural",
+        statement: "This invalid interval must never commit.",
+        confidence: 0.8,
+        trust: "asserted",
+        visibility: "private",
+        status: "active",
+        version: 1,
+        valid_from: "2030-01-01T00:00:00.000Z",
+        valid_to: "2020-01-01T00:00:00.000Z",
+        created_at: "2026-07-31T00:00:00.000Z",
+        superseded_by: null,
+        sources: [{
+          observation_id: baseObservation.id,
+          relation: "supports",
+          created_at: "2026-07-31T00:00:00.000Z",
+        }],
+      };
+      const invalidInterval = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: [header, baseObservation, invalidClaim].map(JSON.stringify).join("\n") + "\n",
+      });
+      expectError(invalidInterval, 400, "VALIDATION_ERROR");
+      assert.deepEqual(await counts(), { observations: 0, claims: 0 });
+
+      const originalHash = "a".repeat(64);
+      const redacted = {
+        ...baseObservation,
+        id: "obs_redacted_import_000000000000",
+        content: `[redacted sha256:${originalHash}]`,
+        content_hash: originalHash,
+      };
+      const redactedClaim = {
+        ...invalidClaim,
+        id: "claim_redacted_import_0000000000",
+        statement: "[redacted: purged evidence]",
+        status: "revoked",
+        version: 2,
+        valid_from: "2026-07-31T00:00:00.000Z",
+        valid_to: null,
+        sources: [{
+          observation_id: redacted.id,
+          relation: "supports",
+          created_at: "2026-07-31T00:00:00.000Z",
+        }],
+      };
+      expectOk(await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: [header, redactedClaim, redacted].map(JSON.stringify).join("\n") + "\n",
+      }));
+      const stored = await fx.query<{ content: string; content_hash: string }>(
+        `SELECT content, content_hash FROM observations WHERE id = ? AND org_id = ?`,
+        [redacted.id, target.orgId],
+      );
+      assert.deepEqual(stored, [{ content: redacted.content, content_hash: originalHash }]);
+      const projections = await fx.query<{
+        observation_fts: number;
+        claim_fts: number;
+        observation_operation: string;
+        claim_operation: string;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations_fts WHERE observation_id = ?) AS observation_fts,
+           (SELECT COUNT(*) FROM claims_fts WHERE claim_id = ?) AS claim_fts,
+           (SELECT operation FROM index_outbox WHERE record_type = 'observation' AND record_id = ? LIMIT 1) AS observation_operation,
+           (SELECT operation FROM index_outbox WHERE record_type = 'claim' AND record_id = ? LIMIT 1) AS claim_operation`,
+        [redacted.id, redactedClaim.id, redacted.id, redactedClaim.id],
+      );
+      assert.deepEqual(projections, [{
+        observation_fts: 0,
+        claim_fts: 0,
+        observation_operation: "delete",
+        claim_operation: "delete",
+      }]);
+
+      const spoofed = {
+        ...redacted,
+        id: "obs_redacted_spoof_0000000000000",
+        content: `[redacted sha256:${"b".repeat(64)}]`,
+      };
+      expectError(await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: `${JSON.stringify(header)}\n${JSON.stringify(spoofed)}\n`,
+      }), 400, "VALIDATION_ERROR");
+      assert.deepEqual(await counts(), { observations: 1, claims: 1 });
+    },
+  },
+  {
+    name: "v2 portability maps actors and restores team supersession without widening ordinary export",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "portability_source_owner", scopes: ["*"] });
+      const sibling = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "portability_source_sibling",
+        scopes: ["*"],
+      });
+      const outsider = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "portability_outsider",
+        scopes: ["export:read"],
+      });
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: owner.key,
+        body: { name: "portable-team" },
+      });
+      expectOk(workspace, 201);
+      const workspaceId = workspace.body.data.workspace_id as string;
+      const membershipIds: string[] = [];
+      for (const principalId of [sibling.principalId]) {
+        const membership = await fx.call("POST", "/v1/memberships", {
+          key: owner.key,
+          body: { workspace_id: workspaceId, principal_id: principalId, principal_kind: "agent", role: "member" },
+        });
+        expectOk(membership, 201);
+        membershipIds.push(membership.body.data.membership_id as string);
+      }
+
+      const privateObservation = await fx.call("POST", "/v1/observations", {
+        key: sibling.key,
+        body: observation({ content: "Portable private actor marker.", visibility: "private" }),
+      });
+      expectOk(privateObservation, 201);
+      const teamRecords: { observationId: string; claimId: string }[] = [];
+      for (const statement of ["Portable team procedure v1.", "Portable team procedure v2."]) {
+        const observed = await fx.call("POST", "/v1/observations", {
+          key: sibling.key,
+          body: observation({ workspace_id: workspaceId, visibility: "team", content: statement }),
+        });
+        expectOk(observed, 201);
+        const consolidated = await fx.call("POST", "/v1/consolidations", {
+          key: sibling.key,
+          body: {
+            subject_id: "user_rama",
+            workspace_id: workspaceId,
+            claims: [claim(observed.body.data.observation_id, { visibility: "team", statement })],
+          },
+        });
+        expectOk(consolidated, 201);
+        teamRecords.push({
+          observationId: observed.body.data.observation_id,
+          claimId: consolidated.body.data.claims[0].claim_id,
+        });
+      }
+      expectOk(await fx.call("POST", `/v1/claims/${teamRecords[0]!.claimId}/supersede`, {
+        key: sibling.key,
+        body: { superseded_by: teamRecords[1]!.claimId, expected_version: 1 },
+      }));
+
+      for (const type of ["workspaces", "memberships"] as const) {
+        const hidden = await fx.call("GET", `/v1/export?type=${type}`, { key: outsider.key });
+        assert.equal(hidden.status, 200);
+        const header = typeof hidden.body === "string"
+          ? JSON.parse(hidden.body.trim().split("\n")[0]!)
+          : hidden.body;
+        assert.equal(header.count, 0);
+        assert.ok(!JSON.stringify(hidden.body).includes(workspaceId));
+      }
+      expectError(
+        await fx.call("GET", "/v1/export?type=workspaces&all=true", { key: outsider.key }),
+        403,
+      );
+      const ownerExport = await fx.call("GET", "/v1/export?type=observations", { key: owner.key });
+      assert.ok(!String(ownerExport.body).includes(privateObservation.body.data.observation_id));
+
+      const streams: string[] = [];
+      for (const type of ["workspaces", "memberships", "projects", "observations", "claims"] as const) {
+        const exported = await fx.call("GET", `/v1/export?type=${type}&all=true`, { key: owner.key });
+        assert.equal(exported.status, 200);
+        streams.push(typeof exported.body === "string" ? exported.body : `${JSON.stringify(exported.body)}\n`);
+      }
+      const audits = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM audit_log WHERE org_id = ? AND action = 'portability.export_all'`,
+        [owner.orgId],
+      );
+      assert.equal(Number(audits[0]!.count), 5);
+
+      const target = await fx.provision({ principalId: "portability_restore_owner", scopes: ["*"] });
+      const ids = [
+        workspaceId,
+        ...membershipIds,
+        privateObservation.body.data.observation_id as string,
+        ...teamRecords.flatMap((record) => [record.observationId, record.claimId]),
+      ];
+      let migrated = streams.join("");
+      const migratedId = new Map(ids.map((id) => [id, `${id}_restored`]));
+      for (const [source, destination] of migratedId) migrated = migrated.replaceAll(source, destination);
+      const siblingMap = JSON.stringify({
+        type: "titen.import.actor_map",
+        source_org_id: owner.orgId,
+        source_actor_id: sibling.principalId,
+        destination_actor_id: "portability_restored_sibling",
+      });
+
+      const missingMap = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: migrated,
+      });
+      expectError(missingMap, 422, "UNRESOLVED_REFERENCE");
+      assert.equal(missingMap.body.meta.dependency_type, "actor_mapping");
+      assert.deepEqual(
+        await fx.query("SELECT id FROM workspaces WHERE org_id = ?", [target.orgId]),
+        [],
+      );
+
+      const imported = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: `${siblingMap}\n${migrated}`,
+      });
+      expectOk(imported);
+      assert.equal(imported.body.data.inserted.workspace, 1);
+      assert.equal(imported.body.data.inserted.membership, 1);
+      const restored = await fx.query<{
+        actor_id: string;
+        workspace_id: string | null;
+        superseded_by: string | null;
+      }>(
+        `SELECT actor_id, workspace_id, NULL AS superseded_by FROM observations WHERE id = ? AND org_id = ?
+         UNION ALL
+         SELECT actor_id, workspace_id, superseded_by FROM claims WHERE id = ? AND org_id = ?`,
+        [
+          migratedId.get(privateObservation.body.data.observation_id as string)!, target.orgId,
+          migratedId.get(teamRecords[0]!.claimId)!, target.orgId,
+        ],
+      );
+      assert.equal(restored[0]!.actor_id, "portability_restored_sibling");
+      assert.equal(restored[1]!.workspace_id, migratedId.get(workspaceId));
+      assert.equal(restored[1]!.superseded_by, migratedId.get(teamRecords[1]!.claimId));
+
+      const crossOrg = await fx.callRaw("POST", "/v1/import", {
+        key: target.key,
+        body: streams[0]!,
+      });
+      expectError(crossOrg, 409, "CONFLICT");
+    },
+  },
+  {
+    name: "every export page stays within the UTF-8 import boundary",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "byte_safe_owner", scopes: ["*"] });
+      for (let index = 0; index < 20; index += 1) {
+        const appended = await fx.call("POST", "/v1/observations", {
+          key: owner.key,
+          body: observation({
+            subject_id: "byte_safe_subject",
+            content: `${"🙂".repeat(15_000)}-${index}`,
+          }),
+        });
+        expectOk(appended, 201);
+      }
+      const exported = await fx.call("GET", "/v1/export?type=observations&limit=2000", { key: owner.key });
+      assert.equal(exported.status, 200);
+      const bytes = new TextEncoder().encode(String(exported.body)).byteLength;
+      assert.ok(bytes <= MAX_BODY_BYTES, `export emitted ${bytes} bytes`);
+      const header = JSON.parse(String(exported.body).trim().split("\n")[0]!);
+      assert.ok(header.count < 20);
+      assert.equal(header.complete, false);
+      assert.ok(header.next_cursor);
+      expectOk(await fx.callRaw("POST", "/v1/import", { key: owner.key, body: String(exported.body) }));
     },
   },
   // --- v0.1: Temporal supersession ---

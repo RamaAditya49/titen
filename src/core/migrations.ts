@@ -756,6 +756,22 @@ async function appliedVersion(db: Db): Promise<number> {
   return rows[0]?.version ?? 0;
 }
 
+/** Read the pending forward-only plan without creating or changing schema. */
+export async function pendingMigrations(db: Db): Promise<typeof MIGRATIONS> {
+  try {
+    const rows = await db.all<{ version: number | null }>(
+      `SELECT MAX(version) AS version FROM titen_migrations`,
+    );
+    const current = rows[0]?.version ?? 0;
+    if (current > SCHEMA_VERSION)
+      throw new Error(`Database schema version ${current} is newer than this binary (${SCHEMA_VERSION}).`);
+    return MIGRATIONS.filter(({ version }) => version > current);
+  } catch (error) {
+    if (error instanceof Error && /no such table/i.test(error.message)) return [...MIGRATIONS];
+    throw error;
+  }
+}
+
 /** Apply pending migrations as one cross-runtime atomic batch per version. */
 export async function migrate(db: Db): Promise<number> {
   let current = await appliedVersion(db);
