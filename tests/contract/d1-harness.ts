@@ -190,7 +190,7 @@ function redactLine(value: string, secrets: readonly string[], pendingSensitiveL
       pending: true,
     };
   }
-  const label = /^[ \t]*(?:\\?["'])?([A-Za-z0-9_$.-]+)(?:\\?["'])?[ \t]*:[ \t]*$/.exec(body);
+  const label = /(?:^|[^A-Za-z0-9_$.-])(?:\\?["'])?([A-Za-z0-9_$.-]+)(?:\\?["'])?[ \t]*:[ \t]*$/.exec(body);
   return {
     safe: redactStructured(value, secrets),
     pending: Boolean(label && isSensitiveIdentifier(label[1])),
@@ -213,15 +213,27 @@ function redact(value: string, secrets: readonly string[]) {
   return safe;
 }
 
+type D1LineState = {
+  line: string;
+  lineOverflow: boolean;
+  pendingSensitiveLabel: boolean;
+};
+
+type D1StderrState = D1LineState & {
+  decoder: TextDecoder;
+};
+
+function lineState(): D1LineState {
+  return { line: "", lineOverflow: false, pendingSensitiveLabel: false };
+}
+
 /** Adds bounded, redacted workerd context without changing assertion objects. */
 export class D1RunDiagnostics {
   readonly handleRuntimeStdio: (stdout: Readable, stderr: Readable) => void;
   #phase = "startup";
   #stderr = Buffer.alloc(0);
-  #line = "";
-  #lineOverflow = false;
-  #pendingSensitiveLabel = false;
-  #decoders = new Map<Readable, { decoder: TextDecoder }>();
+  #direct = lineState();
+  #streams = new Map<Readable, D1StderrState>();
 
   constructor(
     readonly owner: D1LaneOwner,
@@ -231,52 +243,49 @@ export class D1RunDiagnostics {
   ) {
     this.handleRuntimeStdio = (stdout, stderr) => {
       stdout.resume();
-      const state = { decoder: new TextDecoder() };
-      this.#decoders.set(stderr, state);
+      const state = { ...lineState(), decoder: new TextDecoder() };
+      this.#streams.set(stderr, state);
       stderr.on("data", (chunk) => {
         const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
         const decoded = state.decoder.decode(bytes, { stream: true });
-        if (decoded) this.recordStderr(decoded);
+        if (decoded) this.#recordStderr(state, decoded);
       });
       const finish = () => {
-        if (this.#decoders.get(stderr) !== state) return;
+        if (this.#streams.get(stderr) !== state) return;
         const decoded = state.decoder.decode();
-        if (decoded) this.recordStderr(decoded);
-        this.#decoders.delete(stderr);
+        if (decoded) this.#recordStderr(state, decoded);
+        this.#flushLine(state, false);
+        this.#streams.delete(stderr);
       };
       stderr.once("end", finish);
       stderr.once("close", finish);
     };
   }
 
-  #flushDecoders() {
-    for (const state of this.#decoders.values()) {
-      const decoded = state.decoder.decode();
-      if (decoded) this.recordStderr(decoded);
-      state.decoder = new TextDecoder();
-    }
+  recordStderr(value: string) {
+    this.#recordStderr(this.#direct, value);
   }
 
-  recordStderr(value: string) {
+  #recordStderr(state: D1LineState, value: string) {
     let offset = 0;
     while (offset < value.length) {
       const newline = value.indexOf("\n", offset);
       const end = newline === -1 ? value.length : newline;
-      this.#appendLine(value.slice(offset, end));
+      this.#appendLine(state, value.slice(offset, end));
       if (newline === -1) return;
-      this.#flushLine(true);
+      this.#flushLine(state, true);
       offset = newline + 1;
     }
   }
 
-  #appendLine(value: string) {
-    if (this.#lineOverflow) return;
-    if (Buffer.byteLength(this.#line) + Buffer.byteLength(value) > this.limit) {
-      this.#line = "";
-      this.#lineOverflow = true;
+  #appendLine(state: D1LineState, value: string) {
+    if (state.lineOverflow) return;
+    if (Buffer.byteLength(state.line) + Buffer.byteLength(value) > this.limit) {
+      state.line = "";
+      state.lineOverflow = true;
       return;
     }
-    this.#line += value;
+    state.line += value;
   }
 
   #appendOutput(value: string) {
@@ -286,32 +295,38 @@ export class D1RunDiagnostics {
     this.#stderr = Buffer.from(combined.subarray(start));
   }
 
-  #flushLine(newline: boolean) {
-    if (!newline && !this.#line && !this.#lineOverflow) return;
-    const line = this.#lineOverflow
-      ? { safe: "[redacted oversized stderr line]", pending: this.#pendingSensitiveLabel }
-      : redactLine(this.#line, this.secrets, this.#pendingSensitiveLabel);
-    const safe = line.safe;
-    this.#pendingSensitiveLabel = line.pending;
-    this.#appendOutput(`${safe}${newline ? "\n" : ""}`);
-    this.#line = "";
-    this.#lineOverflow = false;
+  #appendSanitized(value: string) {
+    const separator = this.#stderr.length && this.#stderr.at(-1) !== 0x0a ? "\n" : "";
+    this.#appendOutput(`${separator}${value}`);
+  }
+
+  #flushLine(state: D1LineState, newline: boolean) {
+    if (!newline && !state.line && !state.lineOverflow) return;
+    const line = state.lineOverflow
+      ? { safe: "[redacted oversized stderr line]", pending: true }
+      : redactLine(state.line, this.secrets, state.pendingSensitiveLabel);
+    state.pendingSensitiveLabel = line.pending;
+    this.#appendSanitized(`${line.safe}${newline ? "\n" : ""}`);
+    state.line = "";
+    state.lineOverflow = false;
+  }
+
+  #snapshotLine(state: D1LineState) {
+    if (!state.line && !state.lineOverflow) return;
+    const line = state.lineOverflow
+      ? { safe: "[redacted oversized stderr line]" }
+      : redactLine(state.line, this.secrets, state.pendingSensitiveLabel);
+    this.#appendSanitized(line.safe);
   }
 
   async run<T>(phase: string, operation: () => T | Promise<T>): Promise<T> {
-    this.#flushDecoders();
     this.#phase = phase;
     this.#stderr = Buffer.alloc(0);
-    this.#line = "";
-    this.#lineOverflow = false;
-    this.#pendingSensitiveLabel = false;
     try {
-      const result = await operation();
-      this.#flushDecoders();
-      return result;
+      return await operation();
     } catch (error) {
-      this.#flushDecoders();
-      this.#flushLine(false);
+      this.#snapshotLine(this.#direct);
+      for (const state of this.#streams.values()) this.#snapshotLine(state);
       const context = `[d1-contract run=${this.owner.run_id} phase=${phase}] workerd stderr (bounded):\n${this.#stderr.toString("utf8").trim() || "<none captured>"}`;
       this.emit(`${context}\n`);
       if (error instanceof Error) {

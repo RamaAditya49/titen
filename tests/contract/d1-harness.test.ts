@@ -509,6 +509,130 @@ test("D1 diagnostics decode and redact raw stderr bytes at every byte split", as
   }
 });
 
+test("D1 diagnostics fail closed after an oversized folded label", async () => {
+  const secret = "OVERSIZED_FOLDED_SECRET_9382";
+  const input = `Authorization:${" ".repeat(180)}\r\n Bearer ${secret}\r\ncontext-after`;
+  const emitted: string[] = [];
+  const diagnostics = new D1RunDiagnostics(
+    diagnosticOwner("run-oversized-folded-label"),
+    [],
+    128,
+    (value) => emitted.push(value),
+  );
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  diagnostics.handleRuntimeStdio(stdout, stderr);
+  const failure = new Error(`controlled oversized folded failure: ${input}`);
+
+  await assert.rejects(
+    diagnostics.run("oversized folded label", () => {
+      stderr.write(Buffer.from(input));
+      throw failure;
+    }),
+    (error) => {
+      assert.equal(error, failure);
+      const thrown = `${(error as Error).message}\n${(error as Error).stack}`;
+      assert.ok(!thrown.includes(secret));
+      assert.ok(thrown.includes(" [redacted]\r\ncontext-after"));
+      return true;
+    },
+  );
+  const output = emitted.join("");
+  assert.ok(!output.includes(secret));
+  assert.ok(output.includes("[redacted oversized stderr line]\n [redacted]\r\ncontext-after"));
+  assert.ok(Buffer.byteLength(diagnosticBody(output)) <= 128);
+  stdout.destroy();
+  stderr.destroy();
+});
+
+test("D1 diagnostics retain Unicode decoder state across run boundaries", async () => {
+  const secret = "秘密鍵_CROSS_RUN_SECRET_9382";
+  const input = `context-before configured=${secret} context-after`;
+  const bytes = Buffer.from(input);
+  const split = Buffer.byteLength("context-before configured=") + 1;
+  const emitted: string[] = [];
+  const diagnostics = new D1RunDiagnostics(
+    diagnosticOwner("run-cross-boundary-unicode"),
+    [secret],
+    256,
+    (value) => emitted.push(value),
+  );
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  diagnostics.handleRuntimeStdio(stdout, stderr);
+
+  await diagnostics.run("successful prefix", () => {
+    stderr.write(bytes.subarray(0, split));
+  });
+  const failure = new Error(`controlled cross-run failure: ${input}`);
+  await assert.rejects(
+    diagnostics.run("failing suffix", () => {
+      stderr.write(bytes.subarray(split));
+      throw failure;
+    }),
+    (error) => {
+      assert.equal(error, failure);
+      const thrown = `${(error as Error).message}\n${(error as Error).stack}`;
+      assert.ok(!thrown.includes(secret));
+      assert.ok(!thrown.includes("CROSS_RUN_SECRET_9382"));
+      assert.ok(thrown.includes("context-before configured=[redacted] context-after"));
+      return true;
+    },
+  );
+  const output = emitted.join("");
+  assert.ok(!output.includes(secret));
+  assert.ok(!output.includes("CROSS_RUN_SECRET_9382"));
+  assert.ok(output.includes("context-before configured=[redacted] context-after"));
+  stdout.destroy();
+  stderr.destroy();
+});
+
+test("D1 diagnostics keep folded and line state isolated per stderr stream", async () => {
+  const foldedSecret = "INTERLEAVED_FOLDED_SECRET_9382";
+  const tokenSecret = "INTERLEAVED_TOKEN_SECRET_9382";
+  const emitted: string[] = [];
+  const diagnostics = new D1RunDiagnostics(
+    diagnosticOwner("run-interleaved-streams"),
+    [],
+    512,
+    (value) => emitted.push(value),
+  );
+  const stdoutA = new PassThrough();
+  const stderrA = new PassThrough();
+  const stdoutB = new PassThrough();
+  const stderrB = new PassThrough();
+  diagnostics.handleRuntimeStdio(stdoutA, stderrA);
+  diagnostics.handleRuntimeStdio(stdoutB, stderrB);
+  const failure = new Error("controlled interleaved stream failure");
+
+  await assert.rejects(
+    diagnostics.run("interleaved streams", () => {
+      stderrA.write("Authorization:\r\n");
+      stderrB.write(`token=${tokenSecret}`);
+      stderrA.write(` Bearer ${foldedSecret}\r\n`);
+      stderrB.write(" context-after\n");
+      throw failure;
+    }),
+    (error) => {
+      assert.equal(error, failure);
+      const thrown = `${(error as Error).message}\n${(error as Error).stack}`;
+      assert.ok(!thrown.includes(foldedSecret));
+      assert.ok(!thrown.includes(tokenSecret));
+      assert.ok(thrown.includes("Authorization:\r\n [redacted]\r\ntoken=[redacted] context-after"));
+      return true;
+    },
+  );
+  const output = emitted.join("");
+  assert.ok(!output.includes(foldedSecret));
+  assert.ok(!output.includes(tokenSecret));
+  assert.ok(output.includes("Authorization:\r\n [redacted]\r\ntoken=[redacted] context-after"));
+  assert.ok(Buffer.byteLength(diagnosticBody(output)) <= 512);
+  stdoutA.destroy();
+  stderrA.destroy();
+  stdoutB.destroy();
+  stderrB.destroy();
+});
+
 test("D1 diagnostics preserve non-credential diagnostic controls", async () => {
   const controls = [
     "token_count=42",
