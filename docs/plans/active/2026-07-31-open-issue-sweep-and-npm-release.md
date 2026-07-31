@@ -68,6 +68,11 @@ evidence.
   project scope to unscoped-only at the shared compiler boundary, capability-
   gate explicit cross-project mode, return effective scope/reason, and prove
   REST, SDK, MCP, OpenClaw guidance, and dual-runtime authorization parity.
+- [x] Retain safe diagnostics for every unexpected non-200/201 response from the
+  reopened #102 D1 concurrency contract while preserving exact aggregate and
+  one-head/one-winner assertions. Instrumentation is ready; the checkpoint
+  recurrence remains unclassified, while only emulator transport instability
+  is separately tracked in #157.
 - [x] Rewrite and human-review README.md, verify `titen.dev`, run `seng-jelas`
   strictly, and prove the packaged README contains only stable external links.
 - [x] Run focused checks after each integration, then the complete local manual
@@ -118,6 +123,7 @@ to its merged evidence or to the concrete decision recorded here.
 | #138 | Distinguish intentional FTS-only operation from configured semantic failure; persist/compare the migration-13 index fingerprint, fail local readiness closed on incompatible or unavailable vector state, and expose separate embedding/extraction/background capability fields without implementing planned enrichment. |
 | #140 | Keep the default package dependency-free, publish one explicit `sqlite-vec@0.1.9` install command, and exercise both missing-dependency failure and vector-ready success from the clean packed consumer. |
 | #141 | Make omitted project scope select only unscoped claims; add explicit `cross_project` mode guarded by `context:compile:all`, report `project_mode` and the capability-backed broad reason, and make every distributed agent skill resolve a repository project before compile. |
+| #102 recurrence | Keep the atomic UPSERT and handoff fence; retain safe diagnostics for each unexpected D1 contention response, keep the issue open until isolated repeated evidence classifies the recurrence, and add no product retry without a reproducible database failure. |
 
 ## Acceptance evidence mapping
 
@@ -183,6 +189,10 @@ to its merged evidence or to the concrete decision recorded here.
 - AC-SWP-022: portable-skill copy parity and OpenClaw host-kit integration test
   proving repository scope is resolved before compile and cross-project mode is
   never the default.
+- AC-SWP-023: exact aggregate concurrent checkpoint assertions plus safe
+  status/error diagnostics for each unexpected response and one durable head;
+  the unclassified #102 recurrence remains distinct from #157 emulator
+  transport failures.
 
 ## Security, migration, deployment, smoke, and rollback
 
