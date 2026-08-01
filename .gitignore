@@ -11,6 +11,7 @@ playwright-report/
 *.db-shm
 *.db-wal
 graphify-out/
+plugins/claude/titen-memory/reports/
 
 # Project-local developer tools
 .tools/

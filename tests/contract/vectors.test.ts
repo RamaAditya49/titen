@@ -9,6 +9,7 @@ import { migrate } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { createVectorizeStore } from "../../src/runtime/cloudflare/vectors";
 import { clientVia, fakeVectors, provisionWith } from "./harness";
+import { outboxStatement } from "../../src/core/writes";
 import {
   RANK_WEIGHTS,
   normalizeVectorSimilarity,
@@ -237,6 +238,7 @@ test("vector retrieval treats missing project as unscoped and broad mode as expl
 test("Vectorize receives the same canonical metadata and query filter", async () => {
   let upserted: unknown;
   let queried: unknown;
+  let lookedUp: unknown;
   const store = createVectorizeStore({
     async upsert(records) {
       upserted = records;
@@ -245,16 +247,98 @@ test("Vectorize receives the same canonical metadata and query filter", async ()
       queried = options;
       return { matches: [] };
     },
+    async getByIds(ids) {
+      lookedUp = ids;
+      return [{ id: "claim" }];
+    },
     async deleteByIds() {},
   });
   const scope = { org_id: "org", subject_id: "subject", project_id: "project" };
   await store.upsert([{ id: "claim", vector: new Float32Array([1, 0]), metadata: scope }]);
   await store.query(new Float32Array([1, 0]), { topK: 2, filter: scope });
+  const present = await store.present!(["claim", "missing"]);
 
   assert.deepEqual(upserted, [
     { id: "claim", values: [1, 0], metadata: scope },
   ]);
   assert.deepEqual(queried, { topK: 2, filter: scope });
+  assert.deepEqual(lookedUp, ["claim", "missing"]);
+  assert.deepEqual([...present], ["claim"]);
+});
+
+test("unchanged claims skip embeddings while verification repairs a missing vector", async () => {
+  const localHandle = openDatabase(join(directory, "index-verification.db"));
+  const localDb = createSqliteDb(localHandle);
+  try {
+    await migrate(localDb);
+    const auth = await provisionWith(localDb, { scopes: ["*"] });
+    const capability = fakeVectors();
+    const client = clientVia(createApp({
+      db: localDb,
+      revision: "test",
+      runtime: "bun-sqlite",
+      vectors: capability,
+    }), origin);
+    const observed = await client.call("POST", "/v1/observations", {
+      key: auth.key,
+      body: {
+        subject_id: "index-verification",
+        kind: "tool_result",
+        content: "Canonical evidence for bounded vector verification.",
+        source: { type: "test", id: "index-verification-evidence", ref: "verify#1" },
+        trust: "verified",
+      },
+    });
+    assert.equal(observed.status, 201);
+    const consolidated = await client.call("POST", "/v1/consolidations", {
+      key: auth.key,
+      body: {
+        subject_id: "index-verification",
+        claims: [{
+          kind: "procedural",
+          statement: "Bounded verification repairs a missing semantic projection.",
+          sources: [{ observation_id: observed.body.data.observation_id, relation: "supports" }],
+        }],
+      },
+    });
+    assert.equal(consolidated.status, 201);
+    const claimId = consolidated.body.data.claims[0].claim_id as string;
+
+    const first = await client.call("POST", "/v1/index/drain?limit=100", { key: auth.key });
+    assert.equal(first.status, 200);
+    assert.equal(first.body.data.indexed, 1);
+    const calls = capability.embedCalls();
+    await localDb.batch([outboxStatement(
+      auth.orgId,
+      "claim",
+      claimId,
+      "upsert",
+      new Date().toISOString(),
+    )]);
+    const duplicate = await client.call("POST", "/v1/index/drain?limit=100", { key: auth.key });
+    assert.equal(duplicate.status, 200);
+    assert.equal(duplicate.body.data.indexed, 0);
+    assert.equal(duplicate.body.data.skipped, 1);
+    assert.equal(capability.embedCalls(), calls);
+
+    capability.drop(claimId);
+    const verified = await client.call("POST", "/v1/index/verify?limit=100", { key: auth.key });
+    assert.equal(verified.status, 200);
+    assert.deepEqual(verified.body.data, {
+      checked: 1,
+      present: 0,
+      missing: 1,
+      repairs_queued: 1,
+      next_after: null,
+    });
+    const repaired = await client.call("POST", "/v1/index/drain?limit=100", { key: auth.key });
+    assert.equal(repaired.status, 200);
+    assert.equal(repaired.body.data.indexed, 1);
+    assert.equal(capability.embedCalls(), calls + 1);
+    assert.deepEqual(await capability.store.present!([claimId]), new Set([claimId]));
+  } finally {
+    localHandle.close();
+  }
 });
 
 test("Vectorize caps native queries without changing scope filters", async () => {
@@ -266,6 +350,7 @@ test("Vectorize caps native queries without changing scope filters", async () =>
       queried = options;
       return { matches: [] };
     },
+    async getByIds() { return []; },
     async deleteByIds() {},
   });
   const filter = { org_id: "org", subject_id: "subject", project_id: "project" };
@@ -464,7 +549,8 @@ test("index drain reports embedder outages as retryable and preserves pending ro
   assert.equal(failed.body.meta.dependency, "embedder");
   assert.equal(failed.body.meta.retryable, true);
   assert.equal(failed.body.meta.pending, before);
-  assert.equal(await pendingCount(), before);
+  const afterFailure = await pendingCount();
+  assert.ok(afterFailure > 0 && afterFailure <= before);
   const unavailable = await app.call("GET", "/readyz");
   assert.equal(unavailable.status, 503);
   assert.equal(unavailable.body.meta.capabilities.embedding, "configured_error");

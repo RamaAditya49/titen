@@ -177,6 +177,13 @@ export function createSqliteVecStore(
         for (const id of batch) remove.run(id);
       })(ids);
     },
+    async present(ids) {
+      if (ids.length === 0) return new Set<string>();
+      const rows = db.query(
+        `SELECT id FROM vec_claims WHERE id IN (${ids.map(() => "?").join(", ")})`,
+      ).all(...ids) as { id: string }[];
+      return new Set(rows.map(({ id }) => id));
+    },
   };
 }
 

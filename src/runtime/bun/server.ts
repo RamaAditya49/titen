@@ -129,13 +129,8 @@ export async function serve(options: ServeOptions) {
     mcpOrigin,
   });
 
-  // ponytail: one process, one database handle, synchronous bun:sqlite calls on
-  // the main thread. The ceiling is that throughput is set by a single core and
-  // does not improve with client concurrency; the SQLite writer lock is never
-  // the constraint, the event loop is. Upgrade only when an equivalent-quality,
-  // durability-preserving small-team workload misses its accepted latency or
-  // throughput objective; then profile before choosing workers or read replicas
-  // (#123).
+  // Bun/SQLite is the documented one-process deployment profile. Horizontal
+  // scaling uses the Cloudflare runtime so this adapter needs no coordinator.
   // @ts-ignore - Bun global is provided by the runtime.
   let server: ReturnType<typeof Bun.serve>;
   try {

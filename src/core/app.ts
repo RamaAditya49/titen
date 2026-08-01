@@ -9,7 +9,7 @@ import { exportRecords, importRecords } from "./portability";
 import { expireClaim, revokeClaim, supersedeClaim } from "./lifecycle";
 import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, listLeases, releaseLease, forceReleaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
 import { listEvents, getEvent } from "./events";
-import { drainIndex } from "./indexing";
+import { drainIndex, verifyIndex } from "./indexing";
 import { handleMcp } from "./mcp";
 import { compileView } from "./atlas";
 import { listAudit, exportAudit } from "./audit";
@@ -94,6 +94,8 @@ export interface AppContext {
   secretStorageReady: boolean;
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
+  /** Optional public-edge defense in depth; account throttling remains canonical. */
+  loginRateLimit?: { limit(key: string): Promise<{ success: boolean }> };
 }
 
 /** Capabilities are reported honestly based on what's configured. */
@@ -290,6 +292,7 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/webhooks/:id/deliveries", scope: "webhooks:read", handler: listDeliveries },
   { method: "POST", path: "/v1/webhooks/deliver", scope: "webhooks:write", handler: drainWebhooks },
   { method: "POST", path: "/v1/index/drain", scope: "index:write", handler: drainIndex },
+  { method: "POST", path: "/v1/index/verify", scope: "index:write", handler: verifyIndex },
   {
     method: "POST",
     path: "/v1/enrichment/drain",
@@ -433,6 +436,7 @@ export function createApp(context: {
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
   mcpOrigin?: string;
+  loginRateLimit?: AppContext["loginRateLimit"];
 }): (request: Request) => Promise<Response> {
   const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
   const configuredVectors = context.vectors;
@@ -476,6 +480,7 @@ export function createApp(context: {
     secretStorageReady: context.secretStorageReady ?? true,
     webhookSecurity: context.webhookSecurity,
     secretCipher: context.secretCipher,
+    loginRateLimit: context.loginRateLimit,
   };
   let semanticPreparation: Promise<SemanticReadiness> | undefined;
 

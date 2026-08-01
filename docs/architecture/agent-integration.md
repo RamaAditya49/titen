@@ -125,18 +125,20 @@ OpenClaw's runtime API, and Hermes' Python API. Every future adapter must reuse
 the same nine MCP tools or REST operations and pass a host-specific install,
 authorization, lifecycle, and outage smoke.
 
-<!-- ponytail: all host packages ship without lifecycle hooks; add automatic recall or flush only after a measured host workflow needs it and a parity fixture covers failure behavior. -->
-<!-- ponytail: Pi has no built-in MCP client; add a minimal Pi extension only when an operator-selected adapter is insufficient and a full process-authority review exists. -->
-<!-- ponytail: public Cursor, Windsurf, TRAE, ZCode, Hermes, Codex, or ChatGPT catalog submissions remain deferred; add vendor-specific listing assets only when a maintainer schedules that review. -->
+Automatic recall, transcript capture, and lifecycle flush are intentionally not
+part of Titen's agent packages. Memory access stays explicit, scoped, and
+reviewable. Pi therefore remains a skill package paired with an
+operator-selected MCP adapter instead of receiving ambient process authority.
+Public catalogs are distribution channels, not runtime requirements: Titen
+submits a package only where the vendor documents a self-service path and keeps
+the other supported hosts on the direct-install matrix below.
 
 ### Runtime notes
 
-**OpenClaw.** Install the compatible skill bundle from ClawHub and merge the
-shipped `integrations/openclaw/openclaw.json` fragment into native
-`mcp.servers` config. OpenClaw stable imports only stdio MCP declarations from
-compatible bundles, so `.clawhubignore` keeps the Claude HTTP declaration out
-of the registry artifact. Native Streamable HTTP config supplies the same nine
-tools without an in-process provider.
+**OpenClaw.** Install the compatible bundle from ClawHub. Current OpenClaw maps
+its skill and remote HTTP `.mcp.json` into the embedded agent without loading an
+in-process provider. The shipped `integrations/openclaw/openclaw.json` fragment
+remains the explicit native-config fallback.
 
 **Hermes Agent.** The Python plugin registers the read-only skill and native
 `mcp_servers` configuration owns the connection. Hermes displays canonical wire

@@ -4,6 +4,7 @@ const upstreamPort = 44_000 + Math.floor(Math.random() * 1_000);
 const adapterPort = 45_000 + Math.floor(Math.random() * 1_000);
 const serverAdapterPort = 46_000 + Math.floor(Math.random() * 1_000);
 const base = `http://127.0.0.1:${adapterPort}`;
+const sessionKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const principals: Record<string, Record<string, unknown>> = {
   titen_sk_session_a: {
     organization_id: "org_a",
@@ -63,7 +64,7 @@ async function login(username: string, password = "correct horse battery staple"
     body: JSON.stringify({ username, password }),
   });
 }
-async function startAdapter() {
+async function startAdapter(sharedKey = true) {
   adapter = Bun.spawn({
     cmd: [process.execPath, "scripts/dashboard-adapter.ts"],
     env: {
@@ -72,11 +73,12 @@ async function startAdapter() {
       TITEN_DASHBOARD_AUTH: "session",
       TITEN_API_URL: `http://127.0.0.1:${upstreamPort}`,
       TITEN_DASHBOARD_PORT: String(adapterPort),
+      ...(sharedKey ? { TITEN_DASHBOARD_SESSION_KEY: sessionKey } : {}),
     },
     stdout: "ignore",
     stderr: "pipe",
   });
-  for (let attempt = 0; attempt < 50; attempt++) {
+  for (let attempt = 0; attempt < 250; attempt++) {
     try { if ((await fetch(`${base}/dashboard-api/status`)).ok) return; } catch {}
     await Bun.sleep(20);
   }
@@ -291,6 +293,9 @@ describe("dashboard per-principal sessions", () => {
       body: JSON.stringify({ username: "user_a", password: "correct horse battery staple" }),
     });
     const cookie = cookieFrom(login);
+    const ciphertext = cookie.lastIndexOf(".") + 1;
+    const tampered = `${cookie.slice(0, ciphertext)}${cookie[ciphertext] === "A" ? "B" : "A"}${cookie.slice(ciphertext + 1)}`;
+    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie: tampered } })).status).toBe(401);
     revoked.add(latestKey.get("user_a")!);
     const denied = await fetch(`${base}/dashboard-api/work/leases`, { headers: { cookie } });
     expect(denied.status).toBe(401);
@@ -317,23 +322,12 @@ describe("dashboard per-principal sessions", () => {
     expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie } })).status).toBe(200);
   });
 
-  test("replaces sessions for the same key id and caps process-local sessions", async () => {
+  test("keeps independently sealed sessions without process-local state", async () => {
     const first = cookieFrom(await login("user_a"));
     const replacement = cookieFrom(await login("user_a"));
-    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie: first } })).status).toBe(401);
+    expect(first).not.toBe(replacement);
+    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie: first } })).status).toBe(200);
     expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie: replacement } })).status).toBe(200);
-
-    let oldest = "";
-    let newest = "";
-    for (let index = 0; index < 129; index++) {
-      const response = await login(`cap_${index}`);
-      expect(response.status).toBe(201);
-      const sessionCookie = cookieFrom(response);
-      if (index === 0) oldest = sessionCookie;
-      newest = sessionCookie;
-    }
-    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie: oldest } })).status).toBe(401);
-    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie: newest } })).status).toBe(200);
   });
 
   test("introspects and sanitizes the configured server credential", async () => {
@@ -376,7 +370,7 @@ describe("dashboard per-principal sessions", () => {
     }
   });
 
-  test("restart invalidates process-local sessions", async () => {
+  test("a configured sealing key preserves sessions across adapter restart", async () => {
     revoked.delete("titen_sk_session_a");
     const login = await fetch(`${base}/dashboard-api/session`, {
       method: "POST",
@@ -387,6 +381,18 @@ describe("dashboard per-principal sessions", () => {
     adapter.kill();
     await adapter.exited;
     await startAdapter();
+    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie } })).status).toBe(200);
+  });
+
+  test("an ephemeral sealing key invalidates sessions on restart", async () => {
+    adapter.kill();
+    await adapter.exited;
+    await startAdapter(false);
+    const cookie = cookieFrom(await login("user_a"));
+    expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie } })).status).toBe(200);
+    adapter.kill();
+    await adapter.exited;
+    await startAdapter(false);
     expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie } })).status).toBe(401);
   });
 });

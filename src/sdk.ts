@@ -63,7 +63,7 @@ export interface Observation {
   subject_id: string;
   kind: ObservationKind;
   content: string;
-  source: { type: string; ref?: string };
+  source: { type: string; ref?: string; id?: string };
   trust?: Trust;
   visibility?: Visibility;
   workspace_id?: string;
@@ -92,6 +92,10 @@ export interface CompileOptions {
   task: string;
   /** JSON token budget accepted by the server: 128 through 32,000. */
   max_tokens: number;
+  /** Optional ISO-8601 point-in-time eligibility anchor. */
+  at?: string;
+  /** Authorized candidate ceiling: 1 through 1,000; defaults to 200. */
+  max_candidates?: number;
   project_id?: string;
   /** Explicit all-project request; requires the separate context:compile:all capability. */
   cross_project?: boolean;
@@ -295,6 +299,7 @@ export interface ContextPack {
     project_id: string | null;
     project_mode: "project" | "unscoped" | "cross_project";
     broad_access_reason: "credential_scope:context:compile:all" | null;
+    as_of: string;
   };
   budget: {
     max_tokens: number;

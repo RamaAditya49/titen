@@ -19,6 +19,19 @@ const ordinaryTools = [
   "titen_remember",
 ].sort();
 
+test("the README leads with the Level 6 product contract and project identity", () => {
+  const readme = readFileSync(join(root, "README.md"), "utf8");
+  assert.match(readme, /The Level 6 collaborative memory fabric for AI agents/);
+  assert.match(readme, /Level 6 = evidence-grounded context \+ coordinated work \+ governance/);
+  assert.match(readme, /Level 6 is Titen's product model, not an external certification/);
+  assert.match(readme, /https:\/\/titen\.dev/);
+  assert.match(readme, /Built with .*C\.A\.D\.I\.S Agent/);
+  assert.match(
+    readFileSync(join(root, "docs/assets/brand/titen-readme-hero.svg"), "utf8"),
+    /OPEN-SOURCE · LEVEL 6 AGENT MEMORY/,
+  );
+});
+
 function json(path: string) {
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, any>;
 }
@@ -133,7 +146,7 @@ test("native marketplaces and host kits use the correct secret interpolation", (
   const packageManifest = json(join(claudeRoot, "package.json"));
   assert.equal(packageManifest.name, "@ramaaditya49/titen-memory");
   assert.equal(packageManifest.version, openClawManifest.version);
-  assert.equal(packageManifest.private, true);
+  assert.equal("private" in packageManifest, false);
   for (const executable of ["scripts", "dependencies", "devDependencies"])
     assert.equal(executable in packageManifest, false, `${executable} must stay absent`);
   assertRemoteConfig(
@@ -141,10 +154,7 @@ test("native marketplaces and host kits use the correct secret interpolation", (
     "${TITEN_MCP_URL}",
     "Bearer ${TITEN_API_KEY}",
   );
-  assert.equal(
-    readFileSync(join(claudeRoot, ".clawhubignore"), "utf8").trimEnd().endsWith(".mcp.json"),
-    true,
-  );
+  assert.equal(existsSync(join(claudeRoot, ".clawhubignore")), false);
 
   const openClaw = json(join(root, "integrations/openclaw/openclaw.json"));
   assert.equal(openClaw.mcp.servers.titen.url, "${TITEN_MCP_URL}");

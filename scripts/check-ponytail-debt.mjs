@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { strict as assert } from "node:assert";
 
 const marker = String.raw`(^|[[:space:]])(//|/\*|\*|<!--|#)[[:space:]]*ponytail:`;
-const output = execFileSync(
+const scan = spawnSync(
   "git",
   ["grep", "-n", "-E", marker, "--", ":!PONYTAIL-DEBT.md", ":!dist"],
   { encoding: "utf8" },
-).trim();
-const live = output.split("\n").map((line) => {
+);
+assert(scan.status === 0 || scan.status === 1, scan.stderr || "Ponytail marker scan failed");
+const output = scan.stdout.trim();
+const live = (output ? output.split("\n") : []).map((line) => {
   const match = line.match(/^(.+?):(\d+):/);
   assert(match, `unparseable Ponytail marker: ${line}`);
   return `${match[1]}:${match[2]}`;

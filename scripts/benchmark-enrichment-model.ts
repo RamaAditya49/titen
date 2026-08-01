@@ -598,8 +598,8 @@ function containsPhrase(statement: string, phrase: string): boolean {
   return normalizedPhrase.length > 0 && ` ${statement} `.includes(` ${normalizedPhrase} `);
 }
 
-// ponytail: locked lexical aliases are not a general semantic judge; upgrade to blinded
-// independent adjudication when a free-form production corpus becomes a release gate.
+// Deterministic fixture contract only; this score is never presented as
+// independent semantic-quality adjudication.
 function lexicalContractMatch(actual: NormalizedClaim, gold: GoldClaim): boolean {
   if (actual.kind !== gold.kind) return false;
   const statement = normalizedText(actual.statement);

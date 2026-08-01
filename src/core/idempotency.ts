@@ -18,11 +18,8 @@ interface StoredRow {
   expires_at: string;
 }
 
-// ponytail: a fixed 24-hour replay window, which is sized for a retry loop
-// rather than for a re-sync. The ceiling is that any bulk re-ingest run a day
-// later duplicates every record, and there is no content-level dedup behind it
-// to absorb that. Upgrade path: a statement/content hash uniqueness rule so
-// convergence does not depend on the caller replaying inside the window (#101).
+// Request keys cover retry storms; canonical hashes on observations and claims
+// independently make stable re-syncs converge after this bounded window.
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function idempotencyKey(request: Request): string | null {
@@ -30,7 +27,7 @@ export function idempotencyKey(request: Request): string | null {
   return value && value.trim() !== "" ? value.trim().slice(0, 200) : null;
 }
 
-function canonicalJson(value: unknown): string {
+export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
@@ -62,7 +59,7 @@ export async function commitIdempotent(
 ): Promise<{ status: number; data: unknown; replayed: boolean }> {
   if (!key) {
     const write = await build();
-    await db.batch(write.statements);
+    if (write.statements.length > 0) await db.batch(write.statements);
     return { status: write.status, data: write.data, replayed: false };
   }
 

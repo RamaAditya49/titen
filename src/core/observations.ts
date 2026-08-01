@@ -3,7 +3,7 @@ import { first, type Stmt } from "./db";
 import { eventStatement } from "./events";
 import { conflict, notFound, validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
-import { commitIdempotent, idempotencyKey } from "./idempotency";
+import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
 import { authorizeRecordWorkspace } from "./authorization";
 import type { RequestContext, Result } from "./http";
@@ -25,6 +25,38 @@ import {
 
 export const ENDPOINT = "POST /v1/observations";
 export const REDACTED_CLAIM_STATEMENT = "[redacted: purged evidence]";
+
+interface ObservationReplayRow {
+  id: string;
+  subject_id: string;
+  project_id: string | null;
+  workspace_id: string | null;
+  agent_id: string | null;
+  run_id: string | null;
+  kind: string;
+  trust: string;
+  visibility: string;
+  content_hash: string;
+  occurred_at: string | null;
+  ingested_at: string;
+}
+
+function replayData(row: ObservationReplayRow) {
+  return {
+    observation_id: row.id,
+    subject_id: row.subject_id,
+    project_id: row.project_id,
+    agent_id: row.agent_id,
+    run_id: row.run_id,
+    kind: row.kind,
+    trust: row.trust,
+    visibility: row.visibility,
+    workspace_id: row.workspace_id,
+    content_hash: row.content_hash,
+    occurred_at: row.occurred_at,
+    ingested_at: row.ingested_at,
+  };
+}
 
 export function redactedObservationContent(contentHash: string): string {
   return `[redacted sha256:${contentHash}]`;
@@ -58,6 +90,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const source = requireObject(body.source, "source");
   const sourceType = requireString(source, "type", LIMITS.label, "source.type");
   const sourceRef = optionalString(source, "ref", LIMITS.identifier, "source.ref");
+  const sourceId = optionalString(source, "id", LIMITS.identifier, "source.id");
 
   // Trust is authority, not a payload field: a key cannot promote its evidence.
   assertTrustCeiling(principal, trust);
@@ -70,7 +103,33 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   );
   await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
 
-  const result = await commitIdempotent(
+  const contentHash = await sha256Hex(content);
+  const canonicalHash = sourceId ? await sha256Hex(canonicalJson({
+    actor_id: principal.principalId,
+    subject_id: subjectId,
+    project_id: projectId,
+    workspace_id: workspaceId,
+    agent_id: agentId,
+    run_id: runId,
+    kind,
+    content_hash: contentHash,
+    source_type: sourceType,
+    source_ref: sourceRef,
+    source_id: sourceId,
+    trust,
+    visibility,
+    occurred_at: occurredAt,
+  })) : null;
+  const existing = canonicalHash ? await first<ObservationReplayRow>(ctx.app.db,
+    `SELECT id, subject_id, project_id, workspace_id, agent_id, run_id, kind,
+            trust, visibility, content_hash, occurred_at, ingested_at
+       FROM observations
+      WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
+    [principal.orgId, principal.principalId, canonicalHash]) : undefined;
+  if (existing) return { status: 200, data: replayData(existing), meta: { replayed: true } };
+
+  try {
+    const result = await commitIdempotent(
     ctx.app.db,
     principal,
     ctx.request,
@@ -80,7 +139,6 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     async () => {
       const id = newId("obs");
       const ingestedAt = ctx.app.now().toISOString();
-      const contentHash = await sha256Hex(content);
       const enrichment = ctx.app.extraction
         ? [await derivationJobStatement(ctx.app.db, ctx.app.extraction, {
             id,
@@ -118,8 +176,8 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
           {
             sql: `INSERT INTO observations
                     (id, org_id, subject_id, project_id, workspace_id, agent_id, run_id, actor_id, kind, content,
-                     content_hash, source_type, source_ref, trust, visibility, occurred_at, ingested_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                     content_hash, canonical_hash, source_type, source_ref, trust, visibility, occurred_at, ingested_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             params: [
               id,
               principal.orgId,
@@ -132,6 +190,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
               kind,
               content,
               contentHash,
+              canonicalHash,
               sourceType,
               sourceRef,
               trust,
@@ -172,13 +231,25 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         ],
       };
     },
-  );
+    );
 
-  return {
-    status: result.replayed ? 200 : result.status,
-    data: result.data,
-    meta: { replayed: result.replayed },
-  };
+    return {
+      status: result.replayed ? 200 : result.status,
+      data: result.data,
+      meta: { replayed: result.replayed },
+    };
+  } catch (error) {
+    if (canonicalHash && error instanceof Error && /UNIQUE.*canonical_hash/i.test(error.message)) {
+      const raced = await first<ObservationReplayRow>(ctx.app.db,
+        `SELECT id, subject_id, project_id, workspace_id, agent_id, run_id, kind,
+                trust, visibility, content_hash, occurred_at, ingested_at
+           FROM observations
+          WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
+        [principal.orgId, principal.principalId, canonicalHash]);
+      if (raced) return { status: 200, data: replayData(raced), meta: { replayed: true } };
+    }
+    throw error;
+  }
 }
 
 /** Irreversibly removes readable evidence while retaining provenance hashes. */

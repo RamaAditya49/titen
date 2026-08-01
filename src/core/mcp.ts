@@ -54,6 +54,7 @@ const ARG_DESCRIPTIONS: Record<string, string> = {
   content: "Observation content to preserve as evidence.",
   source_type: "Source category, such as chat, tool, document, or import.",
   source_ref: "Stable non-secret reference back to the source.",
+  source_id: "Stable source-event identity used to converge an exact later re-sync.",
   trust: "Evidence trust level authorized for the caller.",
   visibility: "Narrowest audience allowed to read the record.",
   workspace_id: "Opaque Titen workspace identifier when team visibility is used.",
@@ -66,6 +67,8 @@ const ARG_DESCRIPTIONS: Record<string, string> = {
   claims: "Claims to materialize from existing observation evidence.",
   task: "Concrete task or query used to rank memory.",
   max_tokens: "Maximum token budget for the compiled context pack.",
+  max_candidates: "Authorized candidate ceiling from 1 through 1,000; defaults to 200.",
+  at: "Optional ISO 8601 point-in-time eligibility anchor.",
   include_checkpoints: "Include eligible resumable state when supported.",
   context_id: "Context run identifier returned by titen_compile.",
   outcome: "Observed usefulness or safety outcome for recalled context.",
@@ -126,11 +129,11 @@ const TOOL_SPECS: [name: string, description: string, args: string][] = [
   ["titen_project_resolve", "Resolve a stable project reference to its Titen project id.",
     "reference! create:b"],
   ["titen_remember", "Append an observation to memory.",
-    `subject_id! kind!=${OBSERVATION_KINDS.join("|")} content! source_type! source_ref! trust=${TRUST_LEVELS.join("|")} visibility=${VISIBILITIES.join("|")} workspace_id project_id agent_id run_id occurred_at idempotency_key`],
+    `subject_id! kind!=${OBSERVATION_KINDS.join("|")} content! source_type! source_ref! source_id trust=${TRUST_LEVELS.join("|")} visibility=${VISIBILITIES.join("|")} workspace_id project_id agent_id run_id occurred_at idempotency_key`],
   ["titen_consolidate", "Materialize claims from remembered observations.",
     "subject_id! claims!:? project_id workspace_id idempotency_key"],
   ["titen_compile", "Compile context for a task.",
-    "subject_id! task! max_tokens!:i project_id cross_project:b include_checkpoints:b"],
+    "subject_id! task! max_tokens!:i max_candidates:i at project_id cross_project:b include_checkpoints:b"],
   ["titen_feedback", "Record feedback on a context run.",
     `context_id! outcome!=${OUTCOMES.join("|")} claim_id reason_code client_mutation_id idempotency_key`],
   ["titen_checkpoint_save", "Save or update a checkpoint.",
@@ -233,9 +236,10 @@ const toolProjectResolve = (ctx: RequestContext, args: Record<string, unknown>) 
 const toolRemember = (ctx: RequestContext, args: Record<string, unknown>) =>
   callDomain(ctx, "POST", "/v1/observations", {
     ...args,
-    source: { type: args.source_type, ref: args.source_ref },
+    source: { type: args.source_type, ref: args.source_ref, id: args.source_id },
     source_type: undefined,
     source_ref: undefined,
+    source_id: undefined,
   }, appendObservation);
 
 const toolConsolidate = (ctx: RequestContext, args: Record<string, unknown>) =>

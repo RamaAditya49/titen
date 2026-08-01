@@ -25,9 +25,12 @@ dashboard adapter  127.0.0.1:4322
 
 Expose the dashboard adapter, not port `8787`. In the recommended session mode,
 each operator submits username/password to the Titen service. The service issues
-a bounded session key that the adapter keeps only in process memory behind an
-opaque HttpOnly cookie. Never configure a shared owner or wildcard key in the
-adapter.
+a bounded session key that the adapter seals with AES-GCM inside an opaque
+HttpOnly cookie. The raw key never enters browser-visible JSON or storage. Never
+configure a shared owner or wildcard API key in the adapter. Omit
+`TITEN_DASHBOARD_SESSION_KEY` for restart-invalidated single-replica sessions;
+inject one shared base64url 32-byte secret only when replicas must accept the
+same sessions.
 
 If remote agents genuinely need REST or MCP, give the API a separate hostname,
 ingress policy, and revocable Titen key. Set `TITEN_MCP_ORIGIN` to the exact

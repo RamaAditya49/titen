@@ -107,8 +107,8 @@ maturity matrix](../ROADMAP.md#maturity-matrix).
 The Astro dashboard is a live client of health, readiness, Memories, Context,
 Work, Audit, Governance, and Federation through a same-origin loopback adapter.
 Its optional per-principal login verifies canonical human password accounts,
-keeps only short-lived raw API keys in process memory, and uses opaque HttpOnly
-cookies; every API operation still performs canonical key, scope, role, and
+seals short-lived raw API keys into opaque HttpOnly cookies with Web Crypto,
+and optionally shares the sealing key across replicas; every API operation still performs canonical key, scope, role, and
 organization authorization. Agent, service, SDK, CLI, and recovery clients keep
 using API keys. A local build or disconnected page is not deployment evidence.
 Signed federation

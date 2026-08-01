@@ -403,8 +403,9 @@ does not expose a verifiable address-pinning primitive.
 
 Build the static Astro client and run its adapter beside the loopback API. The
 recommended session mode lets each operator sign in with a username/password.
-The resulting bounded Titen key remains only in adapter memory behind an opaque
-HttpOnly cookie. Neither credential enters browser assets, URLs, or Web Storage:
+The adapter seals the resulting bounded Titen key with AES-GCM inside an opaque
+HttpOnly cookie. The raw credential enters neither browser-visible JSON, assets,
+URLs, nor Web Storage:
 
 ```bash
 pnpm build
@@ -414,6 +415,11 @@ TITEN_API_URL=http://127.0.0.1:8787 \
 TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
 pnpm dashboard:adapter
 ```
+
+Single-process deployments may omit `TITEN_DASHBOARD_SESSION_KEY` to invalidate
+all sessions on restart. For multiple replicas or restart-stable sessions,
+inject the same base64url-encoded 32-byte key into every adapter from the host's
+secret manager. Rotating it invalidates every existing cookie.
 
 The adapter remains bound to `127.0.0.1:4322`. Follow the
 [secure ingress guide](./secure-ingress.md) to publish only that listener with

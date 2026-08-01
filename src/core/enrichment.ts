@@ -603,9 +603,8 @@ async function reflectionPolicyFingerprint(job: {
 
 /**
  * Creates idempotent reflection snapshots from current canonical claims.
- *
- * ponytail: one durable cursor per scope and pipeline, not a queue or scheduler
- * framework. It makes the fixed 100-row page eventually cover old anchors.
+ * One durable cursor per scope and pipeline makes the fixed page eventually
+ * cover old anchors without another scheduler framework.
  */
 export async function scheduleReflections(options: {
   db: Db;

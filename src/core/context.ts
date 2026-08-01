@@ -21,6 +21,7 @@ import {
   LIMITS,
   optionalBoolean,
   optionalString,
+  optionalTimestamp,
   requireEnum,
   requireInteger,
   requireObject,
@@ -41,12 +42,13 @@ const BROAD_ACCESS_REASON = "credential_scope:context:compile:all";
 
 const scopePolicySnapshot = (mode: ProjectMode) => `${POLICY_SNAPSHOT}:${mode}`;
 
-function effectiveScope(subjectId: string, projectId: string | null, mode: ProjectMode) {
+function effectiveScope(subjectId: string, projectId: string | null, mode: ProjectMode, asOf: string) {
   return {
     subject_id: subjectId,
     project_id: projectId,
     project_mode: mode,
     broad_access_reason: mode === "cross_project" ? BROAD_ACCESS_REASON : null,
+    as_of: asOf,
   };
 }
 
@@ -73,6 +75,9 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   const subjectId = requireString(body, "subject_id", LIMITS.identifier);
   const task = requireString(body, "task", LIMITS.statement);
   const maxTokens = requireInteger(body, "max_tokens", MIN_BUDGET_TOKENS, LIMITS.maxTokens);
+  const maxCandidates = body.max_candidates === undefined
+    ? LIMITS.candidates
+    : requireInteger(body, "max_candidates", 1, LIMITS.maxCandidates);
   const includeCheckpoints = optionalBoolean(body, "include_checkpoints");
   const requestedProjectId = optionalString(body, "project_id", LIMITS.identifier);
   const crossProject = optionalBoolean(body, "cross_project");
@@ -89,13 +94,9 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       : "unscoped";
   const policySnapshot = scopePolicySnapshot(projectMode);
 
-  // ponytail: compilation is always anchored to now, with no caller-supplied
-  // `at`. The ceiling is that point-in-time recall is impossible even though
-  // `valid_from`/`valid_to` are stored and indexed to support it. Upgrade path:
-  // accept an optional `at` and thread it through the retrieval scope (#118).
   const now = ctx.app.now();
-  const at = now.toISOString();
-  const scope = { subjectId, projectId, crossProject, at };
+  const at = optionalTimestamp(body, "at") ?? now.toISOString();
+  const scope = { subjectId, projectId, crossProject, at, limit: maxCandidates };
   const lexical = planFtsQuery(task);
   const candidates = lexical.match
     ? await retrieveClaimCandidates(ctx.app.db, principal, lexical.match, scope)
@@ -118,7 +119,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         )!;
         const hits = eligibleVectorMatches(
           await ctx.app.vectors.store.query(queryVec, {
-            topK: LIMITS.candidates,
+            topK: Math.min(maxCandidates, 100),
             filter: {
               org_id: principal.orgId,
               subject_id: subjectId,
@@ -147,7 +148,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }
   }
 
-  const ranked = rankCandidates(candidates, now);
+  const ranked = rankCandidates(candidates, new Date(at));
   const evidence = await loadAuthorizedEvidenceIds(
     ctx.app.db,
     principal,
@@ -213,8 +214,8 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     {
       sql: `INSERT INTO context_runs
               (id, org_id, actor_id, subject_id, project_id, task_hash, max_tokens, used_tokens,
-               policy_snapshot, degraded, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               policy_snapshot, degraded, as_of, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
         contextId,
         principal.orgId,
@@ -227,6 +228,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         policySnapshot,
         JSON.stringify(degraded),
         at,
+        now.toISOString(),
       ],
     },
     ...packed.selected.map((selected, index) => ({
@@ -247,7 +249,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     data: {
       context_id: contextId,
       query: task,
-      scope: effectiveScope(subjectId, projectId, projectMode),
+      scope: effectiveScope(subjectId, projectId, projectMode, at),
       budget: {
         max_tokens: maxTokens,
         used_tokens: usedTokens,
@@ -284,11 +286,12 @@ export async function getContext(ctx: RequestContext): Promise<Result> {
     used_tokens: number;
     policy_snapshot: string;
     degraded: string;
+    as_of: string | null;
     created_at: string;
   }>(
     ctx.app.db,
     `SELECT id, actor_id, subject_id, project_id, task_hash, max_tokens,
-            used_tokens, policy_snapshot, degraded, created_at
+            used_tokens, policy_snapshot, degraded, as_of, created_at
        FROM context_runs WHERE id = ? AND org_id = ?`,
     [contextId, principal.orgId],
   );
@@ -384,7 +387,7 @@ export async function getContext(ctx: RequestContext): Promise<Result> {
     data: {
       context_id: run.id,
       task_hash: run.task_hash,
-      scope: effectiveScope(run.subject_id, run.project_id, projectMode),
+      scope: effectiveScope(run.subject_id, run.project_id, projectMode, run.as_of ?? run.created_at),
       budget: { max_tokens: run.max_tokens, used_tokens: run.used_tokens },
       items,
       conflicts: rows

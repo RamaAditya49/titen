@@ -890,8 +890,8 @@ Required behavior:
 - keep categories and tags as memory filters, domain events inside Audit,
   export/import and recovery in deployment tooling, and Settings absent;
 - optionally verify each operator's username/password and exchange it for an
-  opaque HttpOnly browser session backed by a short-lived server-side API key,
-  without persisting either secret in browser storage;
+  AES-GCM-sealed opaque HttpOnly browser session carrying a short-lived API key,
+  without exposing either raw secret to browser-visible JSON or browser storage;
 - let authorized owners/admins create one human password account and
   organization membership with an explicit role atomically, returning a random
   temporary password once;
@@ -914,7 +914,7 @@ Acceptance (EARS):
 - **AC-UI-006 — State-driven:** While runtime configuration lacks an authorized mutation contract, Titen shall expose configuration only as non-secret read-only capability and readiness state.
 - **AC-UI-007 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
 - **AC-UI-008 — Unwanted behavior:** If documentation or a reference-shell label names a dashboard area whose emergence gate has not passed, then Titen shall not present that area as a shipped route, control, or implementation claim.
-- **AC-UI-009 — Event-driven:** When a valid operator username/password enters session mode, Titen shall retain only its short-lived API credential in adapter memory, return an opaque bounded cookie, and clear the session and private DOM on logout, expiry, revocation, or restart.
+- **AC-UI-009 — Event-driven:** When a valid operator username/password enters session mode, Titen shall AES-GCM seal its short-lived API credential in an opaque bounded HttpOnly cookie and clear the session and private DOM on logout, expiry, revocation, tampering, or key rotation; absent a configured shared key, restart shall also invalidate the cookie.
 - **AC-UI-010 — Unwanted behavior:** If atomic human-user provisioning fails authorization, scope/trust ceilings, username or membership uniqueness, or storage, then Titen shall create neither its account nor membership.
 - **AC-UI-011 — State-driven:** While a human account retains its bootstrap or Add User temporary password, Titen shall expose only password replacement, keep every private product area hidden, revoke the temporary session after replacement, and require a fresh login.
 

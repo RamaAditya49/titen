@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
-  <title id="title">Titen — collaborative memory for AI agents</title>
-  <desc id="desc">An Ink banner with the Titen Kawung mark, product name, positioning, and runtime targets.</desc>
+  <title id="title">Titen, the Level 6 collaborative memory fabric for AI agents</title>
+  <desc id="desc">An ink banner with the Titen Kawung mark, Level 6 positioning, and runtime targets.</desc>
 
   <defs>
     <g id="kawung">
@@ -26,11 +26,11 @@
   <g transform="translate(64 34) scale(.44)">
     <use href="#kawung"/>
   </g>
-  <text x="124" y="67" fill="#8A7F72" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" letter-spacing="2.2">OPEN-SOURCE · AGENT MEMORY</text>
+  <text x="124" y="67" fill="#8A7F72" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" letter-spacing="2.2">OPEN-SOURCE · LEVEL 6 AGENT MEMORY</text>
 
   <text x="60" y="242" fill="#F7F2E9" font-family="Arial, Helvetica, sans-serif" font-size="118" font-weight="700">titen</text>
-  <text x="65" y="290" fill="#C9BCA6" font-family="Arial, Helvetica, sans-serif" font-size="25">collaborative memory for AI agents</text>
-  <text x="65" y="334" fill="#8A7F72" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" letter-spacing=".6">EVIDENCE-GROUNDED CONTEXT · SAFE PARALLEL WORK</text>
+  <text x="65" y="290" fill="#C9BCA6" font-family="Arial, Helvetica, sans-serif" font-size="25">the Level 6 memory fabric for AI agents</text>
+  <text x="65" y="334" fill="#8A7F72" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" letter-spacing=".6">EVIDENCE-GROUNDED CONTEXT · COORDINATED WORK</text>
 
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#C9BCA6">
     <rect x="64" y="391" width="156" height="30" rx="4" fill="none" stroke="#3E3630"/>

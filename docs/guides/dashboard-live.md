@@ -14,8 +14,12 @@ pnpm dashboard:adapter
 Open `http://127.0.0.1:4322/dashboard/`, then sign in with the operator username
 and password printed by `titen bootstrap`. The temporary password must be
 replaced before the private product shell opens. The API issues a short-lived
-key only to the adapter; the browser receives an opaque HttpOnly cookie. It is
-discarded after eight hours, logout, password change, revocation, or restart.
+key only to the adapter; the adapter AES-GCM seals it into an opaque HttpOnly
+cookie. The raw key never enters browser-visible JSON or storage. The cookie is
+discarded after eight hours, logout, password change, revocation, tampering, or
+session-key rotation. Omitting `TITEN_DASHBOARD_SESSION_KEY` keeps the key
+ephemeral, so an adapter restart invalidates every session; replicas may instead
+share one base64url-encoded 32-byte secret.
 
 For remote access, keep both listeners on loopback, set the exact HTTPS
 `TITEN_DASHBOARD_ORIGIN`, and follow the

@@ -188,6 +188,7 @@ test("Cloudflare validates binding completeness without calling either binding",
   const vectorize = {
     upsert: async () => { calls += 1; },
     query: async () => { calls += 1; return { matches: [] }; },
+    getByIds: async () => { calls += 1; return []; },
     deleteByIds: async () => { calls += 1; },
   };
   assert.deepEqual(tryCreateVectorize({}).readiness, {
@@ -260,6 +261,7 @@ test("both runtimes require the EmbeddingGemma retrieval profile", () => {
   const VECTORIZE = {
     upsert: async () => {},
     query: async () => ({ matches: [] }),
+    getByIds: async () => [],
     deleteByIds: async () => {},
   };
   const workerBase = {
