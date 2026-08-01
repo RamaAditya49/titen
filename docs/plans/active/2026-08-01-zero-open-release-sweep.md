@@ -23,8 +23,9 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
 - [ ] Implement the extraction, Cloudflare/Bun runtime, shutdown/readiness,
   Vectorize limit, and documentation-command corrections with focused dual-
   runtime checks.
-- [ ] Implement ranking, benchmark/gate parity, replacement import/reconciliation,
-  and quality-floor corrections without weakening locked evidence.
+- [ ] Implement ranking and current benchmark-gate parity corrections; archive
+  historical or terminal `NO-GO` replacement/cutover issues without changing
+  their frozen artifacts or adding an unused migration adapter.
 - [ ] Run focused tests after each root fix, then the complete local manual gate,
   package smoke, production dependency audit, secret scan, and workflow checks.
 - [ ] Update changelog and package version to the smallest valid SemVer, review
@@ -52,8 +53,8 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
 - AC-ZERO-006: gate self-tests plus current-schema, current-version,
   project-scoped live verification, hard-negative floor, rollback, and soak
   transcripts.
-- AC-ZERO-007: import CLI/API tests proving bulk-plus-delta idempotency and a
-  machine-readable reconciliation checkpoint with mismatch detection.
+- AC-ZERO-007: terminal benchmark/cutover records and issue comments that retain
+  the exact unmet bulk, delta, reconciliation, and reauthorization triggers.
 - AC-ZERO-008: repeated packaged CLI SIGTERM probes at pre/post side-effect cut
   points, bounded exit, restart reclaim, and truthful readiness evidence.
 - AC-ZERO-009: copied Wrangler command check and reviewed changelog-driven manual

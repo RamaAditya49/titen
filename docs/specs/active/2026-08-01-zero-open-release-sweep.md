@@ -32,6 +32,9 @@ explicit local maintainer operations.
   regression that fails without the correction.
 - Integrate valid work from pull request #193 and unique local commits only
   after independent review; close or supersede obsolete work with evidence.
+- Close historical replacement, calibration, soak, and migration issues as an
+  explicit terminal `NO-GO` or cancellation when their original exit evidence
+  is already complete and no accepted production cutover remains active.
 - Keep authentication, scope, evidence, migration, recovery, and model-output
   boundaries fail closed on Cloudflare and Bun.
 - Run the complete local release gate, publish the smallest valid SemVer npm
@@ -88,10 +91,11 @@ explicit local maintainer operations.
   rollback, soak, or live semantic gates execute, Titen shall test the current
   production contract and locked fixtures rather than stale schemas, versions,
   scopes, or zero quality floors.
-- **AC-ZERO-007 — Event-driven:** When an authorized operator performs a
-  replacement cutover, Titen shall support idempotent bulk import, a bounded
-  delta pass, and a reconciliation checkpoint that exposes missing, extra, or
-  mismatched canonical records before cutover approval.
+- **AC-ZERO-007 — State-driven:** While the replacement attempt is terminal
+  `NO-GO` and the existing service remains authoritative, Titen shall not add a
+  provider-specific migration path; terminal evidence shall preserve the unmet
+  bulk, delta, and reconciliation requirements as the trigger for a new paired
+  cutover spec if replacement is authorized again.
 - **AC-ZERO-008 — Unwanted behavior:** If shutdown interrupts leased background
   work, then Titen shall either await bounded completion or leave immediately
   reclaimable durable work and shall not report healthy readiness while the
