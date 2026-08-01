@@ -179,7 +179,7 @@ export function createHttpExtraction(config: {
     providerIdentity: baseUrl,
     async generate(request) {
       const headers: Record<string, string> = { "content-type": "application/json" };
-      if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+      if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
       let response: Response;
       try {
         response = await dispatch(`${baseUrl}/chat/completions`, {

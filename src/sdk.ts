@@ -532,7 +532,7 @@ export class TitenError extends Error {
       meta || requestId
         ? {
             ...meta,
-            ...(requestId && typeof meta?.request_id !== "string"
+            ...(requestId && typeof meta?.["request_id"] !== "string"
               ? { request_id: requestId }
               : {}),
           }
@@ -630,7 +630,7 @@ export class TitenClient {
         responseRequestId(res),
         responseMeta(res),
       );
-    return { data: json.data as T, meta: responseMeta(res, json.meta) };
+    return { data: json["data"] as T, meta: responseMeta(res, json["meta"]) };
   }
 
   /** Raw authenticated access for streaming/JSONL responses. */
@@ -960,15 +960,15 @@ function responseRequestId(
   response: Response,
   meta?: Record<string, unknown>,
 ): string | undefined {
-  return typeof meta?.request_id === "string"
-    ? meta.request_id
+  return typeof meta?.["request_id"] === "string"
+    ? meta["request_id"]
     : (response.headers.get("x-request-id") ?? undefined);
 }
 
 function responseMeta(response: Response, value?: unknown): TitenResponseMeta {
   const meta: TitenResponseMeta = isRecord(value) ? { ...value } : {};
   const requestId = responseRequestId(response, meta);
-  if (requestId) meta.request_id = requestId;
+  if (requestId) meta["request_id"] = requestId;
   return meta;
 }
 

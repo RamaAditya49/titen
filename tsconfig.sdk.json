@@ -6,6 +6,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
     "noUncheckedIndexedAccess": true,
     "declaration": true,
     "emitDeclarationOnly": true,

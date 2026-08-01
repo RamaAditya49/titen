@@ -623,9 +623,23 @@ test("typed event iteration stops on empty pages and rejects broken cursors", as
   assert.deepEqual((await collect(local)).map(({ id }) => id), ["evt_1", "evt_2"]);
   assert.equal(calls, 3, "an exact page boundary needs one terminal empty poll");
 
+  let emptyCalls = 0;
+  const empty = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => {
+      emptyCalls += 1;
+      return Response.json({ data: { events: [], cursor: null } });
+    },
+  });
+  assert.deepEqual(await collect(empty), []);
+  assert.equal(emptyCalls, 1);
+
   for (const brokenPages of [
     [{ events: [event("evt_same")], cursor: "evt_same" }, { events: [event("evt_next")], cursor: "evt_same" }],
     [{ events: [event("evt_duplicate")], cursor: "cursor_1" }, { events: [event("evt_duplicate")], cursor: "cursor_2" }],
+    [{ events: [event("evt_null_cursor")], cursor: null }],
+    [{ events: [event("evt_numeric_cursor")], cursor: 42 }],
   ]) {
     let index = 0;
     const broken = new TitenClient({
