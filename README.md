@@ -46,17 +46,18 @@ rebuildable. Retrieved memory is untrusted reference data, not an instruction.
 ## Project status
 
 Titen is pre-1.0. The core service is usable, but public contracts may still
-change between minor releases. The
-[maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
-is the source of truth for shipped and planned capabilities.
+change between minor releases. The current release includes the memory kernel,
+REST API, MCP server, TypeScript SDK, collaboration tools, enterprise
+governance, signed federation, and the operator dashboard.
 
-| Surface | Current evidence | Boundary |
-| --- | --- | --- |
-| Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
-| Containerized Bun service | Verified live on `rama-tuf` at 0.5.3 | The exact rootless OCI image runs behind loopback-only Quadlets with schema 20, verified backup/restore, restart recovery, and rollback artifacts. Optional embeddings remain disabled there. |
-| Operator dashboard | Verified live on `rama-tuf` at 0.5.3 | Default `owner`, forced first-login password change, Add User, and all six areas pass against the exact image in a restored-data canary; production login, scope denial, and restart invalidation pass through the loopback adapter. Tailscale or Cloudflare ingress is operator-configured. |
-| Live Vectorize, Workers AI, and Cloudflare production | Verified live in the isolated `titen-test-*` stack | Rama Digital runs Worker/D1, BGE-M3/Vectorize, scoped metadata filters, Cron repair, schema 20, semantic retrieval, denial, persistence, and dashboard-adapter smokes. This is test-production evidence, not a customer traffic cutover or model-enrichment activation. |
-| Enterprise governance and recallable-memory federation | Implemented; verified locally and in the 0.5.3 restored-data canary | The shared Bun/SQLite and workerd/D1 contract covers governed roles, policies, approvals, releases, retention, legal holds, identity mappings, and opt-in signed canonical import. Production access remains capability-gated. |
+You can run Titen on Bun with SQLite or on Cloudflare Workers with D1. Semantic
+retrieval is optional: use `sqlite-vec` on Bun, or Vectorize and Workers AI on
+Cloudflare. Titen runs in your own infrastructure.
+
+See the [maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
+for detailed runtime evidence and remaining gates, or the
+[changelog](https://github.com/RamaAditya49/titen/blob/main/CHANGELOG.md) for
+release history.
 
 ## Install and run
 
