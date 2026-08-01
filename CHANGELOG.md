@@ -52,6 +52,16 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   replay, peer-source, and cross-organization boundaries in the shared
   Bun/SQLite and workerd/D1 contract.
 
+### Upgrade notes
+
+- Take a verified backup and run `titen migrate --dry-run` before starting
+  0.5.0; migrations 18 and 19 are forward-only, so rollback restores the
+  snapshot with the previous binary rather than running a down migration.
+- Configure `TITEN_SECRET_KEYS` only when encrypted channels or federation are
+  used. The lexical memory core remains available without it.
+- A dashboard principal using governance lenses needs an active organization
+  membership as well as the documented bounded key scopes.
+
 ## [0.4.1] — 2026-08-01
 
 ### Added
