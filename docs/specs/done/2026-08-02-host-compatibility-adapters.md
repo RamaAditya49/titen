@@ -1,16 +1,24 @@
 ---
 work_id: host-compatibility-adapters
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-02
 updated: 2026-08-02
-review_after: 2026-08-16
 owner: ramaaditya
 ---
 
 # Protocol-first MCP host compatibility
+
+## Outcome
+
+Completed in `titen-memory@0.5.7`. The published package now provides a
+stateless stdio bridge and task-boundary MCP guidance, while the npm README and
+titen.dev give verified setup paths for Codex, Claude Code, OpenClaw, Hermes,
+and generic stdio hosts. The full dual-runtime, package, dashboard, website,
+Cloudflare, and rootless VPS gates passed without adding a dependency,
+automatic transcript capture, or hosted GitHub automation.
 
 ## Problem
 
