@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-password-accounts-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
 ---
 # Dashboard password accounts and stable release
@@ -127,3 +126,22 @@ Every criterion has reproducible passing evidence; documentation describes the
 human-account boundary and API-key compatibility; the exact image is deployed
 with backup and rollback retained; npm, tag, GitHub Release, titen.dev, GitHub
 hygiene, and workflow checks pass; both paired artifacts move to `done/`.
+
+## Terminal evidence
+
+- Release commit `4aa9255c3bdf4e156c472f9f2e838ee514806e25`, annotated tag
+  `v0.5.3`, npm `titen-memory@0.5.3`, and OCI image
+  `localhost/titen:0.5.3-4aa9255` identify the same product candidate.
+- Bun contract `101/101`, D1 contract `108/108`, integration `190/190`,
+  CLI/adapter `19/19`, browser `6/6`, live-dashboard verification, Worker dry
+  build, package clean install, route, audit, and workflow checks pass.
+- `rama-tuf` runs schema `20/20` behind loopback-only rootless Quadlets. A
+  checksum-matched schema-19 backup, restored-data canary, forced-change owner,
+  Add User, six-area dashboard, restart invalidation, and exact prior-image
+  rollback probe pass; recovery artifacts remain under the release directory.
+- npm `latest` is `0.5.3` with shasum
+  `d0c71e381ee78c4d8c57744f575ca5bd3ad42c75`. GitHub Release `v0.5.3` is
+  published, not draft or prerelease. `titen.dev` and `www.titen.dev` both serve
+  stable `0.5.3` version metadata, install docs, and the release page.
+- GitHub has zero open issues, zero open pull requests, only remote branch
+  `main`, and Actions disabled. Publication and deployment were manual.

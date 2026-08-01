@@ -53,10 +53,10 @@ is the source of truth for shipped and planned capabilities.
 | Surface | Current evidence | Boundary |
 | --- | --- | --- |
 | Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
-| Containerized Bun service | Verified live on `rama-tuf` at 0.5.2 | The exact rootless OCI image runs behind loopback-only Quadlets with schema 19, verified backup/restore, restart recovery, and rollback artifacts. Optional embeddings remain disabled there. |
-| Operator dashboard | Verified live on `rama-tuf` at 0.5.2 | Per-user login, Add User, and all six areas pass against the exact image in a restored-data canary; production login/logout, scope denial, session invalidation, and Memories pass through the loopback adapter. Tailscale or Cloudflare ingress is operator-configured. |
+| Containerized Bun service | Verified live on `rama-tuf` at 0.5.3 | The exact rootless OCI image runs behind loopback-only Quadlets with schema 20, verified backup/restore, restart recovery, and rollback artifacts. Optional embeddings remain disabled there. |
+| Operator dashboard | Verified live on `rama-tuf` at 0.5.3 | Default `owner`, forced first-login password change, Add User, and all six areas pass against the exact image in a restored-data canary; production login, scope denial, and restart invalidation pass through the loopback adapter. Tailscale or Cloudflare ingress is operator-configured. |
 | Live Vectorize, Workers AI, and Cloudflare production | Planned | Local configuration and emulation are not production evidence. |
-| Enterprise governance and recallable-memory federation | Implemented; verified locally and in the 0.5.2 restored-data canary | The shared Bun/SQLite and workerd/D1 contract covers governed roles, policies, approvals, releases, retention, legal holds, identity mappings, and opt-in signed canonical import. Production access remains capability-gated. |
+| Enterprise governance and recallable-memory federation | Implemented; verified locally and in the 0.5.3 restored-data canary | The shared Bun/SQLite and workerd/D1 contract covers governed roles, policies, approvals, releases, retention, legal holds, identity mappings, and opt-in signed canonical import. Production access remains capability-gated. |
 
 ## Install and run
 

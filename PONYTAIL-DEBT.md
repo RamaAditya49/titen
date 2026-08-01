@@ -21,6 +21,8 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 | Location | Deliberate shortcut | Ceiling | Upgrade trigger |
 | --- | --- | --- | --- |
+| `src/core/accounts.ts:42` | Throttle password failures in one service process | Multiple public replicas can bypass each other's local buckets | A deployment exposes more than one public API replica; add the platform edge rate-limit binding |
+| `src/core/accounts.ts:124` | Reject a small local list of common and account-specific passwords | It does not cover a maintained breached-password corpus | Self-registration is introduced; add an offline maintained breach corpus without creating a network secret boundary |
 | `src/core/context.ts:92` | Anchor compilation to the current time | Point-in-time recall is unavailable | A caller needs historical recall; accept and thread an optional `at` through retrieval (#118) |
 | `src/core/db.ts:41` | Use one global SQL parameter chunk size | Wide lists multiply expensive statement round trips | A bounded query remains dominated by round trips after its SQL shape is fixed |
 | `src/core/enrichment.ts:607` | Use one durable cursor per scope and pipeline instead of a queue framework | A fixed 100-row page must eventually cover old anchors | **No source trigger.** |
@@ -49,7 +51,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 ## Summary
 
-- Markers: 20.
+- Markers: 22.
 - Markers without a source trigger: 3.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned
@@ -57,7 +59,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 ## Audit notes — 2026-08-01
 
-- All 20 tracked source markers still map one-to-one to this ledger; the local
+- All 22 tracked source markers still map one-to-one to this ledger; the local
   ledger checker passes.
 - The forward-only migration marker names `migrate --dry-run` as its upgrade,
   but that command and its regression test now ship. Reword or retire this

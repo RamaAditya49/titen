@@ -1,14 +1,13 @@
 ---
 work_id: dashboard-password-accounts-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
-spec: docs/specs/active/2026-08-01-dashboard-password-accounts-release.md
+spec: docs/specs/done/2026-08-01-dashboard-password-accounts-release.md
 ---
 # Plan
 
@@ -22,11 +21,11 @@ spec: docs/specs/active/2026-08-01-dashboard-password-accounts-release.md
 - [x] Replace dashboard API-key login and Add User output with labeled username,
   password, and role interaction while keeping the private shell hidden.
 - [x] Update PRD, architecture, API, dashboard, deployment, and release notes.
-- [ ] Run focused adversarial, shared D1/Bun, integration, browser, live adapter,
+- [x] Run focused adversarial, shared D1/Bun, integration, browser, live adapter,
   build, package, route, dependency, and workflow checks.
-- [ ] Build the exact container, take a verified production backup, run a
+- [x] Build the exact container, take a verified production backup, run a
   disposable restore canary, activate it on `rama-tuf`, and prove rollback.
-- [ ] Publish npm, annotated Git tag, GitHub Release, and titen.dev discovery
+- [x] Publish npm, annotated Git tag, GitHub Release, and titen.dev discovery
   manually; close repository and workflow hygiene; terminalize this pair.
 
 ## Acceptance evidence mapping
@@ -65,3 +64,9 @@ take an online SQLite backup, restore it into a disposable volume, and run the
 exact image. Rollback restores the prior units/image; restore the snapshot only
 if schema/data integrity requires it. Publication remains manual and irreversible;
 GitHub Actions stays disabled.
+
+## Verification
+
+All plan items and mapped acceptance criteria passed. The terminal evidence is
+recorded in the paired done spec; no deferred implementation is hidden in this
+plan.
