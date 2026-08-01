@@ -36,6 +36,11 @@ evidence. They are removed rather than implemented.
   task or scope boundary.
 - Document the stdio fallback without changing the ten existing host packages
   or their explicit-invocation privacy model.
+- Give a new operator one ordered install, bootstrap, connection, and smoke path
+  in the npm README, with copyable setup for Codex, Claude Code, OpenClaw,
+  Hermes, and generic stdio MCP hosts.
+- Publish the same verified host setup as a dedicated titen.dev documentation
+  page, and remove adjacent stale MCP and Cloudflare capability claims.
 - Remove the dashboard session gate's discovered random-port collision so the
   manual release verification is repeatable.
 - Publish and smoke the resulting stable npm release.
@@ -101,6 +106,14 @@ evidence. They are removed rather than implemented.
 - **AC-HC-011 — Event-driven:** When dashboard integration files run together
   and the session suite switches authentication modes, Titen shall use disjoint
   upstream lanes and reuse the released adapter listener serially.
+- **AC-HC-012 — Ubiquitous:** The npm README and titen.dev shall provide one
+  ordered setup path, host-specific copyable configuration for Codex, Claude
+  Code, OpenClaw, Hermes, and generic stdio MCP clients, a nine-tool connection
+  check, and explicit guidance that keys stay outside source control.
+- **AC-HC-013 — Ubiquitous:** Public titen.dev pages touched by the host guide
+  shall describe the current four MCP protocol revisions, nine tools, shared
+  MCP/REST handlers, schema 21, and verified optional Cloudflare Vectorize
+  support without preserving older planned-only or lexical-only claims.
 
 ## Risks and rollback
 

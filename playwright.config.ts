@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = process.env.PLAYWRIGHT_PORT ?? "4399";
+const port = process.env.PLAYWRIGHT_PORT ?? String(20_000 + [...process.cwd()].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 40_000);
 
 export default defineConfig({
   testDir: "./tests",

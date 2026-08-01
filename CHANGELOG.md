@@ -17,6 +17,22 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.7] — 2026-08-02
+
+### Documentation
+
+- The npm README now gives one ordered path from CLI install through bootstrap,
+  agent-specific keys, service readiness, and verified MCP setup for Codex,
+  Claude Code, OpenClaw, Hermes, and generic stdio clients.
+- The host guide separates direct Streamable HTTP from the bundled `titen mcp`
+  bridge, keeps credentials in host environments, and includes a nine-tool
+  connection check.
+
+### Fixed
+
+- Dashboard integration and browser gates no longer share hard-coded port
+  ranges with unrelated development servers.
+
 ## [0.5.6] — 2026-08-02
 
 ### Added
@@ -607,7 +623,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.7
 [0.5.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.6
 [0.5.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.5
 [0.5.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.4

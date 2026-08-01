@@ -30,6 +30,24 @@ to stdout. Keep both environment variables in the host's secret-aware process
 environment; do not copy their values into the command arguments or project
 configuration.
 
+## Fast path
+
+Install and start Titen first, then choose one connection command. Native HTTP
+avoids an extra process; `titen mcp` is the fallback for hosts that only launch
+stdio servers.
+
+| Host | Connection | Check |
+| --- | --- | --- |
+| Codex | `codex mcp add titen --url "$TITEN_MCP_URL" --bearer-token-env-var TITEN_API_KEY` | `codex mcp get titen --json` |
+| Claude Code | `claude mcp add --transport stdio --scope user titen -- titen mcp` | `claude mcp get titen` and `/mcp` |
+| OpenClaw | merge `integrations/openclaw/openclaw.json` or install the ClawHub bundle | `openclaw mcp doctor titen --probe` |
+| Hermes | stdio bridge with explicit environment-name mapping below | `hermes mcp test titen` |
+| Generic stdio host | command `titen`, args `mcp` | confirm all nine tools appear |
+
+After connecting, ask the host to resolve the current Git origin and compile
+Titen context for one concrete task. A correct connection lists nine tools and
+uses `titen_project_resolve` before the first project-scoped compile.
+
 ## What ships
 
 | Host | Shipped artifact | Installation surface |
@@ -86,6 +104,16 @@ The Codex plugin stays skills-only because the operator-selected endpoint lives
 in user configuration, not in the plugin. See the [Codex MCP details](./agent-guide.md#mcp-integration).
 
 ## Claude Code
+
+The shortest connection path uses Claude Code's user-scoped stdio MCP config.
+Start Claude from a process that has both Titen environment variables:
+
+```bash
+claude mcp add --transport stdio --scope user titen -- titen mcp
+claude mcp get titen
+```
+
+The optional plugin adds Titen's usage skill beside the same MCP connection:
 
 ```bash
 claude plugin marketplace add RamaAditya49/titen
@@ -160,15 +188,22 @@ merges it, the repository marketplace above remains the install path.
 
 ## Hermes
 
-From a Titen checkout, copy the plugin directory into the Hermes plugin root:
+The shortest path uses the CLI's stdio registry and the bridge installed with
+`titen-memory`:
 
 ```bash
-mkdir -p ~/.hermes/plugins
-cp -R plugins/hermes/titen-memory ~/.hermes/plugins/titen-memory
-hermes plugins enable titen-memory
+hermes mcp add titen \
+  --command titen \
+  --args mcp \
+  --env 'TITEN_MCP_URL=${TITEN_MCP_URL}' 'TITEN_API_KEY=${TITEN_API_KEY}'
+hermes mcp test titen
 ```
 
-Add this entry to `~/.hermes/config.yaml`, then run `hermes mcp test titen`:
+Put `TITEN_MCP_URL` and `TITEN_API_KEY` in `~/.hermes/.env` so Hermes and the
+spawned bridge receive them. The `--env` entries store the variable names as
+placeholders, not the secret values.
+
+For direct HTTP instead, add this entry to `~/.hermes/config.yaml`:
 
 ```yaml
 mcp_servers:
@@ -189,9 +224,10 @@ mcp_servers:
         - titen_handoff
 ```
 
-The Python plugin registers the read-only skill only; Hermes' native
-`mcp_servers` client owns the connection. It is not a Hermes memory-provider
-replacement. See [Hermes plugins](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins)
+The optional `plugins/hermes/titen-memory` package adds usage guidance only.
+Hermes' native `mcp_servers` client owns the connection; Titen does not replace
+Hermes' built-in memory provider. See
+[Hermes plugins](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins)
 and [MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp).
 
 ## Pi

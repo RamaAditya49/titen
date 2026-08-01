@@ -25,10 +25,16 @@ spec: docs/specs/active/2026-08-02-host-compatibility-adapters.md
 - [x] Update the smallest relevant agent and install documentation.
 - [x] Serialize the dashboard auth-mode smoke on one released listener after
   the full gate exposes the existing random-port collision.
-- [ ] Run the complete manual gate, package inspection, dependency audit, and
+- [x] Verify current Codex, Claude Code, OpenClaw, and Hermes MCP configuration
+  against primary documentation and installed CLI help.
+- [x] Rewrite the npm README as one ordered install-to-agent path and document
+  the four primary hosts plus the generic stdio fallback.
+- [x] Add the dedicated titen.dev agent integration page and correct adjacent
+  stale MCP, schema, and Cloudflare capability text.
+- [x] Run the complete manual gate, package inspection, dependency audit, and
   exact-tarball MCP smoke; inspect the final diff for stale claims or secrets.
 - [ ] Move this pair to `done/` with terminal evidence and no unchecked work.
-- [ ] Update and merge PR #215, publish the stable npm and GitHub releases,
+- [ ] Merge the 0.5.7 follow-up, publish the stable npm and GitHub releases,
   update stable discovery, smoke the registry artifact, and remove the merged
   remote topic branch.
 
@@ -47,6 +53,8 @@ spec: docs/specs/active/2026-08-02-host-compatibility-adapters.md
 | AC-HC-009 | `scripts/verify-pack.sh` plus an installed-tarball stdio handshake against a local Titen service |
 | AC-HC-010 | public npm metadata, GitHub release target, stable `titen.dev` manifest, and clean registry install |
 | AC-HC-011 | dashboard suites use disjoint upstream lanes, the session test switches auth modes on one listener, and the complete integration gate passes |
+| AC-HC-012 | README review, website docs checks/build, installed CLI help, and live host configuration smoke where the host is locally available |
+| AC-HC-013 | titen.dev stale-claim grep, docs checker, exact-checkout build, and public page smoke after deployment |
 
 ## Release safety
 
