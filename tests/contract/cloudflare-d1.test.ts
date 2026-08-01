@@ -414,8 +414,12 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
       ["lease_expires_at", "lease_token"],
     );
     assert.deepEqual(
-      (await real.all<{ name: string }>("PRAGMA table_info(api_keys)"))
-        .filter(({ name }) => ["not_before", "expires_at", "last_used_at"].includes(name)),
+      (await real.all<{ name: string }>("PRAGMA table_info(policies)"))
+        .filter(({ name }) => ["version", "created_by"].includes(name)),
+      [],
+    );
+    assert.deepEqual(
+      await real.all<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'channels'"),
       [],
     );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);

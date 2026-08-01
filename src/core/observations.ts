@@ -1,7 +1,7 @@
 import { assertTrustCeiling } from "./auth";
 import { first, type Stmt } from "./db";
 import { eventStatement } from "./events";
-import { notFound } from "./errors";
+import { conflict, notFound, validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
@@ -61,6 +61,8 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
 
   // Trust is authority, not a payload field: a key cannot promote its evidence.
   assertTrustCeiling(principal, trust);
+  if (trust === "policy_approved")
+    throw validationError('Trust "policy_approved" is assigned only by the claim approval workflow.');
   const projectId = await requireProject(
     ctx.app.db,
     principal.orgId,
@@ -189,6 +191,24 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
     [observationId, principal.orgId],
   );
   if (!observation) throw notFound();
+  const hold = await first<{ id: string }>(
+    ctx.app.db,
+    `SELECT h.id FROM legal_holds h
+      WHERE h.org_id = ? AND h.released_at IS NULL
+        AND (
+          (h.resource_type = 'observation' AND h.resource_id = ?)
+          OR (
+            h.resource_type = 'claim'
+            AND EXISTS (
+              SELECT 1 FROM claim_sources s
+              JOIN claims c ON c.id = s.claim_id AND c.org_id = h.org_id
+               WHERE s.observation_id = ? AND s.claim_id = h.resource_id
+            )
+          )
+        ) LIMIT 1`,
+    [principal.orgId, observationId, observationId],
+  );
+  if (hold) throw conflict("Observation or a dependent claim is protected by an active legal hold.");
 
   const previousPurge = await first<{ version: number }>(
     ctx.app.db,
@@ -326,7 +346,13 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
     },
   ];
 
-  await ctx.app.db.batch(statements);
+  try {
+    await ctx.app.db.batch(statements);
+  } catch (error) {
+    if (error instanceof Error && /ACTIVE_LEGAL_HOLD/i.test(error.message))
+      throw conflict("Observation or a dependent claim is protected by an active legal hold.");
+    throw error;
+  }
   const dependent = await first<{ count: number }>(
     ctx.app.db,
     `SELECT COUNT(*) AS count FROM claims c

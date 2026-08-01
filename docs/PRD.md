@@ -477,9 +477,10 @@ planned area in documentation is not implementation evidence.
   dual-runtime, and three-deployment evaluation gate;
 - additional host-native plugins after the Codex reference plugin, selected only
   with an active adopter and install/parity evidence;
-- identity-provider interface when enterprise work starts;
-- exact signed customer-assertion format and issuer/key-rotation contract at
-  v0.3;
+- vendor-specific SSO/SCIM connectors beyond the implemented provider-neutral
+  external-subject mapping boundary;
+- asymmetric or centrally rotated assertion issuers beyond the implemented
+  per-channel encrypted HMAC secret contract;
 - transport/orchestration and canonical recallable-memory federation semantics
   after a real multi-node requirement exists;
 - measured Memory Atlas server-side caps after the authorized reference fixture

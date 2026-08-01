@@ -30,13 +30,18 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   const maxTrust = optionalEnum(body, "max_trust", TRUST_LEVELS, "asserted") as Trust;
   if (TRUST_RANK[maxTrust] > TRUST_RANK[principal.maxTrust])
     throw forbidden("A new credential may not exceed the creating credential's trust ceiling.");
+  const requestedPrincipalId = optionalString(body, "principal_id", LIMITS.identifier);
   const principalKind = optionalEnum(
     body,
     "principal_kind",
     ["human", "agent", "service"] as const,
-    "agent",
+    requestedPrincipalId === principal.principalId ? principal.principalKind : "agent",
   );
-  const principalId = optionalString(body, "principal_id", LIMITS.identifier) ?? newId("agent");
+  if (!principal.scopes.includes("*") && requestedPrincipalId !== null) {
+    if (requestedPrincipalId !== principal.principalId || principalKind !== principal.principalKind)
+      throw forbidden("A managed credential may only reuse its own principal identity.");
+  }
+  const principalId = requestedPrincipalId ?? newId("agent");
 
   const now = ctx.app.now();
   const notBefore = optionalTimestamp(body, "not_before") ?? now.toISOString();

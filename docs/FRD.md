@@ -1,7 +1,8 @@
 # Titen functional requirements document
 
-- Status: feature baseline; memory service and opt-in model-assisted enrichment
-  verified locally, production enrichment activation gated
+- Status: feature baseline; memory service and enterprise governance verified
+  locally, opt-in model-assisted enrichment implemented with production
+  activation gated
 - Product: Level 6 collaborative memory fabric
 - Kernel: Level 5 evidence-grounded context memory
 - Target runtimes: Cloudflare Workers/D1 and Bun/SQLite
@@ -924,8 +925,10 @@ Acceptance (EARS):
 
 Required behavior:
 
-- bundle capabilities into organization/workspace/project roles;
-- evaluate actor, action, resource scope, visibility, memory kind, and trust;
+- require explicit credential capabilities plus an authorized organization
+  role for governance mutations;
+- match typed policy by organization/workspace/project/subject scope, memory
+  kind, and minimum trust;
 - support explicit stronger controls for procedural and organization memory;
 - record allow/deny policy decisions by policy version/reference;
 - fail closed when policy state is unavailable or invalid;
@@ -946,7 +949,8 @@ Acceptance:
 Required behavior:
 
 - submit procedural/organization claims for approval;
-- approve, reject, revoke, or request replacement with actor and reason;
+- approve, reject, or revoke with actor and reason; corrected evidence enters a
+  new approval request rather than mutating the prior decision;
 - require visible supporting evidence;
 - prevent pending/rejected claims from appearing as policy-approved context;
 - keep approval lifecycle separate from evidence content.
@@ -975,7 +979,7 @@ Required behavior:
 - support initial audiences `anonymous`, `authenticated_customer`, and
   `partner`;
 - create a draft release from one exact active claim version with bounded
-  proposed content, channel, audience, optional locale/product metadata,
+  proposed content, channel, audience, optional locale metadata,
   validity window, proposal actor/reason, and status;
 - allow approved content to be redacted, summarized, or localized without
   mutating the source claim;
@@ -994,14 +998,14 @@ Required behavior:
   releases matching its channel, audience, validity, and policy;
 - resolve an authenticated customer subject from trusted gateway/session
   identity rather than an arbitrary public request field; the channel contract
-  uses a short-lived signed assertion with issuer, channel/audience, expiry, and
-  replay validation;
-- keep customer-specific memory separate from release indexes and exclude it
-  from anonymous, partner, and other-customer context;
+  uses a short-lived channel-bound signed assertion with subject, audience,
+  expiry, and replay validation;
+- keep customer-specific memory outside the release-only compiler and fetch
+  dynamic customer state from its authoritative system;
 - expose released citations/provenance without exposing private source content
   or internal evidence the audience cannot inspect;
-- keep release FTS/vector indexes rebuildable from canonical release rows and
-  re-authorize/hydrate every vector result;
+- keep any future release FTS/vector index rebuildable from canonical release
+  rows and re-authorize/hydrate every indexed result;
 - treat live balances, inventory, payment state, and order status as source-tool
   data rather than durable public memory unless an explicit bounded snapshot is
   intended.
@@ -1022,8 +1026,8 @@ Acceptance:
   the next compile and requires a new approval before reactivation;
 - replacing a release preserves the prior released snapshot and audit history;
 - disabling a channel suppresses all of its releases without deleting them;
-- model/vector failure may degrade to authorized release FTS but cannot widen
-  eligibility or expose canonical internal memory.
+- optional model/vector failure cannot widen release eligibility or expose
+  canonical internal memory; the current compiler reads canonical SQL.
 
 ### GOV-003 — Retention and legal hold
 

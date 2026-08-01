@@ -3422,12 +3422,12 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "unshipped governance routes are absent from the public contract",
+    name: "governance routes are shipped under their versioned contract only",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
+      expectOk(await fx.call("GET", "/v1/policies", { key: owner.key }));
+      expectError(await fx.call("POST", "/v1/policies", { key: owner.key, body: {} }), 400);
       for (const [method, path] of [
-        ["GET", "/v1/policies"],
-        ["POST", "/v1/policies"],
         ["POST", "/v1/channel-releases"],
         ["POST", "/v1/channel-context"],
       ] as const)
@@ -4711,6 +4711,819 @@ export const CASES: Case[] = [
     },
   },
 ];
+
+CASES.push({
+  name: "enterprise governance enforces roles approvals releases retention holds identity and isolation",
+  async run(fx) {
+    const publisher = await fx.provision({
+      principalId: `governance_publisher_${fx.runtime}`,
+      scopes: ["*"],
+      maxTrust: "verified",
+    });
+    const approver = await fx.provision({
+      orgId: publisher.orgId,
+      principalId: `governance_approver_${fx.runtime}`,
+      scopes: [
+        "observations:write",
+        "governance:read", "governance:write",
+        "approvals:read", "approvals:approve",
+        "releases:read", "releases:write", "releases:approve",
+        "retention:write", "identity:read", "identity:write", "views:compile",
+      ],
+      maxTrust: "policy_approved",
+    });
+    const gateway = await fx.provision({
+      orgId: publisher.orgId,
+      principalId: `governance_gateway_${fx.runtime}`,
+      principalKind: "service",
+      scopes: ["channel:compile"],
+    });
+    const unprivileged = await fx.provision({
+      orgId: publisher.orgId,
+      principalId: `governance_unprivileged_${fx.runtime}`,
+      scopes: [
+        "governance:read", "governance:write", "memberships:read", "memberships:write",
+        "approvals:read", "releases:read", "views:compile", "keys:manage",
+      ],
+    });
+    const foreign = await fx.provision({ scopes: ["*"] });
+
+    expectError(await fx.call("POST", "/v1/observations", {
+      key: approver.key,
+      body: observation({
+        subject_id: `governance_direct_trust_${fx.runtime}`,
+        trust: "policy_approved",
+      }),
+    }), 400, "VALIDATION_ERROR");
+
+    const approvalPolicyBody = {
+      kind: "claim_approval",
+      scope_type: "organization",
+      claim_kind: "procedural",
+      minimum_trust: "verified",
+      independent_approval: true,
+    };
+    expectError(await fx.call("POST", "/v1/policies", {
+      key: unprivileged.key,
+      body: approvalPolicyBody,
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("GET", "/v1/memberships", {
+      key: unprivileged.key,
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("POST", "/v1/keys", {
+      key: unprivileged.key,
+      body: {
+        label: "forged owner identity",
+        scopes: ["governance:write"],
+        principal_id: approver.principalId,
+        principal_kind: "agent",
+      },
+    }), 403, "FORBIDDEN");
+    const member = await fx.call("POST", "/v1/memberships", {
+      key: publisher.key,
+      body: {
+        principal_id: unprivileged.principalId,
+        principal_kind: "agent",
+        role: "member",
+      },
+    });
+    expectOk(member, 201);
+    expectOk(await fx.call("GET", "/v1/memberships", {
+      key: unprivileged.key,
+    }));
+    expectError(await fx.call("POST", "/v1/policies", {
+      key: unprivileged.key,
+      body: approvalPolicyBody,
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("POST", "/v1/memberships", {
+      key: unprivileged.key,
+      body: {
+        principal_id: unprivileged.principalId,
+        principal_kind: "agent",
+        role: "owner",
+      },
+    }), 404, "NOT_FOUND");
+
+    const firstOwner = await fx.call("POST", "/v1/memberships", {
+      key: publisher.key,
+      body: {
+        principal_id: approver.principalId,
+        principal_kind: "agent",
+        role: "owner",
+      },
+    });
+    expectOk(firstOwner, 201);
+    expectError(await fx.call("DELETE", `/v1/memberships/${firstOwner.body.data.membership_id}`, {
+      key: publisher.key,
+    }), 409, "CONFLICT");
+    const secondOwner = await fx.call("POST", "/v1/memberships", {
+      key: publisher.key,
+      body: {
+        principal_id: publisher.principalId,
+        principal_kind: "agent",
+        role: "owner",
+      },
+    });
+    expectOk(secondOwner, 201);
+    expectOk(await fx.call("DELETE", `/v1/memberships/${secondOwner.body.data.membership_id}`, {
+      key: publisher.key,
+    }));
+
+    const approvalPolicy = await fx.call("POST", "/v1/policies", {
+      key: approver.key,
+      body: approvalPolicyBody,
+    });
+    expectOk(approvalPolicy, 201);
+    const approvalPolicyId = approvalPolicy.body.data.policy_id as string;
+    const policyRace = await Promise.all([
+      fx.call("PATCH", `/v1/policies/${approvalPolicyId}`, {
+        key: approver.key,
+        body: { enabled: false, expected_version: 1 },
+      }),
+      fx.call("PATCH", `/v1/policies/${approvalPolicyId}`, {
+        key: approver.key,
+        body: { enabled: false, expected_version: 1 },
+      }),
+    ]);
+    assert.deepEqual(policyRace.map((result) => result.status).sort(), [200, 409]);
+    expectError(policyRace.find((result) => result.status === 409)!, 409, "CONFLICT");
+    expectOk(await fx.call("PATCH", `/v1/policies/${approvalPolicyId}`, {
+      key: approver.key,
+      body: { enabled: true, expected_version: 2 },
+    }));
+
+    const seeded = await seedClaim(fx, publisher.key, {
+      observation: {
+        subject_id: `governance_subject_${fx.runtime}`,
+        content: "The enterprise rollback procedure passed a verified smoke.",
+        occurred_at: "2025-01-01T00:00:00.000Z",
+        visibility: "organization",
+      },
+      claim: {
+        kind: "procedural",
+        statement: "Enterprise releases require a rollback smoke.",
+        trust: "verified",
+        visibility: "organization",
+        valid_from: "2025-01-01T00:00:00.000Z",
+      },
+    });
+    await fx.query(
+      `UPDATE claim_sources SET relation = 'contradicts' WHERE claim_id = ?`,
+      [seeded.claimId],
+    );
+    expectError(await fx.call("POST", "/v1/claim-approvals", {
+      key: publisher.key,
+      body: {
+        claim_id: seeded.claimId,
+        claim_version: 1,
+        reason: "Contradicting evidence alone must not qualify.",
+      },
+    }), 400, "VALIDATION_ERROR");
+    await fx.query(
+      `UPDATE claim_sources SET relation = 'supports' WHERE claim_id = ?`,
+      [seeded.claimId],
+    );
+    const submitted = await fx.call("POST", "/v1/claim-approvals", {
+      key: publisher.key,
+      body: {
+        claim_id: seeded.claimId,
+        claim_version: 1,
+        reason: "Promote the verified rollback procedure.",
+      },
+    });
+    expectOk(submitted, 201);
+    const approvalId = submitted.body.data.approval_id as string;
+    const memberApprovals = await fx.call("GET", "/v1/claim-approvals", { key: unprivileged.key });
+    expectOk(memberApprovals);
+    assert.deepEqual(memberApprovals.body.data.approvals, []);
+    expectError(await fx.call("POST", `/v1/claim-approvals/${approvalId}/decide`, {
+      key: publisher.key,
+      body: { decision: "approve", reason: "self approval", expected_version: 1 },
+    }), 403, "FORBIDDEN");
+    expectError(await fx.call("POST", `/v1/claim-approvals/${approvalId}/decide`, {
+      key: foreign.key,
+      body: { decision: "approve", reason: "foreign approval", expected_version: 1 },
+    }), 404, "NOT_FOUND");
+    const approved = await fx.call("POST", `/v1/claim-approvals/${approvalId}/decide`, {
+      key: approver.key,
+      body: { decision: "approve", reason: "Independent review passed.", expected_version: 1 },
+    });
+    expectOk(approved);
+    assert.equal(approved.body.data.claim_version, 2);
+    const approvedClaim = await fx.query<{ trust: string; version: number }>(
+      `SELECT trust, version FROM claims WHERE id = ?`, [seeded.claimId],
+    );
+    assert.deepEqual(approvedClaim.map((row) => [row.trust, Number(row.version)]), [["policy_approved", 2]]);
+
+    const sharedObservation = await fx.call("POST", "/v1/observations", {
+      key: approver.key,
+      body: observation({
+        subject_id: `governance_shared_support_${fx.runtime}`,
+        content: "An organization-visible verifier supplied this supporting evidence.",
+        visibility: "organization",
+      }),
+    });
+    expectOk(sharedObservation, 201);
+    const sharedClaim = await fx.call("POST", "/v1/consolidations", {
+      key: publisher.key,
+      body: {
+        subject_id: `governance_shared_support_${fx.runtime}`,
+        claims: [claim(sharedObservation.body.data.observation_id, {
+          statement: "Readable organization evidence may support an owned approval claim.",
+          trust: "verified",
+          visibility: "organization",
+        })],
+      },
+    });
+    expectOk(sharedClaim, 201);
+    const sharedSubmission = await fx.call("POST", "/v1/claim-approvals", {
+      key: publisher.key,
+      body: {
+        claim_id: sharedClaim.body.data.claims[0].claim_id,
+        claim_version: 1,
+        reason: "The support is readable even though another principal authored it.",
+      },
+    });
+    expectOk(sharedSubmission, 201);
+    expectOk(await fx.call("POST", `/v1/claim-approvals/${sharedSubmission.body.data.approval_id}/decide`, {
+      key: approver.key,
+      body: { decision: "reject", reason: "Regression exercised without promotion.", expected_version: 1 },
+    }));
+
+    const reversible = await seedClaim(fx, publisher.key, {
+      observation: {
+        subject_id: `governance_reversible_${fx.runtime}`,
+        content: "The enterprise recovery drill passed independent verification.",
+        occurred_at: "2025-01-02T00:00:00.000Z",
+        visibility: "organization",
+      },
+      claim: {
+        kind: "procedural",
+        statement: "Enterprise recovery drills require independent verification.",
+        trust: "verified",
+        visibility: "organization",
+        valid_from: "2025-01-02T00:00:00.000Z",
+      },
+    });
+    const reversibleSubmission = await fx.call("POST", "/v1/claim-approvals", {
+      key: publisher.key,
+      body: {
+        claim_id: reversible.claimId,
+        claim_version: 1,
+        reason: "Validate approval revocation.",
+      },
+    });
+    expectOk(reversibleSubmission, 201);
+    const reversibleApprovalId = reversibleSubmission.body.data.approval_id as string;
+    expectOk(await fx.call("POST", `/v1/claim-approvals/${reversibleApprovalId}/decide`, {
+      key: approver.key,
+      body: { decision: "approve", reason: "Independent verification passed.", expected_version: 1 },
+    }));
+    expectOk(await fx.call("POST", `/v1/claim-approvals/${reversibleApprovalId}/decide`, {
+      key: approver.key,
+      body: { decision: "revoke", reason: "Verification was withdrawn.", expected_version: 2 },
+    }));
+    const revertedClaim = await fx.query<{ trust: string; version: number }>(
+      `SELECT trust, version FROM claims WHERE id = ?`,
+      [reversible.claimId],
+    );
+    assert.deepEqual(revertedClaim.map((row) => [row.trust, Number(row.version)]), [["verified", 3]]);
+    const rejectedSubmission = await fx.call("POST", "/v1/claim-approvals", {
+      key: publisher.key,
+      body: {
+        claim_id: reversible.claimId,
+        claim_version: 3,
+        reason: "Re-evaluate the corrected evidence.",
+      },
+    });
+    expectOk(rejectedSubmission, 201);
+    expectOk(await fx.call("POST", `/v1/claim-approvals/${rejectedSubmission.body.data.approval_id}/decide`, {
+      key: approver.key,
+      body: { decision: "reject", reason: "The corrected evidence is insufficient.", expected_version: 1 },
+    }));
+
+    const assertionSecret = "governance-contract-secret-at-least-32-characters";
+    const channel = await fx.call("POST", "/v1/channels", {
+      key: approver.key,
+      body: {
+        label: `enterprise-crm-${fx.runtime}`,
+        gateway_principal_id: gateway.principalId,
+        allowed_audiences: ["anonymous", "authenticated_customer"],
+        minimum_trust: "policy_approved",
+        assertion_secret: assertionSecret,
+      },
+    });
+    expectOk(channel, 201);
+    const channelId = channel.body.data.channel_id as string;
+    const storedChannel = await fx.query<{ assertion_secret: string; assertion_secret_hash: string }>(
+      `SELECT assertion_secret, assertion_secret_hash FROM channels WHERE id = ?`,
+      [channelId],
+    );
+    assert.equal(storedChannel.length, 1);
+    assert.notEqual(storedChannel[0]!.assertion_secret, assertionSecret);
+    assert.match(storedChannel[0]!.assertion_secret, /^titen-secret:v1:/);
+    assert.equal(storedChannel[0]!.assertion_secret_hash, await sha256Hex(assertionSecret));
+    const beforeRelease = await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: { audience: "anonymous", task: "rollback procedure", max_tokens: 600 },
+    });
+    expectOk(beforeRelease);
+    assert.deepEqual(beforeRelease.body.data.items, []);
+
+    const draftBody = {
+        claim_id: seeded.claimId,
+        claim_version: 2,
+        channel_id: channelId,
+        audience: "anonymous",
+        released_content: "Run the verified rollback smoke before an enterprise release.",
+        valid_from: "2025-01-01T00:00:00.000Z",
+        proposal_reason: "Approved external procedure snapshot.",
+    };
+    const draft = await fx.call("POST", "/v1/knowledge-releases", {
+      key: publisher.key,
+      body: draftBody,
+    });
+    expectOk(draft, 201);
+    const releaseId = draft.body.data.release_id as string;
+    expectError(await fx.call("GET", "/v1/knowledge-releases", {
+      key: unprivileged.key,
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("POST", `/v1/knowledge-releases/${releaseId}/approve`, {
+      key: publisher.key,
+      body: { reason: "self approval", expected_version: 1 },
+    }), 403, "FORBIDDEN");
+    expectOk(await fx.call("POST", `/v1/knowledge-releases/${releaseId}/approve`, {
+      key: approver.key,
+      body: { reason: "External wording reviewed.", expected_version: 1 },
+    }));
+    expectOk(await fx.call("POST", `/v1/knowledge-releases/${releaseId}/activate`, {
+      key: approver.key,
+      body: { expected_version: 2 },
+    }));
+    const served = await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: { audience: "anonymous", task: "rollback procedure", max_tokens: 600 },
+    });
+    expectOk(served);
+    assert.equal(served.body.data.items.length, 1);
+    assert.equal(served.body.data.items[0].citation.claim_id, seeded.claimId);
+    assert.ok(!JSON.stringify(served.body).includes("verified smoke"), "source evidence must stay internal");
+
+    const replacementDraft = await fx.call("POST", "/v1/knowledge-releases", {
+      key: publisher.key,
+      body: {
+        claim_id: seeded.claimId,
+        claim_version: 2,
+        channel_id: channelId,
+        audience: "anonymous",
+        released_content: "Run the reviewed rollback smoke before each enterprise release.",
+        valid_from: "2025-01-01T00:00:00.000Z",
+        proposal_reason: "Clarify the reviewed release wording.",
+      },
+    });
+    expectOk(replacementDraft, 201);
+    const replacementId = replacementDraft.body.data.release_id as string;
+    expectOk(await fx.call("POST", `/v1/knowledge-releases/${replacementId}/approve`, {
+      key: approver.key,
+      body: { reason: "Replacement wording reviewed.", expected_version: 1 },
+    }));
+    expectOk(await fx.call("POST", `/v1/knowledge-releases/${replacementId}/activate`, {
+      key: approver.key,
+      body: { expected_version: 2 },
+    }));
+    const replaced = await fx.query<{ lifecycle_status: string }>(
+      `SELECT lifecycle_status FROM channel_releases WHERE id = ?`,
+      [releaseId],
+    );
+    assert.deepEqual(replaced.map((row) => row.lifecycle_status), ["replaced"]);
+    const servedReplacement = await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: { audience: "anonymous", task: "rollback procedure", max_tokens: 600 },
+    });
+    expectOk(servedReplacement);
+    assert.deepEqual(
+      servedReplacement.body.data.items.map((item: any) => item.release_id),
+      [replacementId],
+    );
+    const blockedDraft = await fx.call("POST", "/v1/knowledge-releases", {
+      key: publisher.key,
+      body: {
+        claim_id: seeded.claimId,
+        claim_version: 2,
+        channel_id: channelId,
+        audience: "anonymous",
+        released_content: "This draft must never activate after retention exclusion.",
+        valid_from: "2025-01-01T00:00:00.000Z",
+        proposal_reason: "Exercise the retention activation fence.",
+      },
+    });
+    expectOk(blockedDraft, 201);
+    const blockedReleaseId = blockedDraft.body.data.release_id as string;
+    expectOk(await fx.call("POST", `/v1/knowledge-releases/${blockedReleaseId}/approve`, {
+      key: approver.key,
+      body: { reason: "Approved only for the retention regression.", expected_version: 1 },
+    }));
+    expectOk(await fx.call("PATCH", `/v1/channels/${channelId}`, {
+      key: approver.key,
+      body: { status: "paused", expected_version: 1 },
+    }));
+    await assert.rejects(
+      () => fx.query(
+        `UPDATE channel_releases SET lifecycle_status = 'active' WHERE id = ?`,
+        [blockedReleaseId],
+      ),
+      /RELEASE_SOURCE_INELIGIBLE/i,
+    );
+    expectOk(await fx.call("PATCH", `/v1/channels/${channelId}`, {
+      key: approver.key,
+      body: { status: "active", expected_version: 2 },
+    }));
+    expectError(await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: { audience: "partner", task: "rollback procedure", max_tokens: 600 },
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: foreign.key,
+      body: { audience: "anonymous", task: "rollback procedure", max_tokens: 600 },
+    }), 404, "NOT_FOUND");
+
+    const assertionPayload = {
+      v: 1,
+      channel_id: channelId,
+      audience: "authenticated_customer",
+      subject_id: `customer_${fx.runtime}`,
+      exp: Math.floor(Date.now() / 1000) + 600,
+      jti: `nonce_${fx.runtime}_${Date.now()}`,
+    };
+    const payloadText = Buffer.from(JSON.stringify(assertionPayload)).toString("base64url");
+    const assertion = `${payloadText}.${await signPayload(assertionSecret, payloadText)}`;
+    expectOk(await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: {
+        audience: "authenticated_customer",
+        task: "customer rollback procedure",
+        max_tokens: 600,
+        customer_session_assertion: assertion,
+      },
+    }));
+    expectError(await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: {
+        audience: "authenticated_customer",
+        task: "customer rollback procedure",
+        max_tokens: 600,
+        customer_session_assertion: assertion,
+      },
+    }), 403, "FORBIDDEN");
+
+    const scopePreview = await fx.call("POST", "/v1/memory-views/compile", {
+      key: approver.key,
+      body: { lens: "scope_preview", focus_id: gateway.principalId },
+    });
+    expectOk(scopePreview);
+    assert.equal(scopePreview.body.data.metadata.preview_only, true);
+    assert.equal(scopePreview.body.data.metadata.authority_granted, false);
+    const releaseView = await fx.call("POST", "/v1/memory-views/compile", {
+      key: approver.key,
+      body: { lens: "knowledge_release", focus_id: channelId },
+    });
+    expectOk(releaseView);
+    assert.equal(releaseView.body.data.nodes.length, 3);
+    assert.deepEqual(
+      new Set(releaseView.body.data.nodes.map((node: any) => node.status)),
+      new Set(["active", "approved", "replaced"]),
+    );
+    const releaseNodeIds = new Set(releaseView.body.data.nodes.map((node: any) => node.id));
+    assert.ok(releaseView.body.data.edges.every((edge: any) =>
+      releaseNodeIds.has(edge.from) && releaseNodeIds.has(edge.to)));
+    assert.equal(releaseView.body.data.metadata.source_refs.length, 3);
+    assert.equal(releaseView.body.data.metadata.source_evidence_included, false);
+    expectError(await fx.call("POST", "/v1/memory-views/compile", {
+      key: unprivileged.key,
+      body: { lens: "knowledge_release", focus_id: channelId },
+    }), 404, "NOT_FOUND");
+
+    await fx.query(
+      `UPDATE claims SET status = 'revoked', version = version + 1 WHERE id = ?`,
+      [seeded.claimId],
+    );
+    expectError(await fx.call("POST", `/v1/claim-approvals/${approvalId}/decide`, {
+      key: approver.key,
+      body: { decision: "revoke", reason: "stale source must fail", expected_version: 2 },
+    }), 409, "CONFLICT");
+    const unchangedApproval = await fx.query<{ status: string; version: number }>(
+      `SELECT status, version FROM claim_approvals WHERE id = ?`,
+      [approvalId],
+    );
+    assert.deepEqual(unchangedApproval.map((row) => [row.status, Number(row.version)]), [["approved", 2]]);
+    await assert.rejects(
+      () => fx.query(
+        `UPDATE channel_releases SET lifecycle_status = 'active' WHERE id = ?`,
+        [blockedReleaseId],
+      ),
+      /RELEASE_SOURCE_INELIGIBLE/i,
+    );
+    await fx.query(
+      `UPDATE claims SET status = 'active', version = 2 WHERE id = ?`,
+      [seeded.claimId],
+    );
+
+    const identity = await fx.call("POST", "/v1/identity-mappings", {
+      key: approver.key,
+      body: {
+        provider: "Example-IDP",
+        external_subject: `external-${fx.runtime}`,
+        principal_id: gateway.principalId,
+      },
+    });
+    expectOk(identity, 201);
+    const mappings = await fx.call("GET", "/v1/identity-mappings", { key: approver.key });
+    expectOk(mappings);
+    assert.ok(mappings.body.data.mappings.some((mapping: any) => mapping.mapping_id === identity.body.data.mapping_id));
+    const identityRemovalRace = await Promise.all([
+      fx.call("DELETE", `/v1/identity-mappings/${identity.body.data.mapping_id}`, { key: approver.key }),
+      fx.call("DELETE", `/v1/identity-mappings/${identity.body.data.mapping_id}`, { key: approver.key }),
+    ]);
+    assert.equal(identityRemovalRace.filter((result) => result.status === 200).length, 1);
+    assert.ok(identityRemovalRace.some((result) => result.status === 404 || result.status === 409));
+
+    const purgedBeforeHold = await fx.call("POST", "/v1/observations", {
+      key: publisher.key,
+      body: observation({
+        subject_id: `governance_purged_before_hold_${fx.runtime}`,
+        content: "This throwaway record verifies the purge-to-hold database fence.",
+        visibility: "organization",
+      }),
+    });
+    expectOk(purgedBeforeHold, 201);
+    expectOk(await fx.call("DELETE", `/v1/observations/${purgedBeforeHold.body.data.observation_id}`, {
+      key: publisher.key,
+    }));
+    expectError(await fx.call("POST", "/v1/legal-holds", {
+      key: approver.key,
+      body: {
+        resource_type: "observation",
+        resource_id: purgedBeforeHold.body.data.observation_id,
+        reason: "A completed purge must reject a late hold.",
+      },
+    }), 409, "CONFLICT");
+
+    const observationHold = await fx.call("POST", "/v1/legal-holds", {
+      key: approver.key,
+      body: {
+        resource_type: "observation",
+        resource_id: reversible.observationId,
+        reason: "Direct evidence preservation.",
+      },
+    });
+    expectOk(observationHold, 201);
+    expectError(await fx.call("DELETE", `/v1/observations/${reversible.observationId}`, {
+      key: publisher.key,
+    }), 409, "CONFLICT");
+    const holdReleaseRace = await Promise.all([
+      fx.call("POST", `/v1/legal-holds/${observationHold.body.data.legal_hold_id}/release`, {
+        key: approver.key,
+        body: { reason: "Direct evidence review complete." },
+      }),
+      fx.call("POST", `/v1/legal-holds/${observationHold.body.data.legal_hold_id}/release`, {
+        key: approver.key,
+        body: { reason: "Duplicate release must lose." },
+      }),
+    ]);
+    assert.equal(holdReleaseRace.filter((result) => result.status === 200).length, 1);
+    assert.ok(holdReleaseRace.some((result) => result.status === 404 || result.status === 409));
+
+    const hold = await fx.call("POST", "/v1/legal-holds", {
+      key: approver.key,
+      body: { resource_type: "claim", resource_id: seeded.claimId, reason: "Active investigation." },
+    });
+    expectOk(hold, 201);
+    await assert.rejects(
+      () => fx.query(
+        `INSERT INTO record_history
+           (id, org_id, record_type, record_id, version, change_kind,
+            actor_id, snapshot_hash, changed_at)
+         VALUES (?, ?, 'observation', ?, 99, 'purge', ?, ?, ?)`,
+        [
+          `hist_hold_guard_${fx.runtime}`,
+          publisher.orgId,
+          seeded.observationId,
+          publisher.principalId,
+          "0".repeat(64),
+          "2026-08-01T00:00:00.000Z",
+        ],
+      ),
+      /ACTIVE_LEGAL_HOLD/i,
+    );
+    expectError(await fx.call("DELETE", `/v1/observations/${seeded.observationId}`, {
+      key: publisher.key,
+    }), 409, "CONFLICT");
+    await fx.query(`UPDATE claims SET created_at = ? WHERE id = ?`, ["2025-01-01T00:00:00.000Z", seeded.claimId]);
+    await fx.query(`UPDATE observations SET ingested_at = ? WHERE id = ?`, ["2025-01-01T00:00:00.000Z", seeded.observationId]);
+    const retention = await fx.call("POST", "/v1/policies", {
+      key: approver.key,
+      body: {
+        kind: "retention",
+        scope_type: "subject",
+        scope_id: `governance_subject_${fx.runtime}`,
+        record_type: "claim",
+        retention_days: 1,
+      },
+    });
+    expectOk(retention, 201);
+    const observationRetention = await fx.call("POST", "/v1/policies", {
+      key: approver.key,
+      body: {
+        kind: "retention",
+        scope_type: "subject",
+        scope_id: `governance_subject_${fx.runtime}`,
+        record_type: "observation",
+        retention_days: 1,
+      },
+    });
+    expectOk(observationRetention, 201);
+    const heldApply = await fx.call("POST", "/v1/retention/apply", {
+      key: approver.key,
+      body: { policy_id: retention.body.data.policy_id },
+    });
+    expectOk(heldApply);
+    assert.equal(heldApply.body.data.excluded_count, 0);
+    const heldObservationApply = await fx.call("POST", "/v1/retention/apply", {
+      key: approver.key,
+      body: { policy_id: observationRetention.body.data.policy_id },
+    });
+    expectOk(heldObservationApply);
+    assert.equal(heldObservationApply.body.data.excluded_count, 0);
+    expectOk(await fx.call("POST", `/v1/legal-holds/${hold.body.data.legal_hold_id}/release`, {
+      key: approver.key,
+      body: { reason: "Investigation complete." },
+    }));
+    const applied = await fx.call("POST", "/v1/retention/apply", {
+      key: approver.key,
+      body: { policy_id: retention.body.data.policy_id },
+    });
+    expectOk(applied);
+    assert.equal(applied.body.data.excluded_count, 1);
+    const observationApplied = await fx.call("POST", "/v1/retention/apply", {
+      key: approver.key,
+      body: { policy_id: observationRetention.body.data.policy_id },
+    });
+    expectOk(observationApplied);
+    assert.equal(observationApplied.body.data.excluded_count, 1);
+    const retentionPrecedenceHold = await fx.call("POST", "/v1/legal-holds", {
+      key: approver.key,
+      body: {
+        resource_type: "claim",
+        resource_id: seeded.claimId,
+        reason: "Legal hold must atomically undo an existing retention exclusion.",
+      },
+    });
+    expectOk(retentionPrecedenceHold, 201);
+    const exclusionAfterHold = await fx.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM retention_exclusions
+        WHERE org_id = ? AND (
+          (resource_type = 'claim' AND resource_id = ?)
+          OR (resource_type = 'observation' AND resource_id = ?)
+        )`,
+      [publisher.orgId, seeded.claimId, seeded.observationId],
+    );
+    assert.equal(Number(exclusionAfterHold[0]!.count), 0);
+    const precedenceAudit = await fx.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM audit_log
+        WHERE org_id = ? AND action = 'retention_exclusion.remove_for_hold'`,
+      [publisher.orgId],
+    );
+    assert.equal(Number(precedenceAudit[0]!.count), 1);
+    const restoredContext = await fx.call("POST", "/v1/context/compile", {
+      key: publisher.key,
+      body: {
+        subject_id: `governance_subject_${fx.runtime}`,
+        task: "enterprise rollback procedure",
+        max_tokens: 600,
+      },
+    });
+    expectOk(restoredContext);
+    assert.ok(restoredContext.body.data.items.some((item: any) => item.claim_id === seeded.claimId));
+    const restoredRelease = await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: { audience: "anonymous", task: "rollback procedure", max_tokens: 600 },
+    });
+    expectOk(restoredRelease);
+    assert.deepEqual(restoredRelease.body.data.items.map((item: any) => item.release_id), [replacementId]);
+    await assert.rejects(
+      () => fx.query(
+        `INSERT INTO retention_exclusions
+           (id, org_id, policy_id, resource_type, resource_id, excluded_at, actor_id)
+         VALUES (?, ?, ?, 'claim', ?, ?, ?)`,
+        [
+          `ret_hold_guard_${fx.runtime}`,
+          publisher.orgId,
+          retention.body.data.policy_id,
+          seeded.claimId,
+          "2026-08-01T00:00:00.000Z",
+          approver.principalId,
+        ],
+      ),
+      /ACTIVE_LEGAL_HOLD/i,
+    );
+    await assert.rejects(
+      () => fx.query(
+        `INSERT INTO retention_exclusions
+           (id, org_id, policy_id, resource_type, resource_id, excluded_at, actor_id)
+         VALUES (?, ?, ?, 'observation', ?, ?, ?)`,
+        [
+          `ret_dependent_hold_guard_${fx.runtime}`,
+          publisher.orgId,
+          observationRetention.body.data.policy_id,
+          seeded.observationId,
+          "2026-08-01T00:00:00.000Z",
+          approver.principalId,
+        ],
+      ),
+      /ACTIVE_LEGAL_HOLD/i,
+    );
+    expectOk(await fx.call("POST", `/v1/legal-holds/${retentionPrecedenceHold.body.data.legal_hold_id}/release`, {
+      key: approver.key,
+      body: { reason: "Retention precedence regression complete." },
+    }));
+    const reapplied = await fx.call("POST", "/v1/retention/apply", {
+      key: approver.key,
+      body: { policy_id: retention.body.data.policy_id },
+    });
+    expectOk(reapplied);
+    assert.equal(reapplied.body.data.excluded_count, 1);
+    const observationReapplied = await fx.call("POST", "/v1/retention/apply", {
+      key: approver.key,
+      body: { policy_id: observationRetention.body.data.policy_id },
+    });
+    expectOk(observationReapplied);
+    assert.equal(observationReapplied.body.data.excluded_count, 1);
+    const afterRetention = await fx.call("POST", "/v1/context/compile", {
+      key: publisher.key,
+      body: {
+        subject_id: `governance_subject_${fx.runtime}`,
+        task: "enterprise rollback procedure",
+        max_tokens: 600,
+      },
+    });
+    expectOk(afterRetention);
+    assert.deepEqual(afterRetention.body.data.items, []);
+    const afterReleaseRetention = await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+      key: gateway.key,
+      body: { audience: "anonymous", task: "rollback procedure", max_tokens: 600 },
+    });
+    expectOk(afterReleaseRetention);
+    assert.deepEqual(afterReleaseRetention.body.data.items, []);
+
+    expectError(await fx.call("POST", "/v1/claim-approvals", {
+      key: publisher.key,
+      body: {
+        claim_id: seeded.claimId,
+        claim_version: 2,
+        reason: "Retained claims cannot re-enter approval.",
+      },
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("POST", "/v1/knowledge-releases", {
+      key: publisher.key,
+      body: {
+        claim_id: seeded.claimId,
+        claim_version: 2,
+        channel_id: channelId,
+        audience: "anonymous",
+        released_content: "Retained memory must stay unavailable.",
+        proposal_reason: "This request must fail closed.",
+      },
+    }), 404, "NOT_FOUND");
+    expectError(await fx.call("POST", `/v1/knowledge-releases/${blockedReleaseId}/activate`, {
+      key: approver.key,
+      body: { expected_version: 2 },
+    }), 404, "NOT_FOUND");
+
+    expectOk(await fx.call("POST", `/v1/knowledge-releases/${replacementId}/revoke`, {
+      key: approver.key,
+      body: { reason: "Procedure retired.", expected_version: 3 },
+    }));
+    const membershipRemovalRace = await Promise.all([
+      fx.call("DELETE", `/v1/memberships/${member.body.data.membership_id}`, { key: publisher.key }),
+      fx.call("DELETE", `/v1/memberships/${member.body.data.membership_id}`, { key: publisher.key }),
+    ]);
+    assert.equal(membershipRemovalRace.filter((result) => result.status === 200).length, 1);
+    assert.ok(membershipRemovalRace.some((result) => result.status === 404 || result.status === 409));
+    const membershipRemovalAudits = await fx.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM audit_log
+        WHERE org_id = ? AND action = 'membership.remove' AND resource_id = ?`,
+      [publisher.orgId, member.body.data.membership_id],
+    );
+    assert.equal(Number(membershipRemovalAudits[0]!.count), 1);
+    const audits = await fx.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM audit_log
+        WHERE org_id = ? AND action IN ('policy.create', 'approval.approve',
+          'release.activate', 'retention.apply', 'identity_mapping.create')`,
+      [publisher.orgId],
+    );
+    assert.ok(Number(audits[0]!.count) >= 5);
+  },
+});
 
 /**
  * Atomicity is a driver guarantee, so it is verified against the driver itself

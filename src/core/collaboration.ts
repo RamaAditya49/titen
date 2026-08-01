@@ -3,7 +3,7 @@ import { recordAccessParams, recordAccessSql } from "./authorization";
 import { auditStatement } from "./audit";
 import type { Principal } from "./auth";
 import type { Db } from "./db";
-import { notFound, validationError, conflict } from "./errors";
+import { notFound, validationError, conflict, forbidden } from "./errors";
 import { eventStatement } from "./events";
 import { newId } from "./ids";
 import { POLICY_SNAPSHOT } from "./context";
@@ -16,6 +16,7 @@ import {
   requireEnum,
   requireInteger,
 } from "./validate";
+import { requireOrgRole } from "./governance";
 
 const PRINCIPAL_KINDS = ["human", "agent", "service"] as const;
 const MEMBER_ROLES = ["owner", "admin", "member", "reader"] as const;
@@ -56,12 +57,15 @@ export async function listWorkspaces(ctx: RequestContext): Promise<Result> {
 // --- Memberships ---
 
 export async function addMember(ctx: RequestContext): Promise<Result> {
+  const authority = await requireOrgRole(ctx, ["owner", "admin"], "membership.add");
   const { orgId, principalId } = ctx.principal!;
   const body = requireObject(await ctx.json());
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   const memberPrincipalId = requireString(body, "principal_id", LIMITS.identifier);
   const principalKind = requireEnum(body, "principal_kind", PRINCIPAL_KINDS);
   const role = requireEnum(body, "role", MEMBER_ROLES);
+  if (role === "owner" && authority === "admin")
+    throw forbidden("Only an organization owner may assign the owner role.");
   const id = newId("mbr");
   const now = ctx.app.now().toISOString();
 
@@ -74,19 +78,26 @@ export async function addMember(ctx: RequestContext): Promise<Result> {
     if (!workspace) throw notFound();
   }
 
-  await ctx.app.db.batch([
-    {
-      sql: `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      params: [id, orgId, workspaceId, memberPrincipalId, principalKind, role, now],
-    },
-    auditStatement(orgId, principalId, "membership.add", "membership", now, id),
-  ]);
+  try {
+    await ctx.app.db.batch([
+      {
+        sql: `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        params: [id, orgId, workspaceId, memberPrincipalId, principalKind, role, now],
+      },
+      auditStatement(orgId, principalId, "membership.add", "membership", now, id),
+    ]);
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE|constraint/i.test(error.message))
+      throw conflict("That principal already has an active membership in this scope.");
+    throw error;
+  }
 
   return { status: 201, data: { membership_id: id } };
 }
 
 export async function listMembers(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin", "member", "reader"], "membership.list");
   const { orgId } = ctx.principal!;
   const workspaceId = ctx.url.searchParams.get("workspace_id") || null;
 
@@ -102,22 +113,52 @@ export async function listMembers(ctx: RequestContext): Promise<Result> {
 }
 
 export async function removeMember(ctx: RequestContext): Promise<Result> {
+  const authority = await requireOrgRole(ctx, ["owner", "admin"], "membership.remove");
   const { orgId, principalId } = ctx.principal!;
   const id = ctx.params.id!;
-  const row = await first<{ id: string }>(
+  const row = await first<{ id: string; workspace_id: string | null; role: string }>(
     ctx.app.db,
-    `SELECT id FROM memberships WHERE id = ? AND org_id = ? AND removed_at IS NULL`,
+    `SELECT id, workspace_id, role FROM memberships
+      WHERE id = ? AND org_id = ? AND removed_at IS NULL`,
     [id, orgId],
   );
   if (!row) throw notFound();
+  if (row.workspace_id === null && row.role === "owner" && authority === "admin")
+    throw forbidden("Only an organization owner may remove another owner.");
+  if (row.workspace_id === null && row.role === "owner") {
+    const owners = await first<{ count: number }>(
+      ctx.app.db,
+      `SELECT COUNT(*) AS count FROM memberships
+        WHERE org_id = ? AND workspace_id IS NULL AND role = 'owner'
+          AND removed_at IS NULL`,
+      [orgId],
+    );
+    if (Number(owners?.count ?? 0) <= 1)
+      throw conflict("The final organization owner cannot be removed.");
+  }
   const now = ctx.app.now().toISOString();
-  await ctx.app.db.batch([
-    {
-      sql: `UPDATE memberships SET removed_at = ? WHERE id = ?`,
-      params: [now, id],
-    },
-    auditStatement(orgId, principalId, "membership.remove", "membership", now, id),
-  ]);
+  try {
+    await ctx.app.db.batch([
+      {
+        sql: `INSERT INTO governance_version_fences
+                (resource_type, resource_id, expected_version, created_at)
+              VALUES ('membership_remove', ?, 1, ?)`,
+        params: [id, now],
+      },
+      {
+        sql: `UPDATE memberships SET removed_at = ?
+               WHERE id = ? AND org_id = ? AND removed_at IS NULL`,
+        params: [now, id, orgId],
+      },
+      auditStatement(orgId, principalId, "membership.remove", "membership", now, id),
+    ]);
+  } catch (error) {
+    if (error instanceof Error && /FINAL_ORGANIZATION_OWNER/i.test(error.message))
+      throw conflict("The final organization owner cannot be removed.");
+    if (error instanceof Error && /UNIQUE|constraint/i.test(error.message))
+      throw conflict("Membership changed concurrently.");
+    throw error;
+  }
   return { data: { membership_id: id, removed_at: now } };
 }
 

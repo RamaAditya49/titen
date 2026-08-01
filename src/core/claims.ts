@@ -163,6 +163,8 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     if (TRUST_RANK[trust] > TRUST_RANK[evidenceTrust])
       throw validationError("Claim trust may not exceed the trust of its supporting evidence.");
     assertTrustCeiling(principal, trust);
+    if (trust === "policy_approved")
+      throw validationError('Trust "policy_approved" is assigned only by the claim approval workflow.');
 
     // Visibility never widens beyond the narrowest source it was derived from.
     const narrowest = sources.reduce<Visibility>((narrow, source) => {

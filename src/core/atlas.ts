@@ -5,14 +5,15 @@ import { loadAuthorizedEvidenceIds } from "./evidence";
 import { notFound, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
 import { requireObject, optionalString, requireEnum } from "./validate";
+import { requireOrgRole } from "./governance";
 
-const LENSES = ["evidence_trace", "neighborhood", "conflict_freshness", "review_queue"] as const;
+const LENSES = ["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "knowledge_release"] as const;
 type Lens = (typeof LENSES)[number];
 const REVIEW_REASONS = ["all", "disputed", "contradiction", "low_confidence", "negative_feedback"] as const;
 
 interface Node {
   id: string;
-  type: "claim" | "observation";
+  type: "claim" | "observation" | "principal" | "release";
   label: string;
   trust: string;
   status: string;
@@ -360,6 +361,87 @@ async function reviewQueue(
   };
 }
 
+async function scopePreview(ctx: RequestContext, principalId: string): Promise<ViewResult> {
+  if (!hasScope(ctx.principal!, "governance:read")) throw notFound();
+  await requireOrgRole(ctx, ["owner", "admin", "reader"], "atlas.scope_preview");
+  const target = await first<{ principal_id: string; principal_kind: string }>(
+    ctx.app.db,
+    `SELECT principal_id, principal_kind FROM api_keys
+      WHERE org_id = ? AND principal_id = ? AND revoked_at IS NULL
+     UNION
+     SELECT principal_id, principal_kind FROM memberships
+      WHERE org_id = ? AND principal_id = ? AND removed_at IS NULL
+     LIMIT 1`,
+    [ctx.principal!.orgId, principalId, ctx.principal!.orgId, principalId],
+  );
+  if (!target) throw notFound();
+  const roles = await ctx.app.db.all<{ workspace_id: string | null; role: string }>(
+    `SELECT workspace_id, role FROM memberships
+      WHERE org_id = ? AND principal_id = ? AND removed_at IS NULL
+      ORDER BY workspace_id, role`,
+    [ctx.principal!.orgId, principalId],
+  );
+  return {
+    lens: "scope_preview",
+    focus_id: principalId,
+    nodes: [{ id: principalId, type: "principal", label: target.principal_kind, trust: "n/a", status: "active", created_at: "" }],
+    edges: [],
+    metadata: {
+      principal_id: principalId,
+      principal_kind: target.principal_kind,
+      organization_role: roles.find((role) => role.workspace_id === null)?.role ?? null,
+      workspace_roles: roles.filter((role) => role.workspace_id !== null),
+      preview_only: true,
+      authority_granted: false,
+    },
+  };
+}
+
+async function knowledgeReleaseView(ctx: RequestContext, channelId: string | null, limit: number): Promise<ViewResult> {
+  if (!hasScope(ctx.principal!, "releases:read")) throw notFound();
+  await requireOrgRole(ctx, ["owner", "admin", "reader"], "atlas.knowledge_release");
+  if (channelId) {
+    const channel = await first<{ id: string }>(ctx.app.db,
+      `SELECT id FROM channels WHERE id = ? AND org_id = ?`, [channelId, ctx.principal!.orgId]);
+    if (!channel) throw notFound();
+  }
+  const rows = await ctx.app.db.all<{
+    id: string; channel_id: string; claim_id: string; claim_version: number;
+    audience: string; released_content: string; status: string; created_at: string;
+  }>(
+    `SELECT id, channel_id, claim_id, claim_version, audience, released_content,
+            lifecycle_status AS status, created_at
+       FROM channel_releases
+      WHERE org_id = ? AND channel_id IS NOT NULL AND (? IS NULL OR channel_id = ?)
+      ORDER BY created_at DESC, id DESC LIMIT ?`,
+    [ctx.principal!.orgId, channelId, channelId, limit],
+  );
+  return {
+    lens: "knowledge_release",
+    focus_id: channelId,
+    nodes: rows.map((row) => ({
+      id: row.id,
+      type: "release" as const,
+      label: row.released_content,
+      trust: "reviewed_snapshot",
+      status: row.status,
+      created_at: row.created_at,
+    })),
+    edges: [],
+    metadata: {
+      channel_id: channelId,
+      release_count: rows.length,
+      audiences: [...new Set(rows.map((row) => row.audience))].sort(),
+      source_refs: rows.map((row) => ({
+        release_id: row.id,
+        claim_id: row.claim_id,
+        claim_version: row.claim_version,
+      })),
+      source_evidence_included: false,
+    },
+  };
+}
+
 // --- Entry point ---
 
 export async function compileView(ctx: RequestContext): Promise<Result> {
@@ -396,6 +478,15 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
     }
     case "review_queue": {
       view = await reviewQueue(ctx, subjectId, ownerId, reviewReason, cursor, limit);
+      break;
+    }
+    case "scope_preview": {
+      if (!focusId) throw validationError('Field "focus_id" is required for scope_preview lens.');
+      view = await scopePreview(ctx, focusId);
+      break;
+    }
+    case "knowledge_release": {
+      view = await knowledgeReleaseView(ctx, focusId, limit);
       break;
     }
   }

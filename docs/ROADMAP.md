@@ -27,7 +27,7 @@ locally verified but has no live deployment evidence.
 | Evidence kernel: observe, claim, compile, feedback | Implemented; Verified locally | [P0 done spec](./specs/done/2026-07-29-p0-dual-runtime-vertical-spike.md), [contract tests](../tests/contract/) | Shared suite covers Bun/SQLite and local workerd/D1; this is not a live Cloudflare claim. |
 | Temporal claims, checkpoints, SDK, optional hybrid retrieval | Implemented; Verified locally | [agent guide](./agent-guide.md), [contract tests](../tests/contract/), [integration tests](../tests/integration/) | FTS works without vectors; live Vectorize/Workers AI is not verified. |
 | Identities, visibility, leases, handoffs, MCP, events, Atlas compiler | Implemented; Verified locally | [collaboration architecture](./architecture/collaboration.md), [API reference](./reference/api.md), [contract tests](../tests/contract/) | Local/emulated runtime evidence only. |
-| Enterprise policy and governed releases | Planned | [FRD governance requirements](./FRD.md), [ADR-0002](./decisions/0002-channel-release-not-public-memory.md) | Withdrawn from the current route inventory until authorization and lifecycle gates are complete. |
+| Enterprise policy and governed releases | Implemented; Verified locally | [FRD governance requirements](./FRD.md), [ADR-0002](./decisions/0002-channel-release-not-public-memory.md), [enterprise governance done spec](./specs/done/2026-08-01-enterprise-governance-v03.md), [contract tests](../tests/contract/) | Roles, typed policy, exact-version approvals, channels/releases, retention/legal hold, identity mapping, and governance Atlas lenses pass the shared local Bun/D1 contract; no claim of a provisioned enterprise deployment. |
 | Enterprise audit | Implemented; Verified locally | [FRD governance requirements](./FRD.md), [contract tests](../tests/contract/) | No claim of a provisioned enterprise deployment. |
 | Memory Atlas dashboard | Implemented; Verified locally | [dashboard guide](./dashboard.md), [browser tests](../tests/), [live adapter smoke](../scripts/verify-dashboard-live.ts) | Live health/readiness and four authorized Atlas lenses pass through the same-origin adapter against temporary Bun/SQLite; this is not a provisioned external deployment claim. |
 | Containerized Bun service with `embeddinggemma` | Historical live evidence: 0.3.0 canary | [evaluation record](./testing/EVALS.md), [cycle 1](./testing/2026-07-31-mem0-replacement-cycle1.md), [cycle 2](./testing/2026-07-31-mem0-replacement-cycle2.md), [end-to-end script](../scripts/verify-live.ts) | The evaluated npm 0.3.0 canary ran loopback-only on Wulan with explicit `sqlite-vec`; this is not evidence for a later package, systemd, or Cloudflare. |
@@ -66,10 +66,13 @@ Adds identities and memberships, scoped visibility, leases, handoffs,
 observer-specific conflicts, MCP, durable metadata events, Memory Atlas view
 compilation, and an optional live same-origin dashboard client.
 
-### v0.3 — governance (planned)
+### v0.3 — governance
 
-Will add role/policy enforcement, approved channel releases, audience-scoped
-context, and audit export.
+Adds role/policy enforcement, exact-version approval and governed channel
+release workflows, signed audience-scoped context, retention/legal hold,
+identity mappings, audit evidence, and governance Atlas projections. The
+shared contract is locally verified; external enterprise deployment remains a
+separate release claim.
 
 ### v1 transport — signed federation event exchange
 

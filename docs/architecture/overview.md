@@ -98,9 +98,10 @@ compatible embedding model at write and query time.
 ## Repository state and target runtime shape
 
 The current checkout contains the memory kernel, authenticated REST/MCP app,
-SQL migrations, Cloudflare and Bun entrypoints, and a shared dual-runtime
-contract suite. Their precise verification boundary is centralized in the
-[roadmap maturity matrix](../ROADMAP.md#maturity-matrix).
+enterprise role/policy/approval/release/retention/identity boundaries, SQL
+migrations, Cloudflare and Bun entrypoints, and a shared dual-runtime contract
+suite. Their precise verification boundary is centralized in the [roadmap
+maturity matrix](../ROADMAP.md#maturity-matrix).
 
 The Astro dashboard is a live read-only client of health, readiness, and the
 authorized Memory Atlas compiler through a same-origin loopback adapter. A

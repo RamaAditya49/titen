@@ -139,10 +139,15 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       `completed migration 16 must retain its lease columns after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(
-      (await db.all<{ name: string }>("PRAGMA table_info(api_keys)"))
-        .filter(({ name }) => ["not_before", "expires_at", "last_used_at"].includes(name)),
+      (await db.all<{ name: string }>("PRAGMA table_info(policies)"))
+        .filter(({ name }) => ["version", "created_by"].includes(name)),
       [],
-      `migration ${migration.version} must roll back its lifecycle columns after statement ${failureAfter + 1}`,
+      `migration ${migration.version} must roll back its policy columns after statement ${failureAfter + 1}`,
+    );
+    assert.deepEqual(
+      await db.all<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'channels'"),
+      [],
+      `migration ${migration.version} must roll back its channel table after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at

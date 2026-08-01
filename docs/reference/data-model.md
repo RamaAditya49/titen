@@ -251,32 +251,36 @@ not add `public` to canonical memory visibility.
 An operator-managed CRM, website, support, or partner serving boundary.
 
 Required fields: `id`, `organization_id`, bounded `name`, `status`, allowed
-audience configuration, optional locale/product defaults, optional external
-customer-assertion policy/key reference, `created_by`, `created_at`, and
-lifecycle timestamps. Gateway access is authorized through principal
-capabilities/policy rather than a shared channel secret stored in this row.
+audience configuration, minimum trust, one gateway service principal,
+`created_by`, `created_at`, and lifecycle timestamps. A channel that accepts
+`authenticated_customer` also stores a hash plus keyring-encrypted copy of its
+HMAC assertion secret. API responses never return either value. Gateway access
+still requires the bound service principal's scoped credential.
 
 Initial audiences are `anonymous`, `authenticated_customer`, and `partner`.
 Channel status can prevent all new context without deleting releases.
 
-### `knowledge_releases`
+### `channel_releases`
 
-A canonical, immutable-content snapshot approved for one channel/audience.
+The v4 table remains the one canonical release ledger. v0.3 adds an immutable
+reviewed-content snapshot and explicit lifecycle fields rather than creating a
+parallel release model.
 
 Required fields:
 
 - `id`, `organization_id`, `channel_id`, and `audience`;
 - source `claim_id` plus exact `claim_version` and source content hash;
 - bounded `released_content` and released-content hash;
-- optional locale/product metadata and released citation metadata;
-- minimum-trust/policy reference, `approved_by`, bounded approval reason, and
-  approval time;
+- optional locale and validity metadata;
+- proposer and approver identities, bounded reasons, and decision times;
 - `status`, monotonic lifecycle version, `valid_from`, optional `valid_to`,
   activation, replacement, expiry, and revocation metadata;
 - creation actor and timestamps.
 
 Release content is not updated in place. Redaction, localization, source-claim
-change, or correction creates a new release row and may replace the old one.
+change, or correction creates a new release row. Activating a replacement for
+the same channel, audience, and claim marks the old active row `replaced` while
+preserving its snapshot.
 Statuses are `draft`, `approved`, `active`, `suspended`, `replaced`, `expired`,
 and `revoked`. Only `active`, currently valid rows whose exact source claim
 version remains current, active, and undisputed are channel-eligible. Eligibility
@@ -583,8 +587,10 @@ outbox work.
 - Proposed channel/release portability must keep imported releases suspended
   until destination gateway, policy, and customer-assertion key references are
   explicitly rebound and verified.
-- Legal hold and physical purge arrive with v0.3 policy; their migration must
-  preserve existing tombstones and provenance.
+- v0.3 legal hold blocks physical purge and retention exclusion at the SQL
+  commit boundary. A hold placed after retention exclusion atomically restores
+  the exact record and supporting observations for a held claim, while a late
+  hold on an already purged record fails closed.
 - Revoking or expiring a release removes channel eligibility before derived
   cache/vector cleanup and preserves the released snapshot/history.
 

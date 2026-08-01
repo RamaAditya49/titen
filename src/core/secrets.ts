@@ -140,6 +140,7 @@ export async function migrateSigningSecrets(db: Db, cipher: SecretCipher): Promi
   const groups = [
     { table: "webhooks", column: "secret", prefix: "webhook" },
     { table: "federation_peers", column: "shared_secret", prefix: "federation" },
+    { table: "channels", column: "assertion_secret", prefix: "channel" },
   ] as const;
   for (const group of groups) {
     let after = "";
@@ -188,6 +189,9 @@ export async function prepareSigningSecrets(
   await db.batch([
     { sql: `UPDATE webhooks SET status = 'disabled' WHERE status = 'active' AND secret IS NULL` },
     { sql: `UPDATE federation_peers SET status = 'suspended' WHERE status = 'active' AND shared_secret IS NULL` },
+    { sql: `UPDATE channels SET status = 'disabled'
+             WHERE status = 'active' AND allowed_audiences LIKE '%authenticated_customer%'
+               AND assertion_secret IS NULL` },
   ]);
   const counts = await Promise.all([
     db.all<{ present: number; missing: number }>(
@@ -199,6 +203,12 @@ export async function prepareSigningSecrets(
       `SELECT SUM(CASE WHEN shared_secret IS NOT NULL THEN 1 ELSE 0 END) AS present,
               SUM(CASE WHEN status = 'active' AND shared_secret IS NULL THEN 1 ELSE 0 END) AS missing
          FROM federation_peers`,
+    ),
+    db.all<{ present: number; missing: number }>(
+      `SELECT SUM(CASE WHEN assertion_secret IS NOT NULL THEN 1 ELSE 0 END) AS present,
+              SUM(CASE WHEN status = 'active' AND allowed_audiences LIKE '%authenticated_customer%'
+                        AND assertion_secret IS NULL THEN 1 ELSE 0 END) AS missing
+         FROM channels`,
     ),
   ]);
   if (counts.some((rows) => Number(rows[0]?.missing ?? 0) > 0)) return false;

@@ -8,6 +8,7 @@ features explicitly listed as proposed are not routes.
 
 <!-- ROUTE_INVENTORY_START -->
 - `DELETE /v1/checkpoints/:id`
+- `DELETE /v1/identity-mappings/:id`
 - `DELETE /v1/keys/:id`
 - `DELETE /v1/leases/:id`
 - `DELETE /v1/memberships/:id`
@@ -17,8 +18,10 @@ features explicitly listed as proposed are not routes.
 - `GET /readyz`
 - `GET /v1/audit`
 - `GET /v1/audit/export`
+- `GET /v1/channels`
 - `GET /v1/checkpoints`
 - `GET /v1/checkpoints/:id`
+- `GET /v1/claim-approvals`
 - `GET /v1/claims/:id/evidence`
 - `GET /v1/context/:id`
 - `GET /v1/events`
@@ -28,14 +31,23 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/federation/peers`
 - `GET /v1/federation/peers/:id/filters`
 - `GET /v1/handoffs`
+- `GET /v1/identity-mappings`
 - `GET /v1/keys`
+- `GET /v1/knowledge-releases`
 - `GET /v1/leases`
 - `GET /v1/memberships`
+- `GET /v1/policies`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
 - `GET /v1/workspaces`
+- `PATCH /v1/channels/:id`
+- `PATCH /v1/policies/:id`
 - `POST /mcp`
+- `POST /v1/channels`
+- `POST /v1/channels/:id/context/compile`
 - `POST /v1/checkpoints`
+- `POST /v1/claim-approvals`
+- `POST /v1/claim-approvals/:id/decide`
 - `POST /v1/claims/:id/expire`
 - `POST /v1/claims/:id/revoke`
 - `POST /v1/claims/:id/supersede`
@@ -50,15 +62,24 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/federation/push`
 - `POST /v1/handoffs`
 - `POST /v1/handoffs/:id/resolve`
+- `POST /v1/identity-mappings`
 - `POST /v1/import`
 - `POST /v1/index/drain`
 - `POST /v1/keys`
+- `POST /v1/knowledge-releases`
+- `POST /v1/knowledge-releases/:id/activate`
+- `POST /v1/knowledge-releases/:id/approve`
+- `POST /v1/knowledge-releases/:id/revoke`
 - `POST /v1/leases`
 - `POST /v1/leases/:id/force-release`
+- `POST /v1/legal-holds`
+- `POST /v1/legal-holds/:id/release`
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
+- `POST /v1/policies`
 - `POST /v1/projects/resolve`
+- `POST /v1/retention/apply`
 - `POST /v1/webhooks`
 - `POST /v1/webhooks/:id/pause`
 - `POST /v1/webhooks/:id/resume`
@@ -69,9 +90,8 @@ features explicitly listed as proposed are not routes.
 ## Proposed/unimplemented endpoints
 
 - Observation batch ingestion (`POST /v1/observations/batch`).
-- Channel CRUD (`/v1/channels`).
-- The old `webhook-subscriptions`, `webhook-deliveries`, `knowledge-releases`,
-  `audit/events`, and channel-scoped context paths are not aliases. Use the
+- The old `webhook-subscriptions`, `webhook-deliveries`, `channel-releases`,
+  `channel-context`, and `audit/events` paths are not aliases. Use the
   implemented inventory above.
 
 ## API keys
@@ -88,6 +108,12 @@ revocable credential and is not an agent identity. `GET /v1/keys` returns the
 same non-secret identity metadata plus `not_before`, `expires_at`, monotonic
 nullable `last_used_at`, and `pending|active|expired|revoked` status, but never
 returns the raw key.
+
+A wildcard root credential may reissue any explicit principal identity. A
+non-wildcard key manager may explicitly reuse only its own `principal_id` with
+the same `principal_kind`; omitting `principal_id` asks the server to generate a
+new opaque identity. This prevents a scoped key manager from borrowing an
+existing owner/admin role by name.
 
 ## Webhook delivery
 
@@ -183,6 +209,8 @@ Append evidence.
 ```
 
 Only authorized service/agent identities may assert `verified` trust.
+Observations cannot assert `policy_approved`; that trust exists only on claims
+promoted by the approval workflow.
 Visibility defaults to `private`. `team` requires `workspace_id` and an active
 non-reader membership; this predicate is applied before retrieval, export,
 events, Atlas limits/counts, and webhook delivery.
@@ -193,9 +221,10 @@ An operator credential with the explicit `observations:purge` scope can
 irreversibly tombstone readable evidence in its organization. The atomic write
 retains the observation ID, original content hash, source metadata, and history;
 removes FTS content; queues a vector delete; redacts and revokes dependent
-claims; and appends a content-free audit/event record. Foreign IDs return the
-same `404` as missing IDs. Ordinary agent and MCP keys should never receive this
-scope, and no MCP forget tool exists.
+claims; and appends a content-free audit/event record. An active legal hold on
+the observation or any dependent claim blocks the purge. Foreign IDs return the
+same `404` as missing IDs. Ordinary agent and MCP keys should never receive
+this scope, and no MCP forget tool exists.
 
 The tombstone marker binds the retained SHA-256 and remains portable. A restore
 from a backup made before the purge can reintroduce the readable content, so an
@@ -215,7 +244,8 @@ Materialize caller-supplied claims for an authorized scope. The implemented
 handler validates and commits the submitted claims, returns `model_used: false`,
 and performs no automatic extraction or classification. Every claim needs
 supporting evidence from the same subject, project, and workspace, with no trust
-or visibility widening.
+or visibility widening. Direct writes cannot assign `policy_approved`; only the
+versioned claim-approval workflow may do that.
 
 The separately configured background derivation/reflection path does not add
 model latency to this request or change its direct-claim semantics.
@@ -376,10 +406,15 @@ Compile one authorized visual projection around a focus record.
 ```
 
 The implemented lenses are `evidence_trace`, `neighborhood`,
-`conflict_freshness`, and the read-only `review_queue`. Additional operations
-and governance queues remain planned until their policy gates pass. The example
-limits are caller requests, not normative server maxima; the server clamps them
-to measured deployment limits.
+`conflict_freshness`, `review_queue`, `scope_preview`, and
+`knowledge_release`. `scope_preview` additionally requires `governance:read`
+and an owner/admin/reader organization role, then returns role eligibility
+without impersonating or granting authority. `knowledge_release` additionally
+requires `releases:read` plus the same inspection roles, exposes reviewed
+snapshots and exact claim-version references in metadata, emits no dangling
+graph edges, and never includes source evidence.
+The example limits are caller requests, not normative server maxima; the server
+clamps them to measured deployment limits.
 
 `review_queue` accepts optional `subject_id`, canonical `owner_id`,
 `review_reason` (`all`, `disputed`, `contradiction`, `low_confidence`, or
@@ -419,8 +454,8 @@ version, lifecycle, visibility, and release eligibility. Hidden candidates do
 not contribute edges, labels, or counts. Limit metadata describes only the
 authorized result.
 
-Governance previews remain proposed and are not present in the current route
-inventory.
+Both governance lenses are read-only projections; they cannot change policy,
+approval, release, retention, or identity state.
 
 ## Collaboration operations
 
@@ -522,14 +557,31 @@ List authorized metadata-only audit events with cursor pagination.
 
 ## Governed channel knowledge operations
 
-All channel and `knowledge-releases` names below are **proposed and not
-implemented**. No governed release route is present in the current inventory.
-
-
-These v0.3 operations implement
+These implemented v0.3 operations implement
 [ADR-0002](../decisions/0002-channel-release-not-public-memory.md). Every
 operation is authenticated. Titen does not expose an anonymous canonical-memory
 or search endpoint.
+
+Policy and identity administration use `POST|GET|PATCH /v1/policies`,
+`POST|GET /v1/claim-approvals`, `POST /v1/claim-approvals/:id/decide`, and
+`POST|GET|DELETE /v1/identity-mappings`. Mutations require both an explicit
+credential capability and an active owner/admin organization role; a wildcard
+root credential is the bootstrap/recovery boundary. Approval binds one current
+claim version and visible evidence. An independent-approval policy prevents
+submitter self-approval. Only readable evidence linked as `supports` satisfies
+submission; approval/revocation changes claim trust with append-only history
+rather than changing evidence.
+
+Retention uses the same canonical `policies` table with typed configuration.
+`POST /v1/legal-holds` and `POST /v1/legal-holds/:id/release` manage exact
+claim/observation holds. `POST /v1/retention/apply` creates bounded retrieval
+exclusions for records older than a policy cutoff; an active legal hold wins.
+Placing a hold atomically restores retrieval eligibility by removing an exact
+existing exclusion and, for a claim hold, exclusions on its supporting
+observations; a metadata audit records that restoration. Retention cannot race
+an active direct or dependent-claim hold back into exclusion.
+`DELETE /v1/observations/:id` also rejects a hold on the observation or any
+dependent claim. Retention does not perform implicit physical deletion.
 
 Release statuses are `draft`, `approved`, `active`, `suspended`, `replaced`,
 `expired`, and `revoked`. Source eligibility can suspend an active release
@@ -540,20 +592,22 @@ release row.
 
 Create an operator-managed CRM, website, support, or partner channel under the
 authenticated organization. The request defines a bounded label, allowed
-audiences, and gateway-service capability binding. Creating a channel does not
-release any claim.
+audiences, minimum claim trust, and gateway-service principal binding. A
+channel allowing `authenticated_customer` also receives an operator-supplied
+assertion secret of at least 32 characters; Titen stores only its hash plus an
+encrypted keyring-wrapped copy. Creating a channel does not release any claim.
 
 ### `GET /v1/channels`
 
 List authorized channels with opaque IDs, labels, allowed audiences, gateway
-policy reference, status, and lifecycle metadata. It returns no credentials,
+principal binding, status, and lifecycle metadata. It returns no credentials,
 assertion verification keys, or released content.
 
 ### `PATCH /v1/channels/:id`
 
-Pause/disable a channel or update bounded non-secret policy references using
-expected-version semantics. Disabling a channel makes all of its releases
-ineligible before the next context compile without deleting release history.
+Set a channel to `active`, `paused`, or `disabled` using expected-version
+semantics. A non-active channel makes all of its releases ineligible before the
+next context compile without deleting release history.
 
 ### `POST /v1/knowledge-releases`
 
@@ -573,39 +627,39 @@ Create a draft release from one exact claim version.
 }
 ```
 
-The caller must be able to read the exact claim/evidence and propose a release.
-The server records source hashes and never copies private evidence into the
-released citation set. `verified` trust alone does not activate this draft.
+The proposer must own the exact claim and its supporting evidence. The server
+records source hashes and never copies evidence into the released citation set.
+`verified` trust alone does not activate this draft.
 
 ### `GET /v1/knowledge-releases`
 
-List authorized release metadata by channel, audience, status, validity, source
-claim, and cursor. Released content is returned only to principals with the
-matching inspection capability; source evidence remains separately authorized.
+List up to 500 authorized release rows in stable creation order. Released
+content is returned only to principals with `releases:read`; source evidence
+remains separately authorized.
 
 ### `POST /v1/knowledge-releases/:id/approve`
 
-Approve an exact draft snapshot/hash, or reapprove a suspended snapshot, with
-expected version and a bounded approval reason. The approver must have
+Approve an exact draft snapshot/hash with expected version and a bounded
+approval reason. The approver must have
 release-approval capability and satisfy the configured separation-of-duty
-policy. Approval records `approved_by` and `approved_at`; it does not activate
-the release or change source claim trust. Reapproval fails unless the same
-source claim version is current, active, and undisputed; otherwise the publisher
-must create a new release.
+policy. The proposer cannot approve the release. Approval records `approved_by`
+and `approved_at`; it does not activate the release or change source claim
+trust. Approval fails unless the same source claim version is current, active,
+and undisputed; otherwise the publisher must create a new release.
 
 ### `POST /v1/knowledge-releases/:id/activate`
 
 Activate an approved release using expected-version semantics. The caller must
 have release-approval capability and satisfy separation-of-duty policy. The
-transaction appends history/audit, updates release FTS, invalidates projections,
-and emits a metadata event/outbox entry. Activation fails if the referenced
-claim version is not the current active, undisputed version.
+transaction appends audit and metadata event evidence. Activation fails if the
+referenced claim version is not the current active, undisputed version.
 
 ### `POST /v1/knowledge-releases/:id/revoke`
 
-Revoke an active release with expected version and bounded reason. Canonical
-eligibility ends in the commit; cache/vector cleanup may finish asynchronously,
-but stale results are rejected during hydration.
+Revoke an approved, active, or suspended release with expected version and a
+bounded reason. Canonical eligibility ends in the commit. The current compiler
+reads canonical SQL directly; a future release cache/index must still recheck
+this state.
 
 ### `POST /v1/channels/:id/context/compile`
 
@@ -616,25 +670,25 @@ Compile context for an authenticated channel gateway.
   "audience": "authenticated_customer",
   "task": "answer the customer's returns question",
   "max_tokens": 900,
-  "locale": "en",
   "customer_session_assertion": "opaque-short-lived-signed-value"
 }
 ```
 
-The gateway credential must be bound to the channel and audience. An
+The gateway credential must be a service principal bound to the channel. An
 `anonymous` request cannot include a customer assertion. For
-`authenticated_customer`, Titen verifies an operator-configured assertion
-issuer, signature, channel/audience, expiry, and replay value, then resolves the
-customer subject from the assertion. The gateway must derive that assertion
-from an authenticated upstream session; it must never copy a user-controlled ID
-or assertion. Customer items remain distinct from release items in the returned
-manifest.
+`authenticated_customer`, Titen verifies an HMAC-SHA256 assertion signed by the
+channel gateway. The base64url JSON payload is
+`{v:1,channel_id,audience:"authenticated_customer",subject_id,exp,jti}`;
+expiry may be at most 15 minutes ahead and each `jti` is accepted once. The
+gateway must derive the subject from an authenticated upstream session; it must
+never sign a user-controlled ID.
 
 The response contains only active, valid release snapshots matching the channel
-and audience, plus optional eligible memory for that authenticated customer. It
-returns released citation metadata, never unreleased source content. Dynamic
-balances, inventory, order, payment, or ticket state should be fetched through
-their authoritative tools instead of assumed from memory.
+and audience. This release-only compiler does not query canonical customer
+memory. It returns released citation metadata, never unreleased source content.
+Dynamic balances, inventory, order, payment, ticket state, and customer-private
+context should be fetched through their authoritative tools instead of assumed
+from release memory.
 
 Eligibility joins the source claim head. A version mismatch, dispute,
 supersession, expiry, or revocation excludes the release immediately even if a

@@ -264,12 +264,8 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
     version: 4,
     statements: [
       // Enterprise governance: policies, channel releases, customer assertions, audit log.
-      // ponytail: `policies` accepts a 'retention' kind that no code reads yet.
-      // Current maintenance removes expired execution bookkeeping only;
-      // canonical evidence, history, and events remain append-only. The ceiling
-      // is a governance adopter that needs table-specific retention or a legal
-      // hold. Upgrade path: accept per-table policy semantics plus erasure and
-      // recovery tests; never add one generic age delete (#105).
+      // v0.3 later reuses this canonical table for typed retention and claim
+      // approval policy rather than adding a second policy model.
       `CREATE TABLE policies (
          id TEXT PRIMARY KEY,
          org_id TEXT NOT NULL REFERENCES organizations(id),
@@ -1015,6 +1011,248 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          BEGIN
            SELECT RAISE(ABORT, 'API_KEY_LAST_USED_NOT_MONOTONIC');
          END`,
+    ],
+  },
+  {
+    version: 18,
+    statements: [
+      // Reuse the v4 policy table as the sole canonical policy model. Typed
+      // request validation owns `config`; the schema adds only lifecycle data.
+      `ALTER TABLE policies ADD COLUMN version INTEGER NOT NULL DEFAULT 1`,
+      `ALTER TABLE policies ADD COLUMN created_by TEXT`,
+      `CREATE INDEX policies_target
+         ON policies (org_id, kind, enabled, target_type, target_id)`,
+      `CREATE TABLE claim_approvals (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         claim_id TEXT NOT NULL REFERENCES claims(id),
+         claim_version INTEGER NOT NULL,
+         policy_id TEXT NOT NULL REFERENCES policies(id),
+         policy_version INTEGER NOT NULL,
+         status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'revoked')),
+         original_trust TEXT NOT NULL CHECK (original_trust IN ('unverified', 'asserted', 'verified')),
+         submitted_by TEXT NOT NULL,
+         submission_reason TEXT NOT NULL,
+         decided_by TEXT,
+         decision_reason TEXT,
+         version INTEGER NOT NULL DEFAULT 1,
+         submitted_at TEXT NOT NULL,
+         decided_at TEXT,
+         UNIQUE (org_id, claim_id, claim_version)
+       )`,
+      `CREATE INDEX claim_approvals_queue
+         ON claim_approvals (org_id, status, submitted_at, id)`,
+      `CREATE TABLE governance_version_fences (
+         resource_type TEXT NOT NULL,
+         resource_id TEXT NOT NULL,
+         expected_version INTEGER NOT NULL,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (resource_type, resource_id, expected_version)
+       )`,
+      `UPDATE memberships AS losing
+          SET removed_at = losing.created_at
+        WHERE losing.workspace_id IS NULL AND losing.removed_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM memberships winning
+             WHERE winning.org_id = losing.org_id
+               AND winning.workspace_id IS NULL
+               AND winning.principal_id = losing.principal_id
+               AND winning.removed_at IS NULL
+               AND (
+                 CASE winning.role WHEN 'owner' THEN 4 WHEN 'admin' THEN 3
+                      WHEN 'member' THEN 2 ELSE 1 END
+                   > CASE losing.role WHEN 'owner' THEN 4 WHEN 'admin' THEN 3
+                      WHEN 'member' THEN 2 ELSE 1 END
+                 OR (winning.role = losing.role AND winning.created_at > losing.created_at)
+                 OR (winning.role = losing.role AND winning.created_at = losing.created_at
+                     AND winning.id > losing.id)
+               )
+          )`,
+      `CREATE UNIQUE INDEX memberships_one_active_org_principal
+         ON memberships (org_id, principal_id)
+         WHERE workspace_id IS NULL AND removed_at IS NULL`,
+      `CREATE TRIGGER memberships_keep_org_owner
+         BEFORE UPDATE OF removed_at ON memberships
+         WHEN OLD.workspace_id IS NULL AND OLD.role = 'owner'
+          AND OLD.removed_at IS NULL AND NEW.removed_at IS NOT NULL
+          AND (SELECT COUNT(*) FROM memberships
+                WHERE org_id = OLD.org_id AND workspace_id IS NULL
+                  AND role = 'owner' AND removed_at IS NULL) <= 1
+         BEGIN
+           SELECT RAISE(ABORT, 'FINAL_ORGANIZATION_OWNER');
+         END`,
+      `CREATE TABLE channels (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         label TEXT NOT NULL,
+         gateway_principal_id TEXT NOT NULL,
+         allowed_audiences TEXT NOT NULL,
+         minimum_trust TEXT NOT NULL CHECK (minimum_trust IN ('unverified', 'asserted', 'verified', 'policy_approved')),
+         assertion_secret_hash TEXT,
+         assertion_secret TEXT,
+         status TEXT NOT NULL CHECK (status IN ('active', 'paused', 'disabled')),
+         version INTEGER NOT NULL DEFAULT 1,
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         UNIQUE (org_id, label)
+       )`,
+      `CREATE INDEX channels_gateway
+         ON channels (org_id, gateway_principal_id, status)`,
+      // Keep channel_releases authoritative. Its v4 `status` remains a
+      // compatibility projection; lifecycle_status carries the v0.3 states.
+      `ALTER TABLE channel_releases ADD COLUMN channel_id TEXT REFERENCES channels(id)`,
+      `ALTER TABLE channel_releases ADD COLUMN claim_id TEXT REFERENCES claims(id)`,
+      `ALTER TABLE channel_releases ADD COLUMN claim_version INTEGER`,
+      `ALTER TABLE channel_releases ADD COLUMN source_hash TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN released_content TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN released_content_hash TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN locale TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN valid_from TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN valid_to TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN lifecycle_status TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN proposed_by TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN proposal_reason TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN approval_reason TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN approved_at TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN activated_at TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN revocation_reason TEXT`,
+      `ALTER TABLE channel_releases ADD COLUMN row_version INTEGER NOT NULL DEFAULT 1`,
+      `ALTER TABLE channel_releases ADD COLUMN updated_at TEXT`,
+      `CREATE INDEX channel_releases_eligible_v03
+         ON channel_releases (org_id, channel_id, audience, lifecycle_status, valid_from, valid_to)`,
+      `CREATE TABLE customer_assertion_replays (
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         channel_id TEXT NOT NULL REFERENCES channels(id),
+         nonce_hash TEXT NOT NULL,
+         expires_at TEXT NOT NULL,
+         used_at TEXT NOT NULL,
+         PRIMARY KEY (org_id, channel_id, nonce_hash)
+       )`,
+      `CREATE TABLE legal_holds (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         resource_type TEXT NOT NULL CHECK (resource_type IN ('observation', 'claim')),
+         resource_id TEXT NOT NULL,
+         reason TEXT NOT NULL,
+         placed_by TEXT NOT NULL,
+         placed_at TEXT NOT NULL,
+         released_by TEXT,
+         release_reason TEXT,
+         released_at TEXT
+       )`,
+      `CREATE INDEX legal_holds_active
+         ON legal_holds (org_id, resource_type, resource_id, released_at)`,
+      `CREATE UNIQUE INDEX legal_holds_one_active
+         ON legal_holds (org_id, resource_type, resource_id) WHERE released_at IS NULL`,
+      `CREATE TRIGGER record_history_purge_respects_holds
+         BEFORE INSERT ON record_history
+         WHEN NEW.record_type = 'observation' AND NEW.change_kind = 'purge'
+          AND EXISTS (
+            SELECT 1 FROM legal_holds h
+             WHERE h.org_id = NEW.org_id AND h.released_at IS NULL
+               AND (
+                 (h.resource_type = 'observation' AND h.resource_id = NEW.record_id)
+                 OR (
+                   h.resource_type = 'claim'
+                   AND EXISTS (
+                     SELECT 1 FROM claim_sources s
+                     JOIN claims c ON c.id = s.claim_id AND c.org_id = h.org_id
+                      WHERE s.observation_id = NEW.record_id
+                        AND s.claim_id = h.resource_id
+                   )
+                 )
+               )
+          )
+         BEGIN
+           SELECT RAISE(ABORT, 'ACTIVE_LEGAL_HOLD');
+         END`,
+      `CREATE TRIGGER legal_holds_reject_purged_resource
+         BEFORE INSERT ON legal_holds
+         WHEN NEW.released_at IS NULL AND EXISTS (
+           SELECT 1 FROM record_history h
+            WHERE h.org_id = NEW.org_id AND h.record_id = NEW.resource_id
+              AND (
+                (NEW.resource_type = 'observation' AND h.record_type = 'observation'
+                  AND h.change_kind = 'purge')
+                OR (NEW.resource_type = 'claim' AND h.record_type = 'claim'
+                  AND h.change_kind = 'evidence_purged')
+              )
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'RESOURCE_ALREADY_PURGED');
+         END`,
+      `CREATE TABLE retention_exclusions (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         policy_id TEXT NOT NULL REFERENCES policies(id),
+         resource_type TEXT NOT NULL CHECK (resource_type IN ('observation', 'claim')),
+         resource_id TEXT NOT NULL,
+         excluded_at TEXT NOT NULL,
+         actor_id TEXT NOT NULL,
+         UNIQUE (org_id, resource_type, resource_id)
+       )`,
+      `CREATE INDEX retention_exclusions_resource
+         ON retention_exclusions (org_id, resource_type, resource_id)`,
+      `CREATE TRIGGER retention_exclusions_respect_holds
+         BEFORE INSERT ON retention_exclusions
+         WHEN EXISTS (
+           SELECT 1 FROM legal_holds h
+            WHERE h.org_id = NEW.org_id AND h.released_at IS NULL
+              AND (
+                (h.resource_type = NEW.resource_type AND h.resource_id = NEW.resource_id)
+                OR (
+                  NEW.resource_type = 'observation' AND h.resource_type = 'claim'
+                  AND EXISTS (
+                    SELECT 1 FROM claim_sources s
+                    JOIN claims c ON c.id = s.claim_id AND c.org_id = h.org_id
+                     WHERE s.observation_id = NEW.resource_id
+                       AND s.claim_id = h.resource_id
+                  )
+                )
+              )
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'ACTIVE_LEGAL_HOLD');
+         END`,
+      `CREATE TRIGGER channel_releases_guard_source_transition
+         BEFORE UPDATE OF lifecycle_status ON channel_releases
+         WHEN NEW.channel_id IS NOT NULL
+          AND NEW.lifecycle_status IN ('approved', 'active')
+          AND NOT EXISTS (
+            SELECT 1 FROM claims c
+            JOIN channels ch ON ch.id = NEW.channel_id AND ch.org_id = NEW.org_id
+             WHERE c.id = NEW.claim_id AND c.org_id = NEW.org_id
+               AND c.status = 'active' AND c.version = NEW.claim_version
+               AND CASE c.trust WHEN 'policy_approved' THEN 3 WHEN 'verified' THEN 2
+                                WHEN 'asserted' THEN 1 ELSE 0 END
+                   >= CASE ch.minimum_trust WHEN 'policy_approved' THEN 3 WHEN 'verified' THEN 2
+                                            WHEN 'asserted' THEN 1 ELSE 0 END
+               AND (NEW.lifecycle_status != 'active' OR ch.status = 'active')
+               AND NOT EXISTS (
+                 SELECT 1 FROM retention_exclusions x
+                  WHERE x.org_id = c.org_id AND x.resource_type = 'claim'
+                    AND x.resource_id = c.id
+               )
+          )
+         BEGIN
+           SELECT RAISE(ABORT, 'RELEASE_SOURCE_INELIGIBLE');
+         END`,
+      `CREATE TABLE external_identity_mappings (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         provider TEXT NOT NULL,
+         external_subject TEXT NOT NULL,
+         principal_id TEXT NOT NULL,
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         removed_at TEXT
+       )`,
+      `CREATE UNIQUE INDEX external_identity_one_active
+         ON external_identity_mappings (org_id, provider, external_subject)
+         WHERE removed_at IS NULL`,
+      `CREATE INDEX external_identity_principal
+         ON external_identity_mappings (org_id, principal_id, removed_at)`,
     ],
   },
 ];

@@ -39,10 +39,13 @@ from active releases for its channel. Authenticated customer context may also
 include memory for the server-resolved customer subject; anonymous callers
 cannot supply an arbitrary `subject_id`.
 
-Authenticated-customer channel requests carry a short-lived signed assertion
-from an operator-configured issuer. Titen validates its signature,
-channel/audience binding, expiry, and replay value before resolving the subject.
-It does not accept a raw public `subject_id`.
+Authenticated-customer channel requests carry a short-lived HMAC-SHA256
+assertion from the channel's authenticated gateway. The key is supplied by the
+operator and encrypted under Titen's existing external keyring. Titen validates
+the signature, channel/audience binding, maximum 15-minute expiry, and one-use
+nonce before resolving the subject. It does not accept a raw public
+`subject_id`. A future centrally managed/asymmetric issuer may replace this
+bounded gateway contract without changing the payload claims.
 
 Release FTS/vector indexes are rebuildable projections of canonical release
 rows. Activation and revocation become visible before the next eligible channel

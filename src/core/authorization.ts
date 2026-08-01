@@ -21,6 +21,11 @@ export function recordAccessSql(alias: RecordAlias, principalSql = "?"): string 
            AND access_membership.removed_at IS NULL
       )
     )
+  ) AND NOT EXISTS (
+    SELECT 1 FROM retention_exclusions retention
+     WHERE retention.org_id = ${alias}.org_id
+       AND retention.resource_type = '${alias === "c" ? "claim" : "observation"}'
+       AND retention.resource_id = ${alias}.id
   )`;
 }
 

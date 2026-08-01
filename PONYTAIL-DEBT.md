@@ -28,7 +28,6 @@ is local and uses tracked Git content; it does not require hosted automation.
 | `src/core/indexing.ts:26` | Re-embed the current claim statement without tracking the indexed version | Repeated claim writes waste embedding calls | Store the indexed statement hash when measured repeated embeddings are material |
 | `src/core/maintenance.ts:30` | Run one bounded organization-ordered pass per tick | A busy tenant can delay others within a tick | Measured delay breaches the maintenance freshness window; add per-organization cursors |
 | `src/core/migrations.ts:10` | Keep migrations forward-only | A bad upgrade requires restore from a verified snapshot | Deployment review needs a preview; add `migrate --dry-run` while retaining the snapshot runbook (#116) |
-| `src/core/migrations.ts:267` | Accept a retention policy kind without enforcing it | No table-specific retention or legal hold | Per-table semantics, erasure, and recovery tests are accepted; never add a generic age delete (#105) |
 | `src/core/tokens.ts:4` | Estimate one token per four characters | Accuracy is limited for non-Latin scripts and code | The configured provider exposes an exact model-tokenizer contract; retain this fallback |
 | `src/core/validate.ts:43` | Cap lexical candidates at 200 | Matches beyond the fixed pool are unreachable | Recall evaluation shows a quality miss requiring a per-request limit |
 | `src/core/vectors.ts:8` | Use one shared vector boundary and persisted fingerprint | No provider factory or readiness network probe | **No source trigger.** |
@@ -44,7 +43,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 ## Summary
 
-- Markers: 20.
+- Markers: 19.
 - Markers without a source trigger: 3.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import frozenData from "../fixtures/enrichment-multilingual.json";
 import { createApp } from "../../src/core/app";
 import type { Db } from "../../src/core/db";
-import { sha256Hex } from "../../src/core/ids";
+import { newId, sha256Hex } from "../../src/core/ids";
 import type { VectorCapability } from "../../src/core/vectors";
 import {
   derivationClaimKey,
@@ -357,6 +357,12 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
         "memberships:write",
       ],
     });
+    await db.batch([{
+      sql: `INSERT INTO memberships
+              (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+            VALUES (?, ?, NULL, ?, 'agent', 'admin', ?)`,
+      params: [newId("mbr"), principal.orgId, principal.principalId, current.toISOString()],
+    }]);
     const app = createApp({
       db,
       runtime,
