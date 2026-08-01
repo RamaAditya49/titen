@@ -1,7 +1,7 @@
 ---
 work_id: zero-open-release-sweep-20260801
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-01

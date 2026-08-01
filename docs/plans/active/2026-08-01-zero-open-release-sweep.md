@@ -1,7 +1,7 @@
 ---
 work_id: zero-open-release-sweep-20260801
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-01
@@ -14,7 +14,7 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
 
 - [x] Capture the starting live issue, pull-request, remote-branch, tag, npm,
   local-worktree, and dirty-checkout inventory without changing user WIP.
-- [ ] Build the issue matrix from current bodies/comments and source-level
+- [x] Build the issue matrix from current bodies/comments and source-level
   reproduction; group reports that share one root fix.
 - [ ] Review pull request #193 and every unique local commit/worktree; integrate,
   supersede, or archive each before branch cleanup.
