@@ -25,4 +25,18 @@ if [ -z "$section" ]; then
   exit 1
 fi
 
+if [[ "$version" == *-* ]]; then
+  release_label="Prerelease"
+  dist_tag="next"
+else
+  release_label="Stable release"
+  dist_tag="latest"
+fi
+
+printf '> **%s** · npm `%s`\n\n' "$release_label" "$dist_tag"
+printf '```bash\nnpm install -g titen-memory@%s\n```\n\n' "$version"
+printf '[Install guide](https://titen.dev/docs/install) · '
+printf '[Release page](https://titen.dev/releases/%s) · ' "$version"
+printf '[npm package](https://www.npmjs.com/package/titen-memory/v/%s)\n\n' "$version"
+printf '%s\n\n' '---'
 printf '%s\n' "$section"
