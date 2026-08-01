@@ -124,9 +124,15 @@ function isSensitiveIdentifier(value: string) {
   const parts = identifierParts(value);
   const last = parts.at(-1);
   const previous = parts.at(-2);
+  const compoundValue = (last === "header" || last === "value") &&
+    parts.some((part, index) =>
+      part === "authorization" || part === "token" || part === "secret" ||
+      (part === "key" && ["api", "secret", "access"].includes(parts[index - 1] ?? ""))
+    );
   return last === "authorization" || last === "token" || last === "secret" ||
     (last === "key" && (previous === "api" || previous === "secret")) ||
-    (parts.length === 1 && last === "apikey");
+    (last === "key" && parts.includes("secret") && parts.includes("access")) ||
+    (parts.length === 1 && last === "apikey") || compoundValue;
 }
 
 function findQuotedValueEnd(value: string, start: number, opener: string) {
@@ -210,25 +216,36 @@ function redactStructured(value: string, secrets: readonly string[]) {
   );
 }
 
-function redactLine(value: string, secrets: readonly string[], pendingSensitiveLabel: boolean) {
+type PendingSensitiveLabel = false | "folded" | "value";
+
+function redactLine(
+  value: string,
+  secrets: readonly string[],
+  pendingSensitiveLabel: PendingSensitiveLabel,
+) {
   const carriage = value.endsWith("\r") ? "\r" : "";
   const body = carriage ? value.slice(0, -1) : value;
   if (pendingSensitiveLabel && /^[ \t]/.test(body)) {
     return {
       safe: `${body.match(/^[ \t]*/)?.[0] ?? ""}[redacted]${carriage}`,
-      pending: true,
+      pending: "folded" as const,
     };
+  }
+  if (pendingSensitiveLabel === "value" && body.trim()) {
+    return { safe: `[redacted]${carriage}`, pending: false };
   }
   const label = /(?:^|[^A-Za-z0-9_$.-])(?:\\?["'])?([A-Za-z0-9_$.-]+)(?:\\?["'])?[ \t]*:[ \t]*$/.exec(body);
   return {
     safe: redactStructured(value, secrets),
-    pending: Boolean(label && isSensitiveIdentifier(label[1])),
+    pending: label && isSensitiveIdentifier(label[1])
+      ? (isAuthorizationIdentifier(label[1]) ? "folded" : "value")
+      : false,
   };
 }
 
 function redact(value: string, secrets: readonly string[]) {
   let offset = 0;
-  let pending = false;
+  let pending: PendingSensitiveLabel = false;
   let safe = "";
   while (offset < value.length) {
     const newline = value.indexOf("\n", offset);
@@ -245,7 +262,7 @@ function redact(value: string, secrets: readonly string[]) {
 type D1LineState = {
   line: string;
   lineOverflow: boolean;
-  pendingSensitiveLabel: boolean;
+  pendingSensitiveLabel: PendingSensitiveLabel;
 };
 
 type D1StderrState = D1LineState & {
@@ -332,7 +349,7 @@ export class D1RunDiagnostics {
   #flushLine(state: D1LineState, newline: boolean) {
     if (!newline && !state.line && !state.lineOverflow) return;
     const line = state.lineOverflow
-      ? { safe: "[redacted oversized stderr line]", pending: true }
+      ? { safe: "[redacted oversized stderr line]", pending: "folded" as const }
       : redactLine(state.line, this.secrets, state.pendingSensitiveLabel);
     state.pendingSensitiveLabel = line.pending;
     this.#appendSanitized(`${line.safe}${newline ? "\n" : ""}`);

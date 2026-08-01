@@ -279,10 +279,15 @@ recovery, and outage smokes are recorded separately in the report; Cloudflare,
 local-computer, migration, service-resource, saturation, and soak gates remain
 open.
 
-Future runs use [`scripts/benchmark-mem0-replacement.ts`](../../scripts/benchmark-mem0-replacement.ts)
-for this exact controlled lane. They must not reuse its tiny corpus as a
-production quality claim, compare its workstation telemetry as service-host
-telemetry, or count an external LLM harness as Titen enrichment.
+[`scripts/benchmark-mem0-replacement.ts`](../../scripts/benchmark-mem0-replacement.ts)
+preserves this exact historical 0.3.0 lane; do not retarget it to a later
+release or reinterpret its artifacts as current capability evidence. Its CLI
+retains only `--help` and `--self-test`; a live invocation fails before service
+I/O or artifact creation. A future replacement attempt needs a new release-bound
+spec and runner. It must not reuse
+this tiny corpus as a production quality claim, compare its workstation
+telemetry as service-host telemetry, or count an external LLM harness as Titen
+enrichment.
 
 Cycle 2 is recorded in the
 [concurrency, migration, and enrichment-audit report](./2026-07-31-mem0-replacement-cycle2.md).

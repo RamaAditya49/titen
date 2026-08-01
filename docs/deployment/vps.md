@@ -89,6 +89,8 @@ Docker is not required.
   rather than a deployment-dependent default. With 4 KiB pages, the tested steady-state WAL
   stays below 5 MiB; the audited live WAL was about 4.0 MiB.
 - Service user: non-root `titen`.
+- Canonical, WAL, shared-memory, and optional vector database files are created
+  and reopened as owner-only (`0600`), independent of the service umask.
 - Configuration/credential files: mode `0600`.
 - TLS/public ingress: Caddy, Nginx, Cloudflare Tunnel, or private network.
 
@@ -125,6 +127,7 @@ TITEN_EXTRACT_MODEL=<model-id>
 TITEN_EXTRACT_MODEL_FINGERPRINT=<64-lowercase-hex-revision>
 TITEN_EXTRACT_API_KEY=<optional-bearer-key>
 TITEN_EXTRACT_TIMEOUT_MS=30000
+TITEN_EXTRACT_RESPONSE_MODE=json_schema
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
@@ -147,10 +150,15 @@ pre-inspected threshold is bundled.
 
 Extraction uses the separate `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`,
 and immutable 64-hex `TITEN_EXTRACT_MODEL_FINGERPRINT` tuple. The API key and
-timeout are optional. A partial or invalid tuple reports `configured_error`;
-an absent tuple remains `disabled`. A positive maintenance interval drains one
+timeout are optional. Strict `json_schema` output is the default. Set
+`TITEN_EXTRACT_RESPONSE_MODE=json_object` only for a provider that cannot enforce
+strict schemas; Titen then sends the exact schema with the bounded input and
+still applies the same local validator. A partial or invalid tuple or response
+mode reports `configured_error`; an absent tuple remains `disabled`. A positive maintenance interval drains one
 shared bounded queue in the background, while `POST /v1/enrichment/drain`
-provides an authorized manual path. Do not expose credentials through readiness.
+provides an authorized manual path. The Bun server's 60-second idle bound stays
+above the supported 45-second extraction timeout, leaving bounded response
+headroom. Do not expose credentials through readiness.
 
 Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
 is the exact external origin (scheme, host, and optional port), with no trailing
@@ -386,7 +394,9 @@ The production unit should use:
 - Restart on failure with bounded backoff.
 - Graceful HTTP and SQLite shutdown.
 - Bounded shutdown flush for canonical/outbox state; remote model/vector or
-  webhook completion is not required before process exit.
+  webhook completion is not required before process exit. An interrupted
+  in-process semantic pass releases only its owned rebuildable leases before
+  SQLite closes, so the next process can reconcile immediately.
 
 ## Capacity, rate limiting, and telemetry
 

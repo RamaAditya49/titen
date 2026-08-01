@@ -1,5 +1,5 @@
-import { first, type Db } from "./db";
-import { forbidden, unauthenticated } from "./errors";
+import type { Db } from "./db";
+import { forbidden, unauthenticated, validationError } from "./errors";
 import { newId, randomToken, sha256Hex } from "./ids";
 import { TRUST_RANK, type Trust } from "./validate";
 
@@ -60,6 +60,8 @@ interface KeyRow {
   principal_kind: "human" | "agent" | "service";
   scopes: string;
   max_trust: Trust;
+  not_before: string;
+  expires_at: string | null;
   revoked_at: string | null;
 }
 
@@ -76,16 +78,28 @@ export function bearerToken(request: Request): string | undefined {
  * Verification is a single indexed lookup on the key hash. A revoked key stops
  * working on the next request because nothing about the principal is cached.
  */
-export async function authenticate(db: Db, request: Request): Promise<Principal> {
+export async function authenticate(
+  db: Db,
+  request: Request,
+  now = new Date(),
+): Promise<Principal> {
   const token = bearerToken(request);
   if (!token || !token.startsWith(KEY_PREFIX)) throw unauthenticated();
-  const row = await first<KeyRow>(
-    db,
-    `SELECT id, org_id, principal_id, principal_kind, scopes, max_trust, revoked_at
-       FROM api_keys WHERE key_hash = ?`,
-    [await sha256Hex(token)],
+  const at = now.toISOString();
+  const rows = await db.all<KeyRow>(
+    `UPDATE api_keys
+        SET last_used_at = CASE
+          WHEN last_used_at IS NULL OR last_used_at < ? THEN ?
+          ELSE last_used_at
+        END
+      WHERE key_hash = ? AND revoked_at IS NULL
+        AND not_before <= ? AND (expires_at IS NULL OR expires_at > ?)
+      RETURNING id, org_id, principal_id, principal_kind, scopes, max_trust,
+                not_before, expires_at, revoked_at`,
+    [at, at, await sha256Hex(token), at, at],
   );
-  if (!row || row.revoked_at) throw unauthenticated();
+  const row = rows[0];
+  if (!row) throw unauthenticated();
   return {
     keyId: row.id,
     orgId: row.org_id,
@@ -104,6 +118,34 @@ export function requireScope(principal: Principal, scope: string): void {
   if (!hasScope(principal, scope)) throw forbidden(`Missing required scope "${scope}".`);
 }
 
+export function requestedScopes(value: unknown, principal: Principal): string[] {
+  if (!Array.isArray(value) || value.length === 0)
+    throw validationError('Field "scopes" must be a non-empty array.');
+  const scopes = value.map((entry) => {
+    if (typeof entry !== "string") throw validationError("Each scope must be a string.");
+    if (entry !== "*" && !SCOPES.includes(entry as never))
+      throw validationError(`Unknown scope "${entry}".`);
+    return entry;
+  });
+  // No credential creation or restore path may exceed its caller's authority.
+  for (const scope of scopes)
+    if (!hasScope(principal, scope))
+      throw forbidden(`This credential may not grant scope "${scope}".`);
+  return [...new Set(scopes)];
+}
+
+export type KeyLifecycleStatus = "pending" | "active" | "expired" | "revoked";
+
+export function keyLifecycleStatus(
+  key: { notBefore: string; expiresAt: string | null; revokedAt: string | null },
+  at: string,
+): KeyLifecycleStatus {
+  if (key.revokedAt) return "revoked";
+  if (key.notBefore > at) return "pending";
+  if (key.expiresAt !== null && key.expiresAt <= at) return "expired";
+  return "active";
+}
+
 /** A principal can never assert evidence more trusted than its own ceiling. */
 export function assertTrustCeiling(principal: Principal, trust: Trust): void {
   if (TRUST_RANK[trust] > TRUST_RANK[principal.maxTrust])
@@ -117,6 +159,8 @@ export interface NewKey {
   label: string;
   scopes: string[];
   maxTrust: Trust;
+  notBefore?: Date;
+  expiresAt?: Date | null;
 }
 
 /**
@@ -129,10 +173,17 @@ export async function createApiKey(
 ): Promise<{ id: string; key: string; statement: { sql: string; params: (string | null)[] } }> {
   const id = newId("key");
   const raw = `${KEY_PREFIX}${randomToken()}`;
+  const notBefore = key.notBefore ?? now;
+  const expiresAt = key.expiresAt ?? null;
+  if (Number.isNaN(notBefore.getTime()) || (expiresAt && Number.isNaN(expiresAt.getTime())))
+    throw new TypeError("Key lifecycle timestamps must be valid dates.");
+  if (expiresAt && notBefore.getTime() >= expiresAt.getTime())
+    throw new TypeError("Key not-before must be earlier than its expiry.");
   const statement = {
     sql: `INSERT INTO api_keys
-            (id, org_id, principal_id, principal_kind, key_hash, label, scopes, max_trust, created_at, revoked_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+            (id, org_id, principal_id, principal_kind, key_hash, label, scopes, max_trust,
+             created_at, not_before, expires_at, last_used_at, revoked_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
     params: [
       id,
       key.orgId,
@@ -143,6 +194,8 @@ export async function createApiKey(
       key.scopes.join(" "),
       key.maxTrust,
       now.toISOString(),
+      notBefore.toISOString(),
+      expiresAt?.toISOString() ?? null,
     ],
   };
   return { id, key: raw, statement };

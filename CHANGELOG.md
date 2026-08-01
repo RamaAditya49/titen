@@ -17,6 +17,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-08-01
+
 ### Added
 
 - `titen version --check` explicitly reads the stable CLI/plugin release
@@ -28,6 +30,32 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - MCP initialization now reports the package SemVer as `serverInfo.version`
   instead of mislabeling a deployment revision such as `dev`, `test`, or a Git
   SHA as the server implementation version.
+- Published SDK declarations now stay inside the package and exactly type claim
+  inputs, readiness diagnostics/capabilities, key lifecycle fields, and a
+  bounded event iterator that terminates on preserved cursors.
+- Extraction now supports explicit strict-schema, JSON-object, and custom modes,
+  rejects redirects and incomplete provider finishes, and uses the same model
+  proposal validator as the locked release gate.
+- Cloudflare liveness no longer waits on D1 preparation, Vectorize queries stay
+  within the platform's `topK` limit, and the documented Wrangler recovery
+  command uses a real temporary SQL file.
+- Bun allows the documented extraction timeout and releases every semantic
+  lease acquired before or during bounded SIGTERM shutdown, so a restart can
+  recover work immediately.
+- Context packing preserves rank when every item fits, applies diversity only
+  under budget pressure, and no longer awards disputed claims a positive score.
+- Live semantic verification carries project scope, while historical comparison
+  tooling refuses to present a current deployment as the frozen `0.3.0` target.
+
+### Security
+
+- D1 diagnostic redaction now covers secrets split across streamed byte and
+  text chunks, and Bun creates the canonical SQLite database plus sidecars with
+  owner-only permissions.
+- API keys now enforce immutable not-before and expiry windows, update
+  `last_used_at` monotonically, preserve lifecycle metadata across supported
+  operator surfaces, reject unknown creation fields, and cannot gain authority
+  through credential import.
 
 ## [0.4.0] — 2026-07-31
 
@@ -376,7 +404,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.1
 [0.4.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.0
 [0.3.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.0
 [0.2.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.2.1

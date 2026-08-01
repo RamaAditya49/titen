@@ -164,6 +164,64 @@ test("port zero, non-decimal integers, and values outside the TCP range are reje
   }
 });
 
+test("key lifecycle flags survive listing and verified backup", async () => {
+  const boot = run("key-lifecycle", ["bootstrap", "--db", "source.db"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const orgId = /^organization: (org_[^ ]+)/m.exec(boot.output)?.[1];
+  assert.ok(orgId);
+  const notBefore = new Date(Date.now() + 86_400_000).toISOString();
+  const expiresAt = new Date(Date.now() + 90_000_000).toISOString();
+  const created = run("key-lifecycle", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--not-before", notBefore, "--expires-at", expiresAt,
+  ]);
+  assert.equal(created.exitCode, 0, created.output);
+  const keyId = /^key_id: (key_[^\s]+)/m.exec(created.output)?.[1];
+  assert.ok(keyId);
+  const listed = run("key-lifecycle", ["key", "list", "--db", "source.db"]);
+  assert.equal(listed.exitCode, 0, listed.output);
+  assert.match(listed.output, new RegExp(`${keyId}  pending.*not_before=${notBefore}.*expires_at=${expiresAt}`));
+
+  const expiredBefore = new Date(Date.now() - 7_200_000).toISOString();
+  const expiredAt = new Date(Date.now() - 3_600_000).toISOString();
+  const expired = run("key-lifecycle", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--not-before", expiredBefore, "--expires-at", expiredAt,
+  ]);
+  assert.equal(expired.exitCode, 0, expired.output);
+  const expiredId = /^key_id: (key_[^\s]+)/m.exec(expired.output)?.[1];
+  assert.ok(expiredId);
+  const relisted = run("key-lifecycle", ["key", "list", "--db", "source.db"]);
+  assert.match(relisted.output, new RegExp(`${expiredId}  expired`));
+
+  const invalid = run("key-lifecycle", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--not-before", expiresAt, "--expires-at", notBefore,
+  ]);
+  assert.notEqual(invalid.exitCode, 0);
+  assert.match(invalid.output, /--not-before must be earlier/u);
+
+  const backup = run("key-lifecycle", [
+    "backup", "--db", "source.db", "--out", "restored.db",
+  ]);
+  assert.equal(backup.exitCode, 0, backup.output);
+  const handle = openDatabase(join(root, "key-lifecycle", "restored.db"), { create: false });
+  try {
+    const row = await createSqliteDb(handle).all<{
+      not_before: string;
+      expires_at: string;
+      last_used_at: string | null;
+    }>("SELECT not_before, expires_at, last_used_at FROM api_keys WHERE id = ?", [keyId]);
+    assert.deepEqual(row, [{
+      not_before: notBefore,
+      expires_at: expiresAt,
+      last_used_at: null,
+    }]);
+  } finally {
+    handle.close();
+  }
+});
+
 test("backup refuses a missing source and atomically refreshes a fixed target", async () => {
   const missing = run("backup-missing", ["backup", "--db", "missing.db", "--out", "latest.db"]);
   assert.notEqual(missing.exitCode, 0);

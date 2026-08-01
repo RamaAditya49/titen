@@ -1,6 +1,6 @@
 import { afterEach, test } from "bun:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Db, Stmt } from "../../src/core/db";
@@ -9,6 +9,7 @@ import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { observedSemanticReadiness } from "../../src/core/vectors";
+import cloudflareWorker from "../../src/runtime/cloudflare/worker";
 import {
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
@@ -27,8 +28,36 @@ afterEach(() => {
     rmSync(directory, { recursive: true, force: true });
 });
 
+test("Cloudflare health returns before touching a stalled D1 binding", async () => {
+  let calls = 0;
+  const stalled = new Promise<never>(() => {});
+  const statement = {
+    bind() { return statement; },
+    all() { calls += 1; return stalled; },
+    run() { calls += 1; return stalled; },
+  };
+  const response = await Promise.race([
+    cloudflareWorker.fetch(new Request("https://titen.test/healthz?probe=1"), {
+      DB: {
+        prepare() { calls += 1; return statement; },
+        batch() { calls += 1; return stalled; },
+      },
+      TITEN_REVISION: "health-probe",
+    }),
+    Bun.sleep(100).then(() => { throw new Error("health waited on D1"); }),
+  ]);
+  assert.equal(response.status, 200);
+  assert.equal(calls, 0);
+  assert.deepEqual((await response.json() as any).data, {
+    status: "ok",
+    runtime: "cloudflare-d1",
+    revision: "health-probe",
+  });
+});
+
 test("a failed migration version rolls back fully and succeeds on retry", async () => {
-  const statements = MIGRATIONS.at(-1)!.statements;
+  const migration = MIGRATIONS.at(-1)!;
+  const statements = migration.statements;
   for (let failureAfter = 0; failureAfter < statements.length; failureAfter += 1) {
     const database = openDatabase(join(temporary(), "titen.db"));
     const db = createSqliteDb(database);
@@ -37,7 +66,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       ...db,
       async batch(batch: Stmt[]) {
         const marker = batch.at(-1);
-        if (inject && marker?.params?.[0] === SCHEMA_VERSION) {
+        if (inject && marker?.params?.[0] === migration.version) {
           inject = false;
           await db.batch([
             {
@@ -75,7 +104,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
-    assert.equal(Number(version[0]!.version), MIGRATIONS.at(-2)!.version);
+    assert.equal(Number(version[0]!.version), migration.version - 1);
     const integrity = await db.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
         WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata', 'enrichment_jobs')
@@ -93,7 +122,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
         .map(({ name }) => name)
         .sort(),
       ["embedder_failure_at", "vector_store_failure_at"],
-      `the completed migration 15 must survive failed migration 16 statement ${failureAfter + 1}`,
+      `the completed migration 15 must survive failed migration ${migration.version} statement ${failureAfter + 1}`,
     );
     assert.equal(
       (await db.all<{ name: string }>("PRAGMA table_info(claims)"))
@@ -103,9 +132,17 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     );
     assert.deepEqual(
       (await db.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
-        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at"),
+        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at")
+        .map(({ name }) => name)
+        .sort(),
+      ["lease_expires_at", "lease_token"],
+      `completed migration 16 must retain its lease columns after statement ${failureAfter + 1}`,
+    );
+    assert.deepEqual(
+      (await db.all<{ name: string }>("PRAGMA table_info(api_keys)"))
+        .filter(({ name }) => ["not_before", "expires_at", "last_used_at"].includes(name)),
       [],
-      `migration 16 must roll back its lease columns after statement ${failureAfter + 1}`,
+      `migration ${migration.version} must roll back its lifecycle columns after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at
@@ -308,4 +345,26 @@ test("the explicit WAL checkpoint policy stays bounded and survives restart", as
   const reopened = openDatabase(path);
   assert.equal((reopened.query("SELECT COUNT(*) AS count FROM writes").get() as { count: number }).count, 30_000);
   reopened.close();
+});
+
+test("canonical SQLite files stay owner-only across create and restart", () => {
+  const path = join(temporary(), "owner-only.db");
+  const previousUmask = process.umask(0o022);
+  try {
+    const database = openDatabase(path);
+    database.run("CREATE TABLE private_values (value TEXT NOT NULL)");
+    database.run("INSERT INTO private_values VALUES ('synthetic')");
+    for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+      assert.ok(existsSync(file), `${file} was not created`);
+      assert.equal(statSync(file).mode & 0o777, 0o600, `${file} is not owner-only`);
+    }
+    database.close();
+
+    chmodSync(path, 0o644);
+    const reopened = openDatabase(path);
+    assert.equal(statSync(path).mode & 0o777, 0o600);
+    reopened.close();
+  } finally {
+    process.umask(previousUmask);
+  }
 });

@@ -1,4 +1,4 @@
-import { createApiKey, hasScope, SCOPES, type Principal } from "./auth";
+import { createApiKey, keyLifecycleStatus, requestedScopes } from "./auth";
 import { auditStatement } from "./audit";
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
@@ -10,30 +10,21 @@ import {
   TRUST_RANK,
   optionalEnum,
   optionalString,
+  optionalTimestamp,
   requireObject,
   requireString,
   type Trust,
 } from "./validate";
 
-function requestedScopes(value: unknown, principal: Principal): string[] {
-  if (!Array.isArray(value) || value.length === 0)
-    throw validationError('Field "scopes" must be a non-empty array.');
-  const scopes = value.map((entry) => {
-    if (typeof entry !== "string") throw validationError("Each scope must be a string.");
-    if (entry !== "*" && !SCOPES.includes(entry as never))
-      throw validationError(`Unknown scope "${entry}".`);
-    return entry;
-  });
-  // A key can never mint more authority than the key that created it.
-  for (const scope of scopes)
-    if (!hasScope(principal, scope))
-      throw forbidden(`This credential may not grant scope "${scope}".`);
-  return [...new Set(scopes)];
-}
-
 export async function createKey(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
+  const allowed = new Set([
+    "label", "scopes", "max_trust", "principal_kind", "principal_id",
+    "not_before", "expires_at",
+  ]);
+  const unknown = Object.keys(body).find((field) => !allowed.has(field));
+  if (unknown) throw validationError(`Unknown key creation field "${unknown}".`);
   const label = requireString(body, "label", LIMITS.label);
   const scopes = requestedScopes(body.scopes, principal);
   const maxTrust = optionalEnum(body, "max_trust", TRUST_LEVELS, "asserted") as Trust;
@@ -48,6 +39,10 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   const principalId = optionalString(body, "principal_id", LIMITS.identifier) ?? newId("agent");
 
   const now = ctx.app.now();
+  const notBefore = optionalTimestamp(body, "not_before") ?? now.toISOString();
+  const expiresAt = optionalTimestamp(body, "expires_at");
+  if (expiresAt !== null && notBefore >= expiresAt)
+    throw validationError('Field "not_before" must be earlier than "expires_at".');
   const created = await createApiKey(
     {
       orgId: principal.orgId,
@@ -56,13 +51,21 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       label,
       scopes,
       maxTrust,
+      notBefore: new Date(notBefore),
+      expiresAt: expiresAt === null ? null : new Date(expiresAt),
     },
     now,
   );
   await ctx.app.db.batch([
     created.statement,
     auditStatement(
-      principal.orgId, principal.principalId, "key.create", "api_key", now.toISOString(), created.id,
+      principal.orgId,
+      principal.principalId,
+      "key.create",
+      "api_key",
+      now.toISOString(),
+      created.id,
+      JSON.stringify({ not_before: notBefore, expires_at: expiresAt }),
     ),
   ]);
 
@@ -77,6 +80,9 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       scopes,
       max_trust: maxTrust,
       principal_kind: principalKind,
+      not_before: notBefore,
+      expires_at: expiresAt,
+      last_used_at: null,
       warning: "Store this key now. Titen keeps only its hash and cannot show it again.",
     },
   };
@@ -85,7 +91,8 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
 export async function listKeys(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const rows = await ctx.app.db.all<Record<string, unknown>>(
-    `SELECT id, principal_id, principal_kind, label, scopes, max_trust, created_at, revoked_at
+    `SELECT id, principal_id, principal_kind, label, scopes, max_trust, created_at,
+            not_before, expires_at, last_used_at, revoked_at
        FROM api_keys WHERE org_id = ? ORDER BY created_at, id`,
     [principal.orgId],
   );
@@ -99,8 +106,15 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
         scopes: String(row.scopes).split(" ").filter(Boolean),
         max_trust: row.max_trust,
         created_at: row.created_at,
+        not_before: row.not_before,
+        expires_at: row.expires_at,
+        last_used_at: row.last_used_at,
         revoked_at: row.revoked_at,
-        status: row.revoked_at ? "revoked" : "active",
+        status: keyLifecycleStatus({
+          notBefore: String(row.not_before),
+          expiresAt: row.expires_at === null ? null : String(row.expires_at),
+          revokedAt: row.revoked_at === null ? null : String(row.revoked_at),
+        }, ctx.app.now().toISOString()),
       })),
     },
   };

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
 import { MAX_BODY_BYTES } from "../../src/core/http";
+import { sha256Hex } from "../../src/core/ids";
 import { signPayload } from "../../src/core/webhooks";
 import { TITEN_VERSION } from "../../src/core/version";
 import type { Fixture, Res } from "./harness";
@@ -464,6 +465,34 @@ export const CASES: Case[] = [
       expectOk(res, 201);
       assert.equal(res.body.data.claims[0].status, "disputed");
 
+      const secondDispute = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          claims: [{
+            kind: "procedural",
+            statement: "Rollback smoke always precedes a release announcement.",
+            sources: [
+              { observation_id: supporting.body.data.observation_id, relation: "supports" },
+              { observation_id: contradicting.body.data.observation_id, relation: "contradicts" },
+            ],
+          }],
+        },
+      });
+      expectOk(secondDispute, 201);
+      const clean = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          claims: [{
+            kind: "procedural",
+            statement: "Rollback smoke always precedes a release announcement.",
+            sources: [{ observation_id: supporting.body.data.observation_id, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(clean, 201);
+
       const compiled = await fx.call("POST", "/v1/context/compile", {
         key: agent.key,
         body: {
@@ -473,11 +502,27 @@ export const CASES: Case[] = [
         },
       });
       expectOk(compiled);
-      assert.equal(compiled.body.data.conflicts.length, 1);
-      assert.equal(
-        compiled.body.data.conflicts[0].claim_id,
+      const disputedIds = [
         res.body.data.claims[0].claim_id,
+        secondDispute.body.data.claims[0].claim_id,
+      ];
+      assert.deepEqual(
+        compiled.body.data.conflicts.map((conflict: any) => conflict.claim_id).sort(),
+        [...disputedIds].sort(),
       );
+      const items = new Map(compiled.body.data.items.map((item: any, index: number) => [
+        item.claim_id, { ...item, index },
+      ]));
+      const cleanItem = items.get(clean.body.data.claims[0].claim_id) as any;
+      assert.equal(cleanItem.status, "active");
+      assert.equal(cleanItem.score_components.conflict, 1);
+      for (const claimId of disputedIds) {
+        const item = items.get(claimId) as any;
+        assert.equal(item.status, "disputed");
+        assert.equal(item.score_components.conflict, 0);
+        assert.ok(cleanItem.index < item.index);
+        assert.ok(cleanItem.score > item.score);
+      }
 
       const evidence = await fx.call(
         "GET",
@@ -564,6 +609,56 @@ export const CASES: Case[] = [
         "repeated compilation against unchanged state must be stable",
       );
       assert.notEqual(again.body.data.context_id, pack.context_id);
+    },
+  },
+  {
+    name: "a full-fit public context preserves rank and ideal final-pack metrics",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = "final_pack_ranking";
+      const definitions = [
+        ["procedural", 1, "Final pack metric marker alpha."],
+        ["procedural", 0.9, "Final pack metric marker bravo."],
+        ["preference", 0.8, "Final pack metric marker delta."],
+        ["semantic_fact", 0.7, "Final pack metric marker gamma."],
+        ["episodic_event", 0.6, "Final pack metric marker omega."],
+      ] as const;
+      const seeded = [];
+      for (const [kind, confidence, statement] of definitions)
+        seeded.push(await seedClaim(fx, agent.key, {
+          observation: {
+            subject_id: subject,
+            content: `Evidence for ${statement}`,
+          },
+          claim: { kind, confidence, statement },
+        }));
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: subject,
+          task: "final pack metric marker",
+          max_tokens: 4_000,
+          at: "2026-08-02T00:00:00.000Z",
+        },
+      });
+      expectOk(compiled);
+      const expected = seeded.map(({ claimId }) => claimId);
+      const emitted = compiled.body.data.items.map((item: any) => item.claim_id as string);
+      assert.deepEqual(emitted, expected);
+      assert.deepEqual(
+        compiled.body.data.items.map((item: any) => item.score),
+        [...compiled.body.data.items.map((item: any) => item.score)].sort((a, b) => b - a),
+      );
+
+      const reciprocalRank = 1 / (emitted.indexOf(expected[1]!) + 1);
+      const gains = new Map(expected.map((id, index) => [id, expected.length - index]));
+      const dcg = emitted.reduce((sum: number, id: string, index: number) =>
+        sum + ((2 ** gains.get(id)! - 1) / Math.log2(index + 2)), 0);
+      const ideal = expected.reduce((sum, id, index) =>
+        sum + ((2 ** gains.get(id)! - 1) / Math.log2(index + 2)), 0);
+      assert.equal(reciprocalRank, 0.5);
+      assert.equal(Number((dcg / ideal).toFixed(6)), 1);
     },
   },
   {
@@ -1316,6 +1411,40 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "credential import cannot exceed the importing credential",
+    async run(fx) {
+      const limited = await fx.provision({
+        scopes: ["keys:manage", "import:write"],
+        maxTrust: "verified",
+      });
+      expectError(await fx.call("GET", "/v1/audit", { key: limited.key }), 403);
+
+      const forgedKey = "titen_sk_synthetic_import_scope_ceiling";
+      const at = "2026-08-01T00:00:00.000Z";
+      const body = [
+        { type: "titen.export.header", format_version: 4, org_id: limited.orgId },
+        {
+          type: "api_key",
+          id: "key_import_scope_ceiling",
+          principal_id: "agent_import_scope_ceiling",
+          principal_kind: "agent",
+          key_hash: await sha256Hex(forgedKey),
+          label: "synthetic escalation attempt",
+          scopes: "*",
+          max_trust: "verified",
+          created_at: at,
+          not_before: at,
+          expires_at: null,
+          last_used_at: null,
+          revoked_at: null,
+        },
+      ].map(JSON.stringify).join("\n");
+
+      expectError(await fx.callRaw("POST", "/v1/import", { key: limited.key, body }), 403, "FORBIDDEN");
+      expectError(await fx.call("GET", "/v1/audit", { key: forgedKey }), 401, "UNAUTHENTICATED");
+    },
+  },
+  {
     name: "revocation takes effect on the next request and stays scoped",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
@@ -1354,6 +1483,76 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "managed keys enforce and preserve their complete lifecycle",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const principalId = "rotating-agent";
+      const before = new Date(Date.now() + 60_000).toISOString();
+      const expiry = new Date(Date.now() + 120_000).toISOString();
+      const pending = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "scheduled",
+          principal_id: principalId,
+          scopes: ["context:compile"],
+          not_before: before,
+          expires_at: expiry,
+        },
+      });
+      expectOk(pending, 201);
+      assert.equal(pending.body.data.not_before, before);
+      assert.equal(pending.body.data.expires_at, expiry);
+      assert.equal(pending.body.data.last_used_at, null);
+      expectError(await fx.call("POST", "/v1/context/compile", {
+        key: pending.body.data.api_key,
+        body: { subject_id: "scheduled", task: "too early", max_tokens: 100 },
+      }), 401);
+
+      for (const body of [
+        { label: "ignored", scopes: ["context:compile"], valid_until: expiry },
+        { label: "backwards", scopes: ["context:compile"], not_before: expiry, expires_at: before },
+      ]) expectError(await fx.call("POST", "/v1/keys", { key: owner.key, body }), 400, "VALIDATION_ERROR");
+
+      const active = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "active",
+          principal_id: principalId,
+          scopes: ["keys:manage", "export:read", "export:all", "import:write"],
+          not_before: new Date(Date.now() - 60_000).toISOString(),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+      });
+      expectOk(active, 201);
+      const activeKey = active.body.data.api_key as string;
+      const activeId = active.body.data.key_id as string;
+      expectOk(await fx.call("GET", "/v1/keys", { key: activeKey }));
+      const listed = await fx.call("GET", "/v1/keys", { key: owner.key });
+      expectOk(listed);
+      const rows = listed.body.data.keys.filter((row: any) => row.principal_id === principalId);
+      assert.equal(rows.length, 2, "overlapping keys for one principal must remain independently visible");
+      assert.equal(rows.find((row: any) => row.key_id === activeId).status, "active");
+      assert.match(rows.find((row: any) => row.key_id === activeId).last_used_at, /^\d{4}-/u);
+      assert.equal(rows.find((row: any) => row.key_id === pending.body.data.key_id).status, "pending");
+
+      const exported = await fx.call("GET", "/v1/export?type=keys&all=true", { key: owner.key });
+      assert.equal(exported.status, 200);
+      assert.ok(!String(exported.body).includes(activeKey), "credential backup must never contain raw bearer material");
+      const header = JSON.parse(String(exported.body).trim().split("\n")[0]!);
+      assert.equal(header.format_version, 4);
+      assert.equal(header.record_type, "keys");
+      await fx.query(`DELETE FROM api_keys WHERE id = ?`, [activeId]);
+      expectError(await fx.call("GET", "/v1/keys", { key: activeKey }), 401);
+      expectOk(await fx.callRaw("POST", "/v1/import", { key: owner.key, body: String(exported.body) }));
+      expectOk(await fx.call("GET", "/v1/keys", { key: activeKey }));
+
+      await fx.restart();
+      expectOk(await fx.call("GET", "/v1/keys", { key: activeKey }));
+      expectOk(await fx.call("DELETE", `/v1/keys/${activeId}`, { key: owner.key }));
+      expectError(await fx.call("GET", "/v1/keys", { key: activeKey }), 401);
+    },
+  },
+  {
     name: "canonical records export and reimport as versioned JSONL",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
@@ -1366,9 +1565,9 @@ export const CASES: Case[] = [
       const observationLines = String(observations.body).trim().split("\n");
       const header = JSON.parse(observationLines[0]!);
       assert.equal(header.type, "titen.export.header");
-      assert.equal(header.format_version, 3);
+      assert.equal(header.format_version, 4);
       assert.equal(header.complete, true);
-      assert.deepEqual(header.dependency_order, ["workspaces", "memberships", "projects", "observations", "claims"]);
+      assert.deepEqual(header.dependency_order, ["keys", "workspaces", "memberships", "projects", "observations", "claims"]);
       assert.deepEqual(header.depends_on, ["workspaces", "memberships", "projects"]);
       assert.equal(observationLines.length, 2);
       assert.ok(!String(observations.body).includes("titen_sk_"), "export must carry no key");
@@ -3177,7 +3376,11 @@ export const CASES: Case[] = [
       ]);
       for (const row of rows) {
         assert.equal(row.actor_id, owner.principalId);
-        assert.equal(row.detail, null);
+        if (row.action === "key.create") {
+          const lifecycle = JSON.parse(row.detail!);
+          assert.match(lifecycle.not_before, /^\d{4}-/u);
+          assert.equal(lifecycle.expires_at, null);
+        } else assert.equal(row.detail, null);
         assert.equal(row.ip_hint, null);
         assert.ok(row.resource_type);
       }

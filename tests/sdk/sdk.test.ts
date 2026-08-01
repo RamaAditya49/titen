@@ -46,6 +46,8 @@ test("health and readiness resolve through the client", async () => {
   assert.equal(health.status, "ok");
   const ready = await titen.ready();
   assert.equal(ready.ready, true);
+  assert.equal(ready.capabilities.extraction_response_mode, "disabled");
+  assert.equal(ready.checks.enrichment_jobs?.state, "disabled");
 });
 
 test("the client drives the whole Level 5 loop", async () => {
@@ -557,7 +559,7 @@ test("mutation idempotency reaches the server and preserves replay semantics", a
 });
 
 test("generic JSON and raw access preserve auth without allowing overrides", async () => {
-  const events = await titen.request<{ events: unknown[] }>("GET", "/v1/events?limit=1");
+  const events = await titen.listEvents({ limit: 1 });
   assert.ok(Array.isArray(events.events));
 
   const exported = await titen.requestRaw(
@@ -589,6 +591,75 @@ test("generic JSON and raw access preserve auth without allowing overrides", asy
     /path must be an absolute API path/,
   );
   assert.equal(called, false, "an invalid generic request must fail before network I/O");
+});
+
+test("typed event iteration stops on empty pages and rejects broken cursors", async () => {
+  const event = (id: string) => ({
+    id,
+    kind: "claim.materialized",
+    actor_id: "agent_test",
+    resource_type: "claim",
+    resource_id: `claim_${id}`,
+    payload: {},
+    created_at: "2026-08-01T00:00:00.000Z",
+  });
+  const collect = async (client: TitenClient) => {
+    const rows = [];
+    for await (const row of client.iterateEvents({ limit: 1 })) rows.push(row);
+    return rows;
+  };
+  const pages = [
+    { events: [event("evt_1")], cursor: "evt_1" },
+    { events: [event("evt_2")], cursor: "evt_2" },
+    // The service deliberately echoes the incoming cursor when exhausted.
+    { events: [], cursor: "evt_2" },
+  ];
+  let calls = 0;
+  const local = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => Response.json({ data: pages[calls++] }),
+  });
+  assert.deepEqual((await collect(local)).map(({ id }) => id), ["evt_1", "evt_2"]);
+  assert.equal(calls, 3, "an exact page boundary needs one terminal empty poll");
+
+  let emptyCalls = 0;
+  const empty = new TitenClient({
+    url: "http://example.test",
+    key: "test",
+    fetch: async () => {
+      emptyCalls += 1;
+      return Response.json({ data: { events: [], cursor: null } });
+    },
+  });
+  assert.deepEqual(await collect(empty), []);
+  assert.equal(emptyCalls, 1);
+
+  for (const brokenPages of [
+    [{ events: [event("evt_same")], cursor: "evt_same" }, { events: [event("evt_next")], cursor: "evt_same" }],
+    [{ events: [event("evt_duplicate")], cursor: "cursor_1" }, { events: [event("evt_duplicate")], cursor: "cursor_2" }],
+    [{ events: [event("evt_null_cursor")], cursor: null }],
+    [{ events: [event("evt_numeric_cursor")], cursor: 42 }],
+  ]) {
+    let index = 0;
+    const broken = new TitenClient({
+      url: "http://example.test",
+      key: "test",
+      fetch: async () => Response.json({ data: brokenPages[index++] }),
+    });
+    await assert.rejects(
+      () => collect(broken),
+      (error: unknown) => error instanceof TitenError && error.code === "INVALID_RESPONSE",
+    );
+  }
+
+  const controller = new AbortController();
+  controller.abort();
+  // A caller can cancel before the iterator's first list request.
+  const aborted = (async () => {
+    for await (const _event of local.iterateEvents({ signal: controller.signal })) void _event;
+  })();
+  await assert.rejects(() => aborted, (error: unknown) => error === controller.signal.reason);
 });
 
 test("typed mutation sends one idempotency header and the capability matrix stays live", async () => {

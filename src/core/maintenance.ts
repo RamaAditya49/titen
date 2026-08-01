@@ -137,6 +137,7 @@ export async function indexPendingForOrg(
   orgId: string,
   vectors: VectorCapability,
   limit: number,
+  onSemanticLease?: (leaseToken: string) => void,
 ): Promise<number> {
   const pending = await db.all<{ id: string; record_type: string; record_id: string; operation: string }>(
     `SELECT id, record_type, record_id, operation FROM index_outbox
@@ -195,6 +196,7 @@ export async function indexPendingForOrg(
     db,
     removals.map((entry) => entry.outboxId),
   );
+  if (removalLease.ids.length > 0) onSemanticLease?.(removalLease.token);
   const ownedRemovalIds = new Set(removalLease.ids);
   const ownedRemovals = removals.filter((entry) => ownedRemovalIds.has(entry.outboxId));
   const preparedRemovals = await prepareSemanticIndexWrites(
@@ -245,6 +247,7 @@ export async function indexPendingForOrg(
     db,
     eligible.map((entry) => entry.outboxId),
   );
+  if (eligibleLease.ids.length > 0) onSemanticLease?.(eligibleLease.token);
   const ownedEligibleIds = new Set(eligibleLease.ids);
   const ownedEligible = eligible.filter((entry) => ownedEligibleIds.has(entry.outboxId));
   if (ownedEligible.length > 0) {
@@ -326,6 +329,7 @@ export async function indexPendingForOrg(
   }
 
   const retireLease = await claimSemanticIndexWork(db, retire);
+  if (retireLease.ids.length > 0) onSemanticLease?.(retireLease.token);
   await completeSemanticIndexWork(db, retireLease.ids, false, retireLease.token);
 
   return indexed;
@@ -429,6 +433,7 @@ export async function runMaintenance(options: {
   secretCipher?: SecretCipher;
   deliverWebhooks?: boolean;
   expectedIntervalMs?: number;
+  onSemanticLease?: (leaseToken: string) => void;
 }): Promise<MaintenanceResult> {
   const limit = options.limit ?? 50;
   const sourceNow = typeof options.now === "function"
@@ -466,6 +471,7 @@ export async function runMaintenance(options: {
             orgId,
             options.vectors,
             limit,
+            options.onSemanticLease,
           );
         } catch (error) {
           // Named by organization, without the message, which can carry content.

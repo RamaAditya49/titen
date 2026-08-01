@@ -83,6 +83,10 @@ export async function capabilities(
     vector: semanticReadiness.vector,
     embedding: semanticReadiness.embedding,
     extraction: app.modelCapabilities.extraction,
+    extraction_response_mode: app.modelCapabilities.extraction === "configured_error"
+      ? "configured_error"
+      : app.extraction?.responseMode
+        ?? (app.modelCapabilities.extraction === "enabled" ? "custom" : "disabled"),
     background_enrichment: app.modelCapabilities.backgroundEnrichment,
     /** @deprecated Use `embedding`; this alias remains for the 0.3.x API. */
     model: semanticReadiness.embedding,
@@ -506,7 +510,7 @@ export function createApp(context: {
       };
 
       if (matched.route.scope) {
-        ctx.principal = await authenticate(app.db, request);
+        ctx.principal = await authenticate(app.db, request, app.now());
         requireScope(ctx.principal, matched.route.scope);
       }
 

@@ -988,6 +988,35 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE index_outbox ADD COLUMN lease_expires_at TEXT`,
     ],
   },
+  {
+    version: 17,
+    statements: [
+      `ALTER TABLE api_keys ADD COLUMN not_before TEXT`,
+      `ALTER TABLE api_keys ADD COLUMN expires_at TEXT`,
+      `ALTER TABLE api_keys ADD COLUMN last_used_at TEXT`,
+      `UPDATE api_keys SET not_before = created_at WHERE not_before IS NULL`,
+      `CREATE TRIGGER api_keys_lifecycle_valid_insert
+         BEFORE INSERT ON api_keys
+         WHEN NEW.not_before IS NULL
+           OR (NEW.expires_at IS NOT NULL AND NEW.not_before >= NEW.expires_at)
+         BEGIN
+           SELECT RAISE(ABORT, 'API_KEY_LIFECYCLE_INVALID');
+         END`,
+      `CREATE TRIGGER api_keys_lifecycle_immutable
+         BEFORE UPDATE OF not_before, expires_at ON api_keys
+         WHEN NEW.not_before IS NOT OLD.not_before OR NEW.expires_at IS NOT OLD.expires_at
+         BEGIN
+           SELECT RAISE(ABORT, 'API_KEY_LIFECYCLE_IMMUTABLE');
+         END`,
+      `CREATE TRIGGER api_keys_last_used_monotonic
+         BEFORE UPDATE OF last_used_at ON api_keys
+         WHEN OLD.last_used_at IS NOT NULL
+          AND (NEW.last_used_at IS NULL OR NEW.last_used_at < OLD.last_used_at)
+         BEGIN
+           SELECT RAISE(ABORT, 'API_KEY_LAST_USED_NOT_MONOTONIC');
+         END`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

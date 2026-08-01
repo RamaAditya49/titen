@@ -132,9 +132,12 @@ if (vectorEnabled) {
   while (Date.now() < deadline) {
     const compiled = await api("POST", "/v1/context/compile", {
       subject_id: SUBJECT,
+      project_id: project.project_id,
       task: QUERY,
       max_tokens: 1200,
     });
+    assert.equal(compiled.scope.project_mode, "project");
+    assert.equal(compiled.scope.project_id, project.project_id);
     if (compiled.items.length > 0) {
       ready = true;
       break;
@@ -148,9 +151,12 @@ if (vectorEnabled) {
 
 const context = await api("POST", "/v1/context/compile", {
   subject_id: SUBJECT,
+  project_id: project.project_id,
   task: QUERY,
   max_tokens: 1200,
 });
+assert.equal(context.scope.project_mode, "project");
+assert.equal(context.scope.project_id, project.project_id);
 console.log(
   `    compiled: ${context.items.length} item(s), ${context.budget.used_tokens}/${context.budget.max_tokens} tokens`,
 );
@@ -278,9 +284,12 @@ const superseded = await api("POST", `/v1/claims/${claimIds[0]}/supersede`, {
 assert.equal(superseded.status, "superseded");
 const afterSupersede = await api("POST", "/v1/context/compile", {
   subject_id: SUBJECT,
+  project_id: project.project_id,
   task: QUERY,
   max_tokens: 1200,
 });
+assert.equal(afterSupersede.scope.project_mode, "project");
+assert.equal(afterSupersede.scope.project_id, project.project_id);
 assert.ok(
   !afterSupersede.items.some((item: any) => item.claim_id === claimIds[0]),
   "a superseded claim must leave context",

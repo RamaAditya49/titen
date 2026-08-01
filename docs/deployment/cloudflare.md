@@ -12,9 +12,16 @@ Prerequisites: Node 22+, pnpm 10+, Cloudflare account with D1.
 pnpm install
 
 # Apply schema and bootstrap to Wrangler's local D1 state
-pnpm titen schema | wrangler d1 execute titen --local --file=-
-pnpm titen bootstrap --org 'My Org' --print-sql | \
-  wrangler d1 execute titen --local --file=-
+(
+  set -eu
+  umask 077
+  titen_sql=$(mktemp)
+  trap 'rm -f "$titen_sql"' EXIT HUP INT TERM
+  pnpm titen schema >"$titen_sql"
+  pnpm exec wrangler d1 execute titen --local --file="$titen_sql"
+  pnpm titen bootstrap --org 'My Org' --print-sql >"$titen_sql"
+  pnpm exec wrangler d1 execute titen --local --file="$titen_sql"
+)
 
 # Start a local Worker preview
 pnpm exec wrangler dev
@@ -27,24 +34,30 @@ commands below for every production schema or credential write.
 
 ```bash
 # 1. Create the production D1 database
-wrangler d1 create titen
+pnpm exec wrangler d1 create titen
 # Copy the database_id from output into wrangler.jsonc
 
-# 2. Apply schema to production
-pnpm titen schema | wrangler d1 execute titen --remote --file=-
+# 2. Apply schema and bootstrap the first production org credential
+(
+  set -eu
+  umask 077
+  titen_sql=$(mktemp)
+  trap 'rm -f "$titen_sql"' EXIT HUP INT TERM
+  pnpm titen schema >"$titen_sql"
+  pnpm exec wrangler d1 execute titen --remote --file="$titen_sql"
+  pnpm titen bootstrap --org 'My Org' --print-sql >"$titen_sql"
+  pnpm exec wrangler d1 execute titen --remote --file="$titen_sql"
+)
+# Save the bootstrap key printed to stderr; only its hash enters D1.
 
-# 3. Bootstrap the first production org credential (save the printed key)
-pnpm titen bootstrap --org 'My Org' --print-sql | \
-  wrangler d1 execute titen --remote --file=-
-
-# 4. Deploy
+# 3. Deploy
 pnpm deploy:worker
 
-# 5. (Optional) Enable auto-migrate on deploy
+# 4. (Optional) Enable auto-migrate on deploy
 # Set TITEN_AUTO_MIGRATE to "1" in wrangler.jsonc vars
 # or: wrangler secret put TITEN_AUTO_MIGRATE
 
-# 6. Verify
+# 5. Verify
 curl https://titen.<your-subdomain>.workers.dev/healthz
 ```
 
@@ -154,7 +167,11 @@ Cron Trigger drains one job per bounded pass and is the background durability
 guarantee; `POST /v1/enrichment/drain?limit=1` is the authorized manual path.
 Set `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and a 64-hex
 `TITEN_EXTRACT_MODEL_FINGERPRINT`; store `TITEN_EXTRACT_API_KEY` as a Worker
-secret. `TITEN_D1_PLAN=paid` is required, and background execution additionally
+secret. Strict `TITEN_EXTRACT_RESPONSE_MODE=json_schema` is the default; select
+`json_object` explicitly only when the provider cannot enforce strict schemas.
+That compatibility mode sends the exact schema and bounds but keeps local
+validation unchanged. The configured mode is visible in readiness without the
+endpoint or secret. `TITEN_D1_PLAN=paid` is required, and background execution additionally
 requires `TITEN_ENRICHMENT_BACKGROUND=1` plus an actual Cron Trigger. Local
 schema and ID validation remains mandatory for every provider response.
 

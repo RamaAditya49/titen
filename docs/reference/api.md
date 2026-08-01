@@ -77,11 +77,17 @@ features explicitly listed as proposed are not routes.
 ## API keys
 
 `POST /v1/keys` accepts a label, scopes, and optional `max_trust`,
-`principal_id`, and `principal_kind`. Its one-time creation response includes
+`principal_id`, `principal_kind`, `not_before`, and `expires_at`. Timestamps are
+canonical UTC; `not_before` is inclusive, `expires_at` is exclusive, and the
+former must precede the latter. The lifecycle window is immutable. Unknown
+creation fields are rejected so a client cannot mistake an ignored security
+control for an enforced one. Its one-time creation response includes
 the raw `api_key`, credential `key_id`, and the caller-supplied or generated
 `principal_id`. Use `principal_id` for handoff targets; `key_id` identifies the
 revocable credential and is not an agent identity. `GET /v1/keys` returns the
-same non-secret identity metadata but never returns the raw key.
+same non-secret identity metadata plus `not_before`, `expires_at`, monotonic
+nullable `last_used_at`, and `pending|active|expired|revoked` status, but never
+returns the raw key.
 
 ## Webhook delivery
 
@@ -282,7 +288,10 @@ stronger normalized signal. The final score is:
 Every factor is returned in `score_components`. A zero-span positive matched
 signal is assigned `1` for each matched candidate; absent lexical or vector
 signals, including vector similarity `0`, are `0`. Confidence is therefore an
-explicit weighted factor, not a hidden multiplier.
+explicit weighted factor, not a hidden multiplier. The conflict component is
+`1` for a conflict-free claim and `0` for a disputed claim, so contradictory
+evidence lowers relative rank by `0.05` while remaining visible in the item
+status and `conflicts`.
 
 Lexical planning removes Unicode format characters, preserves combining marks,
 normalizes to NFC, and drops a bounded English/Indonesian function-word set;
@@ -294,10 +303,11 @@ no searchable term and `used` otherwise. The existing `remove_diacritics 2`
 tradeoff remains: diacritic-only distinctions fold together, while separate
 letters such as `ł` and `ß` do not.
 
-Packing selects one fitting claim per available kind before filling the
-remaining token budget in deterministic rank order. Byte-identical active claim
-statements appear at most once in a context pack; canonical claims and their
-evidence remain unchanged.
+Packing preserves deterministic rank order when every deduplicated candidate
+fits. Under actual token pressure it selects one fitting claim per available
+kind before filling the remaining budget in rank order. Byte-identical active
+claim statements appear at most once in a context pack; canonical claims and
+their evidence remain unchanged.
 
 ### `POST /v1/context/:id/feedback`
 
@@ -468,6 +478,9 @@ or raw memory feed. Public cursors remain stable event IDs; the database maps
 them to a monotonic local sequence, so equal-timestamp pages and federation
 pulls do not order by random UUIDs or skip committed events. An exhausted page
 echoes its incoming cursor so a poller can continue from the same position.
+The SDK's `iterateEvents()` treats an empty page as terminal before comparing
+cursors, rejects a non-advancing/cyclic cursor or repeated event ID, and forwards
+the caller's abort signal and configured request timeout.
 
 ### Federation routes
 
@@ -630,7 +643,10 @@ derived cache/vector or release-status maintenance job is stale.
 - `GET /readyz`: canonical SQL, migration integrity, signing-secret
   decryptability, and capability-contract version 1. Capability states include
   FTS, vector, embedding, extraction, background enrichment,
-  `background_repair`, and export/import. `disabled`, `enabled`, and
+  `extraction_response_mode`, `background_repair`, and export/import. The
+  response mode is `json_schema`, explicit compatibility mode `json_object`,
+  `custom` for an injected extractor, or the matching disabled/error state; it
+  never exposes a provider endpoint or credential. `disabled`, `enabled`, and
   `configured_error` distinguish intentional omission from broken opt-in
   configuration.
 
@@ -652,6 +668,12 @@ vector-store indexing failure returns `503 NOT_READY`, marks the affected
 capability `configured_error`, and supplies one fixed
 `checks.semantic_index` diagnostic. The response does not expose the
 fingerprint, endpoint, database path, or provider error.
+
+An active/disputed claim with pending upsert or reconciliation work reports
+`index_projection_pending` and keeps readiness at `503` until the rebuildable
+projection converges. A graceful Bun shutdown releases only the active
+maintenance pass's owned semantic leases; a fresh process can reclaim them
+without waiting for the normal lease expiry.
 
 The cosine floor is an operator-supplied calibration policy, not a public API
 field or universal Titen default. Sub-threshold vector IDs never reach canonical
@@ -750,8 +772,8 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Compatibility
 
-- Export format v3 is versioned independently from HTTP API v1. Import still
-  accepts v1/v2 files; because v1 carried no transferable actor authority, its
+- Export format v4 is versioned independently from HTTP API v1. Import still
+  accepts v1/v2/v3 files; because v1 carried no transferable actor authority, its
   observations and claims are owned by the authenticated importing principal.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
@@ -759,9 +781,9 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Portability and backup restore
 
-`GET /v1/export?type=workspaces|memberships|projects|observations|claims`
-returns one canonical NDJSON stream. Retain all five streams and headers for a
-logical migration. Headers declare format v3, source organization, scope,
+`GET /v1/export?type=keys|workspaces|memberships|projects|observations|claims`
+returns one canonical NDJSON stream. Retain the five non-credential streams and
+headers for a logical data migration. Headers declare format v4, source organization, scope,
 deterministic dependency order, count, completion state, and the next opaque
 cursor. Pages contain at most 2,000 records and are cut on UTF-8 byte length so
 the complete response remains within the import request limit. Follow
@@ -784,6 +806,12 @@ workspaces, and membership export includes only the caller. `all=true` requires
 the separate `export:all` scope, exports the whole authenticated organization,
 and appends a metadata-only audit entry for each page. It never crosses the
 organization derived from the API key.
+
+Credential backup is deliberately explicit: `type=keys&all=true` additionally
+requires `keys:manage` and `export:all`. It exports hashes and complete lifecycle
+metadata, never the one-time raw bearer token. Protect this stream like a
+database backup. Version 4 import requires `keys:manage`, restores the same
+immutable window, monotonic last-use and revocation state, and is idempotent.
 
 `POST /v1/import` preflights the complete request before mutation, accepts
 canonical records independent of NDJSON line order, and writes in dependency
@@ -818,8 +846,9 @@ mapped actor, while import history records the authenticated importer. That
 administrative scope may restore team records on behalf of mapped members;
 without it, the importer must be an active non-reader in each workspace.
 
-Logical JSONL is not a full deployment snapshot. It deliberately excludes API
-keys, encrypted integration bindings, checkpoints, leases, context runs and
+Logical JSONL is not a full deployment snapshot. Unless the separately guarded
+credential stream is requested, it excludes API keys. It always excludes
+encrypted integration bindings, checkpoints, leases, context runs and
 feedback, audit/event/history rows, and rebuildable indexes or vectors. Use
 `titen backup` for complete Bun/SQLite disaster recovery and a provider-native
 database snapshot for Cloudflare rollback.

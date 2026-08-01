@@ -91,6 +91,9 @@ export async function provisionWith(db: Db, options: ProvisionOptions = {}): Pro
     label: "contract test key",
     scopes: options.scopes ?? DEFAULT_SCOPES,
     maxTrust: options.maxTrust ?? "verified",
+    // Contract suites deliberately move the app clock across decades. Keep
+    // fixture credentials valid throughout that simulated timeline.
+    notBefore: new Date(0),
   });
   const statements = options.orgId
     ? [key.statement]

@@ -6,19 +6,21 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+tsc="$(pwd)/node_modules/.bin/tsc"
+[ -x "$tsc" ] || { echo "FAIL: run pnpm install before pack verification" >&2; exit 1; }
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 echo "==> packing"
 tarball="$work/$(npm pack --pack-destination "$work" --silent | tail -1)"
 
-echo "==> 1/8 packaged README"
+echo "==> 1/9 packaged README"
 if tar -xOf "$tarball" package/README.md | grep -Eq '(href|src)="\./|\]\(\./'; then
   echo "FAIL: packaged README contains repository-relative references" >&2
   exit 1
 fi
 
-echo "==> 2/8 packaged security policy"
+echo "==> 2/9 packaged security policy"
 tar -xOf "$tarball" package/SECURITY.md >/dev/null \
   || { echo "FAIL: SECURITY.md is missing from the package" >&2; exit 1; }
 tar -xOf "$tarball" package/README.md | grep -q 'TITEN_SECRET_KEYS' \
@@ -29,7 +31,7 @@ cd "$work"
 npm init -y >/dev/null
 npm install "$tarball" >/dev/null
 
-echo "==> 3/8 dependency tree"
+echo "==> 3/9 dependency tree"
 installed="$(ls node_modules | grep -v '^\.' | sort | tr '\n' ' ')"
 echo "    $installed"
 if [ -d node_modules/sqlite-vec ]; then
@@ -52,7 +54,116 @@ version="$(node -p 'require("./node_modules/titen-memory/package.json").version'
 [ "$(./node_modules/.bin/titen --version)" = "$version" ] \
   || { echo "FAIL: installed CLI version differs from package.json" >&2; exit 1; }
 
-echo "==> 4/8 titen bootstrap"
+echo "==> 4/9 packed TypeScript declarations"
+manifest_types="$(node -p 'require("./node_modules/titen-memory/package.json").exports["."].types')"
+[ "$manifest_types" = "./dist/npm/sdk.d.ts" ] \
+  || { echo "FAIL: package types do not point at emitted declarations" >&2; exit 1; }
+if grep -Eq 'src/|\.ts["'\'']' node_modules/titen-memory/dist/npm/sdk.d.ts; then
+  echo "FAIL: declaration output reaches repository TypeScript sources" >&2
+  exit 1
+fi
+mkdir "$work/types"
+cat >"$work/types/consumer.mts" <<'EOF'
+import {
+  TitenClient,
+  type Claim,
+  type Readiness,
+  type ReadinessCapabilities,
+  type ReadinessChecks,
+} from "titen-memory";
+import { TitenClient as SubpathClient } from "titen-memory/sdk";
+
+const client = new TitenClient({ url: "https://example.test", key: "key" });
+const subpath = new SubpathClient({ url: "https://example.test", key: "key" });
+const ready: Promise<Readiness> = client.ready();
+declare const checks: ReadinessChecks;
+declare const capabilities: ReadinessCapabilities;
+const pendingProjection: ReadinessChecks["semantic_index"] = "index_projection_pending";
+const responseMode = capabilities.extraction_response_mode;
+const events: AsyncIterable<import("titen-memory").TitenEvent> = client.iterateEvents();
+const claim: Claim = {
+  kind: "semantic_fact",
+  statement: "typed",
+  sources: [{ observation_id: "obs_1", relation: "supports" }],
+  trust: "verified",
+  visibility: "team",
+};
+const badKind: Claim = {
+  // @ts-expect-error unknown claim kind must fail in a packed consumer
+  kind: "invented_kind",
+  statement: "bad",
+  sources: [{ observation_id: "obs_1", relation: "supports" }],
+};
+const badTrust: Claim = {
+  kind: "decision",
+  statement: "bad",
+  sources: [{ observation_id: "obs_1", relation: "supports" }],
+  // @ts-expect-error unknown trust must fail in a packed consumer
+  trust: "super_trusted",
+};
+const badVisibility: Claim = {
+  kind: "decision",
+  statement: "bad",
+  sources: [{ observation_id: "obs_1", relation: "supports" }],
+  // @ts-expect-error unknown visibility must fail in a packed consumer
+  visibility: "public",
+};
+void [subpath, ready, checks, pendingProjection, responseMode, events, claim, badKind, badTrust, badVisibility];
+EOF
+cat >"$work/types/consumer.cts" <<'EOF'
+async function loadFromCommonJs() {
+  const root = await import("titen-memory");
+  const subpath = await import("titen-memory/sdk");
+  return [
+    new root.TitenClient({ url: "https://example.test", key: "key" }),
+    new subpath.TitenClient({ url: "https://example.test", key: "key" }),
+  ];
+}
+void loadFromCommonJs;
+EOF
+cat >"$work/types/consumer-bundler.ts" <<'EOF'
+import { TitenClient, type EventPage } from "titen-memory";
+import type { ClaimKind } from "titen-memory/sdk";
+declare const page: EventPage;
+const kind: ClaimKind = "procedural";
+void [new TitenClient({ url: "https://example.test", key: "key" }), page, kind];
+EOF
+cat >"$work/types/tsconfig.node.json" <<'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "files": ["consumer.mts", "consumer.cts"]
+}
+EOF
+cat >"$work/types/tsconfig.bundler.json" <<'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "files": ["consumer-bundler.ts"]
+}
+EOF
+"$tsc" -p "$work/types/tsconfig.node.json"
+"$tsc" -p "$work/types/tsconfig.bundler.json"
+
+echo "==> 5/9 titen bootstrap"
 bootstrap="$(./node_modules/.bin/titen bootstrap --db "$work/t.db" --org 'Pack Verify')"
 printf '%s\n' "$bootstrap" | grep -q '^api_key: titen_' \
   || { echo "FAIL: bootstrap printed no API key" >&2; exit 1; }
@@ -61,7 +172,7 @@ api_key="$(printf '%s\n' "$bootstrap" | sed -n 's/^api_key: //p')"
 umask 077
 printf 'header = "authorization: Bearer %s"\n' "$api_key" >"$work/curl-auth"
 
-echo "==> 5/8 titen serve + MCP"
+echo "==> 6/9 titen serve + MCP"
 # The verifier may run beside other Titen processes. Ask the OS for a free port
 # instead of mistaking an unrelated fixed-port server for this candidate.
 port="$(node --input-type=module -e '
@@ -198,7 +309,7 @@ esac
 kill "$server" 2>/dev/null || true
 trap 'rm -rf "$work"' EXIT
 
-echo "==> 6/8 SDK on plain node"
+echo "==> 7/9 SDK on plain node"
 node --input-type=module -e '
   const { createRequire } = await import("node:module");
   const { TitenClient } = await import("titen-memory");
@@ -213,14 +324,20 @@ node --input-type=module -e '
   // Bundlers and tooling read it, so the omission only surfaces downstream.
   createRequire(process.cwd() + "/").resolve("titen-memory/package.json");
 ' || { echo "FAIL: node cannot import the SDK" >&2; exit 1; }
+node -e '
+  Promise.all([import("titen-memory"), import("titen-memory/sdk")]).then(([root, subpath]) => {
+    if (typeof root.TitenClient !== "function" || typeof subpath.TitenClient !== "function")
+      throw new Error("CommonJS dynamic import did not resolve the SDK");
+  });
+' || { echo "FAIL: CommonJS dynamic import cannot load the SDK" >&2; exit 1; }
 
-echo "==> 7/8 custom npm global prefix"
+echo "==> 8/9 custom npm global prefix"
 prefix="$work/npm-prefix"
 npm install --global --prefix "$prefix" "$tarball" >/dev/null
 "$prefix/bin/titen" --help | grep -q '^titen — self-hosted memory service' \
   || { echo "FAIL: custom-prefix titen binary did not execute" >&2; exit 1; }
 
-echo "==> 8/8 packed global bin without Node"
+echo "==> 9/9 packed global bin without Node"
 bun_bin="$(command -v bun)"
 mkdir "$work/bun-only-path"
 ln -s "$bun_bin" "$work/bun-only-path/bun"

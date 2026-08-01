@@ -133,11 +133,14 @@ TITEN_EXTRACT_MODEL=<model-id>
 TITEN_EXTRACT_MODEL_FINGERPRINT=<64-lowercase-hex-revision>
 TITEN_EXTRACT_API_KEY=<optional-bearer-key>
 TITEN_EXTRACT_TIMEOUT_MS=30000
+TITEN_EXTRACT_RESPONSE_MODE=json_schema
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 ```
 
 An absent tuple reports the capability as disabled; a partial or invalid tuple
-fails configuration closed. The maintenance timer drains bounded work, or an
+or response mode fails configuration closed. `json_schema` is the default;
+`json_object` is an explicit compatibility mode that still uses the local
+validator. The maintenance timer drains bounded work, or an
 operator key with `enrichment:write` may call
 `POST /v1/enrichment/drain?limit=1`. This is opt-in implementation guidance,
 not evidence that production activation gates have passed.

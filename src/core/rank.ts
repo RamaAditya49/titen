@@ -122,7 +122,7 @@ export function scoreCandidate(
     trust: round(TRUST_RANK[candidate.trust] / 3),
     recency: round(recencyScore(candidate.created_at, now)),
     utility: round(utilityScore(candidate)),
-    conflict: candidate.disputed ? 1 : 0,
+    conflict: candidate.disputed ? 0 : 1,
     confidence: round(candidate.confidence),
   };
   const score =
@@ -170,6 +170,22 @@ export function packUnderBudget<T>(
   entries: { value: T; kind: string; tokens: number; dedupeKey?: string }[],
   budget: number,
 ): { selected: T[]; usedTokens: number } {
+  const ranked: T[] = [];
+  const rankedDedupe = new Set<string>();
+  let rankedTokens = 0;
+  let allFit = true;
+  for (const entry of entries) {
+    if (entry.dedupeKey && rankedDedupe.has(entry.dedupeKey)) continue;
+    if (rankedTokens + entry.tokens > budget) {
+      allFit = false;
+      break;
+    }
+    ranked.push(entry.value);
+    rankedTokens += entry.tokens;
+    if (entry.dedupeKey) rankedDedupe.add(entry.dedupeKey);
+  }
+  if (allFit) return { selected: ranked, usedTokens: rankedTokens };
+
   const selected: T[] = [];
   const kinds = new Set<string>();
   const dedupeKeys = new Set<string>();

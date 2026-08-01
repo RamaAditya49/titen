@@ -1,6 +1,6 @@
 import { afterAll, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tryCreateVectors } from "../../src/runtime/bun/vectors";
@@ -59,6 +59,9 @@ test("Bun distinguishes absent, partial, unavailable, and healthy semantic confi
     ...rawPolicy,
   });
   assert.deepEqual(healthy.readiness, { embedding: "enabled", vector: "enabled" });
+  assert.equal(statSync(join(directory, "vectors.db")).mode & 0o777, 0o600);
+  assert.equal(statSync(join(directory, "vectors.db-wal")).mode & 0o777, 0o600);
+  assert.equal(statSync(join(directory, "vectors.db-shm")).mode & 0o777, 0o600);
   assert.equal(healthy.vectors?.indexEmpty, true);
   assert.deepEqual(healthy.vectors?.fingerprint, {
     provider: healthy.vectors.fingerprint.provider,

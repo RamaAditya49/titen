@@ -122,9 +122,26 @@ test("readiness reports the vector capability only when one is configured", asyn
   assert.equal(off.body.data.capabilities.vector, "disabled");
   assert.equal(off.body.data.capabilities.model, "disabled");
 
+  const pending = await withVectors().call("GET", "/readyz");
+  assert.equal(pending.status, 503);
+  assert.equal(pending.body.meta.checks.semantic_index, "index_projection_pending");
+  const drained = await withVectors().call("POST", "/v1/index/drain?limit=100", { key });
+  assert.equal(drained.status, 200);
+
   const on = await withVectors().call("GET", "/readyz");
+  assert.equal(on.status, 200);
   assert.equal(on.body.data.capabilities.vector, "enabled");
   assert.equal(on.body.data.capabilities.model, "enabled");
+
+  // Preserve the pending fixture expected by the outage/recovery cases below.
+  await vectors.store.remove(claimIds);
+  await db.batch([{
+    sql: `UPDATE index_outbox
+             SET state = 'pending', attempts = 0,
+                 lease_token = NULL, lease_expires_at = NULL
+           WHERE record_id IN (${claimIds.map(() => "?").join(", ")})`,
+    params: claimIds,
+  }]);
 });
 
 test("compilation reports vector retrieval as used and calls the embedder", async () => {
@@ -238,6 +255,22 @@ test("Vectorize receives the same canonical metadata and query filter", async ()
     { id: "claim", values: [1, 0], metadata: scope },
   ]);
   assert.deepEqual(queried, { topK: 2, filter: scope });
+});
+
+test("Vectorize caps native queries without changing scope filters", async () => {
+  let queried: unknown;
+  const store = createVectorizeStore({
+    async upsert() {},
+    async query(_vector, options) {
+      if (options.topK > 100) throw new Error("maximum topK is 100");
+      queried = options;
+      return { matches: [] };
+    },
+    async deleteByIds() {},
+  });
+  const filter = { org_id: "org", subject_id: "subject", project_id: "project" };
+  await store.query(new Float32Array([1, 0]), { topK: 200, filter });
+  assert.deepEqual(queried, { topK: 100, filter });
 });
 
 test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
@@ -398,6 +431,19 @@ test("confidence is an explicit weighted and auditable ranking factor", () => {
   assert.equal(ranked[0]!.components.confidence, 0.9);
   assert.equal(ranked[1]!.components.confidence, 0.2);
   assert.equal(ranked[0]!.score - ranked[1]!.score, 0.07);
+});
+
+test("dispute is an explicit ranking penalty, never a bonus", () => {
+  const clean = rankInput("clean", 0.8);
+  const disputed = { ...rankInput("disputed", 0.8), disputed: true };
+  const ranked = rankCandidates(
+    [disputed, clean],
+    new Date("2026-07-30T00:00:00.000Z"),
+  );
+  assert.equal(ranked[0]!.candidate.id, "clean");
+  assert.equal(ranked[0]!.components.conflict, 1);
+  assert.equal(ranked[1]!.components.conflict, 0);
+  assert.ok(Math.abs(ranked[0]!.score - ranked[1]!.score - 0.05) < 1e-9);
 });
 
 async function pendingCount() {

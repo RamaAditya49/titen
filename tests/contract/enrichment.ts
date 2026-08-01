@@ -885,7 +885,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   assert.equal(exportedClaims.status, 200);
   const observationRows = String(exportedObservations.body).trim().split("\n").map(JSON.parse);
   const claimRows = String(exportedClaims.body).trim().split("\n").map(JSON.parse);
-  assert.equal(claimRows[0]!.format_version, 3);
+  assert.equal(claimRows[0]!.format_version, 4);
   assert.equal(claimRows.length, 2);
   assert.match(claimRows[1]!.enrichment_job_id, /^enr_/u);
   assert.deepEqual(

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Db } from "../../src/core/db";
+import { authenticate, createApiKey, organizationStatement } from "../../src/core/auth";
 import { migrate } from "../../src/core/migrations";
 import {
   createSecretCipher,
@@ -33,6 +34,45 @@ function database(): { db: Db; close(): void } {
 
 afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
+test("API key lifecycle uses exact boundaries and monotonic atomic usage", async () => {
+  const { db, close } = database();
+  await migrate(db);
+  const issued = new Date("2026-08-01T09:00:00.000Z");
+  const key = await createApiKey({
+    orgId: "org_key_lifecycle",
+    principalId: "agent_key_lifecycle",
+    principalKind: "agent",
+    label: "bounded key",
+    scopes: ["context:compile"],
+    maxTrust: "asserted",
+    notBefore: new Date("2026-08-01T10:00:00.000Z"),
+    expiresAt: new Date("2026-08-01T11:00:00.000Z"),
+  }, issued);
+  await db.batch([organizationStatement("org_key_lifecycle", "Lifecycle", issued), key.statement]);
+  const request = new Request("http://titen.test/v1/context/compile", {
+    headers: { authorization: `Bearer ${key.key}` },
+  });
+
+  await assert.rejects(() => authenticate(db, request, new Date("2026-08-01T09:59:59.999Z")));
+  assert.equal((await authenticate(db, request, new Date("2026-08-01T10:00:00.000Z"))).keyId, key.id);
+  await authenticate(db, request, new Date("2026-08-01T10:30:00.000Z"));
+  await authenticate(db, request, new Date("2026-08-01T10:20:00.000Z"));
+  assert.equal((await db.all<{ last_used_at: string }>(
+    "SELECT last_used_at FROM api_keys WHERE id = ?", [key.id],
+  ))[0]!.last_used_at, "2026-08-01T10:30:00.000Z");
+  await assert.rejects(() => authenticate(db, request, new Date("2026-08-01T11:00:00.000Z")));
+  await assert.rejects(() => db.batch([{
+    sql: "UPDATE api_keys SET expires_at = ? WHERE id = ?",
+    params: ["2026-08-01T12:00:00.000Z", key.id],
+  }]), /API_KEY_LIFECYCLE_IMMUTABLE/u);
+  await db.batch([{
+    sql: "UPDATE api_keys SET revoked_at = ? WHERE id = ?",
+    params: ["2026-08-01T10:31:00.000Z", key.id],
+  }]);
+  await assert.rejects(() => authenticate(db, request, new Date("2026-08-01T10:32:00.000Z")));
+  close();
 });
 
 test("signing secrets migrate from plaintext, rotate, and fail closed without the key", async () => {

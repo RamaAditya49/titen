@@ -8,6 +8,7 @@ import { parseSecretCipher, prepareSigningSecrets } from "../../core/secrets";
 import type { WebhookSecurity } from "../../core/webhook-security";
 import { configureHttpExtraction } from "../../core/extraction";
 import { withD1Budget } from "./d1-budget";
+import { newRequestId, success } from "../../core/http";
 
 export interface Env {
   DB: D1Database;
@@ -27,6 +28,7 @@ export interface Env {
   TITEN_EXTRACT_MODEL_FINGERPRINT?: string;
   TITEN_EXTRACT_API_KEY?: string;
   TITEN_EXTRACT_TIMEOUT_MS?: string;
+  TITEN_EXTRACT_RESPONSE_MODE?: string;
   /** Explicit declared D1 plan required before enrichment can mutate. */
   TITEN_D1_PLAN?: string;
   /** Set to "1" only when an enrichment Cron Trigger is provisioned. */
@@ -47,6 +49,7 @@ function extraction(env: Env): ReturnType<typeof configureHttpExtraction> {
     timeoutMs: env.TITEN_EXTRACT_TIMEOUT_MS === undefined
       ? undefined
       : Number(env.TITEN_EXTRACT_TIMEOUT_MS),
+    responseMode: env.TITEN_EXTRACT_RESPONSE_MODE,
   });
   if (
     configured.state === "enabled"
@@ -96,6 +99,14 @@ let secretPreparation: Promise<boolean> | undefined;
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method === "GET" && new URL(request.url).pathname === "/healthz")
+      return success({
+        data: {
+          status: "ok",
+          runtime: "cloudflare-d1",
+          revision: env.TITEN_REVISION ?? "dev",
+        },
+      }, newRequestId());
     const extractionConfig = extraction(env);
     const unbudgeted = createD1Db(env.DB);
     const db = extractionConfig.capability ? withD1Budget(unbudgeted).db : unbudgeted;
