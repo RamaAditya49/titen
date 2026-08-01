@@ -1,14 +1,13 @@
 ---
 work_id: zero-open-release-sweep-20260801
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
-spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
+spec: docs/specs/done/2026-08-01-zero-open-release-sweep.md
 ---
 # Plan
 
@@ -16,7 +15,7 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
   local-worktree, and dirty-checkout inventory without changing user WIP.
 - [x] Build the issue matrix from current bodies/comments and source-level
   reproduction; group reports that share one root fix.
-- [ ] Review pull request #193 and every unique local commit/worktree; integrate,
+- [x] Review pull request #193 and every unique local commit/worktree; integrate,
   supersede, or archive each before branch cleanup.
 - [x] Implement the SDK, auth lifecycle, database-permission, and streamed-
   redaction corrections with focused package/runtime checks.
@@ -28,14 +27,14 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
   their frozen artifacts or adding an unused migration adapter.
 - [x] Run focused tests after each root fix, then the complete local manual gate,
   package smoke, production dependency audit, secret scan, and workflow checks.
-- [ ] Update changelog and package version to the smallest valid SemVer, review
+- [x] Update changelog and package version to the smallest valid SemVer, review
   the exact candidate, and merge it to `main` with the required CADIS trailer.
-- [ ] From a clean detached checkout, repeat irreversible prepublish checks,
+- [x] From a clean detached checkout, repeat irreversible prepublish checks,
   publish npm manually, push the annotated tag, create the GitHub release, and
   smoke the registry artifact.
-- [ ] Reply to and close all resolved issues/PRs, remove merged remote branches,
+- [x] Reply to and close all resolved issues/PRs, remove merged remote branches,
   safely archive unique local WIP, and prove only `main` plus zero open items.
-- [ ] Record exact terminal evidence, move this pair to `done/`, run the workflow
+- [x] Record exact terminal evidence, move this pair to `done/`, run the workflow
   checker, commit/push the closure, and preserve a concise shared handoff.
 
 ## Acceptance evidence mapping
@@ -74,3 +73,46 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
   and rebuild a new candidate.
 - After npm publication, never rewrite the tag or unpublish the package; publish
   a corrective patch and record the failed artifact explicitly.
+
+## Terminal evidence
+
+### Issue and pull-request disposition
+
+- Pull requests #193 and #207 merged; their remote topic branches were deleted.
+- #171, #182–#188, #190–#191, #194–#196, #198, #200–#201, and #203–#206
+  closed through the verified root fixes in #207 and received release comments.
+- #189, #192, #197, #199, and #202 closed with explicit completed, cancelled, or
+  terminal `NO-GO` evidence; no unused replacement adapter or lowered gate was
+  added.
+- Final live queries returned zero open issues and zero open pull requests.
+
+## Verification
+
+- Focused benchmark, extraction, shutdown, vector, SDK, CLI, and ranking lanes:
+  62 passed, 0 failed.
+- `pnpm test:integration`: 178 passed, 0 failed.
+- `pnpm test:api`: workerd/D1 102 passed; Bun/vector/SDK 126 passed.
+- Real Bun/SQLite to scoped Atlas adapter smoke passed; Playwright passed 10/10.
+- `bash scripts/verify-pack.sh` passed twice, including from detached release
+  commit `88935bac871811066692c1d149df030ab694862d`.
+- Workflow/self-test/Ponytail ledger, `git diff --check`, production dependency
+  audit, and changed-commit secret scan all passed; audit reported zero
+  advisories and gitleaks reported no leaks.
+
+## Release and cleanup
+
+- npm `latest` is `titen-memory@0.4.1`; registry SHA-1 is
+  `8928a08db8f8f099a81bfa672baffad7b2e33fcd` and a clean registry install ran
+  CLI `0.4.1` plus a plain-Node SDK import.
+- Annotated tag `v0.4.1` peels to `88935bac871811066692c1d149df030ab694862d`;
+  the matching non-draft GitHub Release was generated from this changelog.
+- GitHub reports only `refs/heads/main` at that commit. All temporary local
+  worktrees and non-main branches were retired after a verified recovery bundle
+  and four WIP archives were written under
+  `/home/ramaaditya/Backups/titen-cleanup-20260801-1208`.
+- The user's dirty primary checkout remains at `b19bd917e6dec493261109ad1693097fbb47d7dc`
+  with its original modifications and untracked files untouched.
+- The separate `titen-web` authority still showed CLI `0.4.0` at the final Titen
+  sweep probe. Its `release:sync 0.4.1 --check` identified the exact stale
+  manifest and release page; this repository neither edited nor deployed that
+  separately assigned checkout.
