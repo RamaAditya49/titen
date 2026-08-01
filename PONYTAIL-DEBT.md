@@ -1,6 +1,6 @@
 # Ponytail debt ledger
 
-Generated from tracked Ponytail comment markers on 2026-07-31. This is a
+Generated from tracked Ponytail comment markers and re-audited on 2026-08-01. This is a
 trigger-based ledger, not a backlog promise: keep each shortcut until its
 source-owned ceiling or trigger is observed.
 
@@ -49,3 +49,26 @@ is local and uses tracked Git content; it does not require hosted automation.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned
   public catalog submissions.
+
+## Audit notes — 2026-08-01
+
+- All 20 tracked source markers still map one-to-one to this ledger; the local
+  ledger checker passes.
+- The forward-only migration marker names `migrate --dry-run` as its upgrade,
+  but that command and its regression test now ship. Reword or retire this
+  marker during the next source change; it is no longer an open implementation
+  debt as written.
+- The standalone ClawHub publication marker is ready for a bounded revalidation:
+  upstream openclaw/clawhub#3327 is closed. Closure is not publication proof, so
+  keep the fallback until the unchanged bundle passes a real hosted publish.
+- The historical-context marker cites Titen issue #118, but that issue concerns
+  timestamp validation rather than point-in-time recall. The behavioral ceiling
+  remains real; repair the stale issue reference before treating it as scheduled
+  work.
+- The three no-trigger markers remain rot risks: enrichment cursor fairness,
+  the intentionally narrow vector boundary, and partial external-index-loss
+  detection need measurable source-owned triggers before implementation.
+- Roadmap `Planned` rows and unchecked boxes inside cancelled or superseded work
+  plans are not Ponytail debt. At audit start, canonical `origin/main` had zero
+  active spec/plan pairs; five terminal plans retained 32 deliberately unmet
+  historical checks.
