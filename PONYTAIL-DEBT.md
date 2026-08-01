@@ -40,7 +40,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 | Location | Deliberate shortcut | Ceiling | Upgrade trigger |
 | --- | --- | --- | --- |
-| `scripts/benchmark-enrichment-model.ts:720` | Use locked lexical aliases as a deterministic contract scorer | It cannot judge free-form semantic quality | A free-form production corpus becomes a release gate; use blinded independent adjudication |
+| `scripts/benchmark-enrichment-model.ts:658` | Use locked lexical aliases as a deterministic contract scorer | It cannot judge free-form semantic quality | A free-form production corpus becomes a release gate; use blinded independent adjudication |
 
 ## Summary
 
