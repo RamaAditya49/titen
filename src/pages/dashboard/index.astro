@@ -56,7 +56,7 @@ const lenses = [
         <section class="credential-note" aria-label="Credential handling">
           <p>Credential boundary</p>
           <strong data-credential-mode>Server-only</strong>
-          <span data-credential-copy>API keys never enter browser storage.</span>
+          <span data-credential-copy>Passwords and session keys never enter browser storage.</span>
           <button type="button" class="text-button" data-logout hidden>Sign out</button>
         </section>
       </aside>
@@ -83,19 +83,36 @@ const lenses = [
             </div>
             <div>
               <p class="eyebrow">Private operator access</p>
-              <h1 id="login-heading">Sign in</h1>
-              <p>Use an API key issued by your Titen organization.</p>
+              <h1 id="login-heading" data-login-heading>Sign in</h1>
+              <p data-login-copy>Use the operator account issued by your Titen organization.</p>
             </div>
             <p class="login-intro-note">Your permissions decide which memory, work, audit, governance, and federation tools become available.</p>
           </div>
           <form data-login-form>
             <label>
-              <span>Titen API key</span>
-              <input name="api_key" type="password" autocomplete="off" spellcheck="false" maxlength="512" required placeholder="titen_sk_…" />
+              <span>Username</span>
+              <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required placeholder="rama" />
+            </label>
+            <label>
+              <span>Password</span>
+              <input name="password" type="password" autocomplete="current-password" maxlength="128" required />
             </label>
             <button class="primary-button" type="submit">Continue</button>
-            <p class="login-boundary"><strong>Kept off this device.</strong> The adapter exchanges this key for an HttpOnly session and never writes it to browser storage.</p>
+            <p class="login-boundary"><strong>Kept off this device.</strong> The adapter exchanges your account for an HttpOnly session and clears both fields after submission.</p>
             <span data-login-status role="status" aria-live="polite"></span>
+          </form>
+          <form data-password-form hidden>
+            <label>
+              <span>New password</span>
+              <input name="password" type="password" autocomplete="new-password" minlength="15" maxlength="128" required />
+            </label>
+            <label>
+              <span>Confirm new password</span>
+              <input name="confirm_password" type="password" autocomplete="new-password" minlength="15" maxlength="128" required />
+            </label>
+            <button class="primary-button" type="submit">Set new password</button>
+            <p class="login-boundary"><strong>First-login requirement.</strong> Updating the password revokes every dashboard session for this user, then asks you to sign in again.</p>
+            <span data-password-status role="status" aria-live="polite"></span>
           </form>
         </section>
 
@@ -239,20 +256,20 @@ const lenses = [
             <button class="secondary-button" type="button" data-governance-refresh>Refresh governance</button>
           </div>
           <section class="user-admin" data-user-admin hidden aria-labelledby="add-user-heading">
-            <div><h3 id="add-user-heading">Add a human user</h3><p>Creates one organization membership and one API key atomically. The key is shown once.</p></div>
+            <div><h3 id="add-user-heading">Add a human user</h3><p>Creates one account and organization membership atomically. Titen generates a one-time temporary password; API keys remain for agents and services.</p></div>
             <form data-user-form>
-              <label><span>Key label</span><input name="label" maxlength="200" autocomplete="off" required placeholder="Rama dashboard" /></label>
-              <label><span>Role</span><select name="membership_role" required><option>reader</option><option>member</option><option>admin</option><option data-owner-role>owner</option></select></label>
+              <label><span>Username</span><input name="username" maxlength="64" pattern="[a-z0-9][a-z0-9._-]{2,63}" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="new.operator" /></label>
+              <label><span>Role</span><select name="role" required><option>reader</option><option>member</option><option>admin</option><option data-owner-role>owner</option></select></label>
               <label><span>Access profile</span><select name="profile" required><option value="reader">Read dashboard</option><option value="operator">Memory operator</option><option value="admin">Administrator</option></select></label>
               <label><span>Trust ceiling</span><select name="max_trust" required><option>asserted</option><option>verified</option><option>policy_approved</option><option>unverified</option></select></label>
               <button class="primary-button" type="submit">Create user</button>
               <span data-user-status role="status"></span>
+              <section class="one-time-credential" data-user-credential hidden aria-label="Temporary password">
+                <div><strong>Temporary password</strong><span>Shown once · first login must replace it</span></div>
+                <code data-user-temporary-password></code>
+                <button class="secondary-button" type="button" data-copy-temporary-password>Copy password</button>
+              </section>
             </form>
-            <div class="one-time-key" data-one-time-key hidden>
-              <strong>Copy this API key now. Titen cannot show it again.</strong>
-              <code data-new-key></code>
-              <div><button type="button" class="secondary-button" data-copy-key>Copy key</button><button type="button" class="text-button" data-clear-key>Clear</button></div>
-            </div>
           </section>
           <div class="live-output" data-governance-output><p>Refresh to load the governance contracts available to this principal.</p></div>
         </section>
@@ -275,6 +292,7 @@ const lenses = [
     <script>
       import {
         DashboardApiError,
+        changePassword,
         checkService,
         compileView,
         getArea,
@@ -419,9 +437,10 @@ const lenses = [
       }
       function clearPrivateState() {
         clearMemory();
+        one<HTMLElement>("[data-user-credential]").hidden = true;
+        text("[data-user-temporary-password]", "");
         for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]"])
           renderMessage(one(selector), "No live data loaded for this principal.");
-        clearOneTimeKey();
       }
       function updateMemoryRequirements() {
         const selected = one<HTMLInputElement>('input[name="lens"]:checked');
@@ -540,8 +559,7 @@ const lenses = [
           && ["root", "owner", "admin"].includes(String(principal?.organization_role)));
         one<HTMLOptionElement>("[data-owner-role]").disabled = !["root", "owner"].includes(String(principal?.organization_role));
       }
-      function signedOut(message?: string) {
-        principal = null;
+      function showLoginSurface() {
         clearPrivateState();
         one<HTMLElement>(".app-shell").dataset.shell = "login";
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = true;
@@ -554,7 +572,25 @@ const lenses = [
         text("[data-connection-label]", "Authentication required");
         text("[data-principal]", "Not signed in");
         text("[data-role]", "no active session");
+      }
+      function signedOut(message?: string) {
+        principal = null;
+        showLoginSurface();
+        one<HTMLFormElement>("[data-login-form]").hidden = false;
+        one<HTMLFormElement>("[data-password-form]").hidden = true;
+        one<HTMLFormElement>("[data-password-form]").reset();
+        text("[data-login-heading]", "Sign in");
+        text("[data-login-copy]", "Use the operator account issued by your Titen organization.");
         text("[data-login-status]", message ?? "");
+        text("[data-password-status]", "");
+      }
+      function showPasswordChange() {
+        showLoginSurface();
+        one<HTMLFormElement>("[data-login-form]").hidden = true;
+        one<HTMLFormElement>("[data-password-form]").hidden = false;
+        text("[data-login-heading]", "Set a new password");
+        text("[data-login-copy]", "Replace the temporary password before accessing organization data.");
+        text("[data-password-status]", "");
       }
       async function refreshService() {
         const notice = one<HTMLElement>("[data-service-notice]");
@@ -567,10 +603,11 @@ const lenses = [
           text("[data-endpoint]", dashboardStatus.endpoint ?? "configured endpoint");
           text("[data-credential-mode]", dashboardStatus.authentication === "session" ? "Per-principal session" : "Server key");
           text("[data-credential-copy]", dashboardStatus.authentication === "session"
-            ? "The API key stays only in adapter memory until logout or expiry."
+            ? "The password is verified once; a short-lived API key stays only in adapter memory."
             : "The browser uses a bounded server-side adapter key.");
           if (dashboardStatus.authentication === "session" && !dashboardStatus.authenticated) return signedOut();
           principal = await getSession();
+          if (principal.password_change_required) return showPasswordChange();
           showPrivateSurface();
           text("[data-principal]", principal?.principal_id ?? "Server key");
           text("[data-role]", principal ? `${principal.organization_role ?? "no org role"} · ${principal.principal_kind}` : "adapter authority");
@@ -599,24 +636,37 @@ const lenses = [
         operator: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "approvals:write", "releases:write"],
         admin: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write"],
       };
-      function clearOneTimeKey() {
-        one<HTMLElement>("[data-one-time-key]").hidden = true;
-        text("[data-new-key]", "");
-      }
-
       for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!));
       one<HTMLFormElement>("[data-login-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget as HTMLFormElement;
-        const input = form.elements.namedItem("api_key") as HTMLInputElement;
-        text("[data-login-status]", "Validating credential…");
+        const username = form.elements.namedItem("username") as HTMLInputElement;
+        const password = form.elements.namedItem("password") as HTMLInputElement;
+        text("[data-login-status]", "Signing in…");
         try {
-          principal = await login(input.value);
-          input.value = "";
+          principal = await login(username.value, password.value);
+          password.value = "";
           await refreshService();
         } catch (error) {
-          input.value = "";
+          password.value = "";
           text("[data-login-status]", errorMessage(error));
+        }
+      });
+      one<HTMLFormElement>("[data-password-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        if (!form.reportValidity()) return;
+        const password = form.elements.namedItem("password") as HTMLInputElement;
+        const confirm = form.elements.namedItem("confirm_password") as HTMLInputElement;
+        if (password.value !== confirm.value) return text("[data-password-status]", "Passwords do not match.");
+        text("[data-password-status]", "Updating password…");
+        try {
+          await changePassword(password.value);
+          signedOut("Password updated. Sign in with your new password.");
+        } catch (error) {
+          password.value = "";
+          confirm.value = "";
+          text("[data-password-status]", errorMessage(error));
         }
       });
       one<HTMLButtonElement>("[data-logout]").addEventListener("click", async () => {
@@ -709,31 +759,34 @@ const lenses = [
       });
       one<HTMLFormElement>("[data-user-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
-        clearOneTimeKey();
         const form = event.currentTarget as HTMLFormElement;
         if (!form.reportValidity()) return;
         const values = new FormData(form);
         const profile = String(values.get("profile"));
-        text("[data-user-status]", "Creating key and membership atomically…");
+        text("[data-user-status]", "Creating account and membership atomically…");
         try {
           const response = await postArea("governance/users", {
-            label: String(values.get("label")).trim(),
-            membership_role: String(values.get("membership_role")),
+            username: String(values.get("username")).trim().toLowerCase(),
+            role: String(values.get("role")),
             scopes: profiles[profile]!,
             max_trust: String(values.get("max_trust")),
           });
           const data = payloadData(response);
-          text("[data-new-key]", String(data.api_key));
-          one<HTMLElement>("[data-one-time-key]").hidden = false;
-          text("[data-user-status]", `Created ${data.principal_id} with role ${data.membership_role}.`);
+          if (typeof data.temporary_password !== "string")
+            throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen did not return the one-time password.");
+          form.reset();
+          text("[data-user-temporary-password]", data.temporary_password);
+          one<HTMLElement>("[data-user-credential]").hidden = false;
+          text("[data-user-status]", `Created ${data.username} with role ${data.role}. Copy the temporary password now.`);
         } catch (error) { text("[data-user-status]", errorMessage(error)); handleError(error); }
       });
-      one<HTMLButtonElement>("[data-copy-key]").addEventListener("click", async () => {
-        const key = one<HTMLElement>("[data-new-key]").textContent ?? "";
-        try { await navigator.clipboard.writeText(key); text("[data-user-status]", "API key copied."); }
-        catch { text("[data-user-status]", "Copy failed. Select the one-time key manually."); }
+      one<HTMLButtonElement>("[data-copy-temporary-password]").addEventListener("click", async () => {
+        const value = one<HTMLElement>("[data-user-temporary-password]").textContent ?? "";
+        try {
+          await navigator.clipboard.writeText(value);
+          text("[data-user-status]", "Temporary password copied.");
+        } catch { text("[data-user-status]", "Copy failed. Select the temporary password manually."); }
       });
-      one<HTMLButtonElement>("[data-clear-key]").addEventListener("click", clearOneTimeKey);
       one<HTMLButtonElement>("[data-federation-refresh]").addEventListener("click", async () => {
         const target = one<HTMLElement>("[data-federation-output]");
         try { renderPayload(target, await getArea("federation/peers")); } catch (error) { handleError(error, target); }

@@ -7,7 +7,7 @@ Status: **verified** — P0 memory service operational on Bun 1.3+ with SQLite (
 Prerequisites: Bun 1.3+.
 
 ```bash
-# Bootstrap org — prints org_id and api_key
+# Bootstrap org — prints org_id, api_key, owner username, and temporary password
 bunx titen-memory bootstrap --org 'My Org'
 
 # Start the memory service (defaults to 127.0.0.1:8787)
@@ -31,7 +31,7 @@ git clone https://github.com/RamaAditya49/titen.git
 cd titen
 pnpm install
 
-# Bootstrap org — prints org_id and api_key
+# Bootstrap org — prints org_id, api_key, owner username, and temporary password
 pnpm titen bootstrap --org 'My Org'
 
 # Start the memory service (defaults to 127.0.0.1:8787)
@@ -261,7 +261,8 @@ Fedora 44; nothing in the `Dockerfile` is docker-specific.
 podman build -t titen:latest .            # or: docker build
 podman volume create titen-data
 
-# Bootstrap once. Save the printed api_key; it cannot be shown again.
+# Bootstrap once. Save the API key and dashboard temporary password; neither can
+# be shown again. The dashboard requires the password to be changed at first login.
 podman run --rm -v titen-data:/var/lib/titen titen:latest \
   bootstrap --db /var/lib/titen/titen.db --org 'My Org'
 
@@ -401,9 +402,9 @@ does not expose a verifiable address-pinning primitive.
 ## Optional live dashboard
 
 Build the static Astro client and run its adapter beside the loopback API. The
-recommended session mode lets each operator sign in with a separate bounded
-Titen key; the key remains only in adapter memory behind an opaque HttpOnly
-cookie. It never enters browser assets, URLs, or Web Storage:
+recommended session mode lets each operator sign in with a username/password.
+The resulting bounded Titen key remains only in adapter memory behind an opaque
+HttpOnly cookie. Neither credential enters browser assets, URLs, or Web Storage:
 
 ```bash
 pnpm build

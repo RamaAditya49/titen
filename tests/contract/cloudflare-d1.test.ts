@@ -432,11 +432,17 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
     assert.equal(
       (await real.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
         .some(({ name }) => name === "source_org_id"),
-      false,
+      true,
     );
     assert.equal(
       (await real.all<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'federated_records'",
+      )).length,
+      1,
+    );
+    assert.equal(
+      (await real.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_accounts'",
       )).length,
       0,
     );
@@ -445,6 +451,12 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
       (await real.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
         .some(({ name }) => name === "source_org_id"),
       true,
+    );
+    assert.equal(
+      (await real.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_accounts'",
+      )).length,
+      1,
     );
     assert.deepEqual(
       (await real.all<{ name: string }>("PRAGMA table_info(index_outbox)"))

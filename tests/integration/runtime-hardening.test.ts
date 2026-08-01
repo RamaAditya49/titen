@@ -160,15 +160,22 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     assert.equal(
       (await db.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
         .some(({ name }) => name === "source_org_id"),
-      false,
-      `migration ${migration.version} must roll back its peer binding after statement ${failureAfter + 1}`,
+      true,
+      `completed migration 19 must retain its peer binding after statement ${failureAfter + 1}`,
     );
     assert.equal(
       (await db.all<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'federated_records'",
       )).length,
+      1,
+      `completed migration 19 must retain its table after statement ${failureAfter + 1}`,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_accounts'",
+      )).length,
       0,
-      `migration ${migration.version} must roll back its table after statement ${failureAfter + 1}`,
+      `migration ${migration.version} must roll back its account table after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at
@@ -200,6 +207,12 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     assert.equal(
       (await db.all<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'federated_records'",
+      )).length,
+      1,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_accounts'",
       )).length,
       1,
     );

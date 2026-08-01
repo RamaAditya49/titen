@@ -1,8 +1,9 @@
 # Live operator dashboard
 
 Titen includes an optional Astro dashboard at `/dashboard/`. It uses the
-authenticated Titen API through a loopback same-origin adapter. The browser
-contains no fixture fallback and never stores an API key in Web Storage.
+authenticated Titen API through a loopback same-origin adapter. Human operators
+use username/password; the browser contains no fixture fallback and never stores
+a password or API key in Web Storage.
 
 The product map has six live, capability-gated areas:
 
@@ -41,12 +42,20 @@ TITEN_API_URL=http://127.0.0.1:8787 \
 pnpm dashboard:adapter
 ```
 
-Open `http://127.0.0.1:4322/dashboard/` and sign in with an active Titen API
-key. The adapter verifies it against `GET /v1/principal`, keeps it only in
-process memory, and gives the browser an opaque `HttpOnly; SameSite=Strict`
-cookie. Sessions expire after eight hours and are discarded on logout, API-key
-revocation, or adapter restart. A new login with the same key replaces its
-previous session; one adapter holds at most 128 active sessions.
+Open `http://127.0.0.1:4322/dashboard/` and sign in with an operator username and
+password. The API verifies the password, issues a short-lived API key to the
+adapter only, and gives the browser an opaque `HttpOnly; SameSite=Strict`
+cookie. Established sessions expire after eight hours and are discarded on
+logout, revocation, password change, or adapter restart. A new login for the
+same principal replaces its previous session; one adapter holds at most 128
+active sessions.
+
+`titen bootstrap` creates username `owner` and prints a random temporary
+password once. A temporary password opens only the **Set a new password** page;
+the private sidebar, topbar, and product routes remain unavailable. The change
+revokes the temporary session and requires a fresh login. For a second
+organization in the same database, pass a unique `--username` because dashboard
+usernames are deployment-wide login identifiers.
 
 For a remote HTTPS hostname, set its exact origin:
 
@@ -67,14 +76,15 @@ instead of opening the adapter or API port.
 
 An organization `owner` or `admin` with `keys:manage` and
 `memberships:write` sees **Governance → Add a human user**. One submission
-creates the organization membership and its API key in one transaction. An
+creates the organization membership and its password account in one transaction.
+Titen generates a random temporary password, displays it once, and requires the
+new user to replace it on first login. An
 admin cannot grant the owner role, scope/trust escalation is rejected, and a
-partial failure creates neither record. The raw key is shown once.
+partial failure creates neither record. No raw API key is returned.
 
-Titen intentionally reuses its existing human principal, membership, and API
-key contracts. It does not add a password database, email invitation flow, or
-identity provider merely for the dashboard. Add SSO/SCIM when a deployment has
-an external identity requirement.
+Titen reuses its existing human principal, membership, scope, trust, and role
+contracts. Email delivery, recovery, self-registration, MFA, and SSO/SCIM remain
+out of scope; add them when a deployment has those identity requirements.
 
 ## Legacy server-key mode
 
@@ -93,9 +103,9 @@ pnpm test:browser tests/dashboard.spec.ts
 pnpm check:workflow
 ```
 
-The real smoke starts temporary Bun/SQLite and proves login, all six areas,
-atomic Add User, logout, and login with the newly issued key through the real
-adapter. Integration and browser tests also cover credential isolation,
+The real smoke starts temporary Bun/SQLite and proves login, forced first
+password replacement, all six areas, atomic Add User, logout, and fresh login
+through the real adapter. Integration and browser tests also cover credential isolation,
 revocation, exact origin checks, request-size limits, capability hiding, stale
 private-state clearing, keyboard use, and a 320 px viewport.
 

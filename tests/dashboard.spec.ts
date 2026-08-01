@@ -82,7 +82,7 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   } }));
   await page.route("**/dashboard-api/session", async (route) => {
     if (route.request().method() === "POST") {
-      expect(route.request().postDataJSON()).toEqual({ api_key: "titen_sk_browser_login" });
+      expect(route.request().postDataJSON()).toEqual({ username: "rama", password: "correct horse battery staple" });
       loggedIn = true;
       return route.fulfill({ status: 201, headers: { "set-cookie": "titen_dashboard_session=opaque; Path=/; HttpOnly; SameSite=Strict" }, json: { data: principal } });
     }
@@ -123,10 +123,13 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await page.route("**/dashboard-api/governance/users", async (route) => {
     calls.push("add-user");
     const body = route.request().postDataJSON() as Record<string, unknown>;
-    expect(body.membership_role).toBe("reader");
+    expect(body.username).toBe("new.reader");
+    expect(body.password).toBeUndefined();
+    expect(body.role).toBe("reader");
     expect(body.scopes).toContain("views:compile");
     return route.fulfill({ status: 201, json: { data: {
-      principal_id: "human_new", membership_role: "reader", membership_id: "mbr_new", api_key: "titen_sk_one_time_browser",
+      username: "new.reader", principal_id: "human_new", role: "reader", membership_id: "mbr_new",
+      temporary_password: "generated temporary password", password_change_required: true,
     } } });
   });
   await page.route("**/dashboard-api/federation/peers", (route) => {
@@ -139,8 +142,9 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "login");
   await expect(page.locator(".sidebar")).toBeHidden();
   await expect(page.locator(".topbar")).toBeHidden();
-  await expect(page.getByLabel("Titen API key")).toBeVisible();
-  await page.locator('[data-login-form] input[name="api_key"]').fill("titen_sk_browser_login");
+  await expect(page.getByLabel("Username").first()).toBeVisible();
+  await page.locator('[data-login-form] input[name="username"]').fill("rama");
+  await page.locator('[data-login-form] input[name="password"]').fill("correct horse battery staple");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
   await expect(page.locator(".sidebar")).toBeVisible();
@@ -167,9 +171,10 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await page.locator('[data-area="governance"]').click();
   await page.getByRole("button", { name: "Refresh governance" }).click();
   await expect(page.getByText("memberships_live", { exact: true })).toBeVisible();
-  await page.getByLabel("Key label").fill("New reader");
+  await page.locator('[data-user-form] input[name="username"]').fill("new.reader");
   await page.getByRole("button", { name: "Create user" }).click();
-  await expect(page.locator("[data-new-key]")).toHaveText("titen_sk_one_time_browser");
+  await expect(page.locator("[data-user-status]")).toContainText("Created new.reader with role reader");
+  await expect(page.locator("[data-user-temporary-password]")).toHaveText("generated temporary password");
 
   await page.locator('[data-area="federation"]').click();
   await page.getByRole("button", { name: "Refresh peers" }).click();
@@ -186,7 +191,61 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
   await expect(page.locator(".sidebar")).toBeHidden();
-  await expect(page.getByText("titen_sk_one_time_browser")).toHaveCount(0);
+  await expect(page.getByText("generated temporary password")).toHaveCount(0);
+});
+
+test("forces a temporary-password login to replace its password before showing the app", async ({ page }) => {
+  let authenticated = false;
+  let passwordChangeRequired = true;
+  const principal = () => ({
+    organization_id: "org_first",
+    principal_id: "owner",
+    principal_kind: "human",
+    key_id: "key_first",
+    scopes: passwordChangeRequired ? [] : ["views:compile"],
+    max_trust: "policy_approved",
+    organization_role: "owner",
+    password_change_required: passwordChangeRequired,
+  });
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: {
+    mode: "live", endpoint: "titen.internal", authentication: "session", authenticated,
+  } }));
+  await page.route("**/dashboard-api/session", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { username: string; password: string };
+      expect(body.username).toBe("owner");
+      expect(body.password).toBe(passwordChangeRequired ? "temporary horse battery staple" : "permanent horse battery staple");
+      authenticated = true;
+      return route.fulfill({ status: 201, json: { data: principal() } });
+    }
+    return route.fulfill({ json: { data: principal() } });
+  });
+  await page.route("**/dashboard-api/password", async (route) => {
+    expect(route.request().method()).toBe("PATCH");
+    expect(route.request().postDataJSON()).toEqual({ password: "permanent horse battery staple" });
+    passwordChangeRequired = false;
+    authenticated = false;
+    return route.fulfill({ json: { data: { password_changed: true, login_required: true } } });
+  });
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+
+  await page.goto("/dashboard/");
+  await page.locator('[data-login-form] input[name="username"]').fill("owner");
+  await page.locator('[data-login-form] input[name="password"]').fill("temporary horse battery staple");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Set a new password" })).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator("[data-product-nav]")).toBeHidden();
+  await page.locator('[data-password-form] input[name="password"]').fill("permanent horse battery staple");
+  await page.locator('[data-password-form] input[name="confirm_password"]').fill("permanent horse battery staple");
+  await page.getByRole("button", { name: "Set new password" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.locator("[data-login-status]")).toContainText("Password updated");
+  await page.locator('[data-login-form] input[name="password"]').fill("permanent horse battery staple");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
+  await expect(page.locator('[data-area="memories"]')).toBeVisible();
 });
 
 test("capability discovery exposes only authorized areas and clears denial state", async ({ page }) => {

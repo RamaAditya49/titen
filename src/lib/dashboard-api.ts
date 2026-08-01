@@ -41,6 +41,7 @@ export interface DashboardPrincipal {
   scopes: string[];
   max_trust: string;
   organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
+  password_change_required?: boolean;
 }
 
 export interface ServiceCheck {
@@ -101,11 +102,11 @@ function principal(payload: Record<string, unknown>): DashboardPrincipal {
   return data as DashboardPrincipal;
 }
 
-export async function login(apiKey: string): Promise<DashboardPrincipal> {
+export async function login(username: string, password: string): Promise<DashboardPrincipal> {
   return principal(await request("/dashboard-api/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ api_key: apiKey }),
+    body: JSON.stringify({ username, password }),
   }));
 }
 
@@ -115,6 +116,14 @@ export async function getSession(): Promise<DashboardPrincipal> {
 
 export async function logout(): Promise<void> {
   await request("/dashboard-api/session", { method: "DELETE" });
+}
+
+export async function changePassword(password: string): Promise<void> {
+  await request("/dashboard-api/password", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
 }
 
 export async function getArea(path: string, query?: URLSearchParams): Promise<Record<string, unknown>> {

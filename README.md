@@ -82,8 +82,10 @@ background or during server/MCP startup. Re-run the installer documented at
 supported SDK dependency manager, but its Node-owned `dlx` runner does not run
 the Bun TypeScript CLI.
 
-Save the printed API key when it appears. Titen stores only its hash and cannot
-show the key again. Start the service from the same directory:
+Save the printed API key and dashboard temporary password when they appear.
+Titen stores only their hashes and cannot show either again. The default
+dashboard username is `owner`; first login requires a new password. Start the
+service from the same directory:
 
 ```bash
 titen serve
@@ -227,10 +229,12 @@ the [Cloudflare deployment guide](https://github.com/RamaAditya49/titen/blob/mai
 
 The checked-in Astro client at `/dashboard/` is a live operator surface for
 Memories, Context, Work, Audit, Governance, and Federation. Each person signs
-in with a Titen API key; the loopback adapter exchanges it for an opaque
-HttpOnly session and never writes it to browser storage. Authorized owners and
-admins can add a human user and receive the new key once. There is no fixture
-fallback when the service is disconnected or denies a request.
+in with a username/password; the loopback adapter keeps the resulting
+short-lived key behind an opaque HttpOnly session and never writes either secret
+to browser storage. Bootstrap creates `owner` with a random temporary password,
+and Add User follows the same forced-first-change flow. API keys remain for
+agents, services, SDKs, and recovery. There is no fixture fallback when the
+service is disconnected or denies a request.
 
 The [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
 covers configuration and verification. Use the

@@ -123,6 +123,25 @@ Rules:
   explicit bounded overlap;
 - revocation is checked on every request.
 
+### `operator_accounts`
+
+Human dashboard login metadata joined to one organization-level human
+membership. Required fields are `id`, `org_id`, `principal_id`, globally unique
+normalized `username`, versioned `password_verifier`, serialized scopes,
+`max_trust`, `must_change_password`, `created_by`, `created_at`, optional
+`password_changed_at`, and optional `disabled_at`.
+
+Rules:
+
+- the account cannot be inserted without its active human membership;
+- a random temporary password is returned once and only its salted verifier is
+  stored;
+- temporary-password sessions have no product scopes;
+- replacement clears `must_change_password` and revokes that principal's active
+  dashboard sessions;
+- operator accounts are not part of logical export/import because password
+  credentials require a separate recovery decision.
+
 ### `subjects` and `subject_references`
 
 `subjects` identify who or what memory is about without treating the author,

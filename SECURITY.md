@@ -29,6 +29,12 @@ Useful reports include:
 - Memory content and model output are untrusted.
 - Tenant/organization authority comes from authentication.
 - API keys are high entropy, hashed at rest, scoped, labeled, and revocable.
+- Human operator passwords use unique salts and versioned PBKDF2-HMAC-SHA-256
+  verifiers with 600,000 iterations; submitted passwords are never stored,
+  exported, logged, or echoed.
+- Bootstrap and Add User reveal a random temporary password once. Its login has
+  no product scopes; replacement revokes all dashboard sessions for that
+  principal and requires fresh authentication.
 - Claims do not become trusted without evidence and policy.
 - Verified trust does not permit external disclosure; customer-facing knowledge
   requires an explicit approved release for one channel/audience.
@@ -45,7 +51,7 @@ Useful reports include:
 
 Titen must not log or expose:
 
-- API keys, model tokens, or session credentials;
+- API keys, passwords, password verifiers, model tokens, or session credentials;
 - raw prompts or private memory content in normal logs;
 - embeddings;
 - full private identifiers when a short/hash reference is sufficient;
@@ -66,6 +72,8 @@ Titen must not log or expose:
 - export/import scope bypass;
 - federation policy or signature bypass;
 - secret leakage through logs, errors, health, backup, or audit export.
+- password enumeration, verifier downgrade, login-throttle bypass, or session
+  key reuse after logout.
 
 ## Supported versions
 

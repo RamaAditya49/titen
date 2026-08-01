@@ -27,7 +27,12 @@ const api = await serve({
   secretCipher: TEST_SECRET_CIPHER,
 });
 const db = createSqliteDb(openDatabase(dbPath));
-const destination = await provisionWith(db, { principalId: "dashboard_operator", scopes: ["*"] });
+const destination = await provisionWith(db, {
+  principalId: "dashboard_operator",
+  principalKind: "human",
+  scopes: ["*"],
+  maxTrust: "policy_approved",
+});
 const approver = await provisionWith(db, { orgId: destination.orgId, principalId: "dashboard_approver", scopes: ["*"] });
 const gateway = await provisionWith(db, { orgId: destination.orgId, principalId: "dashboard_gateway", principalKind: "service", scopes: ["*"] });
 const source = await provisionWith(db, { principalId: "federation_source", scopes: ["*"] });
@@ -145,12 +150,6 @@ await call(`/v1/knowledge-releases/${release.release_id}/approve`, {
   reason: "Independent verifier approval",
 }, approver);
 await call(`/v1/knowledge-releases/${release.release_id}/activate`, { expected_version: 2 }, approver);
-await call("/v1/checkpoints", {
-  subject_id: subject,
-  kind: "task_state",
-  state: { phase: "verify" },
-  ttl_seconds: 600,
-});
 await call("/v1/leases", {
   resource_type: "release",
   resource_id: "dashboard-release",
@@ -161,6 +160,66 @@ await call("/v1/handoffs", {
   to_principal: destination.principalId,
   subject_id: subject,
   message: "Verify the live dashboard product map.",
+}, approver);
+
+const ownerUsername = "dashboard.owner";
+const ownerPassword = "correct horse battery staple owner";
+const ownerAccount = await call("/v1/operator-accounts", {
+  username: ownerUsername,
+  role: "owner",
+  scopes: ["*"],
+  max_trust: "policy_approved",
+});
+const ownerLoginResponse = await fetch(`${api.url}/v1/dashboard-sessions`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ username: ownerUsername, password: ownerAccount.temporary_password }),
+});
+const temporaryOwnerLogin: any = await ownerLoginResponse.json();
+assert.ok(ownerLoginResponse.ok, JSON.stringify(temporaryOwnerLogin));
+assert.equal(temporaryOwnerLogin.data.password_change_required, true);
+assert.deepEqual(temporaryOwnerLogin.data.scopes, []);
+const changedOwnerPassword = await fetch(`${api.url}/v1/operator-accounts/current/password`, {
+  method: "PATCH",
+  headers: { authorization: `Bearer ${temporaryOwnerLogin.data.api_key}`, "content-type": "application/json" },
+  body: JSON.stringify({ password: ownerPassword }),
+});
+assert.equal(changedOwnerPassword.status, 200);
+assert.equal((await fetch(`${api.url}/v1/principal`, {
+  headers: { authorization: `Bearer ${temporaryOwnerLogin.data.api_key}` },
+})).status, 401, "password change revokes the temporary session");
+const establishedOwnerLoginResponse = await fetch(`${api.url}/v1/dashboard-sessions`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ username: ownerUsername, password: ownerPassword }),
+});
+const ownerLogin: any = await establishedOwnerLoginResponse.json();
+assert.ok(establishedOwnerLoginResponse.ok, JSON.stringify(ownerLogin));
+assert.equal(ownerLogin.data.password_change_required, false);
+const ownerSession: Provisioned = {
+  orgId: ownerLogin.data.organization_id,
+  principalId: ownerLogin.data.principal_id,
+  keyId: ownerLogin.data.key_id,
+  key: ownerLogin.data.api_key,
+};
+await call("/v1/checkpoints", {
+  subject_id: subject,
+  kind: "task_state",
+  state: { phase: "verify" },
+  ttl_seconds: 600,
+}, ownerSession);
+const ownerPeer = await call("/v1/federation/peers", {
+  name: "dashboard-owner-peer",
+  endpoint: "https://owner.example.test",
+  shared_secret: "dashboard-owner-shared-secret",
+  direction: "pull",
+}, ownerSession);
+await call(`/v1/federation/peers/${ownerPeer.peer_id}/filters`, { resource_type: "claim" }, ownerSession);
+await call("/v1/federation/pull", { peer_id: ownerPeer.peer_id }, ownerSession);
+await call("/v1/handoffs", {
+  to_principal: ownerAccount.principal_id,
+  subject_id: subject,
+  message: "Verify the live dashboard product map as its human owner.",
 }, approver);
 
 const port = 44_000 + Math.floor(Math.random() * 1000);
@@ -209,17 +268,17 @@ try {
   assert.equal(initial.mode, "live");
   assert.equal(initial.authentication, "session");
   assert.equal(initial.authenticated, false);
-  assert.ok(!JSON.stringify(initial).includes(destination.key), "status must not expose the API key");
+  assert.ok(!JSON.stringify(initial).includes(destination.key), "status must not expose the bootstrap API key");
   const loggedIn = await dashboardCall("/dashboard-api/session", {
     method: "POST",
-    body: { api_key: destination.key },
+    body: { username: ownerUsername, password: ownerPassword },
     expected: 201,
     authenticated: false,
   });
   sessionCookie = loggedIn.response.headers.get("set-cookie")!.split(";", 1)[0]!;
   assert.match(sessionCookie, /^titen_dashboard_session=/);
-  assert.ok(!JSON.stringify(loggedIn.payload).includes(destination.key), "login must not echo the API key");
-  assert.equal(loggedIn.payload.data.principal_id, destination.principalId);
+  assert.ok(!JSON.stringify(loggedIn.payload).includes(ownerPassword), "login must not echo the password");
+  assert.equal(loggedIn.payload.data.principal_id, ownerAccount.principal_id);
   assert.equal((await dashboardCall("/dashboard-api/health")).payload.data.status, "ok");
   assert.equal((await dashboardCall("/dashboard-api/readiness")).payload.data.ready, true);
 
@@ -228,7 +287,7 @@ try {
     { input: { lens: "conflict_freshness", subject_id: federatedSubject, limit: 5 }, marker: importedMarker },
     { input: { lens: "evidence_trace", focus_id: importedClaimId, limit: 5 }, marker: importedMarker },
     { input: { lens: "review_queue", subject_id: federatedSubject, review_reason: "all", limit: 5 }, marker: importedMarker },
-    { input: { lens: "scope_preview", focus_id: destination.principalId, limit: 5 }, marker: "agent" },
+    { input: { lens: "scope_preview", focus_id: destination.principalId, limit: 5 }, marker: "human" },
     { input: { lens: "knowledge_release", focus_id: channel.channel_id, limit: 5 }, marker: releaseMarker },
   ];
   for (const { input, marker: expected } of cases) {
@@ -249,24 +308,26 @@ try {
   assert.ok(leases.some((item: any) => item.resource_id === "dashboard-release"), "Work area returns leases");
   const handoffs = (await dashboardCall("/dashboard-api/work/handoffs")).payload.data.handoffs;
   assert.ok(handoffs.some((item: any) => item.message.includes("product map")), "Work area returns pending handoffs");
-  assert.equal((await dashboardCall(`/dashboard-api/work/checkpoint?subject_id=${subject}&agent_id=${destination.principalId}&kind=task_state`)).payload.data.state.phase, "verify");
+  assert.equal((await dashboardCall(`/dashboard-api/work/checkpoint?subject_id=${subject}&agent_id=${ownerAccount.principal_id}&kind=task_state`)).payload.data.state.phase, "verify");
 
   assert.ok((await dashboardCall("/dashboard-api/audit/log?limit=50")).payload.data.entries.length > 0, "Audit area returns entries");
   assert.ok((await dashboardCall("/dashboard-api/audit/events?limit=50")).payload.data.events.length > 0, "Audit area returns events");
   assert.ok((await dashboardCall("/dashboard-api/governance/channels")).payload.data.channels.length > 0, "Governance area returns channels");
   assert.ok((await dashboardCall("/dashboard-api/governance/releases")).payload.data.releases.length > 0, "Governance area returns releases");
   assert.ok((await dashboardCall("/dashboard-api/federation/peers")).payload.data.peers.length > 0, "Federation area returns peers");
-  assert.ok((await dashboardCall(`/dashboard-api/federation/log?peer_id=${destinationPeer.peer_id}&limit=50`)).payload.data.entries.length > 0, "Federation area returns exchange log");
+  assert.ok((await dashboardCall(`/dashboard-api/federation/log?peer_id=${ownerPeer.peer_id}&limit=50`)).payload.data.entries.length > 0, "Federation area returns exchange log");
 
   const created = (await dashboardCall("/dashboard-api/governance/users", { body: {
-    label: "Dashboard verifier reader",
-    membership_role: "reader",
+    username: "dashboard.reader",
+    role: "reader",
     scopes: ["views:compile"],
     max_trust: "asserted",
   }, expected: 201 })).payload.data;
-  assert.match(created.api_key, /^titen_sk_/);
-  const newKey = created.api_key as string;
-  assert.equal(created.membership_role, "reader");
+  assert.equal(created.api_key, undefined);
+  assert.match(created.temporary_password, /^[A-Za-z0-9_-]{24}$/);
+  assert.equal(created.password_change_required, true);
+  assert.equal(created.username, "dashboard.reader");
+  assert.equal(created.role, "reader");
   const membershipRows = await db.all<{ count: number }>(
     `SELECT COUNT(*) AS count FROM memberships WHERE org_id = ? AND principal_id = ? AND role = 'reader' AND removed_at IS NULL`,
     [destination.orgId, created.principal_id],
@@ -277,13 +338,40 @@ try {
   assert.equal((await dashboardCall("/dashboard-api/work/leases", { expected: 401 })).payload.error.code, "DASHBOARD_AUTH_REQUIRED");
   sessionCookie = "";
   const readerLogin = await dashboardCall("/dashboard-api/session", {
-    method: "POST", body: { api_key: newKey }, expected: 201, authenticated: false,
+    method: "POST",
+    body: { username: "dashboard.reader", password: created.temporary_password },
+    expected: 201,
+    authenticated: false,
   });
   sessionCookie = readerLogin.response.headers.get("set-cookie")!.split(";", 1)[0]!;
   assert.equal(readerLogin.payload.data.principal_id, created.principal_id, "new user can log in");
+  assert.equal(readerLogin.payload.data.password_change_required, true);
+  assert.deepEqual(readerLogin.payload.data.scopes, []);
+  assert.equal((await dashboardCall("/dashboard-api/work/leases", { expected: 403 })).payload.error.code, "UPSTREAM_403");
+  const readerPassword = "correct horse battery staple reader";
+  const changed = await dashboardCall("/dashboard-api/password", {
+    method: "PATCH",
+    body: { password: readerPassword },
+  });
+  assert.match(changed.response.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  sessionCookie = "";
+  await dashboardCall("/dashboard-api/session", {
+    method: "POST",
+    body: { username: "dashboard.reader", password: created.temporary_password },
+    expected: 401,
+    authenticated: false,
+  });
+  const establishedReader = await dashboardCall("/dashboard-api/session", {
+    method: "POST",
+    body: { username: "dashboard.reader", password: readerPassword },
+    expected: 201,
+    authenticated: false,
+  });
+  sessionCookie = establishedReader.response.headers.get("set-cookie")!.split(";", 1)[0]!;
+  assert.equal(establishedReader.payload.data.password_change_required, false);
   assert.equal((await dashboardCall("/dashboard-api/session")).payload.data.organization_role, "reader");
 
-  console.log("OK — six live product areas, per-principal login, atomic add-user, and canonical federation passed through the real adapter");
+  console.log("OK — six live product areas, forced first password change, atomic add-user, and canonical federation passed through the real adapter");
 } finally {
   adapter.kill();
   await api.stop();

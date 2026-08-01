@@ -8,6 +8,7 @@ features explicitly listed as proposed are not routes.
 
 <!-- ROUTE_INVENTORY_START -->
 - `DELETE /v1/checkpoints/:id`
+- `DELETE /v1/dashboard-sessions/current`
 - `DELETE /v1/identity-mappings/:id`
 - `DELETE /v1/keys/:id`
 - `DELETE /v1/leases/:id`
@@ -42,6 +43,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/webhooks/:id/deliveries`
 - `GET /v1/workspaces`
 - `PATCH /v1/channels/:id`
+- `PATCH /v1/operator-accounts/current/password`
 - `PATCH /v1/policies/:id`
 - `POST /mcp`
 - `POST /v1/channels`
@@ -55,6 +57,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/consolidations`
 - `POST /v1/context/:id/feedback`
 - `POST /v1/context/compile`
+- `POST /v1/dashboard-sessions`
 - `POST /v1/enrichment/drain`
 - `POST /v1/federation/peers`
 - `POST /v1/federation/peers/:id/filters`
@@ -78,6 +81,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
 - `POST /v1/observations`
+- `POST /v1/operator-accounts`
 - `POST /v1/policies`
 - `POST /v1/projects/resolve`
 - `POST /v1/retention/apply`
@@ -117,8 +121,9 @@ new opaque identity. This prevents a scoped key manager from borrowing an
 existing owner/admin role by name.
 
 An optional `membership_role` (`owner`, `admin`, `member`, or `reader`) turns
-the same operation into **Add user**. It fixes `principal_kind` to `human` and
-atomically creates one organization-level membership with the new key. The
+the same operation into a managed human API credential. It fixes
+`principal_kind` to `human` and atomically creates one organization-level
+membership with the new key. The
 caller needs `keys:manage`, `memberships:write`, and an active organization
 `owner` or `admin` role; an admin cannot assign `owner`. Scope and trust ceilings
 still cannot exceed the caller. A duplicate membership or any validation,
@@ -134,6 +139,39 @@ so a least-privilege dashboard session can verify its identity. A wildcard
 bootstrap/recovery key reports role `root`; a key without an active
 organization membership reports `null`. Expired or revoked keys return `401`
 on the next request.
+
+## Dashboard operator accounts
+
+`POST /v1/operator-accounts` accepts `username`, `role`, non-empty `scopes`, and
+optional `max_trust`. The caller needs `keys:manage`, `memberships:write`, and an
+active organization `owner` or `admin` role; only an owner may assign `owner`.
+The operation atomically creates one human membership and password account,
+then returns a random `temporary_password` once with
+`password_change_required: true`. It never returns a raw API key. Usernames are
+lowercase and unique across one Titen deployment; use `titen bootstrap
+--username <unique-name>` when bootstrapping another organization into the same
+database.
+
+`POST /v1/dashboard-sessions` is the unauthenticated username/password exchange.
+A valid established account receives an eight-hour revocable API key for the
+same principal, scopes, trust ceiling, and organization role. A temporary
+password receives a 15-minute key with no scopes and
+`password_change_required: true`; it can call only authenticated scope-free
+routes such as principal introspection and the password-change route. Unknown
+users and wrong passwords return the same `INVALID_LOGIN` response, and failed
+attempts are bounded.
+
+`PATCH /v1/operator-accounts/current/password` accepts only `password`. It is
+available to an authenticated operator session even when that session has no
+scopes. A successful change replaces the salted verifier, clears the first-login
+flag, revokes every active dashboard session for that principal, and requires a
+fresh login. Passwords contain 15–128 Unicode characters after NFC
+normalization and are checked against a small deployment-local common/context
+list.
+
+`DELETE /v1/dashboard-sessions/current` revokes the bearer dashboard session.
+API keys created for agents, services, SDKs, CLI recovery, or other integrations
+are separate and unchanged.
 
 ## Webhook delivery
 

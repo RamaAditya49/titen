@@ -96,10 +96,10 @@ interface DashboardPrincipal {
   scopes: string[];
   max_trust: "unverified" | "asserted" | "verified" | "policy_approved";
   organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
+  password_change_required?: boolean;
 }
 interface Session {
   key: string;
-  keyId: string;
   principal: DashboardPrincipal;
   expiresAt: number;
 }
@@ -117,7 +117,8 @@ function safePrincipal(value: unknown): DashboardPrincipal | undefined {
     || typeof row.key_id !== "string" || !["human", "agent", "service"].includes(String(kind))
     || !["unverified", "asserted", "verified", "policy_approved"].includes(String(trust))
     || !Array.isArray(row.scopes) || row.scopes.length > 256 || !row.scopes.every((scope) => typeof scope === "string")
-    || (role !== null && !["root", "owner", "admin", "member", "reader"].includes(String(role)))) return;
+    || (role !== null && !["root", "owner", "admin", "member", "reader"].includes(String(role)))
+    || (row.password_change_required !== undefined && typeof row.password_change_required !== "boolean")) return;
   return {
     organization_id: row.organization_id,
     principal_id: row.principal_id,
@@ -126,6 +127,8 @@ function safePrincipal(value: unknown): DashboardPrincipal | undefined {
     scopes: row.scopes,
     max_trust: trust as DashboardPrincipal["max_trust"],
     organization_role: role as DashboardPrincipal["organization_role"],
+    ...(typeof row.password_change_required === "boolean"
+      ? { password_change_required: row.password_change_required } : {}),
   };
 }
 function sessionId(request: Request): string | undefined {
@@ -144,14 +147,16 @@ function sessionFor(request: Request): [string, Session] | undefined {
 function rememberSession(key: string, principal: DashboardPrincipal): string {
   const now = Date.now();
   for (const [id, session] of sessions)
-    if (session.expiresAt <= now || session.keyId === principal.key_id) sessions.delete(id);
+    if (session.expiresAt <= now
+      || (session.principal.organization_id === principal.organization_id
+        && session.principal.principal_id === principal.principal_id)) sessions.delete(id);
   while (sessions.size >= MAX_SESSIONS) {
     const oldest = sessions.keys().next().value;
     if (!oldest) break;
     sessions.delete(oldest);
   }
   const id = crypto.randomUUID().replaceAll("-", "");
-  sessions.set(id, { key, keyId: principal.key_id, principal, expiresAt: now + SESSION_TTL_MS });
+  sessions.set(id, { key, principal, expiresAt: now + SESSION_TTL_MS });
   return id;
 }
 function cookie(id: string, maxAge = SESSION_TTL_MS / 1000): string {
@@ -211,6 +216,7 @@ function upstreamMessage(status: number): string {
   if (status === 403) return "This principal is not authorized for the selected operation.";
   if (status === 404) return "The requested authorized resource was not found.";
   if (status === 409) return "The operation conflicts with current canonical state.";
+  if (status === 429) return "Too many sign-in attempts. Try again later.";
   if (status === 503) return "Titen is not ready.";
   if (status === 400 || status === 413) return "Titen rejected the bounded request.";
   return "Titen did not return a usable response.";
@@ -268,14 +274,26 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     if (!sessionMode) return error(404, "NOT_FOUND", "Dashboard session mode is not enabled.");
     if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
     const body = await bodyObject(request, 2048);
-    const key = typeof body?.api_key === "string" && body.api_key.startsWith("titen_sk_") && body.api_key.length <= 512
-      ? body.api_key : undefined;
-    if (!key) return error(401, "INVALID_CREDENTIAL", "The Titen credential was rejected.");
+    const username = typeof body?.username === "string" && body.username.length <= 64 ? body.username : undefined;
+    const password = typeof body?.password === "string" && body.password.length <= 256 ? body.password : undefined;
+    if (!username || !password) return error(401, "INVALID_LOGIN", "Username or password is invalid.");
     try {
-      const { response, principal } = await introspect(key);
-      if (response.status === 401) return error(401, "INVALID_CREDENTIAL", "The Titen credential was rejected.");
+      const response = await fetch(`${upstream!.replace(/\/+$/, "")}/v1/dashboard-sessions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, password }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const payload = await response.json().catch(() => null) as { data?: unknown } | null;
+      if (response.status === 401) return error(401, "INVALID_LOGIN", "Username or password is invalid.");
+      if (response.status === 429) return error(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
       if (response.status === 503) return error(503, "UPSTREAM_503", "Titen is not ready.");
+      const data = payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+        ? payload.data as Record<string, unknown> : undefined;
+      const key = typeof data?.api_key === "string" && data.api_key.startsWith("titen_sk_") ? data.api_key : undefined;
+      const principal = safePrincipal(data);
       if (!response.ok || !principal) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid principal.");
+      if (!key) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid session.");
       const id = rememberSession(key, principal);
       return json({ data: principal }, 201, { "set-cookie": cookie(id) });
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
@@ -290,13 +308,48 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
         sessionMode ? clearSession(request) : undefined);
       if (response.status === 503) return error(503, "UPSTREAM_503", "Titen is not ready.");
       if (!response.ok || !principal) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid principal.");
-      if (found) found[1].principal = principal;
+      if (found) {
+        principal.password_change_required = found[1].principal.password_change_required;
+        found[1].principal = principal;
+      }
       return json({ data: principal });
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
   }
   if (url.pathname === "/dashboard-api/session" && request.method === "DELETE") {
     if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const found = sessionMode ? sessionFor(request) : undefined;
+    if (found) {
+      try {
+        const response = await upstreamRequest("/v1/dashboard-sessions/current", found[1].key, { method: "DELETE" });
+        if (!response.ok && response.status !== 401)
+          return error(502, "UPSTREAM_UNAVAILABLE", "Titen could not revoke the dashboard session.");
+      } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
+    }
     return json({ data: { logged_out: true } }, 200, clearSession(request));
+  }
+  if (url.pathname === "/dashboard-api/password" && request.method === "PATCH") {
+    if (!sessionMode) return error(404, "NOT_FOUND", "Password changes require dashboard session mode.");
+    if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const found = sessionFor(request);
+    if (!found) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.");
+    const body = await bodyObject(request, 2048);
+    const password = typeof body?.password === "string" && body.password.length <= 256 ? body.password : undefined;
+    if (!password) return error(400, "INVALID_REQUEST", "A new password is required.");
+    try {
+      const response = await upstreamRequest("/v1/operator-accounts/current/password", found[1].key, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!payload || typeof payload !== "object")
+        return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned invalid JSON.");
+      if (!response.ok) {
+        const status = [400, 401, 404, 503].includes(response.status) ? response.status : 502;
+        return json(payload, status, status === 401 ? clearSession(request) : undefined);
+      }
+      return json(payload, response.status, clearSession(request));
+    } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
   }
 
   if (url.pathname === "/dashboard-api/atlas/compile" && request.method === "POST") {
@@ -341,7 +394,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
     const body = await bodyObject(request, 8192);
     if (!body) return error(400, "INVALID_REQUEST", "A bounded JSON body is required.");
-    return proxyJson(request, "/v1/keys", {
+    return proxyJson(request, "/v1/operator-accounts", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
     });
   }

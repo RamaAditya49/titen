@@ -19,11 +19,32 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [0.5.3] — 2026-08-01
 
+### Added
+
+- Bootstrap creates default username `owner` with a random temporary password;
+  human operators sign in with username/password, and authorized owners/admins
+  can atomically add another account, membership, role, and one-time password.
+  API keys remain unchanged for agents, services, SDKs, CLI recovery, and
+  existing integrations.
+
+### Changed
+
+- Schema 20 adds canonical operator accounts. Temporary-password login is
+  restricted to password replacement; established login issues an eight-hour
+  revocable API credential only to the server-side adapter.
+
 ### Fixed
 
 - The per-principal sign-in state now uses a focused responsive login surface;
   the private product sidebar and operator topbar appear only after a valid
   session instead of framing the unauthenticated form.
+
+### Security
+
+- Password verifiers use unique salts and PBKDF2-HMAC-SHA-256 with 600,000
+  iterations on both D1 and Bun/SQLite. Login failures are non-disclosing and
+  locally throttled; password change and logout revoke short-lived dashboard
+  credentials.
 
 ## [0.5.2] — 2026-08-01
 

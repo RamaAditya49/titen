@@ -297,11 +297,19 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .user-admin form { display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 12px; }
 .user-admin form .primary-button { align-self: end; }
-.one-time-key { grid-column: 1 / -1; display: grid; gap: 12px; padding-top: 18px; border-top: 1px solid var(--rule); }
-.one-time-key code { padding: 12px; overflow-wrap: anywhere; background: var(--paper); border: 1px solid var(--rule); font: 11px/1.55 "JetBrains Mono Variable", monospace; }
-.one-time-key > div { display: flex; align-items: center; gap: 14px; }
-.one-time-key .secondary-button { margin: 0; }
-
+.one-time-credential {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--accent);
+}
+.one-time-credential div { display: grid; gap: 3px; }
+.one-time-credential div span { color: var(--muted); font-size: 10px; }
+.one-time-credential code { grid-column: 1 / -1; overflow-wrap: anywhere; font: 12px/1.5 "JetBrains Mono Variable", monospace; }
+.one-time-credential .secondary-button { grid-column: 2; grid-row: 1; margin: 0; }
 .atlas-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, .55fr);
@@ -391,6 +399,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .record-list strong { white-space: normal; }
   .result-header { align-items: flex-start; flex-direction: column; gap: 8px; }
   .inline-form, .user-admin form { grid-template-columns: 1fr; }
+  .one-time-credential { grid-template-columns: minmax(0, 1fr); }
+  .one-time-credential .secondary-button { grid-column: 1; grid-row: auto; justify-self: start; }
   .credential-note { width: 130px; }
   .credential-note strong { display: none; }
 }

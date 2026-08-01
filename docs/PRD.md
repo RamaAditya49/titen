@@ -290,8 +290,13 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Categories and tags MUST remain memory filters; webhooks and domain events
   MUST remain inside Audit; export and recovery remain deployment operations;
   account settings remain absent. Where per-principal dashboard sessions are
-  enabled, credentials MUST remain adapter-only and user provisioning MUST reuse
-  canonical API-key and organization-membership authority.
+  enabled, session credentials MUST remain adapter-only; password verifiers and
+  user provisioning MUST reuse canonical principal, organization-membership,
+  scope, trust, and role authority.
+- Bootstrap and Add User MUST generate a random temporary password shown once.
+  Until it is replaced, the session MUST have no product scope and the private
+  dashboard shell MUST remain hidden; replacement MUST revoke dashboard sessions
+  and require a fresh login.
 - Navigation and route discovery MUST NOT bypass authorization or reveal a
   foreign resource, hidden capability, record count, or private scope.
 
@@ -351,6 +356,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Memory content is untrusted input.
 - API keys are high entropy, stored only as hashes, scoped, revocable, and never
   logged.
+- Human operator passwords are stored only as uniquely salted, versioned slow
+  verifiers, never exported or logged, and login attempts are bounded.
 - Logs exclude content, prompts, embeddings, credentials, and full private IDs.
 - Destructive tenant purge requires explicit administrative tooling and backup.
 
@@ -470,7 +477,10 @@ areas use live same-origin responses, capability discovery hides unauthorized
 areas, failures clear stale private data, and no area substitutes fixtures.
 Session mode is accepted when each operator uses its own revocable principal,
 logout/restart invalidates the browser session, and an owner/admin can add one
-human credential plus membership atomically.
+human password account plus membership and explicit role atomically. API keys
+remain the authentication contract for agents, services, SDKs, and recovery.
+Bootstrap and Add User temporary passwords are accepted only for a required
+password replacement before normal dashboard authorization.
 
 ## 11. Success measures
 

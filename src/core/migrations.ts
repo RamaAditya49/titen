@@ -1294,6 +1294,38 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          )
          BEGIN
            SELECT RAISE(ABORT, 'FEDERATION_SOURCE_ORG_MISMATCH');
+       END`,
+    ],
+  },
+  {
+    version: 20,
+    statements: [
+      `CREATE TABLE operator_accounts (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id),
+         principal_id TEXT NOT NULL,
+         username TEXT NOT NULL UNIQUE,
+         password_verifier TEXT NOT NULL CHECK (password_verifier LIKE 'pbkdf2-sha256$%'),
+         scopes TEXT NOT NULL,
+         max_trust TEXT NOT NULL CHECK (max_trust IN ('unverified', 'asserted', 'verified', 'policy_approved')),
+         must_change_password INTEGER NOT NULL DEFAULT 1 CHECK (must_change_password IN (0, 1)),
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         password_changed_at TEXT,
+         disabled_at TEXT,
+         UNIQUE (org_id, principal_id)
+       )`,
+      `CREATE INDEX operator_accounts_org ON operator_accounts (org_id, created_at, id)`,
+      `CREATE TRIGGER operator_accounts_membership_insert
+         BEFORE INSERT ON operator_accounts
+         WHEN NOT EXISTS (
+           SELECT 1 FROM memberships m
+            WHERE m.org_id = NEW.org_id AND m.workspace_id IS NULL
+              AND m.principal_id = NEW.principal_id AND m.principal_kind = 'human'
+              AND m.removed_at IS NULL
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'OPERATOR_MEMBERSHIP_REQUIRED');
          END`,
     ],
   },

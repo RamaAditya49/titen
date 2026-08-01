@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 import { createApiKey, keyLifecycleStatus, organizationStatement, SCOPES } from "../../core/auth";
+import { newOperatorAccount } from "../../core/accounts";
+import { auditStatement } from "../../core/audit";
 import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
@@ -21,7 +23,7 @@ Usage:
   titen version    [--check]
   titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
   titen migrate    [--db titen.db] [--dry-run]
-  titen bootstrap  [--db titen.db] [--org "My Org"] [--label owner] [--print-sql]
+  titen bootstrap  [--db titen.db] [--org "My Org"] [--username owner] [--label owner] [--print-sql]
   titen key create [--db titen.db] --org-id <id> [--principal <id>] [--kind agent]
                    [--scopes "a,b"] [--trust asserted] [--label name]
                    [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
@@ -32,7 +34,8 @@ Usage:
 
 Notes:
   --print-sql emits SQL for a remote database (Cloudflare D1) instead of writing
-  locally. A raw key is printed once and is never recoverable afterwards.
+  locally. A raw key and temporary dashboard password are printed once and are
+  never recoverable afterwards.
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
 
@@ -45,7 +48,7 @@ const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> =
   version: { values: [], booleans: ["check"] },
   serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
-  bootstrap: { values: ["db", "org", "label"], booleans: ["print-sql"] },
+  bootstrap: { values: ["db", "org", "username", "label"], booleans: ["print-sql"] },
   "key create": {
     values: [
       "db", "org-id", "principal", "kind", "scopes", "trust", "label",
@@ -302,7 +305,9 @@ switch (command) {
 
   case "bootstrap": {
     const orgName = text(flags.org, "Titen");
+    const ownerUsername = text(flags.username, "owner");
     const orgId = newId("org");
+    const now = new Date();
     const key = await createApiKey({
       orgId,
       principalId: "owner",
@@ -310,24 +315,41 @@ switch (command) {
       label: text(flags.label, "owner"),
       scopes: ["*"],
       maxTrust: "policy_approved",
+    }, now);
+    const owner = await newOperatorAccount({
+      orgId,
+      createdBy: "owner",
+      username: ownerUsername,
+      role: "owner",
+      scopes: ["*"],
+      maxTrust: "policy_approved",
+      now,
+      principalId: "owner",
     });
-    const org = organizationStatement(orgId, orgName);
+    const org = organizationStatement(orgId, orgName, now);
+    const statements = [org, key.statement, ...owner.statements,
+      auditStatement(orgId, "owner", "operator_account.create", "operator_account", now.toISOString(), owner.accountId)];
     if (flags["print-sql"]) {
       console.error(`-- organization ${orgId} (${orgName})`);
-      console.log(renderStatement(org));
-      console.log(renderStatement(key.statement));
+      for (const statement of statements) console.log(renderStatement(statement));
       console.error("");
       console.error(`key_id: ${key.id}`);
       console.error(`api_key: ${key.key}`);
-      console.error("Store this key now. Only its hash appears in the SQL above.");
+      console.error(`dashboard_username: ${owner.username}`);
+      console.error(`temporary_password: ${owner.temporaryPassword}`);
+      console.error("Store these credentials now. Only their hashes appear in the SQL above.");
+      console.error("Change the temporary password on first dashboard sign-in.");
       break;
     }
     await withDb(dbPath, async (db) => {
       await migrate(db);
-      await db.batch([org, key.statement]);
+      await db.batch(statements);
     });
     console.log(`organization: ${orgId} (${orgName})`);
     printKey(key.key, key.id);
+    console.log(`dashboard_username: ${owner.username}`);
+    console.log(`temporary_password: ${owner.temporaryPassword}`);
+    console.log("Change the temporary password on first dashboard sign-in.");
     break;
   }
 

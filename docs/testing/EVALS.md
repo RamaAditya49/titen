@@ -55,7 +55,8 @@ failure classes may not.
 The dual-runtime contract covers all six read-only Memory Atlas lenses,
 canonical re-authorization, limits, and disabled behavior. The dashboard's
 real-runtime smoke starts Bun/SQLite and proves login, the six live product
-areas, atomic Add User, logout, and new-user login through the actual adapter;
+areas, atomic Add User, restricted temporary-password login, password
+replacement, logout, and fresh new-user login through the actual adapter;
 browser-only mocks remain UX evidence rather than service evidence.
 
 When v0.3 ships, the same dual-runtime contract also covers channel

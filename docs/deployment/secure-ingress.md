@@ -11,7 +11,8 @@ Use one of these paths:
 
 Tailscale Funnel and an unprotected Cloudflare Tunnel hostname are public. Do
 not put the live dashboard, `/v1`, or `/mcp` behind either one without a separate
-application-authentication layer.
+application-authentication layer. The dashboard's own username/password login
+does not replace the outer tailnet or Access policy.
 
 ## Preserve the local boundary
 
@@ -23,9 +24,10 @@ dashboard adapter  127.0.0.1:4322
 ```
 
 Expose the dashboard adapter, not port `8787`. In the recommended session mode,
-each operator submits a bounded Titen key once and the adapter keeps it only in
-process memory behind an opaque HttpOnly cookie. Never configure a shared owner
-or wildcard key in the adapter.
+each operator submits username/password to the Titen service. The service issues
+a bounded session key that the adapter keeps only in process memory behind an
+opaque HttpOnly cookie. Never configure a shared owner or wildcard key in the
+adapter.
 
 If remote agents genuinely need REST or MCP, give the API a separate hostname,
 ingress policy, and revocable Titen key. Set `TITEN_MCP_ORIGIN` to the exact

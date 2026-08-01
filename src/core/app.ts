@@ -1,4 +1,5 @@
 import { authenticate, requireScope } from "./auth";
+import { changeOperatorPassword, createDashboardSession, createOperatorAccount, revokeDashboardSession } from "./accounts";
 import { saveCheckpoint, getCheckpoint, deleteCheckpoint } from "./checkpoints";
 import { claimEvidence } from "./evidence";
 import { compileContext, getContext, recordFeedback } from "./context";
@@ -228,6 +229,10 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/keys", scope: "keys:manage", handler: listKeys },
   { method: "DELETE", path: "/v1/keys/:id", scope: "keys:manage", handler: revokeKey },
   { method: "GET", path: "/v1/principal", authenticated: true, handler: getPrincipal },
+  { method: "POST", path: "/v1/operator-accounts", scope: "keys:manage", handler: createOperatorAccount },
+  { method: "PATCH", path: "/v1/operator-accounts/current/password", authenticated: true, handler: changeOperatorPassword },
+  { method: "POST", path: "/v1/dashboard-sessions", handler: createDashboardSession },
+  { method: "DELETE", path: "/v1/dashboard-sessions/current", authenticated: true, handler: revokeDashboardSession },
   { method: "GET", path: "/v1/export", scope: "export:read", handler: exportRecords },
   { method: "POST", path: "/v1/import", scope: "import:write", handler: importRecords },
   { method: "POST", path: "/v1/workspaces", scope: "workspaces:write", handler: createWorkspace },

@@ -11,9 +11,11 @@ TITEN_API_URL=http://127.0.0.1:8787 \
 pnpm dashboard:adapter
 ```
 
-Open `http://127.0.0.1:4322/dashboard/`, then sign in with an active Titen API
-key. The key is exchanged for an opaque HttpOnly cookie, kept only in adapter
-memory, and discarded after eight hours, logout, revocation, or restart.
+Open `http://127.0.0.1:4322/dashboard/`, then sign in with the operator username
+and password printed by `titen bootstrap`. The temporary password must be
+replaced before the private product shell opens. The API issues a short-lived
+key only to the adapter; the browser receives an opaque HttpOnly cookie. It is
+discarded after eight hours, logout, password change, revocation, or restart.
 
 For remote access, keep both listeners on loopback, set the exact HTTPS
 `TITEN_DASHBOARD_ORIGIN`, and follow the
@@ -27,8 +29,9 @@ fixed route allowlist, bounded request bodies, exact Host/Origin validation,
 five-second upstream timeouts, no-store JSON, and generic external errors.
 
 An organization owner/admin with `keys:manage` and `memberships:write` can use
-Governance → Add a human user. Titen creates the membership and API key
-atomically and shows the raw key once.
+Governance → Add a human user. Titen creates the membership and password account
+atomically, shows a random temporary password once, and requires its replacement
+on first login. API keys remain for agents, services, SDKs, and recovery.
 
 ```sh
 pnpm verify:dashboard-live

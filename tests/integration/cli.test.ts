@@ -155,6 +155,34 @@ test("malformed flags fail before side effects for every command", () => {
   }
 });
 
+test("bootstrap creates owner login with a one-time random password", () => {
+  const boot = run("bootstrap-owner-login", ["bootstrap", "--db", "titen.db", "--org", "Example"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  assert.match(boot.output, /^dashboard_username: owner$/m);
+  const temporary = /^temporary_password: ([A-Za-z0-9_-]{24})$/m.exec(boot.output)?.[1];
+  assert.ok(temporary);
+  assert.match(boot.output, /Change the temporary password on first dashboard sign-in\./);
+  const database = openDatabase(join(root, "bootstrap-owner-login", "titen.db"), { create: false, readonly: true });
+  try {
+    const account = database.query(`SELECT a.username, a.password_verifier, a.must_change_password, m.role
+      FROM operator_accounts a JOIN memberships m
+        ON m.org_id = a.org_id AND m.principal_id = a.principal_id
+      WHERE a.username = 'owner'`).get() as {
+        username: string;
+        password_verifier: string;
+        must_change_password: number;
+        role: string;
+      };
+    assert.equal(account.username, "owner");
+    assert.equal(account.role, "owner");
+    assert.equal(account.must_change_password, 1);
+    assert.match(account.password_verifier, /^pbkdf2-sha256\$600000\$/);
+    assert.ok(!account.password_verifier.includes(temporary));
+  } finally {
+    database.close();
+  }
+});
+
 test("port zero, non-decimal integers, and values outside the TCP range are rejected", () => {
   for (const value of ["0", "65536", "1.5", "1e3", "+80", "NaN"]) {
     const result = run(`port-${value.replace(".", "-")}`, ["serve", "--port", value]);
@@ -319,7 +347,7 @@ test("backup refuses a missing source and atomically refreshes a fixed target", 
     repaired.close();
   }
 
-  assert.equal(run("backup-repeat", ["bootstrap", "--db", "source.db", "--org", "Second"]).exitCode, 0);
+  assert.equal(run("backup-repeat", ["bootstrap", "--db", "source.db", "--org", "Second", "--username", "owner-second"]).exitCode, 0);
   const second = run("backup-repeat", ["backup", "--db", "source.db", "--out", "latest.db"]);
   assert.equal(second.exitCode, 0, second.output);
   assert.doesNotMatch(second.output, /SQLiteError|\n\s+at /);

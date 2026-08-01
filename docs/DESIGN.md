@@ -117,8 +117,9 @@ integration displays no fixture data.
 
 Context compilation and Add user are the only mutations in this surface.
 Creating a context run changes no canonical memory. Add user is visibly
-separate, requires session mode, and atomically creates a bounded human key and
-organization membership. Every other area is diagnostic.
+separate, requires session mode, and atomically creates a bounded human password
+account and organization membership with an explicit role. Every other area is
+diagnostic.
 
 ## 6. Intentional non-menus
 
@@ -130,9 +131,10 @@ organization membership. Every other area is diagnostic.
   capability- and authority-gated.
 - **Runtime configuration** starts as read-only capability/readiness state.
   Browser mutations require a separate secure configuration contract.
-- **Settings** remain absent. The implemented adapter session exchanges an API
-  key for an opaque cookie; it is not a profile, password, or account-settings
-  lifecycle.
+- **Settings** remain absent. The implemented adapter verifies an operator
+  account and exchanges its short-lived server-side key for an opaque cookie;
+  only required first-login/current password replacement exists. Recovery and
+  profile settings remain separate product work.
 - **Overview analytics** do not exist until a named operator job and bounded,
   privacy-safe metric contract justify them.
 
@@ -187,9 +189,13 @@ channels. Color alone never carries meaning.
 
 ## 10. Privacy and security
 
-- Credentials live only in the server adapter process. In session mode the
-  browser submits a key once over loopback or configured HTTPS, then receives a
-  time-bounded opaque HttpOnly SameSite=Strict cookie.
+- Passwords are verified by the Titen service as salted PBKDF2-HMAC-SHA-256
+  verifiers. In session mode the browser submits username/password once over
+  loopback or configured HTTPS; only a short-lived API key remains in the
+  adapter process behind a time-bounded opaque HttpOnly SameSite=Strict cookie.
+- Bootstrap and Add User generate a random temporary password shown once. Until
+  it is replaced, the session has no product scopes and the private shell stays
+  hidden; replacement revokes every dashboard session for that principal.
 - Credentials, private IDs, response content, and view data never enter URLs,
   browser storage, analytics, third-party requests, service workers, or logs.
 - Navigation, counts, search suggestions, and empty states must not reveal

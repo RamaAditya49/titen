@@ -109,9 +109,13 @@ Rules at every boundary:
 - A Memory Atlas projection cannot grant authority, become evidence, or expose
   hidden existence through topology, labels, aggregate counts, caches, or scope
   preview.
-- A dashboard API key exists only in adapter memory, never Web Storage, HTML,
-  URL, response payload, or normal logs; its session is opaque, bounded, and
-  invalid after logout, expiry, restart, or key revocation.
+- A dashboard session API key crosses only the service-to-adapter exchange and
+  then exists in adapter memory, never Web Storage, HTML, browser-visible JSON,
+  URL, or normal logs; its session is opaque, bounded, and invalid after logout,
+  password change, expiry, restart, or key revocation.
+- Human passwords exist only at the input boundary and as salted versioned
+  verifiers. A generated temporary password is shown once, grants no product
+  scope, and must be replaced before the private dashboard shell opens.
 
 ## Threat register
 

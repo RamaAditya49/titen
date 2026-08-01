@@ -1544,6 +1544,168 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "password operator accounts login atomically and revoke their short session key",
+    async run(fx) {
+      const owner = await fx.provision({
+        principalId: `password_owner_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["*"],
+        maxTrust: "policy_approved",
+      });
+      const username = `operator-${fx.runtime}`;
+      const password = `correct horse battery ${fx.runtime}`;
+      const created = await fx.call("POST", "/v1/operator-accounts", {
+        key: owner.key,
+        body: {
+          username,
+          role: "reader",
+          scopes: ["views:compile", "memberships:read"],
+          max_trust: "asserted",
+        },
+      });
+      expectOk(created, 201);
+      assert.equal(created.body.data.username, username);
+      assert.equal(created.body.data.role, "reader");
+      assert.equal(created.body.data.api_key, undefined);
+      assert.equal(created.body.data.password_change_required, true);
+      const temporaryPassword = created.body.data.temporary_password as string;
+      assert.match(temporaryPassword, /^[A-Za-z0-9_-]{24}$/);
+
+      const [stored] = await fx.query<{ password_verifier: string; memberships: number; must_change_password: number }>(
+        `SELECT a.password_verifier, a.must_change_password,
+                (SELECT COUNT(*) FROM memberships m WHERE m.org_id = a.org_id
+                  AND m.principal_id = a.principal_id AND m.removed_at IS NULL) AS memberships
+           FROM operator_accounts a WHERE a.username = ?`,
+        [username],
+      );
+      assert.match(stored!.password_verifier, /^pbkdf2-sha256\$600000\$/);
+      assert.ok(!stored!.password_verifier.includes(temporaryPassword));
+      assert.equal(stored!.memberships, 1);
+      assert.equal(stored!.must_change_password, 1);
+
+      const wrong = await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username, password: "this is the wrong passphrase" },
+      });
+      expectError(wrong, 401, "INVALID_LOGIN");
+      const missing = await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username: `missing-${fx.runtime}`, password: "this is the wrong passphrase" },
+      });
+      expectError(missing, 401, "INVALID_LOGIN");
+      assert.equal(missing.body.error.message, wrong.body.error.message);
+      expectError(await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username, password: temporaryPassword, role: "owner" },
+      }), 400, "VALIDATION_ERROR");
+
+      const session = await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username: username.toUpperCase(), password: temporaryPassword },
+      });
+      expectOk(session, 201);
+      assert.match(session.body.data.api_key, /^titen_sk_/);
+      assert.equal(session.body.data.organization_role, "reader");
+      assert.equal(session.body.data.principal_id, created.body.data.principal_id);
+      assert.equal(session.body.data.password_change_required, true);
+      assert.deepEqual(session.body.data.scopes, []);
+      const sessionKey = session.body.data.api_key as string;
+      const principal = await fx.call("GET", "/v1/principal", { key: sessionKey });
+      expectOk(principal);
+      assert.equal(principal.body.data.organization_role, "reader");
+      expectError(await fx.call("GET", "/v1/memberships", { key: sessionKey }), 403, "FORBIDDEN");
+      expectError(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
+        key: sessionKey,
+        body: { password: temporaryPassword },
+      }), 400, "VALIDATION_ERROR");
+      expectOk(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
+        key: sessionKey,
+        body: { password },
+      }));
+      expectError(await fx.call("GET", "/v1/principal", { key: sessionKey }), 401, "UNAUTHENTICATED");
+      expectError(await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username, password: temporaryPassword },
+      }), 401, "INVALID_LOGIN");
+      const established = await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username, password },
+      });
+      expectOk(established, 201);
+      assert.equal(established.body.data.password_change_required, false);
+      assert.deepEqual(established.body.data.scopes, ["views:compile", "memberships:read"]);
+      expectOk(await fx.call("DELETE", "/v1/dashboard-sessions/current", {
+        key: established.body.data.api_key as string,
+      }));
+      const [changed] = await fx.query<{ must_change_password: number; password_changed_at: string | null }>(
+        `SELECT must_change_password, password_changed_at FROM operator_accounts WHERE username = ?`, [username]);
+      assert.equal(changed!.must_change_password, 0);
+      assert.ok(changed!.password_changed_at);
+
+      const before = await fx.query<{ accounts: number; memberships: number }>(
+        `SELECT (SELECT COUNT(*) FROM operator_accounts) AS accounts,
+                (SELECT COUNT(*) FROM memberships) AS memberships`,
+      );
+      expectError(await fx.call("POST", "/v1/operator-accounts", {
+        key: owner.key,
+        body: {
+          username,
+          role: "reader",
+          scopes: ["views:compile"],
+          max_trust: "asserted",
+        },
+      }), 409, "CONFLICT");
+      const after = await fx.query<{ accounts: number; memberships: number }>(
+        `SELECT (SELECT COUNT(*) FROM operator_accounts) AS accounts,
+                (SELECT COUNT(*) FROM memberships) AS memberships`,
+      );
+      assert.deepEqual(after, before, "duplicate account must roll back its membership");
+
+      const second = await fx.call("POST", "/v1/operator-accounts", {
+        key: owner.key,
+        body: {
+          username: `second-${fx.runtime}`,
+          role: "reader",
+          scopes: ["views:compile"],
+          max_trust: "asserted",
+        },
+      });
+      expectOk(second, 201);
+      assert.notEqual(second.body.data.temporary_password, temporaryPassword);
+      const hashes = await fx.query<{ password_verifier: string }>(
+        `SELECT password_verifier FROM operator_accounts
+          WHERE username IN (?, ?) ORDER BY username`,
+        [username, `second-${fx.runtime}`],
+      );
+      assert.equal(hashes.length, 2);
+      assert.notEqual(hashes[0]!.password_verifier, hashes[1]!.password_verifier, "each account needs a unique salt");
+
+      const admin = await fx.provision({
+        orgId: owner.orgId,
+        principalId: `password_admin_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["keys:manage", "memberships:write", "views:compile"],
+        maxTrust: "verified",
+      });
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: { principal_id: admin.principalId, principal_kind: "human", role: "admin" },
+      }), 201);
+      expectError(await fx.call("POST", "/v1/operator-accounts", {
+        key: admin.key,
+        body: {
+          username: `owner-escalation-${fx.runtime}`,
+          role: "owner",
+          scopes: ["views:compile"],
+          max_trust: "asserted",
+        },
+      }), 403, "FORBIDDEN");
+
+      const throttled = `locked-${fx.runtime}`;
+      for (let attempt = 0; attempt < 10; attempt++)
+        expectError(await fx.call("POST", "/v1/dashboard-sessions", {
+          body: { username: throttled, password: "this is the wrong passphrase" },
+        }), 401, "INVALID_LOGIN");
+      expectError(await fx.call("POST", "/v1/dashboard-sessions", {
+        body: { username: throttled, password: "this is the wrong passphrase" },
+      }), 429, "LOGIN_RATE_LIMITED");
+    },
+  },
+  {
     name: "credential import cannot exceed the importing credential",
     async run(fx) {
       const limited = await fx.provision({
