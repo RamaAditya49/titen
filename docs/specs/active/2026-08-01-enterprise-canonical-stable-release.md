@@ -27,7 +27,7 @@ stable replacement candidate.
 - federate authorized canonical claims with their evidence and provenance using
   the existing signed peer transport while preserving conflicts and replay safety;
 - make the Astro dashboard a real authenticated REST client with loading, empty,
-  denial, error, enterprise, federation, and Atlas states;
+  denial, error, governance lenses, and federated canonical recall through Atlas;
 - resolve issues #208-#212 at their shared CLI/context boundaries;
 - verify Bun/SQLite and workerd/D1, package/install the candidate, deploy the same
   candidate on `rama-tuf`, run immediate live and rollback smokes, publish the
@@ -61,11 +61,14 @@ stable replacement candidate.
   imported memory recallable.
 - **AC-ECS-005 — Unwanted behavior:** If a canonical federation request is
   unsigned, tampered, replayed, foreign-scoped, suspended, or outside the peer
-  filter, then Titen shall disclose no canonical content and write nothing.
+  filter, then Titen shall disclose no canonical content and shall create no
+  canonical memory, provenance, or index mutation; bounded metadata-only
+  federation logs may record a denial or idempotent replay.
 - **AC-ECS-006 — State-driven:** While the dashboard has a configured authenticated
-  API session, it shall render authorized live health, readiness, Atlas,
-  enterprise, and federation data; without data or authority it shall render an
-  honest empty, setup, denial, or error state and never synthetic service proof.
+  API session, it shall render authorized live health, readiness, ordinary and
+  governance Atlas lenses, including imported canonical federation records;
+  without data or authority it shall render an honest empty, setup, denial, or
+  error state and never synthetic service proof.
 - **AC-ECS-007 — Unwanted behavior:** If CLI key operations address a missing
   database, organization, or key, then Titen shall fail without creating state,
   leaking a raw stack, or reporting false success.
@@ -77,8 +80,8 @@ stable replacement candidate.
   dashboard-build, CLI, SDK, packaging, and workflow checks.
 - **AC-ECS-010 — Event-driven:** When the exact candidate is deployed on
   `rama-tuf`, it shall start from persistent storage, become ready, serve the live
-  dashboard through an authenticated operator path, preserve data through a
-  bounded restart/restore smoke, and expose a URL verified from the operator host.
+  dashboard through a tailnet-authenticated operator path, preserve data through
+  a bounded restart/restore smoke, and expose a URL verified from the operator host.
 - **AC-ECS-011 — Event-driven:** When every gate passes, maintainers shall publish
   one exact stable semantic version to npm and GitHub, update the stable release
   manifest, close the five issues with evidence, merge to `main`, and leave no
