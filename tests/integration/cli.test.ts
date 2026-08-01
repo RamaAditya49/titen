@@ -323,6 +323,7 @@ test("backup refuses a missing source and atomically refreshes a fixed target", 
   const second = run("backup-repeat", ["backup", "--db", "source.db", "--out", "latest.db"]);
   assert.equal(second.exitCode, 0, second.output);
   assert.doesNotMatch(second.output, /SQLiteError|\n\s+at /);
+  assert.equal(statSync(join(root, "backup-repeat", "latest.db")).mode & 0o777, 0o600);
 
   const copy = openDatabase(join(root, "backup-repeat", "latest.db"), { create: false });
   try {

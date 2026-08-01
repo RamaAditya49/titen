@@ -460,6 +460,9 @@ switch (command) {
       }
       chmodSync(temporary, 0o600);
       renameSync(temporary, outPath);
+      // Reassert after replacement because some container bind mounts recreate
+      // the destination inode with the mount's default mode during rename.
+      chmodSync(outPath, 0o600);
     } catch (error) {
       rmSync(temporary, { force: true });
       fail(`backup failed: ${error instanceof Error ? error.message : "unknown error"}`);

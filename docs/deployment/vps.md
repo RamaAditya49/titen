@@ -461,6 +461,11 @@ code.
   verifies integrity, foreign keys, non-empty schema, and the exact schema
   version, sets mode `0600`, then atomically replaces a fixed output path. A
   failure leaves an existing output untouched and prints no internal stack.
+- When a second rootless Podman container mounts the live named volume for an
+  online backup, use the shared SELinux suffix `:z` on both containers. Never
+  attach the same live volume with a second private `:Z` label: that relabels it
+  away from the running service. A host-installed CLI avoids this sidecar
+  boundary entirely.
 - Do not copy a live WAL database file. Keep timestamped snapshots and an
   independently verified checksum outside the service state directory.
 - Vector indexes are rebuildable and do not block canonical restore. The
@@ -505,5 +510,7 @@ locked multilingual evaluation and real VPS, Cloudflare Paid D1, and local
 computer smokes are recorded. Repository verification is manual/local. GitHub
 Actions remains disabled so the repository incurs no hosted automation cost.
 
-The `rama-tuf` reboot validation remains unverified until the operator approves
-a reboot window. Do not close that gate from a service restart alone.
+The approved `rama-tuf` reboot validation is complete: the boot ID changed,
+the rootless user service auto-started with `NRestarts=0`, canonical counts and
+the recorded event survived, and the real-model live verifier passed. A later
+service restart is not a substitute for repeating that host-level gate.
