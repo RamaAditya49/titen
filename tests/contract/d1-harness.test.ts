@@ -408,6 +408,49 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
       forbidden: ["ENV_API_KEY_SECRET_9382"],
       expected: "OPENAI_API_KEY=[redacted]",
     },
+    {
+      name: "AWS secret access key",
+      input: "context-before AWS_SECRET_ACCESS_KEY=AWS_ACCESS_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["AWS_ACCESS_SECRET_9382"],
+      expected: "AWS_SECRET_ACCESS_KEY=[redacted]",
+    },
+    {
+      name: "authorization header field",
+      input: "context-before authorization_header=AUTH_HEADER_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["AUTH_HEADER_SECRET_9382"],
+      expected: "authorization_header=[redacted]",
+    },
+    {
+      name: "token value field",
+      input: "context-before token_value=TOKEN_VALUE_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["TOKEN_VALUE_SECRET_9382"],
+      expected: "token_value=[redacted]",
+    },
+    {
+      name: "secret value field",
+      input: "context-before secret_value=SECRET_VALUE_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["SECRET_VALUE_SECRET_9382"],
+      expected: "secret_value=[redacted]",
+    },
+    {
+      name: "API key value field",
+      input: "context-before api_key_value=API_KEY_VALUE_SECRET_9382 context-after",
+      secrets: [],
+      forbidden: ["API_KEY_VALUE_SECRET_9382"],
+      expected: "api_key_value=[redacted]",
+    },
+    {
+      name: "unindented structured value",
+      input: "context-before\ntoken:\nMULTILINE_TOKEN_SECRET_9382\ncontext-after",
+      secrets: [],
+      forbidden: ["MULTILINE_TOKEN_SECRET_9382"],
+      expected: "token:\n[redacted]\ncontext-after",
+      redacted: "context-before\ntoken:\n[redacted]\ncontext-after",
+    },
   ];
 
   for (const fixture of cases) {
