@@ -11,7 +11,7 @@ context without a documentation-site dependency.
 | [PRD](./PRD.md)                                                    | Product scope, users, requirements, and acceptance criteria                   |
 | [FRD](./FRD.md)                                                    | Feature behavior, release scope, failure rules, and acceptance journeys       |
 | [DESIGN](./DESIGN.md)                                              | Progressive dashboard areas, emergence gates, interaction, and visual rules   |
-| [Dashboard](./dashboard.md)                                        | Astro preview, fixture boundary, tests, screenshots, and static hosting       |
+| [Dashboard](./dashboard.md)                                        | Live read-only Atlas client, same-origin adapter, tests, and hosting boundary  |
 | [Roadmap](./ROADMAP.md)                                            | Delivery order and release gates                                              |
 | [Requirements workflow](./engineering/requirements-workflow.md)    | EARS acceptance criteria and spec-plan-implement-done lifecycle               |
 | [Architecture](./architecture/overview.md)                         | Current repository state, target components, and runtime boundaries           |
@@ -38,11 +38,13 @@ context without a documentation-site dependency.
 
 | Surface                            | Current state                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Astro dashboard | Implemented and tested at `/dashboard/` against a frozen synthetic fixture |
+| Astro dashboard | Six authorized Atlas lenses use the live same-origin adapter; local Bun/SQLite checks pass and external `0.5.0` deployment evidence is pending |
 | Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
+| Enterprise governance | Roles, policies, approvals, releases, retention, legal holds, identity mappings, and two governance Atlas lenses pass the shared contract |
+| Canonical federation | Opt-in signed claim/evidence bundles preserve provenance and conflicts; filtered import, replay, source binding, and cross-scope failures pass the shared contract |
 | Optional embedding/indexing | Implemented on Bun and in Cloudflare adapter code; deployment evidence varies |
 | Automatic LLM derivation/reflection | Implemented and dual-runtime tested; opt-in and not production-activated |
-| Live deployment | One recorded Bun/container embedding smoke; real Cloudflare Paid D1/VPS/local enrichment activation smokes remain open |
+| Live deployment | One earlier Bun/container embedding smoke is recorded; the exact `0.5.0` API and dashboard smoke is still pending |
 
 ## Documentation rules
 

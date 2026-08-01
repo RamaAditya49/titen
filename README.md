@@ -39,6 +39,8 @@ rebuildable. Retrieved memory is untrusted reference data, not an instruction.
 - Token-bounded context compilation after tenant, subject, and visibility checks.
 - Authenticated REST, Streamable HTTP MCP, and a TypeScript SDK.
 - Collaboration state for checkpoints, leases, handoffs, feedback, and events.
+- Enterprise roles, approvals, releases, retention, legal holds, and identity mappings.
+- Opt-in signed federation for recallable canonical claims and their evidence.
 - Versioned JSONL export and import. Titen does not run agent loops.
 
 ## Project status
@@ -52,9 +54,9 @@ is the source of truth for shipped and planned capabilities.
 | --- | --- | --- |
 | Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
 | Containerized Bun service with optional embeddings | Historical 0.3.0 canary evidence | The recorded loopback container does not verify this release, systemd/Caddy, or Cloudflare. |
-| Memory Atlas dashboard | Implemented and verified locally | Health, readiness, and four authorized Atlas lenses pass through the same-origin adapter against temporary Bun/SQLite. This is not evidence of an external deployment. |
+| Memory Atlas dashboard | Implemented and verified locally | Health, readiness, and six authorized Atlas lenses pass through the same-origin adapter against temporary Bun/SQLite. External deployment evidence for this release is still pending. |
 | Live Vectorize, Workers AI, and Cloudflare production | Planned | Local configuration and emulation are not production evidence. |
-| Enterprise governance and recallable-memory federation | Planned | Signed event exchange exists, but remote events do not become canonical memory automatically. |
+| Enterprise governance and recallable-memory federation | Implemented and verified locally | The shared Bun/SQLite and workerd/D1 contract covers governed roles, policies, approvals, releases, retention, legal holds, identity mappings, and opt-in signed canonical import. External deployment evidence for this release is still pending. |
 
 ## Install and run
 
@@ -225,7 +227,10 @@ the [Cloudflare deployment guide](https://github.com/RamaAditya49/titen/blob/mai
 
 The checked-in Astro client at `/dashboard/` is a live, read-only Memory Atlas
 client. It uses a loopback same-origin adapter, keeps the API key server-side,
-and shows no fixture fallback when disconnected or denied. The
+and shows no fixture fallback when disconnected or denied. Its six lenses cover
+evidence trace, neighborhood, conflict and freshness, review work, governance
+scope, and knowledge releases. An external URL is intentionally absent until
+the `0.5.0` deployment smoke passes. The
 [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
 documents configuration, tests, and the hosting boundary.
 

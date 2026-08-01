@@ -17,6 +17,41 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-01
+
+### Added
+
+- Enterprise governance now covers organization roles, typed approval and
+  retention policies, claim review, encrypted channel assertions, versioned
+  channel releases, legal holds, and external identity mappings.
+- Opt-in canonical federation exchanges signed, filtered claim bundles with
+  their evidence and provenance. Imports bind the source organization, preserve
+  disagreement, reject unsafe trust elevation, and remain idempotent on both
+  supported runtimes.
+- The read-only dashboard now uses the live same-origin adapter for six
+  authorized Memory Atlas lenses, including governance scope and knowledge
+  release views. It has explicit loading, empty, denied, and disconnected
+  states instead of a synthetic fallback.
+
+### Changed
+
+- Context compilation reports selected, omitted, and deduplicated candidate
+  counts plus an explicit budget-exhaustion flag without exposing unauthorized
+  records.
+
+### Fixed
+
+- Local key commands fail cleanly for a missing database, schema, organization,
+  or key and no longer report a false revocation success.
+- `titen backup` reapplies owner-only permissions after atomic replacement, so
+  container bind mounts cannot leave the finished backup group- or world-readable.
+
+### Security
+
+- Governance and federation mutations now enforce role, resource, retention,
+  replay, peer-source, and cross-organization boundaries in the shared
+  Bun/SQLite and workerd/D1 contract.
+
 ## [0.4.1] — 2026-08-01
 
 ### Added
@@ -404,7 +439,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.0
 [0.4.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.1
 [0.4.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.0
 [0.3.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.3.0
