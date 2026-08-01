@@ -522,6 +522,13 @@ the caller's abort signal and configured request timeout.
 
 ### Federation routes
 
+Federation capabilities are necessary but not sufficient. Registering or
+suspending peers, changing filters, and pulling or pushing data requires an
+organization `owner` or `admin` role. Listing peers, filters, or federation log
+entries also permits `reader`. A wildcard-root credential bypasses this role
+gate only for bootstrap and recovery. Peer resources remain bound to the
+principal that registered them.
+
 Each federation peer and cursor belongs to the principal that registered it.
 The default `POST /v1/federation/pull` response remains event-only. Passing
 `include_memory: true` requires `export:read` and an explicit `claim` filter;

@@ -9,6 +9,7 @@ import { normalizeProjectReference } from "./projects";
 import { historyStatement, outboxStatement } from "./writes";
 import { signPayload } from "./webhooks";
 import { MAX_BODY_BYTES, type RequestContext, type Result } from "./http";
+import { requireOrgRole } from "./governance";
 import {
   CLAIM_KINDS,
   CLAIM_RELATIONS,
@@ -36,6 +37,7 @@ const FEDERATED_MEMORY_VERSION = 1;
 
 /** POST /v1/federation/peers */
 export async function registerPeer(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin"], "federation.peer.register");
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
   const name = requireString(body, "name", LIMITS.label);
@@ -67,6 +69,7 @@ export async function registerPeer(ctx: RequestContext): Promise<Result> {
 
 /** GET /v1/federation/peers */
 export async function listPeers(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin", "reader"], "federation.peer.list");
   const principal = ctx.principal!;
   const rows = await ctx.app.db.all<{
     id: string;
@@ -88,6 +91,7 @@ export async function listPeers(ctx: RequestContext): Promise<Result> {
 
 /** POST /v1/federation/peers/:id/suspend */
 export async function suspendPeer(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin"], "federation.peer.suspend");
   const principal = ctx.principal!;
   const peerId = ctx.params.id!;
 
@@ -117,6 +121,7 @@ export async function suspendPeer(ctx: RequestContext): Promise<Result> {
 
 /** POST /v1/federation/peers/:id/filters */
 export async function addFilter(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin"], "federation.filter.add");
   const principal = ctx.principal!;
   const peerId = ctx.params.id!;
 
@@ -149,6 +154,7 @@ export async function addFilter(ctx: RequestContext): Promise<Result> {
 
 /** GET /v1/federation/peers/:id/filters */
 export async function listFilters(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin", "reader"], "federation.filter.list");
   const principal = ctx.principal!;
   const peerId = ctx.params.id!;
 
@@ -664,6 +670,7 @@ async function prepareMemoryImport(
 
 /** POST /v1/federation/pull — pull local events matching peer filters from cursor. */
 export async function pullEvents(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin"], "federation.export");
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
   const peerId = requireString(body, "peer_id", LIMITS.identifier);
@@ -783,6 +790,7 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
 
 /** POST /v1/federation/push — receive events from a remote peer. */
 export async function pushEvents(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin"], "federation.import");
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
   const peerId = requireString(body, "peer_id", LIMITS.identifier);
@@ -1015,6 +1023,7 @@ export async function pushEvents(ctx: RequestContext): Promise<Result> {
 
 /** GET /v1/federation/log */
 export async function federationLog(ctx: RequestContext): Promise<Result> {
+  await requireOrgRole(ctx, ["owner", "admin", "reader"], "federation.log.list");
   const principal = ctx.principal!;
   const peerId = ctx.url.searchParams.get("peer_id");
   const limitParam = ctx.url.searchParams.get("limit");

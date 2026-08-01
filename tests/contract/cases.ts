@@ -3839,6 +3839,124 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "federation requires organization roles and readers remain read-only",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const federationScopes = [
+        "federation:read",
+        "federation:write",
+        "export:read",
+        "import:write",
+        "projects:create",
+        "observations:write",
+        "claims:write",
+      ];
+      const reader = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "federation_role_reader",
+        scopes: federationScopes,
+      });
+      const roleless = await fx.provision({ orgId: owner.orgId, scopes: federationScopes });
+      const adminMembership = await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          principal_id: reader.principalId,
+          principal_kind: "agent",
+          role: "admin",
+        },
+      });
+      expectOk(adminMembership, 201);
+
+      const peerBody = {
+        name: "reader-owned-peer",
+        endpoint: "https://reader-federation.example.test",
+        shared_secret: "reader-federation-secret",
+        direction: "pull",
+      };
+      const peer = await fx.call("POST", "/v1/federation/peers", {
+        key: reader.key,
+        body: peerBody,
+      });
+      expectOk(peer, 201);
+      const peerId = peer.body.data.peer_id as string;
+      expectOk(await fx.call("POST", `/v1/federation/peers/${peerId}/filters`, {
+        key: reader.key,
+        body: { resource_type: "claim" },
+      }), 201);
+      await seedClaim(fx, reader.key);
+      expectOk(await fx.call("POST", "/v1/federation/pull", {
+        key: reader.key,
+        body: { peer_id: peerId },
+      }));
+      expectOk(await fx.call(
+        "DELETE",
+        `/v1/memberships/${adminMembership.body.data.membership_id}`,
+        { key: owner.key },
+      ));
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          principal_id: reader.principalId,
+          principal_kind: "agent",
+          role: "reader",
+        },
+      }), 201);
+
+      const peers = await fx.call("GET", "/v1/federation/peers", { key: reader.key });
+      expectOk(peers);
+      assert.ok(peers.body.data.peers.some((candidate: any) => candidate.peer_id === peerId));
+      expectOk(await fx.call("GET", `/v1/federation/peers/${peerId}/filters`, { key: reader.key }));
+      const log = await fx.call("GET", `/v1/federation/log?peer_id=${peerId}`, { key: reader.key });
+      expectOk(log);
+      assert.ok(log.body.data.entries.length >= 1);
+
+      const readerMutations = [
+        () => fx.call("POST", "/v1/federation/peers", { key: reader.key, body: peerBody }),
+        () => fx.call("POST", `/v1/federation/peers/${peerId}/filters`, {
+          key: reader.key,
+          body: { resource_type: "event" },
+        }),
+        () => fx.call("POST", `/v1/federation/peers/${peerId}/suspend`, {
+          key: reader.key,
+          body: {},
+        }),
+        () => fx.call("POST", "/v1/federation/pull", {
+          key: reader.key,
+          body: { peer_id: peerId },
+        }),
+        () => fx.call("POST", "/v1/federation/push", {
+          key: reader.key,
+          body: { peer_id: peerId, events: [] },
+        }),
+      ];
+      for (const request of readerMutations) expectError(await request(), 404, "NOT_FOUND");
+
+      const rolelessRequests = [
+        () => fx.call("GET", "/v1/federation/peers", { key: roleless.key }),
+        () => fx.call("GET", `/v1/federation/peers/${peerId}/filters`, { key: roleless.key }),
+        () => fx.call("GET", `/v1/federation/log?peer_id=${peerId}`, { key: roleless.key }),
+        () => fx.call("POST", "/v1/federation/peers", { key: roleless.key, body: peerBody }),
+        () => fx.call("POST", `/v1/federation/peers/${peerId}/filters`, {
+          key: roleless.key,
+          body: { resource_type: "event" },
+        }),
+        () => fx.call("POST", `/v1/federation/peers/${peerId}/suspend`, {
+          key: roleless.key,
+          body: {},
+        }),
+        () => fx.call("POST", "/v1/federation/pull", {
+          key: roleless.key,
+          body: { peer_id: peerId },
+        }),
+        () => fx.call("POST", "/v1/federation/push", {
+          key: roleless.key,
+          body: { peer_id: peerId, events: [] },
+        }),
+      ];
+      for (const request of rolelessRequests) expectError(await request(), 404, "NOT_FOUND");
+    },
+  },
+  {
     name: "federation pull does not expose another principal's private events",
     async run(fx) {
       const owner = await fx.provision({ principalId: "federation_owner", scopes: ["*"] });
@@ -4250,6 +4368,14 @@ export const CASES: Case[] = [
         key: destination.key,
         body,
       }), 403);
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: destination.key,
+        body: {
+          principal_id: destination.principalId,
+          principal_kind: "agent",
+          role: "owner",
+        },
+      }), 201);
       const transportOnly = await fx.provision({
         orgId: destination.orgId,
         principalId: destination.principalId,
