@@ -219,9 +219,12 @@ export async function serve(options: ServeOptions) {
     if (timer) clearInterval(timer);
     await server.stop(true);
     const pass = activeTick;
-    try {
+    const releaseActiveSemanticWork = async () => {
       for (const token of activeSemanticLeases ?? [])
         await releaseSemanticIndexLease(db, token);
+    };
+    try {
+      await releaseActiveSemanticWork();
       if (pass) await Promise.race([
         pass,
         new Promise<void>((resolve) => setTimeout(resolve, 100)),
@@ -229,6 +232,13 @@ export async function serve(options: ServeOptions) {
     } catch {
       // Shutdown must still close SQLite; a restart reports unreclaimed work stale.
     } finally {
+      // A pass may advance from removal to embedding during the bounded grace
+      // period and acquire another token after the first sweep.
+      try {
+        await releaseActiveSemanticWork();
+      } catch {
+        // Closing SQLite remains the final bounded shutdown action.
+      }
       database.close();
     }
   };

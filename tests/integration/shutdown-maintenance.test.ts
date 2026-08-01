@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSqliteDb } from "../../src/runtime/bun/sqlite";
+import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { fakeVectors, provisionWith } from "../contract/harness";
 
@@ -62,6 +62,66 @@ async function victim(directory: string) {
     `SELECT lease_token IS NOT NULL AS leased FROM index_outbox
       WHERE record_id = ? AND state = 'pending'`,
     [claimId],
+  );
+  process.stdout.write(`${JSON.stringify({ claimId, leased: Number(lease?.leased ?? 0) })}\n`);
+  await new Promise<void>(() => {});
+}
+
+async function multiphaseVictim(directory: string) {
+  const vectors = fakeVectors();
+  let markRemovalStarted!: () => void;
+  const removalStarted = new Promise<void>((resolve) => { markRemovalStarted = resolve; });
+  let releaseRemoval!: () => void;
+  const removalReleased = new Promise<void>((resolve) => { releaseRemoval = resolve; });
+  vectors.store.remove = async () => {
+    markRemovalStarted();
+    await removalReleased;
+  };
+  vectors.embedder.embed = async () => {
+    await new Promise<void>(() => {});
+    return [];
+  };
+  const running = await serve({
+    dbPath: join(directory, "titen.db"),
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    maintenanceIntervalMs: INTERVAL_MS * 10,
+    vectors,
+  });
+  process.once("SIGTERM", () => setTimeout(releaseRemoval, 20));
+  const db = createSqliteDb(running.database);
+  const principal = await provisionWith(db, { scopes: ["*"] });
+  const observation = await call(running.url, principal.key, "POST", "/v1/observations", {
+    subject_id: "subject_multiphase_shutdown",
+    kind: "tool_result",
+    content: "Synthetic multiphase shutdown evidence.",
+    source: { type: "test" },
+    trust: "verified",
+  });
+  const consolidation = await call(running.url, principal.key, "POST", "/v1/consolidations", {
+    subject_id: "subject_multiphase_shutdown",
+    claims: [{
+      kind: "procedural",
+      statement: "Synthetic multiphase shutdown claim.",
+      sources: [{ observation_id: observation.observation_id, relation: "supports" }],
+    }],
+  });
+  const claimId = String(consolidation.claims[0].claim_id);
+  await db.batch([{
+    sql: `INSERT INTO index_outbox
+            (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+          VALUES ('idx_shutdown_remove_first', ?, 'claim', 'clm_shutdown_missing',
+                  'delete', 'pending', 0, '2000-01-01T00:00:00.000Z')`,
+    params: [principal.orgId],
+  }]);
+  await Promise.race([
+    removalStarted,
+    Bun.sleep(2_000).then(() => { throw new Error("maintenance did not acquire removal work"); }),
+  ]);
+  const [lease] = await db.all<{ leased: number }>(
+    `SELECT lease_token IS NOT NULL AS leased FROM index_outbox
+      WHERE id = 'idx_shutdown_remove_first' AND state = 'pending'`,
   );
   process.stdout.write(`${JSON.stringify({ claimId, leased: Number(lease?.leased ?? 0) })}\n`);
   await new Promise<void>(() => {});
@@ -133,6 +193,7 @@ async function bounded<T>(promise: Promise<T>, timeoutMs: number) {
 
 const mode = process.argv[2];
 if (mode === "--victim") await victim(process.argv[3]!);
+else if (mode === "--multiphase-victim") await multiphaseVictim(process.argv[3]!);
 else if (mode === "--restart") await restart(process.argv[3]!, process.argv[4]!);
 else test("SIGTERM releases active semantic work for immediate truthful recovery", async () => {
   const root = mkdtempSync(join(tmpdir(), "titen-shutdown-maintenance-"));
@@ -176,3 +237,61 @@ else test("SIGTERM releases active semantic work for immediate truthful recovery
     rmSync(root, { recursive: true, force: true });
   }
 }, 30_000);
+
+if (mode === undefined)
+  test("SIGTERM releases semantic work acquired after the initial shutdown sweep", async () => {
+    const root = mkdtempSync(join(tmpdir(), "titen-shutdown-multiphase-"));
+    try {
+      for (let repeat = 0; repeat < 5; repeat += 1) {
+        const directory = join(root, String(repeat));
+        mkdirSync(directory);
+        const victimProcess = Bun.spawn({
+          cmd: ["bun", import.meta.path, "--multiphase-victim", directory],
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const acquired = await bounded(firstLine(victimProcess.stdout), 3_000);
+        const before = JSON.parse(acquired.value) as { claimId: string; leased: number };
+        assert.equal(before.leased, 1);
+        const signalledAt = performance.now();
+        victimProcess.kill("SIGTERM");
+        assert.equal(await bounded(victimProcess.exited, 2_000), 0);
+        assert.ok(performance.now() - signalledAt < 1_000);
+        while (!(await acquired.reader.read()).done) {}
+        assert.equal((await new Response(victimProcess.stderr).text()).trim(), "");
+
+        const inspection = openDatabase(join(directory, "titen.db"));
+        const inspectDb = createSqliteDb(inspection);
+        try {
+          const pending = await inspectDb.all<{ leased: number }>(
+            `SELECT lease_token IS NOT NULL AS leased FROM index_outbox
+              WHERE record_id = ? AND operation = 'upsert' AND state = 'pending'`,
+            [before.claimId],
+          );
+          assert.ok(pending.length > 0);
+          assert.ok(pending.every(({ leased }) => Number(leased) === 0));
+        } finally {
+          inspection.close();
+        }
+
+        const restarted = Bun.spawn({
+          cmd: ["bun", import.meta.path, "--restart", directory, before.claimId],
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const stdout = await new Response(restarted.stdout).text();
+        const stderr = await new Response(restarted.stderr).text();
+        assert.equal(await restarted.exited, 0);
+        assert.equal(stderr.trim(), "");
+        const after = JSON.parse(stdout) as any;
+        assert.equal(after.ready, 200);
+        assert.equal(after.embeds, 1);
+        assert.equal(after.vector, true);
+        assert.deepEqual(after.outbox, { state: "done", leased: 0 });
+        assert.deepEqual(after.counts, { observations: 1, claims: 1 });
+        assert.equal(after.integrity, "ok");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
