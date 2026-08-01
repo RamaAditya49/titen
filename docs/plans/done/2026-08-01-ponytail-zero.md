@@ -1,14 +1,13 @@
 ---
 work_id: ponytail-zero-20260801
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-02
-review_after: 2026-08-15
 owner: maintainer
-spec: docs/specs/active/2026-08-01-ponytail-zero.md
+spec: docs/specs/done/2026-08-01-ponytail-zero.md
 ---
 
 # Ponytail zero-debt release plan
@@ -30,17 +29,17 @@ spec: docs/specs/active/2026-08-01-ponytail-zero.md
 - [x] Rewrite the README opening around the Level 6 product model, concrete
   evidence and collaboration differences, `titen.dev`, and C.A.D.I.S Agent;
   run a human editorial pass before release.
-- [ ] Package and validate the current OpenClaw HTTP bundle; submit only to
+- [x] Package and validate the current OpenClaw HTTP bundle; submit only to
   catalogs with a verified official path and record public evidence.
 - [x] Run dual-runtime, security, migration, dashboard, package, workflow, and
   zero-ledger checks; inspect the publish tarball for secrets and omissions.
-- [ ] Publish the stable npm package and supported agent bundle, create the GitHub
+- [x] Publish the stable npm package and supported agent bundle, create the GitHub
   release, deploy the exact artifact to Cloudflare and rama-tuf, smoke all
   surfaces, and verify the recorded rollback path.
-- [ ] Move this pair to `done/` with exact command, version, commit, deployment,
+- [x] Move this pair to `done/` with exact command, version, commit, deployment,
   registry, and smoke evidence.
 
-## Evidence map
+## Acceptance evidence mapping
 
 | Acceptance | Planned evidence |
 | --- | --- |
@@ -67,6 +66,32 @@ spec: docs/specs/active/2026-08-01-ponytail-zero.md
 | AC-PZ-021 | current compatibility matrix plus public catalog submission URL where supported |
 | AC-PZ-022 | npm/GitHub immutable versions, Worker deployment ID, rama-tuf image/version, live smokes, and rollback artifact |
 | AC-PZ-023 | README link/attribution assertions plus a manual anti-slop pass against concrete product contracts |
+
+## Terminal result
+
+All acceptance criteria passed. Exact release, deployment, registry, rollback,
+and manual-gate identifiers are recorded in the paired
+[done spec](../../specs/done/2026-08-01-ponytail-zero.md#delivery-evidence).
+The live debt ledger contains zero markers.
+
+## Verification
+
+- `PLAYWRIGHT_PORT=48973 pnpm test:all`: dual-runtime API contracts, integration,
+  dashboard adapter, browser, workflow, and package gates passed on the exact
+  release merge.
+- `bash scripts/verify-pack.sh`: 9/9 package, CLI, MCP, SDK, and global-bin
+  checks passed; `pnpm audit --prod` reported no known vulnerabilities.
+- `pnpm check:workflow`, `pnpm check:routes`, `pnpm check:ponytail`,
+  `bun test tests/integration/agent-plugin.test.ts`, and `git diff --check`
+  passed after terminal documentation was recorded.
+- Clean npm-registry install: CLI reported `0.5.5`, the SDK exported
+  `TitenClient`, and the downloaded tarball SHA-1 matched registry metadata.
+- Public discovery smoke: `titen.dev` and `www.titen.dev` returned stable CLI
+  `0.5.5`; the release page, installer guide, and documented index-verification
+  route returned successfully after Cloudflare deployment.
+- Live `/readyz` checks reported revision
+  `35ea5552095cd6509f412266fc4c5458cc7c8b10` and schema 21 on Cloudflare and
+  `rama-tuf`; both rootless VPS services remained active and loopback-only.
 
 ## Security, migration, deploy, and rollback
 

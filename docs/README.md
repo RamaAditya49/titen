@@ -39,13 +39,13 @@ context without a documentation-site dependency.
 
 | Surface                            | Current state                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Astro dashboard | Six live areas, default `owner`, forced first-login password change, and atomic Add User pass local/browser checks and the exact 0.5.3 restored-data canary on `rama-tuf`; production login, scope denial, and restart invalidation also pass |
+| Astro dashboard | Six live areas, default `owner`, forced first-login password change, and atomic Add User pass local/browser checks and the exact 0.5.5 restored-data canary on `rama-tuf`; production login, scope denial, sealed-session restart, and cross-process checks also pass |
 | Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
 | Enterprise governance | Roles, policies, approvals, releases, retention, legal holds, identity mappings, and two governance Atlas lenses pass the shared contract |
 | Canonical federation | Opt-in signed claim/evidence bundles preserve provenance and conflicts; filtered import, replay, source binding, and cross-scope failures pass the shared contract |
-| Optional embedding/indexing | Implemented on Bun and in Cloudflare adapter code; deployment evidence varies |
+| Optional embedding/indexing | Implemented on Bun and verified live with BGE-M3, Vectorize, bounded repair, and scoped retrieval in the isolated Cloudflare stack |
 | Automatic LLM derivation/reflection | Implemented and dual-runtime tested; opt-in and not production-activated |
-| Live deployment | Exact `0.5.3` API and session dashboard run as rootless Quadlets on `rama-tuf`; schema 20 readiness, backup/restore, all-area canary, login/logout, restart recovery, rollback proof, and loopback-only bindings pass |
+| Live deployment | Exact `0.5.5` API and dashboard run as rootless Quadlets on `rama-tuf`; schema 21 readiness, backup/restore, all-area canary, login/logout, restart recovery, rollback proof, and loopback-only bindings pass. The isolated Cloudflare stack passes the same release's native semantic and repair smokes; see the [0.5.5 delivery evidence](./specs/done/2026-08-01-ponytail-zero.md#delivery-evidence) |
 
 ## Documentation rules
 
