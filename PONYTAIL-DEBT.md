@@ -41,9 +41,15 @@ is local and uses tracked Git content; it does not require hosted automation.
 | --- | --- | --- | --- |
 | `scripts/benchmark-enrichment-model.ts:601` | Use locked lexical aliases as a deterministic contract scorer | It cannot judge free-form semantic quality | A free-form production corpus becomes a release gate; use blinded independent adjudication |
 
+## Dashboard
+
+| Location | Deliberate shortcut | Ceiling | Upgrade trigger |
+| --- | --- | --- | --- |
+| `scripts/dashboard-adapter.ts:107` | Keep dashboard sessions in one adapter process | Restart logs users out and multiple replicas cannot share sessions | A deployment needs multiple dashboard adapter replicas; add a shared encrypted session store |
+
 ## Summary
 
-- Markers: 19.
+- Markers: 20.
 - Markers without a source trigger: 3.
 - Native agent work intentionally deferred: lifecycle hooks, a Pi MCP client
   extension, automatic OpenClaw bundle-to-remote-MCP import, and vendor-owned

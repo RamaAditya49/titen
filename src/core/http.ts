@@ -11,7 +11,7 @@ export interface RequestContext {
   url: URL;
   params: Record<string, string>;
   requestId: string;
-  /** Present only on routes that declare a required scope. */
+  /** Present only on routes that require authentication. */
   principal?: Principal;
   json: <T>() => Promise<T>;
   rawBody: () => Promise<string>;
@@ -30,6 +30,8 @@ export interface RouteDef {
   path: string;
   /** Required capability. Omitted means the route is unauthenticated. */
   scope?: string;
+  /** Authenticate without requiring an additional capability. */
+  authenticated?: boolean;
   handler: (ctx: RequestContext) => Promise<Result>;
 }
 

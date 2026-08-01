@@ -17,6 +17,30 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-08-01
+
+### Added
+
+- The operator dashboard now wires Memories, Context, Work, Audit, Governance,
+  and Federation to fixed authenticated API routes, with capability-gated
+  navigation and no fixture fallback.
+- Per-principal dashboard login exchanges an API key for an opaque HttpOnly
+  session, and authorized owners/admins can atomically create one human
+  membership plus its one-time API key.
+- The deployment guide now covers private Tailscale Serve and Cloudflare Tunnel
+  protected by Cloudflare Access while both Titen listeners remain loopback-only.
+
+### Changed
+
+- The public SDK now types all six Memory Atlas lenses and the optional Add User
+  fields on key creation.
+
+### Security
+
+- Dashboard routes enforce exact Host/Origin, bounded bodies and list results,
+  credential isolation, revocation, expiry, logout/restart invalidation, and
+  server-side authorization independent of browser navigation.
+
 ## [0.5.1] — 2026-08-01
 
 ### Fixed
@@ -459,7 +483,9 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.2
+[0.5.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.1
 [0.5.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.0
 [0.4.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.1
 [0.4.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.4.0

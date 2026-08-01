@@ -145,6 +145,23 @@ await call(`/v1/knowledge-releases/${release.release_id}/approve`, {
   reason: "Independent verifier approval",
 }, approver);
 await call(`/v1/knowledge-releases/${release.release_id}/activate`, { expected_version: 2 }, approver);
+await call("/v1/checkpoints", {
+  subject_id: subject,
+  kind: "task_state",
+  state: { phase: "verify" },
+  ttl_seconds: 600,
+});
+await call("/v1/leases", {
+  resource_type: "release",
+  resource_id: "dashboard-release",
+  purpose: "verify live work area",
+  ttl_seconds: 600,
+});
+await call("/v1/handoffs", {
+  to_principal: destination.principalId,
+  subject_id: subject,
+  message: "Verify the live dashboard product map.",
+}, approver);
 
 const port = 44_000 + Math.floor(Math.random() * 1000);
 const adapter = Bun.spawn({
@@ -152,24 +169,33 @@ const adapter = Bun.spawn({
   env: {
     ...process.env,
     TITEN_DASHBOARD_LIVE: "true",
+    TITEN_DASHBOARD_AUTH: "session",
     TITEN_API_URL: api.url,
-    TITEN_API_KEY: destination.key,
     TITEN_DASHBOARD_PORT: String(port),
   },
   stdout: "ignore",
   stderr: "pipe",
 });
 const dashboard = `http://127.0.0.1:${port}`;
+let sessionCookie = "";
 
-async function dashboardCall(path: string, body?: unknown) {
-  const response = await fetch(dashboard + path, body === undefined ? undefined : {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+async function dashboardCall(
+  path: string,
+  options: { method?: string; body?: unknown; expected?: number; authenticated?: boolean } = {},
+) {
+  const method = options.method ?? (options.body === undefined ? "GET" : "POST");
+  const headers = new Headers({ accept: "application/json" });
+  if (options.body !== undefined) headers.set("content-type", "application/json");
+  if (method !== "GET") headers.set("origin", dashboard);
+  if (options.authenticated !== false && sessionCookie) headers.set("cookie", sessionCookie);
+  const response = await fetch(dashboard + path, {
+    method,
+    headers,
+    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });
   const payload: any = await response.json();
-  assert.equal(response.status, 200, `${path}: ${JSON.stringify(payload)}`);
-  return payload;
+  assert.equal(response.status, options.expected ?? 200, `${path}: ${JSON.stringify(payload)}`);
+  return { payload, response };
 }
 
 try {
@@ -179,11 +205,23 @@ try {
     await Bun.sleep(20);
   }
   assert.ok(started, "adapter starts");
-  const status = await dashboardCall("/dashboard-api/status");
-  assert.equal(status.mode, "live");
-  assert.ok(!JSON.stringify(status).includes(destination.key), "status must not expose the API key");
-  assert.equal((await dashboardCall("/dashboard-api/health")).data.status, "ok");
-  assert.equal((await dashboardCall("/dashboard-api/readiness")).data.ready, true);
+  const initial = (await dashboardCall("/dashboard-api/status", { authenticated: false })).payload;
+  assert.equal(initial.mode, "live");
+  assert.equal(initial.authentication, "session");
+  assert.equal(initial.authenticated, false);
+  assert.ok(!JSON.stringify(initial).includes(destination.key), "status must not expose the API key");
+  const loggedIn = await dashboardCall("/dashboard-api/session", {
+    method: "POST",
+    body: { api_key: destination.key },
+    expected: 201,
+    authenticated: false,
+  });
+  sessionCookie = loggedIn.response.headers.get("set-cookie")!.split(";", 1)[0]!;
+  assert.match(sessionCookie, /^titen_dashboard_session=/);
+  assert.ok(!JSON.stringify(loggedIn.payload).includes(destination.key), "login must not echo the API key");
+  assert.equal(loggedIn.payload.data.principal_id, destination.principalId);
+  assert.equal((await dashboardCall("/dashboard-api/health")).payload.data.status, "ok");
+  assert.equal((await dashboardCall("/dashboard-api/readiness")).payload.data.ready, true);
 
   const cases = [
     { input: { lens: "neighborhood", subject_id: federatedSubject, limit: 5 }, marker: importedMarker },
@@ -194,12 +232,58 @@ try {
     { input: { lens: "knowledge_release", focus_id: channel.channel_id, limit: 5 }, marker: releaseMarker },
   ];
   for (const { input, marker: expected } of cases) {
-    const payload = await dashboardCall("/dashboard-api/atlas/compile", input);
+    const payload = (await dashboardCall("/dashboard-api/atlas/compile", { body: input })).payload;
     const labels = payload.data.nodes.map((node: any) => node.label);
     assert.ok(labels.includes(expected), `${input.lens} returns its authorized record`);
     assert.ok(!labels.includes(leak), `${input.lens} excludes another subject`);
   }
-  console.log("OK — six scoped Atlas lenses + signed canonical federation recall passed through the live adapter");
+
+  const context = (await dashboardCall("/dashboard-api/context/compile", { body: {
+    subject_id: federatedSubject,
+    task: "imported canonical marker",
+    max_tokens: 600,
+  } })).payload.data;
+  assert.ok(context.items.some((item: any) => item.claim.includes(importedMarker)), "Context area returns imported memory");
+
+  const leases = (await dashboardCall("/dashboard-api/work/leases?limit=50")).payload.data.leases;
+  assert.ok(leases.some((item: any) => item.resource_id === "dashboard-release"), "Work area returns leases");
+  const handoffs = (await dashboardCall("/dashboard-api/work/handoffs")).payload.data.handoffs;
+  assert.ok(handoffs.some((item: any) => item.message.includes("product map")), "Work area returns pending handoffs");
+  assert.equal((await dashboardCall(`/dashboard-api/work/checkpoint?subject_id=${subject}&agent_id=${destination.principalId}&kind=task_state`)).payload.data.state.phase, "verify");
+
+  assert.ok((await dashboardCall("/dashboard-api/audit/log?limit=50")).payload.data.entries.length > 0, "Audit area returns entries");
+  assert.ok((await dashboardCall("/dashboard-api/audit/events?limit=50")).payload.data.events.length > 0, "Audit area returns events");
+  assert.ok((await dashboardCall("/dashboard-api/governance/channels")).payload.data.channels.length > 0, "Governance area returns channels");
+  assert.ok((await dashboardCall("/dashboard-api/governance/releases")).payload.data.releases.length > 0, "Governance area returns releases");
+  assert.ok((await dashboardCall("/dashboard-api/federation/peers")).payload.data.peers.length > 0, "Federation area returns peers");
+  assert.ok((await dashboardCall(`/dashboard-api/federation/log?peer_id=${destinationPeer.peer_id}&limit=50`)).payload.data.entries.length > 0, "Federation area returns exchange log");
+
+  const created = (await dashboardCall("/dashboard-api/governance/users", { body: {
+    label: "Dashboard verifier reader",
+    membership_role: "reader",
+    scopes: ["views:compile"],
+    max_trust: "asserted",
+  }, expected: 201 })).payload.data;
+  assert.match(created.api_key, /^titen_sk_/);
+  const newKey = created.api_key as string;
+  assert.equal(created.membership_role, "reader");
+  const membershipRows = await db.all<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM memberships WHERE org_id = ? AND principal_id = ? AND role = 'reader' AND removed_at IS NULL`,
+    [destination.orgId, created.principal_id],
+  );
+  assert.equal(Number(membershipRows[0]!.count), 1, "Add user commits one membership");
+
+  await dashboardCall("/dashboard-api/session", { method: "DELETE" });
+  assert.equal((await dashboardCall("/dashboard-api/work/leases", { expected: 401 })).payload.error.code, "DASHBOARD_AUTH_REQUIRED");
+  sessionCookie = "";
+  const readerLogin = await dashboardCall("/dashboard-api/session", {
+    method: "POST", body: { api_key: newKey }, expected: 201, authenticated: false,
+  });
+  sessionCookie = readerLogin.response.headers.get("set-cookie")!.split(";", 1)[0]!;
+  assert.equal(readerLogin.payload.data.principal_id, created.principal_id, "new user can log in");
+  assert.equal((await dashboardCall("/dashboard-api/session")).payload.data.organization_role, "reader");
+
+  console.log("OK — six live product areas, per-principal login, atomic add-user, and canonical federation passed through the real adapter");
 } finally {
   adapter.kill();
   await api.stop();

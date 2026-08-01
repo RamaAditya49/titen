@@ -277,21 +277,21 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 
 - Titen MUST treat the dashboard as an optional authenticated REST client;
   disabling it MUST leave complete headless REST/MCP behavior unchanged.
-- The initial implemented frontend MUST expose Memory Atlas as its first and
-  only active product area and MUST display only responses from the authorized
-  view compiler; disconnected or failed integration MUST show no fixture data.
-- Later dashboard areas MUST follow the canonical groups defined in
-  [DESIGN](./DESIGN.md): Memory, Collaboration, Operations, Administration, and
-  Governance.
+- The implemented frontend MUST expose the canonical live product map defined
+  in [DESIGN](./DESIGN.md): Memories, Context, Work, Audit, Governance, and
+  Federation. Memories uses the authorized Memory Atlas projection; every
+  other area uses its existing authenticated domain REST contract.
 - An area MUST NOT become a link, control, or route until its backend contract
   is implemented, the current build declares it available, its authorization
   and failure behavior pass, and its paired EARS UI work item is complete.
 - The approved reference shell MAY show unavailable area names as
   non-interactive orientation, but MUST NOT render them as placeholder routes,
   locks, disabled controls, paid upgrades, or shipped functionality.
-- Categories and tags MUST remain memory filters; webhooks MUST remain inside
-  Audit & Events; export and recovery MUST remain inside System; account
-  settings MUST remain absent until an account/session lifecycle exists.
+- Categories and tags MUST remain memory filters; webhooks and domain events
+  MUST remain inside Audit; export and recovery remain deployment operations;
+  account settings remain absent. Where per-principal dashboard sessions are
+  enabled, credentials MUST remain adapter-only and user provisioning MUST reuse
+  canonical API-key and organization-membership authority.
 - Navigation and route discovery MUST NOT bypass authorization or reveal a
   foreign resource, hidden capability, record count, or private scope.
 
@@ -465,11 +465,12 @@ inferring hidden records; disabling the surface leaves headless REST/MCP
 behavior unchanged. Its v0.3 preview lenses must not impersonate another
 principal or convert verified memory into an active release.
 
-The dashboard information architecture is accepted when Atlas is the only
-active route, the final reference shell identifies its values as synthetic, and
-each later area remains non-interactive until its backing capability,
-authorization, EARS UI work item, and release evidence are complete. A label or
-planned area in documentation is not implementation evidence.
+The dashboard information architecture is accepted when all six canonical
+areas use live same-origin responses, capability discovery hides unauthorized
+areas, failures clear stale private data, and no area substitutes fixtures.
+Session mode is accepted when each operator uses its own revocable principal,
+logout/restart invalidates the browser session, and an owner/admin can add one
+human credential plus membership atomically.
 
 ## 11. Success measures
 
@@ -522,5 +523,5 @@ planned area in documentation is not implementation evidence.
   broader private/team or model-derived federation after measured demand;
 - measured Memory Atlas server-side caps after the authorized reference fixture
   exists;
-- the first post-Atlas dashboard area, selected only after its operator journey
-  and authorized list/detail API are stable.
+- durable or federated browser sessions beyond the implemented single-adapter
+  process boundary.

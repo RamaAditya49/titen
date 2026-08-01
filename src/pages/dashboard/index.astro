@@ -6,14 +6,21 @@ import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
 import packageJson from "../../../package.json";
 
-const productAreas = ["Memories", "Context", "Work", "Audit", "Governance", "Federation"];
+const productAreas = [
+  { id: "memories", label: "Memories", scopes: "views:compile" },
+  { id: "context", label: "Context", scopes: "context:compile" },
+  { id: "work", label: "Work", scopes: "checkpoints:read leases:read handoffs:read" },
+  { id: "audit", label: "Audit", scopes: "audit:read events:read" },
+  { id: "governance", label: "Governance", scopes: "governance:read approvals:read releases:read memberships:read keys:manage" },
+  { id: "federation", label: "Federation", scopes: "federation:read" },
+];
 const lenses = [
-  { id: "neighborhood", label: "Neighborhood", needs: "subject" },
-  { id: "evidence_trace", label: "Evidence trace", needs: "focus" },
-  { id: "conflict_freshness", label: "Conflict & freshness", needs: "subject" },
-  { id: "review_queue", label: "Review queue", needs: "optional" },
-  { id: "scope_preview", label: "Scope preview", needs: "focus" },
-  { id: "knowledge_release", label: "Knowledge releases", needs: "optional" },
+  { id: "neighborhood", label: "Neighborhood", needs: "subject", scope: "" },
+  { id: "evidence_trace", label: "Evidence trace", needs: "focus", scope: "" },
+  { id: "conflict_freshness", label: "Conflict & freshness", needs: "subject", scope: "" },
+  { id: "review_queue", label: "Review queue", needs: "optional", scope: "" },
+  { id: "scope_preview", label: "Scope preview", needs: "focus", scope: "governance:read" },
+  { id: "knowledge_release", label: "Knowledge releases", needs: "optional", scope: "releases:read" },
 ];
 ---
 
@@ -24,8 +31,8 @@ const lenses = [
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light" />
     <meta name="referrer" content="no-referrer" />
-    <meta name="description" content="Titen Memory Atlas — live, authorized memory inspection." />
-    <title>Titen · Live Memory Atlas</title>
+    <meta name="description" content="Titen operator dashboard — live memory, context, work, audit, governance, and federation." />
+    <title>Titen · Operator dashboard</title>
   </head>
   <body>
     <a class="skip-link" href="#workspace">Skip to workspace</a>
@@ -37,25 +44,28 @@ const lenses = [
           <span>v{packageJson.version}</span>
         </header>
 
-        <nav>
-          <p>Memory</p>
-          <a href="/dashboard/" aria-current="page">Memory Atlas</a>
+        <nav data-product-nav hidden>
           <p>Product map</p>
-          {productAreas.map((area) => <span class="inactive-area">{area}<small>not wired</small></span>)}
+          {productAreas.map((area) => (
+            <button type="button" data-area={area.id} data-scopes={area.scopes} hidden>
+              {area.label}<small>live</small>
+            </button>
+          ))}
         </nav>
 
         <section class="credential-note" aria-label="Credential handling">
           <p>Credential boundary</p>
-          <strong>Server-only</strong>
-          <span>The browser uses same-origin routes. API keys stay in the adapter process.</span>
+          <strong data-credential-mode>Server-only</strong>
+          <span data-credential-copy>API keys never enter browser storage.</span>
+          <button type="button" class="text-button" data-logout hidden>Sign out</button>
         </section>
       </aside>
 
       <main id="workspace" class="main-shell" tabindex="-1">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Operator surface / read only</p>
-            <h1>Live Memory Atlas</h1>
+            <p class="eyebrow">Authorized operator surface</p>
+            <h1 data-page-title>Titen dashboard</h1>
           </div>
           <div class="connection" role="status" aria-live="polite">
             <i data-connection-dot></i>
@@ -64,7 +74,23 @@ const lenses = [
           </div>
         </header>
 
-        <section class="service-strip" aria-label="Service checks">
+        <section class="login-panel" data-login-panel hidden aria-labelledby="login-heading">
+          <div>
+            <p class="eyebrow">Private operator access</p>
+            <h2 id="login-heading">Sign in with your Titen API key</h2>
+            <p>The key is exchanged once for an HttpOnly session and is never written to browser storage.</p>
+          </div>
+          <form data-login-form>
+            <label>
+              <span>API key</span>
+              <input name="api_key" type="password" autocomplete="off" spellcheck="false" maxlength="512" required placeholder="titen_sk_…" />
+            </label>
+            <button class="primary-button" type="submit">Sign in</button>
+            <span data-login-status role="status" aria-live="polite"></span>
+          </form>
+        </section>
+
+        <section class="service-strip" data-service-strip hidden aria-label="Service checks">
           <article>
             <span>Process</span>
             <strong data-health>Checking</strong>
@@ -76,101 +102,164 @@ const lenses = [
             <small data-revision>readyz</small>
           </article>
           <article>
-            <span>Projection</span>
-            <strong data-projection>No query</strong>
-            <small>authorized SQL view</small>
+            <span>Principal</span>
+            <strong data-principal>Server key</strong>
+            <small data-role>adapter authority</small>
           </article>
           <button type="button" class="secondary-button" data-reconnect>Refresh service</button>
         </section>
 
         <div class="notice" data-service-notice role="alert" hidden></div>
 
-        <section class="query-panel" aria-labelledby="query-heading">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Bounded query</p>
-              <h2 id="query-heading">Choose what the API may return</h2>
-            </div>
-            <span>Nothing is stored in this browser.</span>
-          </div>
-
-          <form data-query-form>
-            <fieldset class="lens-picker">
-              <legend>Atlas lens</legend>
-              {lenses.map((lens, index) => (
-                <label>
-                  <input type="radio" name="lens" value={lens.id} data-needs={lens.needs} checked={index === 0} />
-                  <span>{lens.label}</span>
-                </label>
-              ))}
-            </fieldset>
-
-            <div class="input-grid">
-              <label>
-                <span>Subject ID</span>
-                <input name="subject_id" autocomplete="off" maxlength="200" placeholder="subject or project identity" required />
-                <small data-subject-help>Required for the selected lens.</small>
-              </label>
-              <label>
-                <span data-focus-label>Focus claim ID</span>
-                <input name="focus_id" autocomplete="off" maxlength="200" placeholder="claim ID for evidence trace" />
-                <small data-focus-help>Used only by Evidence trace.</small>
-              </label>
-              <label>
-                <span>Result limit</span>
-                <input name="limit" type="number" min="1" max="100" value="50" inputmode="numeric" required />
-                <small>Server limit: 1–100.</small>
-              </label>
-            </div>
-
-            <div class="form-actions">
-              <button class="primary-button" type="submit" data-run>Compile authorized view</button>
-              <span data-query-status role="status" aria-live="polite">Enter an authorized scope to begin.</span>
-            </div>
-          </form>
-        </section>
-
-        <section class="atlas-workspace" aria-label="Atlas result">
-          <div class="result-column">
-            <header class="result-header">
+        <section class="area-panel" data-area-panel="memories" hidden>
+          <section class="query-panel" aria-labelledby="memory-query-heading">
+            <div class="section-heading">
               <div>
-                <p class="eyebrow">Canonical projection</p>
-                <h2 data-view-title>Waiting for a live query</h2>
+                <p class="eyebrow">Memories / authorized projection</p>
+                <h2 id="memory-query-heading">Inspect canonical memory</h2>
               </div>
-              <span data-result-count>0 records</span>
-            </header>
+              <span>No fixture fallback</span>
+            </div>
+            <form data-memory-form>
+              <fieldset class="lens-picker">
+                <legend>Memory lens</legend>
+                {lenses.map((lens, index) => (
+                  <label>
+                    <input type="radio" name="lens" value={lens.id} data-needs={lens.needs} data-scope={lens.scope} checked={index === 0} />
+                    <span>{lens.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <div class="input-grid">
+                <label>
+                  <span>Subject ID</span>
+                  <input name="subject_id" autocomplete="off" maxlength="200" placeholder="subject identity" required />
+                  <small data-subject-help>Required for the selected lens.</small>
+                </label>
+                <label>
+                  <span data-focus-label>Focus claim ID</span>
+                  <input name="focus_id" autocomplete="off" maxlength="200" placeholder="claim ID" />
+                  <small data-focus-help>Used only by Evidence trace.</small>
+                </label>
+                <label>
+                  <span>Result limit</span>
+                  <input name="limit" type="number" min="1" max="100" value="50" inputmode="numeric" required />
+                  <small>Server limit: 1–100.</small>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button class="primary-button" type="submit" data-memory-run>Compile memory view</button>
+                <span data-memory-status role="status" aria-live="polite">Enter an authorized scope to begin.</span>
+              </div>
+            </form>
+          </section>
 
-            <div class="loading-state" data-loading hidden aria-label="Loading Atlas records">
-              <span></span><span></span><span></span>
+          <section class="atlas-workspace" aria-label="Memory result">
+            <div class="result-column">
+              <header class="result-header">
+                <div><p class="eyebrow">Canonical projection</p><h2 data-view-title>Waiting for a live query</h2></div>
+                <span data-result-count>0 records</span>
+              </header>
+              <div class="loading-state" data-memory-loading hidden aria-label="Loading memory records"><span></span><span></span><span></span></div>
+              <div class="empty-state" data-memory-empty>
+                <strong>No live query yet.</strong>
+                <p>Run a bounded query to inspect records authorized for this principal.</p>
+              </div>
+              <div class="notice" data-memory-error role="alert" hidden></div>
+              <div class="record-list" data-memory-records hidden></div>
             </div>
-            <div class="empty-state" data-empty>
-              <strong>No fixture is loaded.</strong>
-              <p>Run a bounded query to inspect records authorized for the adapter credential.</p>
-            </div>
-            <div class="notice" data-query-error role="alert" hidden></div>
-            <div class="record-list" data-records hidden></div>
-          </div>
-
-          <aside class="inspector" aria-labelledby="inspector-heading">
-            <header>
-              <p class="eyebrow">Selected record</p>
-              <h2 id="inspector-heading" data-inspector-title>Nothing selected</h2>
-            </header>
-            <div class="inspector-empty" data-inspector-empty>Select a returned record to inspect canonical fields and relationships.</div>
-            <div data-inspector-body hidden>
-              <dl data-node-fields></dl>
-              <section>
-                <h3>Relationships</h3>
-                <div data-relationships></div>
-              </section>
-            </div>
-          </aside>
+            <aside class="inspector" aria-labelledby="inspector-heading">
+              <header><p class="eyebrow">Selected record</p><h2 id="inspector-heading" data-inspector-title>Nothing selected</h2></header>
+              <div class="inspector-empty" data-inspector-empty>Select a returned record to inspect canonical fields and relationships.</div>
+              <div data-inspector-body hidden>
+                <dl data-node-fields></dl>
+                <section><h3>Relationships</h3><div data-relationships></div></section>
+              </div>
+            </aside>
+          </section>
+          <details class="metadata-panel"><summary>View metadata</summary><pre data-metadata>No live view compiled.</pre></details>
         </section>
 
-        <details class="metadata-panel">
-          <summary>View metadata</summary>
-          <pre data-metadata>No live view compiled.</pre>
-        </details>
+        <section class="area-panel query-panel" data-area-panel="context" hidden aria-labelledby="context-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Context / bounded compile</p><h2 id="context-heading">Compile task-specific context</h2></div>
+            <span>Authorized SQL + optional semantic candidates</span>
+          </div>
+          <form data-context-form>
+            <div class="input-grid context-grid">
+              <label><span>Subject ID</span><input name="subject_id" maxlength="200" autocomplete="off" required /></label>
+              <label><span>Task</span><input name="task" maxlength="2000" autocomplete="off" required /></label>
+              <label><span>Token budget</span><input name="max_tokens" type="number" min="128" max="32000" value="1200" required /></label>
+              <label><span>Project ID (optional)</span><input name="project_id" maxlength="200" autocomplete="off" /></label>
+            </div>
+            <div class="form-actions"><button class="primary-button" type="submit">Compile context</button><span data-context-status role="status"></span></div>
+          </form>
+          <div class="live-output" data-context-output><p>No context compiled in this browser session.</p></div>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="work" hidden aria-labelledby="work-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Work / collaboration state</p><h2 id="work-heading">Leases, handoffs, and checkpoints</h2></div>
+            <button class="secondary-button" type="button" data-work-refresh>Refresh work</button>
+          </div>
+          <form class="inline-form" data-checkpoint-form>
+            <label><span>Subject ID</span><input name="subject_id" maxlength="200" autocomplete="off" required /></label>
+            <label><span>Agent ID</span><input name="agent_id" maxlength="200" autocomplete="off" required /></label>
+            <label><span>Kind</span><input name="kind" maxlength="100" autocomplete="off" required /></label>
+            <button class="secondary-button" type="submit">Find checkpoint</button>
+          </form>
+          <div class="live-output" data-work-output><p>Refresh to load the work contracts available to this principal.</p></div>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="audit" hidden aria-labelledby="audit-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Audit / metadata activity</p><h2 id="audit-heading">Audit log and domain events</h2></div>
+            <button class="secondary-button" type="button" data-audit-refresh>Refresh activity</button>
+          </div>
+          <form class="inline-form" data-audit-form>
+            <label><span>Audit action (optional)</span><input name="action" maxlength="200" autocomplete="off" /></label>
+            <label><span>Event kind (optional)</span><input name="kind" maxlength="200" autocomplete="off" /></label>
+            <label><span>Limit</span><input name="limit" type="number" min="1" max="200" value="50" required /></label>
+          </form>
+          <div class="live-output" data-audit-output><p>Refresh to reconstruct authorized metadata activity.</p></div>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="governance" hidden aria-labelledby="governance-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Governance / access and releases</p><h2 id="governance-heading">Policies, approvals, releases, and users</h2></div>
+            <button class="secondary-button" type="button" data-governance-refresh>Refresh governance</button>
+          </div>
+          <section class="user-admin" data-user-admin hidden aria-labelledby="add-user-heading">
+            <div><h3 id="add-user-heading">Add a human user</h3><p>Creates one organization membership and one API key atomically. The key is shown once.</p></div>
+            <form data-user-form>
+              <label><span>Key label</span><input name="label" maxlength="200" autocomplete="off" required placeholder="Rama dashboard" /></label>
+              <label><span>Role</span><select name="membership_role" required><option>reader</option><option>member</option><option>admin</option><option data-owner-role>owner</option></select></label>
+              <label><span>Access profile</span><select name="profile" required><option value="reader">Read dashboard</option><option value="operator">Memory operator</option><option value="admin">Administrator</option></select></label>
+              <label><span>Trust ceiling</span><select name="max_trust" required><option>asserted</option><option>verified</option><option>policy_approved</option><option>unverified</option></select></label>
+              <button class="primary-button" type="submit">Create user</button>
+              <span data-user-status role="status"></span>
+            </form>
+            <div class="one-time-key" data-one-time-key hidden>
+              <strong>Copy this API key now. Titen cannot show it again.</strong>
+              <code data-new-key></code>
+              <div><button type="button" class="secondary-button" data-copy-key>Copy key</button><button type="button" class="text-button" data-clear-key>Clear</button></div>
+            </div>
+          </section>
+          <div class="live-output" data-governance-output><p>Refresh to load the governance contracts available to this principal.</p></div>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="federation" hidden aria-labelledby="federation-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Federation / signed peers</p><h2 id="federation-heading">Peers and exchange log</h2></div>
+            <button class="secondary-button" type="button" data-federation-refresh>Refresh peers</button>
+          </div>
+          <form class="inline-form" data-federation-form>
+            <label><span>Peer ID</span><input name="peer_id" maxlength="200" autocomplete="off" required /></label>
+            <label><span>Log limit</span><input name="limit" type="number" min="1" max="200" value="50" required /></label>
+            <button class="secondary-button" type="submit">Load peer log</button>
+          </form>
+          <div class="live-output" data-federation-output><p>Refresh to load peers registered by this principal.</p></div>
+        </section>
       </main>
     </div>
 
@@ -179,31 +268,39 @@ const lenses = [
         DashboardApiError,
         checkService,
         compileView,
+        getArea,
         getDashboardStatus,
+        getSession,
+        login,
+        logout,
+        postArea,
         type AtlasNode,
         type AtlasView,
+        type DashboardPrincipal,
+        type DashboardStatus,
       } from "../../lib/dashboard-api";
 
       const one = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
-      const form = one<HTMLFormElement>("[data-query-form]");
-      const runButton = one<HTMLButtonElement>("[data-run]");
-      const records = one<HTMLElement>("[data-records]");
-      const empty = one<HTMLElement>("[data-empty]");
-      const loading = one<HTMLElement>("[data-loading]");
-      const queryError = one<HTMLElement>("[data-query-error]");
+      const all = <T extends Element>(selector: string) => [...document.querySelectorAll<T>(selector)];
+      const memoryForm = one<HTMLFormElement>("[data-memory-form]");
+      const memoryRun = one<HTMLButtonElement>("[data-memory-run]");
+      const memoryRecords = one<HTMLElement>("[data-memory-records]");
+      const memoryEmpty = one<HTMLElement>("[data-memory-empty]");
+      const memoryLoading = one<HTMLElement>("[data-memory-loading]");
+      const memoryError = one<HTMLElement>("[data-memory-error]");
       let view: AtlasView | null = null;
-      let projectionGeneration = 0;
+      let principal: DashboardPrincipal | null = null;
+      let dashboardStatus: DashboardStatus | null = null;
+      let generation = 0;
 
-      function text(selector: string, value: string) { one<HTMLElement>(selector).textContent = value; }
-      function data(payload: Record<string, unknown>): Record<string, unknown> {
-        return payload.data && typeof payload.data === "object"
-          ? payload.data as Record<string, unknown>
-          : payload.error && typeof payload.error === "object"
-            ? payload.error as Record<string, unknown>
-            : payload;
+      const text = (selector: string, value: string) => { one<HTMLElement>(selector).textContent = value; };
+      const has = (scope: string) => Boolean(principal?.scopes.includes("*") || principal?.scopes.includes(scope));
+      function payloadData(payload: Record<string, unknown>): Record<string, unknown> {
+        return payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+          ? payload.data as Record<string, unknown> : payload;
       }
       function serviceDetail(payload: Record<string, unknown>, key: string): string | undefined {
-        const value = data(payload)[key];
+        const value = payloadData(payload)[key];
         return typeof value === "string" ? value : undefined;
       }
       function setNotice(element: HTMLElement, message?: string) {
@@ -212,62 +309,131 @@ const lenses = [
       }
       function errorMessage(error: unknown): string {
         if (error instanceof DashboardApiError) {
-          if (error.status === 401) return "Authentication failed. Replace the server-side dashboard credential.";
-          if (error.status === 403) return "This credential is not authorized for the selected view.";
+          if (error.status === 401) return "Your dashboard session is no longer valid. Sign in again.";
+          if (error.status === 403) return "This principal is not authorized for that operation.";
+          if (error.status === 404) return "The authorized resource was not found.";
           if (error.status === 503) return "Titen is not ready. Inspect readiness before retrying.";
           return error.message;
         }
         return "The same-origin dashboard adapter is unreachable.";
       }
+      function handleError(error: unknown, target?: HTMLElement) {
+        if (error instanceof DashboardApiError && error.status === 401 && dashboardStatus?.authentication === "session") signedOut(errorMessage(error));
+        else if (target) renderMessage(target, errorMessage(error), true);
+        else setNotice(one("[data-service-notice]"), errorMessage(error));
+      }
 
-      function clearProjection() {
-        projectionGeneration += 1;
+      function renderMessage(target: HTMLElement, message: string, danger = false) {
+        target.replaceChildren();
+        const paragraph = document.createElement("p");
+        paragraph.textContent = message;
+        if (danger) paragraph.className = "output-error";
+        target.append(paragraph);
+      }
+      function rowLabel(row: Record<string, unknown>, index: number): string {
+        for (const key of ["label", "statement", "name", "action", "kind", "principal_id", "peer_id", "lease_id", "handoff_id", "event_id", "membership_id", "policy_id", "release_id", "key_id", "id", "status"])
+          if (typeof row[key] === "string" && row[key]) return String(row[key]);
+        return `Record ${index + 1}`;
+      }
+      function renderPayload(target: HTMLElement, payload: Record<string, unknown>) {
+        target.replaceChildren();
+        const data = payloadData(payload);
+        const arrays = Object.entries(data).filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1]));
+        if (!arrays.length) {
+          const pre = document.createElement("pre");
+          pre.textContent = JSON.stringify(data, null, 2);
+          target.append(pre);
+          return;
+        }
+        for (const [name, rows] of arrays) {
+          const section = document.createElement("section");
+          const heading = document.createElement("h3");
+          heading.textContent = `${name.replaceAll("_", " ")} · ${rows.length}`;
+          section.append(heading);
+          if (!rows.length) {
+            const empty = document.createElement("p");
+            empty.textContent = "No authorized records returned.";
+            section.append(empty);
+          }
+          rows.slice(0, 200).forEach((value, index) => {
+            const row = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : { value };
+            const details = document.createElement("details");
+            const summary = document.createElement("summary");
+            const pre = document.createElement("pre");
+            summary.textContent = rowLabel(row, index);
+            pre.textContent = JSON.stringify(row, null, 2);
+            details.append(summary, pre);
+            section.append(details);
+          });
+          target.append(section);
+        }
+        const metadata = Object.fromEntries(Object.entries(data).filter(([, value]) => !Array.isArray(value)));
+        if (Object.keys(metadata).length) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          const pre = document.createElement("pre");
+          summary.textContent = "Response metadata";
+          pre.textContent = JSON.stringify(metadata, null, 2);
+          details.append(summary, pre);
+          target.append(details);
+        }
+      }
+      async function loadAvailable(target: HTMLElement, requests: Array<[string, string]>) {
+        renderMessage(target, "Loading authorized live data…");
+        const selected = requests.filter(([, scope]) => has(scope));
+        if (!selected.length) return renderMessage(target, "This principal has no read capability for this area.");
+        const results = await Promise.all(selected.map(async ([path]) => [path.split("/").at(-1)!, await getArea(path)] as const));
+        const merged: Record<string, unknown> = {};
+        for (const [name, payload] of results) Object.assign(merged, payloadData(payload));
+        renderPayload(target, { data: merged });
+      }
+
+      function clearMemory() {
+        generation += 1;
         view = null;
-        records.replaceChildren();
-        records.hidden = true;
-        loading.hidden = true;
-        empty.hidden = false;
-        empty.querySelector("strong")!.textContent = "No fixture is loaded.";
-        empty.querySelector("p")!.textContent = "Run a bounded query to inspect records authorized for the adapter credential.";
+        memoryRecords.replaceChildren();
+        memoryRecords.hidden = true;
+        memoryLoading.hidden = true;
+        memoryEmpty.hidden = false;
+        memoryEmpty.querySelector("strong")!.textContent = "No live query yet.";
+        memoryEmpty.querySelector("p")!.textContent = "Run a bounded query to inspect records authorized for this principal.";
         text("[data-view-title]", "Waiting for a live query");
         text("[data-result-count]", "0 records");
-        text("[data-projection]", "No query");
         text("[data-metadata]", "No live view compiled.");
-        text("[data-query-status]", "Enter an authorized scope to begin.");
-        setNotice(queryError);
+        text("[data-memory-status]", "Enter an authorized scope to begin.");
+        setNotice(memoryError);
         text("[data-inspector-title]", "Nothing selected");
         one<HTMLElement>("[data-inspector-empty]").hidden = false;
         one<HTMLElement>("[data-inspector-body]").hidden = true;
         one<HTMLDListElement>("[data-node-fields]").replaceChildren();
         one<HTMLElement>("[data-relationships]").replaceChildren();
       }
-
-      function updateRequirements() {
+      function clearPrivateState() {
+        clearMemory();
+        for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]"])
+          renderMessage(one(selector), "No live data loaded for this principal.");
+        clearOneTimeKey();
+      }
+      function updateMemoryRequirements() {
         const selected = one<HTMLInputElement>('input[name="lens"]:checked');
-        const subject = form.elements.namedItem("subject_id") as HTMLInputElement;
-        const focus = form.elements.namedItem("focus_id") as HTMLInputElement;
+        const subject = memoryForm.elements.namedItem("subject_id") as HTMLInputElement;
+        const focus = memoryForm.elements.namedItem("focus_id") as HTMLInputElement;
         const lens = selected.value;
         subject.required = selected.dataset.needs === "subject";
         focus.required = selected.dataset.needs === "focus";
-        text("[data-subject-help]", subject.required ? "Required for the selected lens." : lens === "review_queue" ? "Optional filter for Review queue." : "Not used by the selected lens.");
-        const focusCopy = lens === "evidence_trace"
-          ? ["Focus claim ID", "claim ID for evidence trace", "Required for Evidence trace."]
-          : lens === "scope_preview"
-            ? ["Focus principal ID", "principal ID to preview", "Required for Scope preview."]
-            : lens === "knowledge_release"
-              ? ["Focus channel ID", "optional channel ID", "Optional; leave blank to include all authorized channels."]
-              : ["Focus ID", "not used by selected lens", "Not used by the selected lens."];
-        text("[data-focus-label]", focusCopy[0]);
-        focus.placeholder = focusCopy[1];
-        text("[data-focus-help]", focusCopy[2]);
+        text("[data-subject-help]", subject.required ? "Required for the selected lens." : lens === "review_queue" ? "Optional review filter." : "Not used by this lens.");
+        const copy = lens === "evidence_trace" ? ["Focus claim ID", "claim ID", "Required for Evidence trace."]
+          : lens === "scope_preview" ? ["Focus principal ID", "principal ID", "Required for Scope preview."]
+          : lens === "knowledge_release" ? ["Focus channel ID", "optional channel ID", "Optional channel filter."]
+          : ["Focus ID", "not used", "Not used by this lens."];
+        text("[data-focus-label]", copy[0]);
+        focus.placeholder = copy[1];
+        text("[data-focus-help]", copy[2]);
       }
-
       function formatDate(value: string, detailed = false): string | undefined {
-        if (!value) return;
         const date = new Date(value);
         return Number.isNaN(date.valueOf()) ? undefined : detailed ? date.toLocaleString() : date.toLocaleDateString();
       }
-
       function addField(list: HTMLDListElement, label: string, value: unknown) {
         if (value === undefined || value === null || value === "") return;
         const term = document.createElement("dt");
@@ -276,29 +442,19 @@ const lenses = [
         description.textContent = Array.isArray(value) ? value.join(", ") || "none" : String(value);
         list.append(term, description);
       }
-
       function inspect(node: AtlasNode) {
-        records.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.id === node.id)));
+        memoryRecords.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.id === node.id)));
         text("[data-inspector-title]", node.label);
         one<HTMLElement>("[data-inspector-empty]").hidden = true;
         one<HTMLElement>("[data-inspector-body]").hidden = false;
         const fields = one<HTMLDListElement>("[data-node-fields]");
         fields.replaceChildren();
-        addField(fields, "ID", node.id);
-        addField(fields, "Type", node.type);
-        addField(fields, "Trust", node.trust);
-        addField(fields, "Status", node.status);
-        addField(fields, "Created", formatDate(node.created_at, true));
-        addField(fields, "Freshness", node.freshness === undefined ? undefined : `${node.freshness} days`);
-        addField(fields, "Confidence", node.confidence);
-        addField(fields, "Priority", node.priority);
-        addField(fields, "Reasons", node.reasons);
-        addField(fields, "Owner", node.owner_id);
-        addField(fields, "Next action", node.next_action);
-        addField(fields, "Deadline", node.deadline);
-        addField(fields, "Evidence refs", node.evidence_refs);
-        addField(fields, "Audit refs", node.audit_refs);
-
+        for (const [label, value] of [
+          ["ID", node.id], ["Type", node.type], ["Trust", node.trust], ["Status", node.status],
+          ["Created", formatDate(node.created_at, true)], ["Freshness", node.freshness === undefined ? undefined : `${node.freshness} days`],
+          ["Confidence", node.confidence], ["Priority", node.priority], ["Reasons", node.reasons], ["Owner", node.owner_id],
+          ["Next action", node.next_action], ["Deadline", node.deadline], ["Evidence refs", node.evidence_refs], ["Audit refs", node.audit_refs],
+        ] as const) addField(fields, label, value);
         const relationships = one<HTMLElement>("[data-relationships]");
         relationships.replaceChildren();
         const edges = view?.edges.filter((edge) => edge.from === node.id || edge.to === node.id) ?? [];
@@ -309,110 +465,278 @@ const lenses = [
           relationships.append(row);
         }
       }
-
-      function render(next: AtlasView) {
+      function renderMemory(next: AtlasView) {
         view = next;
-        records.replaceChildren();
+        memoryRecords.replaceChildren();
         text("[data-view-title]", next.lens.replaceAll("_", " "));
-        text("[data-result-count]", `${next.nodes.length} record${next.nodes.length === 1 ? "" : "s"} · ${next.edges.length} edge${next.edges.length === 1 ? "" : "s"}`);
-        text("[data-projection]", next.nodes.length ? "Live data" : "Empty");
+        text("[data-result-count]", `${next.nodes.length} records · ${next.edges.length} edges`);
         text("[data-metadata]", JSON.stringify(next.metadata, null, 2));
-        empty.hidden = next.nodes.length > 0;
+        memoryEmpty.hidden = next.nodes.length > 0;
         if (!next.nodes.length) {
-          empty.querySelector("strong")!.textContent = "No authorized records found.";
-          empty.querySelector("p")!.textContent = "The query succeeded. Adjust the subject, focus, or review filter if you expected data.";
+          memoryEmpty.querySelector("strong")!.textContent = "No authorized records found.";
+          memoryEmpty.querySelector("p")!.textContent = "The live query succeeded. Adjust its bounded scope if you expected data.";
         }
-        records.hidden = next.nodes.length === 0;
+        memoryRecords.hidden = next.nodes.length === 0;
         for (const node of next.nodes) {
           const button = document.createElement("button");
-          button.type = "button";
-          button.dataset.id = node.id;
-          button.setAttribute("aria-pressed", "false");
           const kind = document.createElement("span");
           const label = document.createElement("strong");
           const detail = document.createElement("small");
+          button.type = "button";
+          button.dataset.id = node.id;
+          button.setAttribute("aria-pressed", "false");
           kind.textContent = node.type;
           kind.className = "record-kind";
           label.textContent = node.label;
           detail.textContent = [node.trust, node.status, formatDate(node.created_at)].filter(Boolean).join(" · ");
           button.append(kind, label, detail);
           button.addEventListener("click", () => inspect(node));
-          records.append(button);
+          memoryRecords.append(button);
         }
         if (next.nodes[0]) inspect(next.nodes[0]);
       }
 
+      function accessible(button: HTMLButtonElement): boolean {
+        const scopes = button.dataset.scopes?.split(" ") ?? [];
+        return scopes.some(has);
+      }
+      function activateArea(id: string) {
+        for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = panel.dataset.areaPanel !== id;
+        for (const button of all<HTMLButtonElement>("[data-area]")) button.setAttribute("aria-current", button.dataset.area === id ? "page" : "false");
+        const label = all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id)?.textContent?.replace("live", "").trim() ?? "Dashboard";
+        text("[data-page-title]", label);
+        history.replaceState(null, "", `#${id}`);
+      }
+      function showPrivateSurface() {
+        one<HTMLElement>("[data-login-panel]").hidden = true;
+        one<HTMLElement>("[data-service-strip]").hidden = false;
+        one<HTMLElement>("[data-product-nav]").hidden = false;
+        const buttons = all<HTMLButtonElement>("[data-area]");
+        for (const button of buttons) button.hidden = !accessible(button);
+        for (const input of all<HTMLInputElement>('[data-memory-form] input[name="lens"]')) {
+          const allowed = !input.dataset.scope || has(input.dataset.scope);
+          input.disabled = !allowed;
+          input.closest("label")!.hidden = !allowed;
+        }
+        const selectedLens = one<HTMLInputElement>('[data-memory-form] input[name="lens"]:checked');
+        if (selectedLens.disabled) all<HTMLInputElement>('[data-memory-form] input[name="lens"]:not(:disabled)')[0]?.click();
+        const preferred = location.hash.slice(1);
+        const first = buttons.find((button) => !button.hidden && button.dataset.area === preferred)
+          ?? buttons.find((button) => !button.hidden);
+        if (first) activateArea(first.dataset.area!);
+        one<HTMLButtonElement>("[data-logout]").hidden = dashboardStatus?.authentication !== "session";
+        one<HTMLElement>("[data-user-admin]").hidden = !(dashboardStatus?.authentication === "session"
+          && has("keys:manage") && has("memberships:write")
+          && ["root", "owner", "admin"].includes(String(principal?.organization_role)));
+        one<HTMLOptionElement>("[data-owner-role]").disabled = !["root", "owner"].includes(String(principal?.organization_role));
+      }
+      function signedOut(message?: string) {
+        principal = null;
+        clearPrivateState();
+        for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = true;
+        for (const button of all<HTMLButtonElement>("[data-area]")) button.hidden = true;
+        one<HTMLElement>("[data-product-nav]").hidden = true;
+        one<HTMLElement>("[data-service-strip]").hidden = true;
+        one<HTMLButtonElement>("[data-logout]").hidden = true;
+        one<HTMLElement>("[data-login-panel]").hidden = false;
+        text("[data-page-title]", "Sign in");
+        text("[data-connection-label]", "Authentication required");
+        text("[data-principal]", "Not signed in");
+        text("[data-role]", "no active session");
+        text("[data-login-status]", message ?? "");
+      }
       async function refreshService() {
         const notice = one<HTMLElement>("[data-service-notice]");
-        clearProjection();
+        setNotice(notice);
         text("[data-connection-label]", "Connecting");
         one<HTMLElement>("[data-connection-dot]").className = "";
         try {
-          const status = await getDashboardStatus();
-          if (status.mode !== "live") throw new DashboardApiError(503, "DASHBOARD_DISCONNECTED", "Live dashboard integration is disabled.");
-          text("[data-endpoint]", status.endpoint ?? "configured endpoint");
+          dashboardStatus = await getDashboardStatus();
+          if (dashboardStatus.mode !== "live") throw new DashboardApiError(503, "DASHBOARD_DISCONNECTED", "Live dashboard integration is disabled.");
+          text("[data-endpoint]", dashboardStatus.endpoint ?? "configured endpoint");
+          text("[data-credential-mode]", dashboardStatus.authentication === "session" ? "Per-principal session" : "Server key");
+          text("[data-credential-copy]", dashboardStatus.authentication === "session"
+            ? "The API key stays only in adapter memory until logout or expiry."
+            : "The browser uses a bounded server-side adapter key.");
+          if (dashboardStatus.authentication === "session" && !dashboardStatus.authenticated) return signedOut();
+          principal = await getSession();
+          showPrivateSurface();
+          text("[data-principal]", principal?.principal_id ?? "Server key");
+          text("[data-role]", principal ? `${principal.organization_role ?? "no org role"} · ${principal.principal_kind}` : "adapter authority");
           const [health, readiness] = await Promise.all([checkService("health"), checkService("readiness")]);
           text("[data-health]", health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`);
           text("[data-runtime]", serviceDetail(health.payload, "runtime") ?? "healthz");
           text("[data-readiness]", readiness.ok ? "Ready" : `Not ready · ${readiness.status}`);
-          text("[data-revision]", serviceDetail(health.payload, "revision") ?? "revision unavailable");
+          text("[data-revision]", serviceDetail(readiness.payload, "revision") ?? "revision unavailable");
           text("[data-connection-label]", health.ok ? "Connected" : "Degraded");
           one<HTMLElement>("[data-connection-dot]").className = health.ok && readiness.ok ? "ok" : "warn";
-          setNotice(notice, readiness.ok ? undefined : "The process is reachable but not ready. Atlas requests may fail until readiness recovers.");
-          runButton.disabled = !health.ok;
+          setNotice(notice, readiness.ok ? undefined : "The process is reachable but not ready. Product requests may fail until readiness recovers.");
         } catch (error) {
+          if (error instanceof DashboardApiError && error.status === 401
+            && dashboardStatus?.authentication === "session") return signedOut(errorMessage(error));
+          clearPrivateState();
           text("[data-connection-label]", "Disconnected");
           text("[data-endpoint]", "same-origin adapter unavailable");
-          text("[data-health]", "Unavailable");
-          text("[data-readiness]", "Unavailable");
           one<HTMLElement>("[data-connection-dot]").className = "bad";
-          setNotice(notice, `${errorMessage(error)} Configure TITEN_API_URL and TITEN_API_KEY in the dashboard adapter process.`);
-          runButton.disabled = true;
+          setNotice(notice, dashboardStatus ? errorMessage(error) : "The same-origin dashboard adapter is unavailable.");
         }
       }
 
-      form.addEventListener("change", (event) => {
-        if ((event.target as HTMLInputElement).name === "lens") updateRequirements();
-      });
-      form.addEventListener("submit", async (event) => {
+      const readerScopes = ["views:compile", "context:compile", "evidence:read", "checkpoints:read", "leases:read", "handoffs:read", "events:read", "audit:read", "governance:read", "approvals:read", "releases:read", "memberships:read", "identity:read", "federation:read", "workspaces:read"];
+      const profiles: Record<string, string[]> = {
+        reader: readerScopes,
+        operator: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "approvals:write", "releases:write"],
+        admin: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write"],
+      };
+      function clearOneTimeKey() {
+        one<HTMLElement>("[data-one-time-key]").hidden = true;
+        text("[data-new-key]", "");
+      }
+
+      for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!));
+      one<HTMLFormElement>("[data-login-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!form.reportValidity()) return;
-        const values = new FormData(form);
-        const lens = String(values.get("lens"));
-        const subject = String(values.get("subject_id") ?? "").trim();
-        const focus = String(values.get("focus_id") ?? "").trim();
-        const limit = Number(values.get("limit"));
-        const payload: Record<string, unknown> = { lens, limit };
-        if (subject) payload.subject_id = subject;
-        if (focus) payload.focus_id = focus;
-        clearProjection();
-        const generation = projectionGeneration;
-        loading.hidden = false;
-        empty.hidden = true;
-        setNotice(queryError);
-        runButton.disabled = true;
-        text("[data-query-status]", "Compiling authorized view…");
+        const form = event.currentTarget as HTMLFormElement;
+        const input = form.elements.namedItem("api_key") as HTMLInputElement;
+        text("[data-login-status]", "Validating credential…");
         try {
-          const next = await compileView(payload);
-          if (generation !== projectionGeneration) return;
-          render(next);
-          text("[data-query-status]", "Live view compiled from the Titen API.");
+          principal = await login(input.value);
+          input.value = "";
+          await refreshService();
         } catch (error) {
-          if (generation !== projectionGeneration) return;
-          clearProjection();
-          setNotice(queryError, errorMessage(error));
-          text("[data-query-status]", "Query failed without a fixture fallback.");
-          text("[data-projection]", "Query failed");
-          runButton.disabled = false;
-        } finally {
-          if (generation === projectionGeneration) {
-            loading.hidden = true;
-            runButton.disabled = false;
-          }
+          input.value = "";
+          text("[data-login-status]", errorMessage(error));
         }
       });
+      one<HTMLButtonElement>("[data-logout]").addEventListener("click", async () => {
+        try {
+          await logout();
+          signedOut("Signed out. The adapter discarded this browser session.");
+        } catch (error) { handleError(error); }
+      });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);
-      updateRequirements();
+
+      memoryForm.addEventListener("change", (event) => {
+        if ((event.target as HTMLInputElement).name === "lens") updateMemoryRequirements();
+      });
+      memoryForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!memoryForm.reportValidity()) return;
+        const values = new FormData(memoryForm);
+        const payload: Record<string, unknown> = { lens: String(values.get("lens")), limit: Number(values.get("limit")) };
+        const subject = String(values.get("subject_id") ?? "").trim();
+        const focus = String(values.get("focus_id") ?? "").trim();
+        if (subject) payload.subject_id = subject;
+        if (focus) payload.focus_id = focus;
+        clearMemory();
+        const current = generation;
+        memoryLoading.hidden = false;
+        memoryEmpty.hidden = true;
+        memoryRun.disabled = true;
+        text("[data-memory-status]", "Compiling authorized memory view…");
+        try {
+          const next = await compileView(payload);
+          if (current !== generation) return;
+          renderMemory(next);
+          text("[data-memory-status]", "Live view compiled from the Titen API.");
+        } catch (error) {
+          if (current !== generation) return;
+          clearMemory();
+          setNotice(memoryError, errorMessage(error));
+          handleError(error);
+        } finally { memoryLoading.hidden = true; memoryRun.disabled = false; }
+      });
+
+      one<HTMLFormElement>("[data-context-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        if (!form.reportValidity()) return;
+        const values = new FormData(form);
+        const body: Record<string, unknown> = {
+          subject_id: String(values.get("subject_id")).trim(),
+          task: String(values.get("task")).trim(),
+          max_tokens: Number(values.get("max_tokens")),
+        };
+        const project = String(values.get("project_id") ?? "").trim();
+        if (project) body.project_id = project;
+        const target = one<HTMLElement>("[data-context-output]");
+        renderMessage(target, "Compiling authorized context…");
+        try { renderPayload(target, await postArea("context/compile", body)); text("[data-context-status]", "Live context compiled."); }
+        catch (error) { handleError(error, target); }
+      });
+      one<HTMLButtonElement>("[data-work-refresh]").addEventListener("click", async () => {
+        try { await loadAvailable(one("[data-work-output]"), [["work/leases?limit=50", "leases:read"], ["work/handoffs", "handoffs:read"]]); }
+        catch (error) { handleError(error, one("[data-work-output]")); }
+      });
+      one<HTMLFormElement>("[data-checkpoint-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        const values = new FormData(form);
+        const query = new URLSearchParams();
+        for (const field of ["subject_id", "agent_id", "kind"]) query.set(field, String(values.get(field)).trim());
+        const target = one<HTMLElement>("[data-work-output]");
+        try { renderPayload(target, await getArea("work/checkpoint", query)); } catch (error) { handleError(error, target); }
+      });
+      one<HTMLButtonElement>("[data-audit-refresh]").addEventListener("click", async () => {
+        const values = new FormData(one<HTMLFormElement>("[data-audit-form]"));
+        const limit = String(values.get("limit"));
+        const requests: Array<[string, string]> = [];
+        const action = String(values.get("action") ?? "").trim();
+        const kind = String(values.get("kind") ?? "").trim();
+        requests.push([`audit/log?limit=${encodeURIComponent(limit)}${action ? `&action=${encodeURIComponent(action)}` : ""}`, "audit:read"]);
+        requests.push([`audit/events?limit=${encodeURIComponent(limit)}${kind ? `&kind=${encodeURIComponent(kind)}` : ""}`, "events:read"]);
+        try { await loadAvailable(one("[data-audit-output]"), requests); } catch (error) { handleError(error, one("[data-audit-output]")); }
+      });
+      one<HTMLButtonElement>("[data-governance-refresh]").addEventListener("click", async () => {
+        try {
+          await loadAvailable(one("[data-governance-output]"), [
+            ["governance/memberships", "memberships:read"], ["governance/keys", "keys:manage"],
+            ["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"],
+            ["governance/channels", "releases:read"], ["governance/releases", "releases:read"],
+          ]);
+        } catch (error) { handleError(error, one("[data-governance-output]")); }
+      });
+      one<HTMLFormElement>("[data-user-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        clearOneTimeKey();
+        const form = event.currentTarget as HTMLFormElement;
+        if (!form.reportValidity()) return;
+        const values = new FormData(form);
+        const profile = String(values.get("profile"));
+        text("[data-user-status]", "Creating key and membership atomically…");
+        try {
+          const response = await postArea("governance/users", {
+            label: String(values.get("label")).trim(),
+            membership_role: String(values.get("membership_role")),
+            scopes: profiles[profile]!,
+            max_trust: String(values.get("max_trust")),
+          });
+          const data = payloadData(response);
+          text("[data-new-key]", String(data.api_key));
+          one<HTMLElement>("[data-one-time-key]").hidden = false;
+          text("[data-user-status]", `Created ${data.principal_id} with role ${data.membership_role}.`);
+        } catch (error) { text("[data-user-status]", errorMessage(error)); handleError(error); }
+      });
+      one<HTMLButtonElement>("[data-copy-key]").addEventListener("click", async () => {
+        const key = one<HTMLElement>("[data-new-key]").textContent ?? "";
+        try { await navigator.clipboard.writeText(key); text("[data-user-status]", "API key copied."); }
+        catch { text("[data-user-status]", "Copy failed. Select the one-time key manually."); }
+      });
+      one<HTMLButtonElement>("[data-clear-key]").addEventListener("click", clearOneTimeKey);
+      one<HTMLButtonElement>("[data-federation-refresh]").addEventListener("click", async () => {
+        const target = one<HTMLElement>("[data-federation-output]");
+        try { renderPayload(target, await getArea("federation/peers")); } catch (error) { handleError(error, target); }
+      });
+      one<HTMLFormElement>("[data-federation-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const values = new FormData(event.currentTarget as HTMLFormElement);
+        const query = new URLSearchParams({ peer_id: String(values.get("peer_id")).trim(), limit: String(values.get("limit")) });
+        const target = one<HTMLElement>("[data-federation-output]");
+        try { renderPayload(target, await getArea("federation/log", query)); } catch (error) { handleError(error, target); }
+      });
+
+      updateMemoryRequirements();
+      clearPrivateState();
       refreshService();
     </script>
   </body>

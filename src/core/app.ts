@@ -3,7 +3,7 @@ import { saveCheckpoint, getCheckpoint, deleteCheckpoint } from "./checkpoints";
 import { claimEvidence } from "./evidence";
 import { compileContext, getContext, recordFeedback } from "./context";
 import { consolidate } from "./claims";
-import { createKey, listKeys, revokeKey } from "./keys";
+import { createKey, getPrincipal, listKeys, revokeKey } from "./keys";
 import { exportRecords, importRecords } from "./portability";
 import { expireClaim, revokeClaim, supersedeClaim } from "./lifecycle";
 import { createWorkspace, listWorkspaces, addMember, listMembers, removeMember, acquireLease, listLeases, releaseLease, forceReleaseLease, createHandoff, resolveHandoff, listHandoffs } from "./collaboration";
@@ -227,6 +227,7 @@ export const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/keys", scope: "keys:manage", handler: createKey },
   { method: "GET", path: "/v1/keys", scope: "keys:manage", handler: listKeys },
   { method: "DELETE", path: "/v1/keys/:id", scope: "keys:manage", handler: revokeKey },
+  { method: "GET", path: "/v1/principal", authenticated: true, handler: getPrincipal },
   { method: "GET", path: "/v1/export", scope: "export:read", handler: exportRecords },
   { method: "POST", path: "/v1/import", scope: "import:write", handler: importRecords },
   { method: "POST", path: "/v1/workspaces", scope: "workspaces:write", handler: createWorkspace },
@@ -553,9 +554,9 @@ export function createApp(context: {
         },
       };
 
-      if (matched.route.scope) {
+      if (matched.route.scope || matched.route.authenticated) {
         ctx.principal = await authenticate(app.db, request, app.now());
-        requireScope(ctx.principal, matched.route.scope);
+        if (matched.route.scope) requireScope(ctx.principal, matched.route.scope);
       }
 
       const result = await matched.route.handler(ctx);

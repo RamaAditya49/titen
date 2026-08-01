@@ -1,30 +1,37 @@
-# Secure live dashboard
+# Run the secure live dashboard
 
-The dashboard has no synthetic fallback. A loopback same-origin adapter accepts
-`TITEN_API_URL` and `TITEN_API_KEY` only as server environment variables and
-forwards safe service checks plus bounded read-only Atlas requests.
+The dashboard talks only to a same-origin adapter bound to
+`127.0.0.1:4322`. The adapter talks to the Titen API at `127.0.0.1:8787`.
 
 ```sh
 pnpm build
 TITEN_DASHBOARD_LIVE=true \
+TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
-TITEN_API_KEY='...' \
-TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
 pnpm dashboard:adapter
-# open http://127.0.0.1:4322/dashboard/
 ```
 
-Use a least-privilege key with `views:compile`; add `governance:read` for Scope
-preview and `releases:read` for Knowledge releases. Give that key's principal an
-active organization-level `reader`, `admin`, or `owner` membership before
-enabling the governance lenses. Never put credentials in `PUBLIC_*` variables:
-Astro embeds those in browser assets. The adapter exposes
-an exact `/dashboard-api/*` allowlist, validates lens-specific subject, claim,
-principal, and optional channel input, caps the limit at 100, times out upstream
-calls after five seconds, uses no-store JSON, and preserves generic
-401/403/404/503 states without relaying upstream secrets.
+Open `http://127.0.0.1:4322/dashboard/`, then sign in with an active Titen API
+key. The key is exchanged for an opaque HttpOnly cookie, kept only in adapter
+memory, and discarded after eight hours, logout, revocation, or restart.
 
-The adapter still binds loopback when `TITEN_DASHBOARD_ORIGIN` is set; that
-value only allowlists one exact reverse-proxy Host/Origin. It supports an HTTPS
-Tailscale Serve origin without exposing the API listener or API key. A broader
-public ingress requires its own authenticated TLS/session review.
+For remote access, keep both listeners on loopback, set the exact HTTPS
+`TITEN_DASHBOARD_ORIGIN`, and follow the
+[secure ingress tutorial](../deployment/secure-ingress.md): Tailscale Serve for
+private tailnet access, or Cloudflare Tunnel plus Cloudflare Access for a
+custom hostname.
+
+Never put a credential in `PUBLIC_*`, a URL, or browser storage. Session mode
+does not require `TITEN_API_KEY` in the adapter environment. The adapter has a
+fixed route allowlist, bounded request bodies, exact Host/Origin validation,
+five-second upstream timeouts, no-store JSON, and generic external errors.
+
+An organization owner/admin with `keys:manage` and `memberships:write` can use
+Governance → Add a human user. Titen creates the membership and API key
+atomically and shows the raw key once.
+
+```sh
+pnpm verify:dashboard-live
+pnpm test:adapter
+pnpm test:browser tests/dashboard.spec.ts
+```

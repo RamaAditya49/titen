@@ -54,7 +54,7 @@ is the source of truth for shipped and planned capabilities.
 | --- | --- | --- |
 | Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
 | Containerized Bun service with optional embeddings | Historical 0.3.0 canary evidence | The recorded loopback container does not verify this release, systemd/Caddy, or Cloudflare. |
-| Memory Atlas dashboard | Implemented and verified locally | Health, readiness, and six authorized Atlas lenses pass through the same-origin adapter against temporary Bun/SQLite. External deployment evidence for this release is still pending. |
+| Operator dashboard | Implemented and verified locally | Per-user login, Add User, and Memories, Context, Work, Audit, Governance, and Federation pass through the same-origin adapter against temporary Bun/SQLite. External deployment evidence for this release is still pending. |
 | Live Vectorize, Workers AI, and Cloudflare production | Planned | Local configuration and emulation are not production evidence. |
 | Enterprise governance and recallable-memory federation | Implemented and verified locally | The shared Bun/SQLite and workerd/D1 contract covers governed roles, policies, approvals, releases, retention, legal holds, identity mappings, and opt-in signed canonical import. External deployment evidence for this release is still pending. |
 
@@ -225,14 +225,17 @@ the [Cloudflare deployment guide](https://github.com/RamaAditya49/titen/blob/mai
 
 ## Dashboard
 
-The checked-in Astro client at `/dashboard/` is a live, read-only Memory Atlas
-client. It uses a loopback same-origin adapter, keeps the API key server-side,
-and shows no fixture fallback when disconnected or denied. Its six lenses cover
-evidence trace, neighborhood, conflict and freshness, review work, governance
-scope, and knowledge releases. An external URL is intentionally absent until
-the `0.5.1` deployment smoke passes. The
-[dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
-documents configuration, tests, and the hosting boundary.
+The checked-in Astro client at `/dashboard/` is a live operator surface for
+Memories, Context, Work, Audit, Governance, and Federation. Each person signs
+in with a Titen API key; the loopback adapter exchanges it for an opaque
+HttpOnly session and never writes it to browser storage. Authorized owners and
+admins can add a human user and receive the new key once. There is no fixture
+fallback when the service is disconnected or denies a request.
+
+The [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
+covers configuration and verification. Use the
+[secure ingress guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/secure-ingress.md)
+for private Tailscale Serve access or Cloudflare Tunnel protected by Access.
 
 ## Documentation
 
@@ -244,6 +247,7 @@ documents configuration, tests, and the hosting boundary.
 | [Agent integrations](https://github.com/RamaAditya49/titen/blob/main/docs/agent-plugins.md) | Host-specific MCP and skill setup |
 | [VPS deployment](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md) | Bun, containers, persistence, and hardening |
 | [Cloudflare deployment](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/cloudflare.md) | Worker and D1 setup |
+| [Secure dashboard ingress](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/secure-ingress.md) | Tailscale Serve or Cloudflare Tunnel with Access |
 | [Roadmap](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md) | Evidence-based maturity and planned work |
 | [Documentation index](https://github.com/RamaAditya49/titen/blob/main/docs/README.md) | Product, engineering, security, and research docs |
 

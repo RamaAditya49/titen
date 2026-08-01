@@ -37,6 +37,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/leases`
 - `GET /v1/memberships`
 - `GET /v1/policies`
+- `GET /v1/principal`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
 - `GET /v1/workspaces`
@@ -114,6 +115,25 @@ non-wildcard key manager may explicitly reuse only its own `principal_id` with
 the same `principal_kind`; omitting `principal_id` asks the server to generate a
 new opaque identity. This prevents a scoped key manager from borrowing an
 existing owner/admin role by name.
+
+An optional `membership_role` (`owner`, `admin`, `member`, or `reader`) turns
+the same operation into **Add user**. It fixes `principal_kind` to `human` and
+atomically creates one organization-level membership with the new key. The
+caller needs `keys:manage`, `memberships:write`, and an active organization
+`owner` or `admin` role; an admin cannot assign `owner`. Scope and trust ceilings
+still cannot exceed the caller. A duplicate membership or any validation,
+authorization, or SQL failure creates neither record. The one-time response adds
+`membership_id` and `membership_role`; key listing never returns the raw key.
+
+### `GET /v1/principal`
+
+Validate the bearer key and return its own non-secret `organization_id`,
+`principal_id`, `principal_kind`, `key_id`, `scopes`, `max_trust`, and active
+organization role. This route requires authentication but no additional scope,
+so a least-privilege dashboard session can verify its identity. A wildcard
+bootstrap/recovery key reports role `root`; a key without an active
+organization membership reports `null`. Expired or revoked keys return `401`
+on the next request.
 
 ## Webhook delivery
 

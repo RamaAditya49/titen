@@ -1441,6 +1441,109 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "principal introspection and human membership provisioning stay atomic",
+    async run(fx) {
+      const owner = await fx.provision({
+        principalId: `user_owner_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["*"],
+        maxTrust: "policy_approved",
+      });
+      const ownerPrincipal = await fx.call("GET", "/v1/principal", { key: owner.key });
+      expectOk(ownerPrincipal);
+      assert.deepEqual(ownerPrincipal.body.data, {
+        organization_id: owner.orgId,
+        principal_id: owner.principalId,
+        principal_kind: "human",
+        key_id: owner.keyId,
+        scopes: ["*"],
+        max_trust: "policy_approved",
+        organization_role: "root",
+      });
+      expectError(await fx.call("GET", "/v1/principal"), 401, "UNAUTHENTICATED");
+
+      const admin = await fx.provision({
+        orgId: owner.orgId,
+        principalId: `user_admin_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["keys:manage", "memberships:read", "memberships:write", "views:compile"],
+        maxTrust: "verified",
+      });
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: { principal_id: admin.principalId, principal_kind: "human", role: "admin" },
+      }), 201);
+      const adminPrincipal = await fx.call("GET", "/v1/principal", { key: admin.key });
+      expectOk(adminPrincipal);
+      assert.equal(adminPrincipal.body.data.organization_role, "admin");
+
+      const created = await fx.call("POST", "/v1/keys", {
+        key: admin.key,
+        body: {
+          label: "Dashboard reader",
+          scopes: ["memberships:read", "views:compile"],
+          max_trust: "asserted",
+          membership_role: "reader",
+        },
+      });
+      expectOk(created, 201);
+      assert.equal(created.body.data.principal_kind, "human");
+      assert.equal(created.body.data.membership_role, "reader");
+      assert.match(created.body.data.membership_id, /^mbr_/);
+      assert.match(created.body.data.api_key, /^titen_sk_/);
+      const readerPrincipal = await fx.call("GET", "/v1/principal", {
+        key: created.body.data.api_key,
+      });
+      expectOk(readerPrincipal);
+      assert.equal(readerPrincipal.body.data.organization_role, "reader");
+      assert.equal(readerPrincipal.body.data.principal_id, created.body.data.principal_id);
+
+      const before = await fx.query<{ keys: number; memberships: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM api_keys WHERE org_id = ? AND principal_id = ?) AS keys,
+           (SELECT COUNT(*) FROM memberships WHERE org_id = ? AND principal_id = ?
+             AND removed_at IS NULL) AS memberships`,
+        [owner.orgId, created.body.data.principal_id, owner.orgId, created.body.data.principal_id],
+      );
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "Duplicate reader",
+          scopes: ["views:compile"],
+          principal_id: created.body.data.principal_id,
+          principal_kind: "human",
+          membership_role: "reader",
+        },
+      }), 409, "CONFLICT");
+      const after = await fx.query<{ keys: number; memberships: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM api_keys WHERE org_id = ? AND principal_id = ?) AS keys,
+           (SELECT COUNT(*) FROM memberships WHERE org_id = ? AND principal_id = ?
+             AND removed_at IS NULL) AS memberships`,
+        [owner.orgId, created.body.data.principal_id, owner.orgId, created.body.data.principal_id],
+      );
+      assert.deepEqual(after, before, "failed membership creation must roll back its key");
+
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: admin.key,
+        body: {
+          label: "Owner escalation",
+          scopes: ["views:compile"],
+          membership_role: "owner",
+        },
+      }), 403, "FORBIDDEN");
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: admin.key,
+        body: {
+          label: "Wrong principal kind",
+          scopes: ["views:compile"],
+          principal_kind: "agent",
+          membership_role: "reader",
+        },
+      }), 400, "VALIDATION_ERROR");
+    },
+  },
+  {
     name: "credential import cannot exceed the importing credential",
     async run(fx) {
       const limited = await fx.provision({
@@ -5286,6 +5389,105 @@ export const CASES: Case[] = [
     },
   },
 ];
+
+CASES.push({
+  name: "dashboard list surfaces enforce server-side hard caps",
+  async run(fx) {
+    const owner = await fx.provision({
+      principalId: `dashboard_cap_owner_${fx.runtime}`,
+      scopes: ["*"],
+    });
+    const createdAt = "2026-08-01T00:00:00.000Z";
+
+    await fx.query(
+      `WITH RECURSIVE n(value) AS (
+         VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 501
+       )
+       INSERT INTO memberships
+         (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+       SELECT 'mbr_dashboard_cap_' || printf('%03d', value), ?, NULL,
+              'dashboard_member_' || printf('%03d', value), 'human', 'reader', ?
+         FROM n`,
+      [owner.orgId, createdAt],
+    );
+    await fx.query(
+      `WITH RECURSIVE n(value) AS (
+         VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 501
+       )
+       INSERT INTO handoffs
+         (id, org_id, from_principal, to_principal, subject_id, message, status, created_at)
+       SELECT 'hnd_dashboard_cap_' || printf('%03d', value), ?,
+              'dashboard_sender_' || printf('%03d', value), ?,
+              'dashboard_subject_' || printf('%03d', value), 'bounded', 'pending', ?
+         FROM n`,
+      [owner.orgId, owner.principalId, createdAt],
+    );
+    await fx.query(
+      `WITH RECURSIVE n(value) AS (
+         VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 501
+       )
+       INSERT INTO api_keys
+         (id, org_id, principal_id, principal_kind, key_hash, label, scopes,
+          max_trust, created_at, not_before)
+       SELECT 'key_dashboard_cap_' || printf('%03d', value), ?,
+              'dashboard_key_principal_' || printf('%03d', value), 'agent',
+              'dashboard_key_hash_' || printf('%03d', value),
+              'Dashboard key ' || value, 'context:compile', 'asserted', ?, ?
+         FROM n`,
+      [owner.orgId, createdAt, createdAt],
+    );
+    await fx.query(
+      `WITH RECURSIVE n(value) AS (
+         VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 501
+       )
+       INSERT INTO policies
+         (id, org_id, kind, target_type, target_id, config, enabled, created_at, updated_at)
+       SELECT 'pol_dashboard_cap_' || printf('%03d', value), ?, 'retention',
+              'organization', NULL, '{}', 1, ?, ?
+         FROM n`,
+      [owner.orgId, createdAt, createdAt],
+    );
+    await fx.query(
+      `WITH RECURSIVE n(value) AS (
+         VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 501
+       )
+       INSERT INTO channels
+         (id, org_id, label, gateway_principal_id, allowed_audiences, minimum_trust,
+          status, created_by, created_at, updated_at)
+       SELECT 'chn_dashboard_cap_' || printf('%03d', value), ?,
+              'Dashboard channel ' || printf('%03d', value), ?, '["anonymous"]',
+              'asserted', 'active', ?, ?, ?
+         FROM n`,
+      [owner.orgId, owner.principalId, owner.principalId, createdAt, createdAt],
+    );
+    await fx.query(
+      `WITH RECURSIVE n(value) AS (
+         VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 501
+       )
+       INSERT INTO federation_peers
+         (id, org_id, name, endpoint, shared_secret_hash, direction, status,
+          principal_id, created_at)
+       SELECT 'peer_dashboard_cap_' || printf('%03d', value), ?,
+              'Dashboard peer ' || printf('%03d', value),
+              'https://dashboard-peer-' || printf('%03d', value) || '.example.test',
+              'dashboard_peer_hash_' || printf('%03d', value), 'pull', 'suspended', ?, ?
+         FROM n`,
+      [owner.orgId, owner.principalId, createdAt],
+    );
+
+    const lists = await Promise.all([
+      fx.call("GET", "/v1/memberships", { key: owner.key }),
+      fx.call("GET", "/v1/handoffs", { key: owner.key }),
+      fx.call("GET", "/v1/keys", { key: owner.key }),
+      fx.call("GET", "/v1/policies", { key: owner.key }),
+      fx.call("GET", "/v1/channels", { key: owner.key }),
+      fx.call("GET", "/v1/federation/peers", { key: owner.key }),
+    ]);
+    for (const result of lists) expectOk(result);
+    assert.deepEqual(lists.map((result) => Object.values(result.body.data)[0].length),
+      [500, 500, 500, 500, 500, 500]);
+  },
+});
 
 CASES.push({
   name: "enterprise governance enforces roles approvals releases retention holds identity and isolation",

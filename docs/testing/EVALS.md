@@ -52,11 +52,11 @@ Runtime-specific request IDs, timestamps assigned by the server, and diagnostic
 fields may differ. Authorization, status codes, selected canonical IDs, and
 failure classes may not.
 
-When v0.2 ships, the same dual-runtime contract also covers the three read-only
-Memory Atlas lenses, canonical re-authorization, limits, and disabled behavior.
-The current v0.3.1 frontend exercises four lenses against a synthetic fixture;
-those browser checks are UX evidence, not live compiler, authorization, runtime,
-or roadmap-v0.3 service evidence.
+The dual-runtime contract covers all six read-only Memory Atlas lenses,
+canonical re-authorization, limits, and disabled behavior. The dashboard's
+real-runtime smoke starts Bun/SQLite and proves login, the six live product
+areas, atomic Add User, logout, and new-user login through the actual adapter;
+browser-only mocks remain UX evidence rather than service evidence.
 
 When v0.3 ships, the same dual-runtime contract also covers channel
 create/pause, release draft/approve/activate/suspend/replace/revoke, signed

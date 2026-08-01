@@ -869,25 +869,16 @@ Acceptance (EARS):
 
 ### UI-001 — Progressive dashboard information architecture
 
-**Release:** Memory Atlas is live through the same-origin adapter; later areas
-follow their backing feature release and a separate completed UI work item
+**Release:** six live product areas plus optional per-principal dashboard sessions
 
-The canonical area map is defined in [DESIGN](./DESIGN.md). It groups operator
-jobs without claiming that every planned area is implemented:
-
-- Memory: Atlas, Memories, and Context;
-- Collaboration: Work;
-- Operations: Audit & Events and System;
-- Administration: Access;
-- Governance: Approvals & Releases.
+The canonical area map is defined in [DESIGN](./DESIGN.md): Memories, Context,
+Work, Audit, Governance, and Federation.
 
 Required behavior:
 
 - keep the dashboard optional and consume only authenticated REST contracts;
-- render Memory Atlas as the only active route in the reference shell, using
-  only same-origin health, readiness, and authorized view compiler responses;
-- allow the approved shell to show the canonical area map as non-interactive
-  orientation without implying those labels have routes or backend behavior;
+- render all six areas only from fixed same-origin routes and current authorized
+  API responses, with Memories reusing the Atlas compiler;
 - add a later area only after its backend behavior is implemented, the current
   build reports it available, the principal may discover it, and its paired
   EARS UI work item is complete;
@@ -896,11 +887,12 @@ Required behavior:
   badges, or shipped menus;
 - authorize every route and request independently from navigation state and
   return a non-disclosing response for foreign resources;
-- keep categories and tags as Memory filters, webhooks inside Audit & Events,
-  export/import and recovery inside System, and runtime configuration read-only
-  until a mutation contract exists;
-- omit Settings until a browser account/session, profile, or password lifecycle
-  is explicitly specified;
+- keep categories and tags as memory filters, domain events inside Audit,
+  export/import and recovery in deployment tooling, and Settings absent;
+- optionally exchange each operator's API key for an opaque HttpOnly session
+  without persisting it in browser storage;
+- let authorized owners/admins create one human key and organization membership
+  atomically, displaying the raw key once;
 - keep read-only diagnosis visibly distinct from key, approval, release,
   retention, or recovery mutations;
 - use the same built client and external behavior on Cloudflare and VPS, while
@@ -909,13 +901,15 @@ Required behavior:
 Acceptance (EARS):
 
 - **AC-UI-001 — State-driven:** While a dashboard area lacks an implemented authorized backend contract or completed EARS UI work item, Titen shall expose no route or interactive control for it and shall keep any approved reference-shell label non-interactive.
-- **AC-UI-002 — Optional feature:** Where the final reference shell is enabled, Titen shall render Memory Atlas as the sole active product area and may show the canonical area map only as non-interactive orientation.
+- **AC-UI-002 — Optional feature:** Where the live dashboard is enabled, Titen shall expose the six canonical product areas only when the current principal holds a corresponding read capability.
 - **AC-UI-003 — Event-driven:** When an area passes its emergence gate, Titen shall convert only that authorized discoverable area into an interactive control and route under the canonical DESIGN group.
 - **AC-UI-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign dashboard route or resource, then Titen shall return a non-disclosing state and shall clear prior private content that could be mistaken for the requested result.
-- **AC-UI-005 — Ubiquitous:** Titen shall keep categories and tags as Memory filters, webhooks inside Audit & Events, portability and recovery inside System, and Settings absent until an account/session contract exists.
+- **AC-UI-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, portability and recovery in deployment tooling, and Settings absent.
 - **AC-UI-006 — State-driven:** While runtime configuration lacks an authorized mutation contract, Titen shall expose configuration only as non-secret read-only capability and readiness state.
 - **AC-UI-007 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
 - **AC-UI-008 — Unwanted behavior:** If documentation or a reference-shell label names a dashboard area whose emergence gate has not passed, then Titen shall not present that area as a shipped route, control, or implementation claim.
+- **AC-UI-009 — Event-driven:** When a valid operator key enters session mode, Titen shall retain it only in adapter memory, return an opaque bounded cookie, and clear the session and private DOM on logout, expiry, revocation, or restart.
+- **AC-UI-010 — Unwanted behavior:** If atomic human-user provisioning fails authorization, scope/trust ceilings, membership uniqueness, or storage, then Titen shall create neither its key nor membership.
 
 ## 12. Enterprise governance features
 
@@ -1196,10 +1190,10 @@ Pass conditions:
 10. Reconstruct the flow from metadata-only audit events.
 11. Compile Evidence Trace, Memory Neighborhood, and Conflict & Freshness views
     for visible records, then probe each with a foreign/private record ID.
-12. Open the live dashboard, compile an authorized Atlas view, and confirm
-    Atlas is the only active product area; other approved shell labels are
-    plain, non-interactive orientation with no route or shipped-capability
-    treatment.
+12. Open the live dashboard with a separately credentialed human principal;
+    confirm Memories, Context, Work, Audit, Governance, and Federation are
+    discoverable only according to that principal's scopes, exercise one live
+    contract in each authorized area, and verify logout clears private state.
 
 Pass conditions:
 
@@ -1211,7 +1205,8 @@ Pass conditions:
 - audit contains no memory content or credential.
 - Atlas returns useful authorized provenance without leaking hidden topology or
   aggregate counts; disabling it does not affect the journey.
-- dashboard navigation exposes no unshipped route or unauthorized scope.
+- dashboard navigation exposes no unauthorized area or stale private result;
+  one atomic Add user flow returns a usable credential exactly once.
 
 ### Journey C — Enterprise governance and recovery
 

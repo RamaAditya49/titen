@@ -104,9 +104,12 @@ migrations, Cloudflare and Bun entrypoints, and a shared dual-runtime contract
 suite. Their precise verification boundary is centralized in the [roadmap
 maturity matrix](../ROADMAP.md#maturity-matrix).
 
-The Astro dashboard is a live read-only client of health, readiness, and the
-authorized Memory Atlas compiler through a same-origin loopback adapter. A
-local build or disconnected page is not deployment evidence. Signed federation
+The Astro dashboard is a live client of health, readiness, Memories, Context,
+Work, Audit, Governance, and Federation through a same-origin loopback adapter.
+Its optional per-principal login keeps raw API keys only in process memory and
+uses opaque HttpOnly cookies; every API operation still performs canonical key,
+scope, role, and organization authorization. A local build or disconnected
+page is not deployment evidence. Signed federation
 event exchange and its explicit organization-visible canonical claim/evidence
 import mode are implemented; event-only exchange remains the default.
 
@@ -174,13 +177,13 @@ rebuildable and cannot become canonical memory.
 1. Serve one optional static client that consumes authenticated REST only.
 2. Render only areas implemented in the current build and discoverable by the
    authenticated principal; navigation never replaces route authorization.
-3. In the v0.3.1 static preview, keep Atlas as the only active route; the
-   approved shell may show other area names only as plain non-interactive
-   orientation.
-4. Add later areas according to [DESIGN](../DESIGN.md), one completed EARS UI
-   work item at a time.
-5. Keep categories/tags as filters, webhooks within Audit & Events,
-   export/recovery within System, and Settings absent until its own contract.
+3. Discover Memories, Context, Work, Audit, Governance, and Federation from the
+   authenticated principal's scopes; an undiscoverable area exposes no control
+   or prior private result.
+4. Route each area only through the adapter's fixed method/path/query allowlist;
+   Memories reuses Atlas and no dashboard route becomes domain authority.
+5. Keep categories/tags as memory filters, events inside Audit, account settings
+   absent, and backup/recovery in deployment tooling.
 
 Disabling or rolling back the static client changes no canonical data, API
 contract, or ordinary-agent MCP behavior.
@@ -215,8 +218,7 @@ remain source-tool calls instead of stale knowledge releases.
 - Memory Atlas failure disables only operator visualization; stale projections
   are re-authorized at canonical hydration and cannot widen scope.
 - dashboard failure or omission leaves all headless REST/MCP behavior complete;
-  unavailable areas have no route or control, even when the approved shell shows
-  their non-interactive labels.
+  an area without a current authorized contract has no route or control.
 - Expired lease/checkpoint never becomes a durable fact.
 - Signed event-exchange failure never changes local canonical event history;
   remote events become recallable only when an explicit claim filter,

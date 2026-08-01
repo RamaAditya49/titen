@@ -103,9 +103,11 @@ export async function listMembers(ctx: RequestContext): Promise<Result> {
 
   const sql = workspaceId
     ? `SELECT id, workspace_id, principal_id, principal_kind, role, created_at
-       FROM memberships WHERE org_id = ? AND workspace_id = ? AND removed_at IS NULL`
+       FROM memberships WHERE org_id = ? AND workspace_id = ? AND removed_at IS NULL
+       ORDER BY created_at, id LIMIT 500`
     : `SELECT id, workspace_id, principal_id, principal_kind, role, created_at
-       FROM memberships WHERE org_id = ? AND removed_at IS NULL`;
+       FROM memberships WHERE org_id = ? AND removed_at IS NULL
+       ORDER BY created_at, id LIMIT 500`;
 
   const params = workspaceId ? [orgId, workspaceId] : [orgId];
   const rows = await ctx.app.db.all<Record<string, unknown>>(sql, params);
@@ -503,7 +505,7 @@ export async function listHandoffs(ctx: RequestContext): Promise<Result> {
   const rows = await ctx.app.db.all<Record<string, unknown>>(
     `SELECT id, from_principal, to_principal, subject_id, context_id, checkpoint_id, message, status, created_at
      FROM handoffs WHERE org_id = ? AND to_principal = ? AND status = 'pending'
-     ORDER BY created_at`,
+     ORDER BY created_at, id LIMIT 500`,
     [orgId, principalId],
   );
   return { data: { handoffs: rows.map(r => ({ handoff_id: r.id, ...r })) } };

@@ -1,8 +1,9 @@
-import { createApiKey, keyLifecycleStatus, requestedScopes } from "./auth";
+import { createApiKey, keyLifecycleStatus, requestedScopes, requireScope } from "./auth";
 import { auditStatement } from "./audit";
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
 import { newId } from "./ids";
+import { requireOrgRole } from "./governance";
 import type { RequestContext, Result } from "./http";
 import {
   LIMITS,
@@ -11,17 +12,40 @@ import {
   optionalEnum,
   optionalString,
   optionalTimestamp,
+  requireEnum,
   requireObject,
   requireString,
   type Trust,
 } from "./validate";
+
+const MEMBER_ROLES = ["owner", "admin", "member", "reader"] as const;
+
+export async function getPrincipal(ctx: RequestContext): Promise<Result> {
+  const principal = ctx.principal!;
+  const membership = principal.scopes.includes("*") ? undefined : await first<{ role: string }>(
+    ctx.app.db,
+    `SELECT role FROM memberships
+      WHERE org_id = ? AND workspace_id IS NULL AND principal_id = ?
+        AND principal_kind = ? AND removed_at IS NULL LIMIT 1`,
+    [principal.orgId, principal.principalId, principal.principalKind],
+  );
+  return { data: {
+    organization_id: principal.orgId,
+    principal_id: principal.principalId,
+    principal_kind: principal.principalKind,
+    key_id: principal.keyId,
+    scopes: principal.scopes,
+    max_trust: principal.maxTrust,
+    organization_role: principal.scopes.includes("*") ? "root" : membership?.role ?? null,
+  } };
+}
 
 export async function createKey(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
   const allowed = new Set([
     "label", "scopes", "max_trust", "principal_kind", "principal_id",
-    "not_before", "expires_at",
+    "not_before", "expires_at", "membership_role",
   ]);
   const unknown = Object.keys(body).find((field) => !allowed.has(field));
   if (unknown) throw validationError(`Unknown key creation field "${unknown}".`);
@@ -31,17 +55,30 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   if (TRUST_RANK[maxTrust] > TRUST_RANK[principal.maxTrust])
     throw forbidden("A new credential may not exceed the creating credential's trust ceiling.");
   const requestedPrincipalId = optionalString(body, "principal_id", LIMITS.identifier);
+  const membershipRole = body.membership_role === undefined
+    ? null
+    : requireEnum(body, "membership_role", MEMBER_ROLES);
   const principalKind = optionalEnum(
     body,
     "principal_kind",
     ["human", "agent", "service"] as const,
-    requestedPrincipalId === principal.principalId ? principal.principalKind : "agent",
+    membershipRole ? "human" : requestedPrincipalId === principal.principalId ? principal.principalKind : "agent",
   );
+  if (membershipRole && principalKind !== "human")
+    throw validationError('Field "membership_role" requires principal_kind "human".');
   if (!principal.scopes.includes("*") && requestedPrincipalId !== null) {
     if (requestedPrincipalId !== principal.principalId || principalKind !== principal.principalKind)
       throw forbidden("A managed credential may only reuse its own principal identity.");
   }
-  const principalId = requestedPrincipalId ?? newId("agent");
+  const principalId = requestedPrincipalId ?? newId(membershipRole ? "human" : "agent");
+  let membershipId: string | null = null;
+  if (membershipRole) {
+    requireScope(principal, "memberships:write");
+    const authority = await requireOrgRole(ctx, ["owner", "admin"], "membership.add");
+    if (membershipRole === "owner" && authority === "admin")
+      throw forbidden("Only an organization owner may assign the owner role.");
+    membershipId = newId("mbr");
+  }
 
   const now = ctx.app.now();
   const notBefore = optionalTimestamp(body, "not_before") ?? now.toISOString();
@@ -63,6 +100,12 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   );
   await ctx.app.db.batch([
     created.statement,
+    ...(membershipId ? [{
+      sql: `INSERT INTO memberships
+              (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+            VALUES (?, ?, NULL, ?, 'human', ?, ?)`,
+      params: [membershipId, principal.orgId, principalId, membershipRole!, now.toISOString()],
+    }] : []),
     auditStatement(
       principal.orgId,
       principal.principalId,
@@ -72,6 +115,14 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       created.id,
       JSON.stringify({ not_before: notBefore, expires_at: expiresAt }),
     ),
+    ...(membershipId ? [auditStatement(
+      principal.orgId,
+      principal.principalId,
+      "membership.add",
+      "membership",
+      now.toISOString(),
+      membershipId,
+    )] : []),
   ]);
 
   return {
@@ -88,6 +139,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       not_before: notBefore,
       expires_at: expiresAt,
       last_used_at: null,
+      ...(membershipId ? { membership_id: membershipId, membership_role: membershipRole } : {}),
       warning: "Store this key now. Titen keeps only its hash and cannot show it again.",
     },
   };
@@ -98,7 +150,7 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
   const rows = await ctx.app.db.all<Record<string, unknown>>(
     `SELECT id, principal_id, principal_kind, label, scopes, max_trust, created_at,
             not_before, expires_at, last_used_at, revoked_at
-       FROM api_keys WHERE org_id = ? ORDER BY created_at, id`,
+       FROM api_keys WHERE org_id = ? ORDER BY created_at, id LIMIT 500`,
     [principal.orgId],
   );
   return {

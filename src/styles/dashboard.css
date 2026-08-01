@@ -21,9 +21,9 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--canvas); }
 body { min-height: 100dvh; margin: 0; background: var(--canvas); }
-button, input { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible {
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -47,6 +47,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   top: 0;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   height: 100dvh;
   background: var(--paper);
   border-right: 1px solid var(--rule);
@@ -74,6 +75,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
 }
 .sidebar nav > p { padding: 14px 10px 6px; }
 .sidebar nav a,
+.sidebar nav button,
 .inactive-area {
   display: flex;
   align-items: center;
@@ -83,7 +85,17 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   font-size: 13px;
   text-decoration: none;
 }
-.sidebar nav a { color: var(--paper); background: var(--ink); }
+.sidebar nav button {
+  justify-content: space-between;
+  color: var(--muted);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.sidebar nav button small { font: 8px "JetBrains Mono Variable", monospace; text-transform: uppercase; }
+.sidebar nav a,
+.sidebar nav button[aria-current="page"] { color: var(--paper); background: var(--ink); }
 .inactive-area { justify-content: space-between; color: var(--muted); }
 .inactive-area small { font: 8px "JetBrains Mono Variable", monospace; text-transform: uppercase; }
 .credential-note {
@@ -95,6 +107,16 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
 }
 .credential-note strong { font: 11px "JetBrains Mono Variable", monospace; }
 .credential-note span { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.text-button {
+  width: fit-content;
+  padding: 4px 0;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+}
 
 .main-shell { min-width: 0; padding-bottom: 36px; }
 .topbar {
@@ -146,6 +168,30 @@ h3 { margin: 0 0 10px; font-size: 13px; font-weight: 580; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 
 .notice { margin: 16px clamp(16px, 3vw, 44px) 0; padding: 12px 14px; color: var(--danger); background: #f8e8df; border-left: 3px solid var(--danger); font-size: 12px; line-height: 1.5; }
+.login-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, .75fr);
+  gap: 36px;
+  margin: 24px clamp(16px, 3vw, 44px) 0;
+  padding: clamp(24px, 4vw, 48px);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+.login-panel > div > p:last-child, .user-admin p { max-width: 58ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.login-panel form { display: grid; gap: 12px; align-content: center; }
+.login-panel label, .inline-form label, .user-admin label { display: grid; gap: 6px; }
+.login-panel label span, .inline-form label span, .user-admin label span { font-size: 11px; font-weight: 600; }
+.login-panel input, .inline-form input, .user-admin input, .user-admin select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: var(--paper-strong);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font: 11px "JetBrains Mono Variable", monospace;
+}
+.login-panel form > span, .user-admin form > span { min-height: 1.4em; color: var(--muted); font-size: 11px; }
 .query-panel {
   margin: 18px clamp(16px, 3vw, 44px) 0;
   padding: 22px;
@@ -165,7 +211,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .input-grid { display: grid; grid-template-columns: 1.2fr 1.2fr .45fr; gap: 14px; margin-top: 18px; }
 .input-grid label { display: grid; gap: 6px; }
 .input-grid label > span { font-size: 11px; font-weight: 600; }
-.input-grid input {
+.input-grid input, .input-grid select {
   width: 100%;
   min-height: 42px;
   padding: 9px 11px;
@@ -179,6 +225,49 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .input-grid small { color: var(--muted); font-size: 10px; }
 .form-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
 .form-actions span { color: var(--muted); font-size: 11px; }
+.area-panel > .query-panel { margin-inline: 0; }
+.context-grid { grid-template-columns: 1fr 1.5fr .5fr 1fr; }
+.inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule-soft);
+}
+.inline-form .secondary-button { margin: 0; }
+.live-output { display: grid; gap: 14px; margin-top: 20px; border-top: 1px solid var(--rule-soft); }
+.live-output > p { margin: 0; padding: 22px 0 0; color: var(--muted); font-size: 12px; }
+.live-output > p.output-error { color: var(--danger); }
+.live-output > section { padding-top: 20px; }
+.live-output details { border-top: 1px solid var(--rule-soft); }
+.live-output summary { padding: 10px 2px; cursor: pointer; font-size: 12px; overflow-wrap: anywhere; }
+.live-output pre {
+  max-height: 320px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  color: var(--ink-soft);
+  background: var(--paper-strong);
+  border-top: 1px solid var(--rule-soft);
+  font: 10px/1.55 "JetBrains Mono Variable", monospace;
+}
+.user-admin {
+  display: grid;
+  grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr);
+  gap: 24px;
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--paper-strong);
+  border: 1px solid var(--rule-soft);
+}
+.user-admin form { display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 12px; }
+.user-admin form .primary-button { align-self: end; }
+.one-time-key { grid-column: 1 / -1; display: grid; gap: 12px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.one-time-key code { padding: 12px; overflow-wrap: anywhere; background: var(--paper); border: 1px solid var(--rule); font: 11px/1.55 "JetBrains Mono Variable", monospace; }
+.one-time-key > div { display: flex; align-items: center; gap: 14px; }
+.one-time-key .secondary-button { margin: 0; }
 
 .atlas-workspace {
   display: grid;
@@ -231,14 +320,21 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
 @media (max-width: 960px) {
-  .app-shell { grid-template-columns: 1fr; }
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
-  .sidebar nav, .credential-note { display: none; }
+  .sidebar nav { flex-direction: row; gap: 4px; width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; padding: 8px 10px; border-top: 1px solid var(--rule-soft); }
+  .sidebar nav > p { display: none; }
+  .sidebar nav button { flex: 0 0 auto; gap: 14px; }
+  .credential-note { position: absolute; top: 9px; right: 12px; width: 190px; padding: 8px 10px; border: 0; }
+  .credential-note p, .credential-note span { display: none; }
   .service-strip { grid-template-columns: repeat(3, 1fr); }
   .service-strip .secondary-button { grid-column: 1 / -1; }
   .input-grid { grid-template-columns: 1fr 1fr; }
   .input-grid label:last-child { grid-column: 1 / -1; max-width: 180px; }
   .atlas-workspace { grid-template-columns: 1fr; }
+  .context-grid { grid-template-columns: 1fr 1fr; }
+  .inline-form { grid-template-columns: 1fr 1fr; }
+  .user-admin { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -248,6 +344,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .service-strip { grid-template-columns: 1fr; margin-top: 14px; }
   .service-strip article { border-right: 0; border-bottom: 1px solid var(--rule-soft); }
   .query-panel { padding: 18px 14px; }
+  .login-panel { grid-template-columns: 1fr; gap: 18px; padding: 22px 18px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .input-grid { grid-template-columns: 1fr; }
   .input-grid label:last-child { grid-column: auto; max-width: none; }
@@ -255,6 +352,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .record-list button { grid-template-columns: 1fr; gap: 5px; }
   .record-list strong { white-space: normal; }
   .result-header { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .inline-form, .user-admin form { grid-template-columns: 1fr; }
+  .credential-note { width: 130px; }
+  .credential-note strong { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -262,5 +362,5 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 
 @media (forced-colors: active) {
-  .connection i, .lens-picker span, .service-strip, .query-panel, .atlas-workspace, .metadata-panel { border: 1px solid CanvasText; }
+  .connection i, .lens-picker span, .service-strip, .query-panel, .atlas-workspace, .metadata-panel, .login-panel, .user-admin { border: 1px solid CanvasText; }
 }

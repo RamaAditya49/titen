@@ -2,6 +2,8 @@ import type { ExtractionResponseMode as CoreExtractionResponseMode } from "../..
 import type { SemanticDiagnostic as CoreSemanticDiagnostic } from "../../src/core/vectors";
 import type {
   ClaimKind,
+  CreatedKey,
+  CreateKeyOptions,
   EnrichmentJobState,
   Readiness,
   ReadinessCapabilities,
@@ -9,6 +11,7 @@ import type {
   ReadinessExtractionResponseMode,
   SemanticDiagnostic,
   Trust,
+  ViewLens,
   Visibility,
 } from "../../src/sdk";
 import { CLAIM_KINDS, TRUST_LEVELS, VISIBILITIES } from "../../src/core/validate";
@@ -22,6 +25,16 @@ type Equal<Left, Right> =
 const claimKindsStayCanonical: Equal<ClaimKind, (typeof CLAIM_KINDS)[number]> = true;
 const trustStaysCanonical: Equal<Trust, (typeof TRUST_LEVELS)[number]> = true;
 const visibilityStaysCanonical: Equal<Visibility, (typeof VISIBILITIES)[number]> = true;
+const atlasLensesStayComplete: Equal<
+  ViewLens,
+  "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue" | "scope_preview" | "knowledge_release"
+> = true;
+type MembershipRole = "owner" | "admin" | "member" | "reader";
+const createKeyRoleStaysCanonical: Equal<CreateKeyOptions["membership_role"], MembershipRole | undefined> = true;
+const createdKeyMembershipStaysCanonical: Equal<
+  Pick<CreatedKey, "membership_id" | "membership_role">,
+  { membership_id?: string; membership_role?: MembershipRole }
+> = true;
 const diagnosticsStayCanonical: Equal<SemanticDiagnostic, CoreSemanticDiagnostic> = true;
 const responseModesStayCanonical: Equal<
   ReadinessExtractionResponseMode,
@@ -70,6 +83,9 @@ void [
   claimKindsStayCanonical,
   trustStaysCanonical,
   visibilityStaysCanonical,
+  atlasLensesStayComplete,
+  createKeyRoleStaysCanonical,
+  createdKeyMembershipStaysCanonical,
   diagnosticsStayCanonical,
   responseModesStayCanonical,
   readiness,

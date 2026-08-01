@@ -7,9 +7,10 @@ runtime, or externally reachable operation changes.
 
 This model covers the Titen HTTP service, canonical SQL store, FTS projection,
 optional vector/model integrations, background repair, export/import, the
-stateless MCP adapter, planned agent lifecycle hooks, and signed webhook/event
-delivery, plus the optional read-only Memory Atlas compiler. It covers personal, company, and enterprise
-deployments while features are enabled according to their release phase.
+stateless MCP adapter, planned agent lifecycle hooks, signed webhook/event
+delivery, Memory Atlas compiler, and optional per-principal operator dashboard.
+It covers personal, company, and enterprise deployments while features are
+enabled according to their release phase.
 
 The host, Cloudflare account, VPS operating system, reverse proxy, and model
 provider remain deployment responsibilities, but Titen must fail safely when
@@ -65,7 +66,8 @@ exchange boundary: JSONL import/export and future federation
 agent edge: host plugin/hooks and MCP/REST credential
 event edge: signed outbound webhook to an allowlisted orchestrator
 channel edge: external user -> CRM/chatbot gateway -> scoped Titen service key
-Atlas edge: operator/browser -> authenticated read-only view compiler -> policy
+dashboard edge: browser -> loopback session adapter -> authenticated API -> policy
+ingress edge: Tailscale Serve or Cloudflare Tunnel + Access -> loopback adapter
 ```
 
 Rules at every boundary:
@@ -79,6 +81,8 @@ Rules at every boundary:
    independently; no one signal implies another.
 7. Memory Atlas authorizes before traversal and both endpoints of every edge;
    hidden records cannot influence returned labels, topology, or counts.
+8. Dashboard capability hiding is never authorization; every API request is
+   authenticated and authorized again.
 
 ## Security invariants
 
@@ -105,6 +109,9 @@ Rules at every boundary:
 - A Memory Atlas projection cannot grant authority, become evidence, or expose
   hidden existence through topology, labels, aggregate counts, caches, or scope
   preview.
+- A dashboard API key exists only in adapter memory, never Web Storage, HTML,
+  URL, response payload, or normal logs; its session is opaque, bounded, and
+  invalid after logout, expiry, restart, or key revocation.
 
 ## Threat register
 
@@ -138,6 +145,8 @@ Rules at every boundary:
 | TM-26 | remote model egress exposes more memory than required or leaks a credential                                    | minimum authorized source content, TLS/VPC endpoint policy, secret store, no redirects/logging, per-deployment processing disclosure                                                                | captured request contains only allowlisted fields; keys/prompts/raw output absent from logs/export                   |
 | TM-27 | duplicate drain, crash, or retry creates duplicate claims or unbounded spend                                   | persistent lease/expiry, unique job fingerprint, bounded timeout/attempt/backoff/concurrency, atomic result-plus-done transaction                                                                    | concurrent/expired-lease/crash fixtures create at most one semantic result and terminate within declared bounds      |
 | TM-28 | omitted project scope silently broadens context across otherwise-visible projects                              | treat omission as unscoped-only in FTS, vector filter, and hydration; require explicit `cross_project` plus `context:compile:all`; return effective scope and grant reason                            | two-org/two-project REST/MCP fixture proves omission, foreign substitution, visibility, membership, and broad-grant isolation |
+| TM-29 | dashboard login, cookie replay, CSRF, Host confusion, or stale browser state exposes another principal's data   | exact Host/Origin checks; HTTPS remote origin; opaque HttpOnly SameSite cookie; absolute TTL; process-local key isolation; clear state on denial/logout/restart; fixed routes and bounded bodies       | integration and browser tests prove two-session isolation, invalid/revoked key rejection, origin/body limits, logout/restart invalidation, and stale-state clearing |
+| TM-30 | a public tunnel bypasses intended identity controls or exposes the loopback API                                  | keep API and adapter on loopback; Tailscale grants or Cloudflare Access default-deny before routing; separate API hostname/policy when required; retain Titen bearer auth; no Funnel                   | remote ingress reaches only the adapter hostname; direct ports deny; unauthenticated dashboard/API operations fail |
 
 ## Memory-poisoning controls by lifecycle
 
@@ -188,15 +197,18 @@ Rules at every boundary:
   credentials, record counts, or private identifiers.
 - Production release checks unauthenticated `401`, authenticated content type,
   deployed revision, migration compatibility, rollback, and cross-scope denial.
+- Remote dashboard access uses Tailscale Serve or Cloudflare Tunnel protected
+  by Cloudflare Access; Tunnel alone and Tailscale Funnel are not approved
+  authentication boundaries.
 - Backups are verified by restore, integrity check, and functional smoke—not by
   file existence alone.
 - Observation erasure is an explicitly scoped, audited tombstone that removes
   readable canonical and derived text while retaining hashes and provenance.
   Backups predating the tombstone can restore that text and require separate
   operator expiry or replacement.
-- An optional Atlas web client uses the authenticated REST boundary, receives
-  no direct database/binding access, applies a restrictive CSP, and is omitted
-  without affecting service readiness.
+- The optional dashboard receives no direct database/binding access, applies a
+  restrictive CSP, uses fixed adapter routes, and is omitted without affecting
+  service readiness.
 
 ## Residual risks
 
@@ -212,8 +224,8 @@ Rules at every boundary:
   content is excluded.
 - Authorized Atlas topology may still reveal sensitive organizational patterns
   to an over-privileged operator; capability scoping and audit remain required.
-- Federation and external identity integration require dedicated reviews before
-  implementation; this document does not approve their protocols.
+- An adapter process crash logs users out; durable or distributed sessions are
+  deferred until a deployment needs multiple adapter replicas.
 
 ## Review triggers
 
@@ -225,9 +237,10 @@ Review this model before merging a change that adds:
 - background execution outside the current bounded outbox model;
 - an agent plugin/hook event, webhook event type, or outbound destination class;
 - storage of raw prompts, conversations, tool traces, or new sensitive fields;
-- federation, SSO/SCIM, a new channel/audience/public-serving mode, or a hosted
+- SSO/SCIM, a new channel/audience/public-serving mode, or a hosted
   control plane;
-- a new Memory Atlas lens, renderer, cache, stored layout, or traversal backend.
+- a new dashboard mutation, session backend, Memory Atlas lens, renderer,
+  cache, stored layout, or traversal backend.
 
 ## Research references
 

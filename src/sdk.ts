@@ -135,6 +135,7 @@ export interface CreateKeyOptions {
   max_trust?: "unverified" | "asserted" | "verified" | "policy_approved";
   principal_id?: string;
   principal_kind?: "human" | "agent" | "service";
+  membership_role?: "owner" | "admin" | "member" | "reader";
   not_before?: string;
   expires_at?: string;
 }
@@ -150,6 +151,8 @@ export interface CreatedKey {
   not_before: string;
   expires_at: string | null;
   last_used_at: null;
+  membership_id?: string;
+  membership_role?: "owner" | "admin" | "member" | "reader";
   warning: string;
 }
 
@@ -442,16 +445,20 @@ export interface ResolvedHandoff {
   resolved_at: string;
 }
 
+export type ViewLens =
+  | "evidence_trace"
+  | "neighborhood"
+  | "conflict_freshness"
+  | "review_queue"
+  | "scope_preview"
+  | "knowledge_release";
+
 export interface ViewResult {
-  lens:
-    | "evidence_trace"
-    | "neighborhood"
-    | "conflict_freshness"
-    | "review_queue";
+  lens: ViewLens;
   focus_id: string | null;
   nodes: Array<{
     id: string;
-    type: "claim" | "observation";
+    type: "claim" | "observation" | "principal" | "release";
     label: string;
     trust: string;
     status: string;
@@ -863,11 +870,7 @@ export class TitenClient {
   }
 
   async compileView(
-    lens:
-      | "evidence_trace"
-      | "neighborhood"
-      | "conflict_freshness"
-      | "review_queue",
+    lens: ViewLens,
     options: {
       subject_id?: string;
       focus_id?: string;

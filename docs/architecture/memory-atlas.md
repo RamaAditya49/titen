@@ -70,17 +70,16 @@ authorized candidate set; they cannot reveal that hidden nodes or edges exist.
 
 ## Dashboard placement
 
-Atlas is the first and only active area in the implemented Astro dashboard at
-`/dashboard/`. The reference shell shows the canonical area map, but every
-label besides Atlas is non-interactive and has no route. Displayed records and
-runtime state come only from live same-origin health, readiness, and authorized
-Atlas responses; disconnected or failed integration shows no fixture data.
+Atlas is the Memories projection inside the six-area Astro dashboard at
+`/dashboard/`. Context, Work, Audit, Governance, and Federation use their
+existing bounded REST contracts through the same fixed-route adapter. Displayed
+records and runtime state come only from live same-origin health, readiness,
+and authorized API responses; disconnected or failed integration shows no
+fixture data.
 
-The later dashboard may activate Memories and Context under Memory and the
-other groups defined in DESIGN. The information map does not change Atlas
-authorization or make its labels part of this release. Each label becomes a
-control only after its backend contract, authorization, current-build
-capability, and separate EARS UI work item are complete.
+The product map does not change Atlas authorization. Each area is visible only
+when the current principal advertises at least one matching capability, and the
+API re-authorizes each request independently of the browser navigation.
 
 ## Projection contract
 
@@ -143,8 +142,8 @@ measured need and a revised work spec.
 
 - P0/v0.1 have no Memory Atlas release requirement.
 - v0.2 ships only after evidence, collaboration, and cross-scope fixtures pass.
-- the dashboard client keeps only Atlas active and treats the remaining
-  canonical area labels as non-interactive orientation;
+- the dashboard presents Atlas under Memories and routes the other live areas
+  only to their existing bounded authenticated contracts;
 - v0.3 lenses ship only after policy, customer isolation, and channel-release
   fixtures pass.
 - A missing UI or renderer is not a readiness failure for the headless service.

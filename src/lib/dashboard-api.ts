@@ -29,6 +29,18 @@ export interface AtlasView {
 export interface DashboardStatus {
   mode: "live" | "disconnected";
   endpoint: string | null;
+  authentication: "session" | "server";
+  authenticated: boolean;
+}
+
+export interface DashboardPrincipal {
+  organization_id: string;
+  principal_id: string;
+  principal_kind: "human" | "agent" | "service";
+  key_id: string;
+  scopes: string[];
+  max_trust: string;
+  organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
 }
 
 export interface ServiceCheck {
@@ -77,7 +89,44 @@ export async function getDashboardStatus(): Promise<DashboardStatus> {
   return {
     mode: payload.mode === "live" ? "live" : "disconnected",
     endpoint: typeof payload.endpoint === "string" ? payload.endpoint : null,
+    authentication: payload.authentication === "session" ? "session" : "server",
+    authenticated: payload.authenticated === true,
   };
+}
+
+function principal(payload: Record<string, unknown>): DashboardPrincipal {
+  const data = payload.data;
+  if (!data || typeof data !== "object" || Array.isArray(data))
+    throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen returned invalid principal metadata.");
+  return data as DashboardPrincipal;
+}
+
+export async function login(apiKey: string): Promise<DashboardPrincipal> {
+  return principal(await request("/dashboard-api/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ api_key: apiKey }),
+  }));
+}
+
+export async function getSession(): Promise<DashboardPrincipal> {
+  return principal(await request("/dashboard-api/session"));
+}
+
+export async function logout(): Promise<void> {
+  await request("/dashboard-api/session", { method: "DELETE" });
+}
+
+export async function getArea(path: string, query?: URLSearchParams): Promise<Record<string, unknown>> {
+  return request(`/dashboard-api/${path}${query?.size ? `?${query}` : ""}`);
+}
+
+export async function postArea(path: string, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return request(`/dashboard-api/${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 export async function checkService(path: "health" | "readiness"): Promise<ServiceCheck> {

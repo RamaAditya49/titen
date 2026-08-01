@@ -1,8 +1,23 @@
-# Live Memory Atlas dashboard
+# Live operator dashboard
 
-Titen includes an optional Astro dashboard at `/dashboard/`. It is a read-only
-same-origin client of the authenticated Titen API; it contains no fixture
-records and is not required for REST or MCP operation.
+Titen includes an optional Astro dashboard at `/dashboard/`. It uses the
+authenticated Titen API through a loopback same-origin adapter. The browser
+contains no fixture fallback and never stores an API key in Web Storage.
+
+The product map has six live, capability-gated areas:
+
+| Area | Live job | Required read capability |
+| --- | --- | --- |
+| Memories | compile the six bounded Memory Atlas lenses | `views:compile` |
+| Context | compile a task-specific context pack | `context:compile` |
+| Work | list leases and pending handoffs; find an exact checkpoint | `leases:read`, `handoffs:read`, or `checkpoints:read` |
+| Audit | list bounded audit records and domain events | `audit:read` or `events:read` |
+| Governance | inspect memberships, keys, policies, approvals, channels, and releases | matching governance read capability |
+| Federation | inspect owned peers and a bounded peer log | `federation:read` |
+
+The navigation hides an area when the signed-in principal has none of its
+capabilities. That is presentation only: the API authenticates and authorizes
+every request again.
 
 ## Run disconnected
 
@@ -11,48 +26,62 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:4321/dashboard/`. Static Astro development has no
-credential-bearing adapter, so the page truthfully shows a disconnected state.
+Open `http://127.0.0.1:4321/dashboard/`. Static Astro development has no
+credential-bearing adapter, so it shows a disconnected state.
 
-## Run live
+## Run with per-user login
 
-Build once, then start the existing loopback adapter with a least-privilege key:
+Start the Bun API first, then build and run the adapter:
 
 ```bash
 pnpm build
 TITEN_DASHBOARD_LIVE=true \
+TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
-TITEN_API_KEY='replace-with-a-dashboard-read-key' \
-TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
 pnpm dashboard:adapter
 ```
 
-Open `http://127.0.0.1:4322/dashboard/`. The browser calls only same-origin
-`/dashboard-api/*` routes. The adapter keeps the upstream URL and API key in its
-process environment, forwards `/healthz`, `/readyz`, and the six current
-read-only Atlas lenses, and never returns the key. Nothing is written to Web
-Storage.
+Open `http://127.0.0.1:4322/dashboard/` and sign in with an active Titen API
+key. The adapter verifies it against `GET /v1/principal`, keeps it only in
+process memory, and gives the browser an opaque `HttpOnly; SameSite=Strict`
+cookie. Sessions expire after eight hours and are discarded on logout, API-key
+revocation, or adapter restart. A new login with the same key replaces its
+previous session; one adapter holds at most 128 active sessions.
 
-Supported lenses:
+For a remote HTTPS hostname, set its exact origin:
 
-- Neighborhood and Conflict & freshness require a subject ID;
-- Evidence trace requires a focus claim ID;
-- Review queue accepts an optional subject filter;
-- Scope preview requires a focus principal ID;
-- Knowledge releases accepts an optional channel ID and otherwise returns all
-  authorized channel releases up to the requested limit.
+```bash
+TITEN_DASHBOARD_LIVE=true \
+TITEN_DASHBOARD_AUTH=session \
+TITEN_API_URL=http://127.0.0.1:8787 \
+TITEN_DASHBOARD_ORIGIN=https://memory.example.com \
+pnpm dashboard:adapter
+```
 
-The four memory lenses need `views:compile`. Scope preview also needs
-`governance:read`; Knowledge releases also needs `releases:read`. Use all three
-scopes only when the dashboard must expose all six lenses. The credential's
-principal must also have an active organization-level `reader`, `admin`, or
-`owner` membership; create the bounded key for that same principal.
+The listener remains `127.0.0.1:4322`. The origin only authorizes the reverse
+proxy Host and same-origin mutations and adds `Secure` to the session cookie.
+Use [Tailscale Serve or Cloudflare Tunnel with Access](./deployment/secure-ingress.md)
+instead of opening the adapter or API port.
 
-Empty, loading, disconnected, not-ready, unauthorized, forbidden, and upstream
-failure are distinct states. A failed request never falls back to synthetic
-records. Atlas remains the only active dashboard route; the product-map labels
-are non-interactive and describe whether an area is visible through Atlas or
-remains headless.
+## Add a user
+
+An organization `owner` or `admin` with `keys:manage` and
+`memberships:write` sees **Governance → Add a human user**. One submission
+creates the organization membership and its API key in one transaction. An
+admin cannot grant the owner role, scope/trust escalation is rejected, and a
+partial failure creates neither record. The raw key is shown once.
+
+Titen intentionally reuses its existing human principal, membership, and API
+key contracts. It does not add a password database, email invitation flow, or
+identity provider merely for the dashboard. Add SSO/SCIM when a deployment has
+an external identity requirement.
+
+## Legacy server-key mode
+
+Existing private installations can omit `TITEN_DASHBOARD_AUTH=session` and set
+`TITEN_API_KEY`. Every browser then shares that one server-side principal and
+user administration is disabled. Keep this mode behind a private ingress; use
+session mode for a new deployment.
 
 ## Verification
 
@@ -64,22 +93,11 @@ pnpm test:browser tests/dashboard.spec.ts
 pnpm check:workflow
 ```
 
-The real smoke provisions a temporary Bun/SQLite service and proves health,
-readiness, evidence trace, neighborhood, conflict/freshness, review queue, and
-cross-subject exclusion through the adapter. Browser and adapter tests also
-cover the exact Scope preview and Knowledge releases input contracts, including
-an empty principal timestamp. Browser tests cover no-secret, no-storage,
-disconnected, loading, empty, denial, mobile, and keyboard paths.
+The real smoke starts temporary Bun/SQLite and proves login, all six areas,
+atomic Add User, logout, and login with the newly issued key through the real
+adapter. Integration and browser tests also cover credential isolation,
+revocation, exact origin checks, request-size limits, capability hiding, stale
+private-state clearing, keyboard use, and a 320 px viewport.
 
-Refresh documentation captures explicitly with `pnpm screenshots`; ordinary
-test runs do not rewrite tracked images.
-
-## Deployment and rollback
-
-The included adapter binds only to loopback and rejects foreign Host and Origin
-values. `TITEN_DASHBOARD_ORIGIN` allowlists exactly one HTTPS reverse-proxy
-origin while keeping the listener and upstream API private. Put authentication
-and TLS at a separately audited ingress before making it remotely reachable;
-do not treat the adapter as a public session service. Rollback is stopping the
-optional adapter or removing the dashboard static assets. Neither action
-changes canonical data or headless readiness.
+Rollback is stopping the optional adapter or restoring the previous dashboard
+image. Neither action mutates canonical memory.

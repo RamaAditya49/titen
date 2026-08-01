@@ -92,7 +92,8 @@ Docker is not required.
 - Canonical, WAL, shared-memory, and optional vector database files are created
   and reopened as owner-only (`0600`), independent of the service umask.
 - Configuration/credential files: mode `0600`.
-- TLS/public ingress: Caddy, Nginx, Cloudflare Tunnel, or private network.
+- TLS/public ingress: Caddy, Nginx, Cloudflare Tunnel, or private network. Keep
+  the listeners private by following the [secure ingress guide](./secure-ingress.md).
 
 ## Configuration
 
@@ -399,29 +400,26 @@ does not expose a verifiable address-pinning primitive.
 
 ## Optional live dashboard
 
-Build the static Astro client and run its adapter beside the loopback API. A
-base dashboard key needs `views:compile`; add `governance:read` and
-`releases:read` only when exposing the two governance lenses. The key never
-enters browser assets or responses. The key's principal must also have an active
-organization-level `reader`, `admin`, or `owner` membership; use the bounded
-key for that same principal rather than a wildcard administrative key:
+Build the static Astro client and run its adapter beside the loopback API. The
+recommended session mode lets each operator sign in with a separate bounded
+Titen key; the key remains only in adapter memory behind an opaque HttpOnly
+cookie. It never enters browser assets, URLs, or Web Storage:
 
 ```bash
 pnpm build
 TITEN_DASHBOARD_LIVE=true \
+TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
-TITEN_API_KEY='...' \
 TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
 pnpm dashboard:adapter
 ```
 
-The adapter remains bound to `127.0.0.1:4322`. An authenticated tailnet may
-publish that single origin with Tailscale Serve while the Titen API stays
-loopback-only. Configure Serve to proxy the HTTPS tailnet hostname to
-`http://127.0.0.1:4322`; the exact hostname must match
-`TITEN_DASHBOARD_ORIGIN`. Do not expose port 8787 or reuse an administrative
-wildcard key. Stop the adapter and remove the Serve mapping to roll back without
-touching canonical data.
+The adapter remains bound to `127.0.0.1:4322`. Follow the
+[secure ingress guide](./secure-ingress.md) to publish only that listener with
+Tailscale Serve or Cloudflare Tunnel protected by Access. The exact HTTPS
+hostname must match `TITEN_DASHBOARD_ORIGIN`; port `8787` remains private. Stop
+the adapter and remove the ingress mapping to roll back without touching
+canonical data.
 
 ## Service hardening
 

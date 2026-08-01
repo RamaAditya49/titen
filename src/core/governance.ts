@@ -187,7 +187,7 @@ export async function listPolicies(ctx: RequestContext): Promise<Result> {
     `SELECT id, kind, target_type, target_id, config, enabled, version,
             created_by, created_at, updated_at
        FROM policies WHERE org_id = ? AND kind IN ('approval_required', 'retention')
-       ORDER BY created_at, id`,
+       ORDER BY created_at, id LIMIT 500`,
     [ctx.principal!.orgId],
   );
   return { data: { policies: rows.map((row) => ({
@@ -551,7 +551,7 @@ export async function listChannels(ctx: RequestContext): Promise<Result> {
   const rows = await ctx.app.db.all<Record<string, unknown>>(
     `SELECT id, label, gateway_principal_id, allowed_audiences, minimum_trust,
             status, version, created_by, created_at, updated_at
-       FROM channels WHERE org_id = ? ORDER BY created_at, id`,
+       FROM channels WHERE org_id = ? ORDER BY created_at, id LIMIT 500`,
     [ctx.principal!.orgId],
   );
   return { data: { channels: rows.map((row) => ({ channel_id: row.id, ...row, id: undefined, allowed_audiences: JSON.parse(String(row.allowed_audiences)) })) } };

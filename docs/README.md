@@ -11,7 +11,7 @@ context without a documentation-site dependency.
 | [PRD](./PRD.md)                                                    | Product scope, users, requirements, and acceptance criteria                   |
 | [FRD](./FRD.md)                                                    | Feature behavior, release scope, failure rules, and acceptance journeys       |
 | [DESIGN](./DESIGN.md)                                              | Progressive dashboard areas, emergence gates, interaction, and visual rules   |
-| [Dashboard](./dashboard.md)                                        | Live read-only Atlas client, same-origin adapter, tests, and hosting boundary  |
+| [Dashboard](./dashboard.md)                                        | Six live product areas, per-user sessions, Add User, tests, and hosting boundary |
 | [Roadmap](./ROADMAP.md)                                            | Delivery order and release gates                                              |
 | [Requirements workflow](./engineering/requirements-workflow.md)    | EARS acceptance criteria and spec-plan-implement-done lifecycle               |
 | [Architecture](./architecture/overview.md)                         | Current repository state, target components, and runtime boundaries           |
@@ -26,6 +26,7 @@ context without a documentation-site dependency.
 | [Threat model](./security/threat-model.md)                         | Assets, trust boundaries, threats, controls, and residual risks               |
 | [Cloudflare](./deployment/cloudflare.md)                           | Worker, D1, Vectorize, and scheduled processing                               |
 | [VPS](./deployment/vps.md)                                         | Bun, SQLite, optional sqlite-vec, and service hardening                       |
+| [Secure ingress](./deployment/secure-ingress.md)                    | Tailscale Serve or Cloudflare Tunnel plus Access for the loopback dashboard   |
 | [Agent-memory landscape](./research/competitive-landscape.md)      | Mem0, Honcho, Karpathy, and Titen's falsifiable position                      |
 | [Memory model evaluation](./research/2026-07-31-memory-model-evaluation.md) | Live Luna/Terra/Sol and embedding pilot, limitations, and rollout evidence |
 | [Brand guide](./BRAND.md)                                          | Kawung mark, palette, typography, mascot, and usage rules                     |
@@ -38,7 +39,7 @@ context without a documentation-site dependency.
 
 | Surface                            | Current state                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Astro dashboard | Six authorized Atlas lenses use the live same-origin adapter; `0.5.1` passes local browser checks and the exact Podman deployment smoke on `rama-tuf` |
+| Astro dashboard | Six live areas, per-principal login, and atomic Add User pass local adapter, real Bun/SQLite, and browser checks; exact release deployment evidence is pending |
 | Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
 | Enterprise governance | Roles, policies, approvals, releases, retention, legal holds, identity mappings, and two governance Atlas lenses pass the shared contract |
 | Canonical federation | Opt-in signed claim/evidence bundles preserve provenance and conflicts; filtered import, replay, source binding, and cross-scope failures pass the shared contract |

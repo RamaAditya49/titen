@@ -83,7 +83,7 @@ export async function listPeers(ctx: RequestContext): Promise<Result> {
     created_at: string;
   }>(
     `SELECT id, name, endpoint, direction, status, last_cursor, last_sync_at, source_org_id, created_at
-       FROM federation_peers WHERE org_id = ? AND principal_id = ? ORDER BY created_at DESC`,
+       FROM federation_peers WHERE org_id = ? AND principal_id = ? ORDER BY created_at DESC, id DESC LIMIT 500`,
     [principal.orgId, principal.principalId],
   );
   return { data: { peers: rows.map((r) => ({ peer_id: r.id, ...r, id: undefined })) } };

@@ -4,6 +4,10 @@ Status: **implemented and verified locally** through workerd/D1. A provisioned
 live Worker/D1 deployment and live Vectorize/Workers AI bindings are not current
 repository evidence.
 
+Cloudflare Tunnel is ingress for a self-hosted Bun/VPS origin, not a way to
+deploy this Worker runtime. See the [secure ingress guide](./secure-ingress.md)
+for Tailscale Serve and Cloudflare Tunnel with Access.
+
 ## Local preview
 
 Prerequisites: Node 22+, pnpm 10+, Cloudflare account with D1.
