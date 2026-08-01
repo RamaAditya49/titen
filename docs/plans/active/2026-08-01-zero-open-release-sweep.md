@@ -18,15 +18,15 @@ spec: docs/specs/active/2026-08-01-zero-open-release-sweep.md
   reproduction; group reports that share one root fix.
 - [ ] Review pull request #193 and every unique local commit/worktree; integrate,
   supersede, or archive each before branch cleanup.
-- [ ] Implement the SDK, auth lifecycle, database-permission, and streamed-
+- [x] Implement the SDK, auth lifecycle, database-permission, and streamed-
   redaction corrections with focused package/runtime checks.
-- [ ] Implement the extraction, Cloudflare/Bun runtime, shutdown/readiness,
+- [x] Implement the extraction, Cloudflare/Bun runtime, shutdown/readiness,
   Vectorize limit, and documentation-command corrections with focused dual-
   runtime checks.
-- [ ] Implement ranking and current benchmark-gate parity corrections; archive
+- [x] Implement ranking and current benchmark-gate parity corrections; archive
   historical or terminal `NO-GO` replacement/cutover issues without changing
   their frozen artifacts or adding an unused migration adapter.
-- [ ] Run focused tests after each root fix, then the complete local manual gate,
+- [x] Run focused tests after each root fix, then the complete local manual gate,
   package smoke, production dependency audit, secret scan, and workflow checks.
 - [ ] Update changelog and package version to the smallest valid SemVer, review
   the exact candidate, and merge it to `main` with the required CADIS trailer.
