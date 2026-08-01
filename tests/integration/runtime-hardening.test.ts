@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Db, Stmt } from "../../src/core/db";
 import { backgroundRepairState, runMaintenance } from "../../src/core/maintenance";
-import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
+import { MIGRATIONS, migrate, schemaState, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { observedSemanticReadiness } from "../../src/core/vectors";
@@ -53,6 +53,32 @@ test("Cloudflare health returns before touching a stalled D1 binding", async () 
     runtime: "cloudflare-d1",
     revision: "health-probe",
   });
+});
+
+test("schema readiness verifies the complete migration contract in one read", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await migrate(db);
+  let reads = 0;
+  assert.deepEqual(await schemaState({
+    ...db,
+    async all<Row>(sql: string, params = []) {
+      reads += 1;
+      return db.all<Row>(sql, params);
+    },
+  }), { applied: SCHEMA_VERSION, expected: SCHEMA_VERSION, verified: true });
+  assert.equal(reads, 1);
+  await db.exec("DROP INDEX operator_accounts_org");
+  reads = 0;
+  assert.deepEqual(await schemaState({
+    ...db,
+    async all<Row>(sql: string, params = []) {
+      reads += 1;
+      return db.all<Row>(sql, params);
+    },
+  }), { applied: SCHEMA_VERSION, expected: SCHEMA_VERSION, verified: false });
+  assert.equal(reads, 1);
+  database.close();
 });
 
 test("a failed migration version rolls back fully and succeeds on retry", async () => {

@@ -1403,25 +1403,29 @@ export async function schemaState(
   db: Db,
 ): Promise<{ applied: number; expected: number; verified: boolean }> {
   try {
-    const rows = await db.all<{ version: number | null }>(
-      `SELECT MAX(version) AS version FROM titen_migrations`,
+    const objects = REQUIRED_OBJECTS.map(({ type, name }) => `('${type}', '${name}')`).join(", ");
+    const columns = REQUIRED_COLUMNS.map(({ table, column }) => `('${table}', '${column}')`).join(", ");
+    const rows = await db.all<{ version: number | null; missing: number }>(
+      `WITH required_objects(type, name) AS (VALUES ${objects}),
+            required_columns(table_name, column_name) AS (VALUES ${columns})
+       SELECT (SELECT MAX(version) FROM titen_migrations) AS version,
+              (SELECT COUNT(*) FROM required_objects required
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM sqlite_master actual
+                   WHERE actual.type = required.type AND actual.name = required.name
+                )) +
+              (SELECT COUNT(*) FROM required_columns required
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM pragma_table_info(required.table_name) actual
+                   WHERE actual.name = required.column_name
+                )) AS missing`,
     );
     const applied = rows[0]?.version ?? 0;
-    if (applied !== SCHEMA_VERSION)
-      return { applied, expected: SCHEMA_VERSION, verified: false };
-    for (const object of REQUIRED_OBJECTS) {
-      const found = await db.all<{ name: string }>(
-        "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
-        [object.type, object.name],
-      );
-      if (!found.length) return { applied, expected: SCHEMA_VERSION, verified: false };
-    }
-    for (const required of REQUIRED_COLUMNS) {
-      const columns = await db.all<{ name: string }>(`PRAGMA table_info(${required.table})`);
-      if (!columns.some(({ name }) => name === required.column))
-        return { applied, expected: SCHEMA_VERSION, verified: false };
-    }
-    return { applied, expected: SCHEMA_VERSION, verified: true };
+    return {
+      applied,
+      expected: SCHEMA_VERSION,
+      verified: applied === SCHEMA_VERSION && Number(rows[0]?.missing ?? 1) === 0,
+    };
   } catch {
     return { applied: 0, expected: SCHEMA_VERSION, verified: false };
   }
