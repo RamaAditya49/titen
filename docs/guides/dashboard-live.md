@@ -15,8 +15,10 @@ pnpm dashboard:adapter
 ```
 
 Use a least-privilege key with `views:compile`; add `governance:read` for Scope
-preview and `releases:read` for Knowledge releases. Never put credentials in
-`PUBLIC_*` variables: Astro embeds those in browser assets. The adapter exposes
+preview and `releases:read` for Knowledge releases. Give that key's principal an
+active organization-level `reader`, `admin`, or `owner` membership before
+enabling the governance lenses. Never put credentials in `PUBLIC_*` variables:
+Astro embeds those in browser assets. The adapter exposes
 an exact `/dashboard-api/*` allowlist, validates lens-specific subject, claim,
 principal, and optional channel input, caps the limit at 100, times out upstream
 calls after five seconds, uses no-store JSON, and preserves generic

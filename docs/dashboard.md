@@ -44,7 +44,9 @@ Supported lenses:
 
 The four memory lenses need `views:compile`. Scope preview also needs
 `governance:read`; Knowledge releases also needs `releases:read`. Use all three
-scopes only when the dashboard must expose all six lenses.
+scopes only when the dashboard must expose all six lenses. The credential's
+principal must also have an active organization-level `reader`, `admin`, or
+`owner` membership; create the bounded key for that same principal.
 
 Empty, loading, disconnected, not-ready, unauthorized, forbidden, and upstream
 failure are distinct states. A failed request never falls back to synthetic

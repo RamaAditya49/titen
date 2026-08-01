@@ -402,7 +402,9 @@ does not expose a verifiable address-pinning primitive.
 Build the static Astro client and run its adapter beside the loopback API. A
 base dashboard key needs `views:compile`; add `governance:read` and
 `releases:read` only when exposing the two governance lenses. The key never
-enters browser assets or responses:
+enters browser assets or responses. The key's principal must also have an active
+organization-level `reader`, `admin`, or `owner` membership; use the bounded
+key for that same principal rather than a wildcard administrative key:
 
 ```bash
 pnpm build
