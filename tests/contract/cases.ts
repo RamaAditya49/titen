@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import type { Db } from "../../src/core/db";
 import { MAX_BODY_BYTES } from "../../src/core/http";
+import { sha256Hex } from "../../src/core/ids";
 import { signPayload } from "../../src/core/webhooks";
 import { TITEN_VERSION } from "../../src/core/version";
 import type { Fixture, Res } from "./harness";
@@ -1313,6 +1314,40 @@ export const CASES: Case[] = [
         }),
         403,
       );
+    },
+  },
+  {
+    name: "credential import cannot exceed the importing credential",
+    async run(fx) {
+      const limited = await fx.provision({
+        scopes: ["keys:manage", "import:write"],
+        maxTrust: "verified",
+      });
+      expectError(await fx.call("GET", "/v1/audit", { key: limited.key }), 403);
+
+      const forgedKey = "titen_sk_synthetic_import_scope_ceiling";
+      const at = "2026-08-01T00:00:00.000Z";
+      const body = [
+        { type: "titen.export.header", format_version: 4, org_id: limited.orgId },
+        {
+          type: "api_key",
+          id: "key_import_scope_ceiling",
+          principal_id: "agent_import_scope_ceiling",
+          principal_kind: "agent",
+          key_hash: await sha256Hex(forgedKey),
+          label: "synthetic escalation attempt",
+          scopes: "*",
+          max_trust: "verified",
+          created_at: at,
+          not_before: at,
+          expires_at: null,
+          last_used_at: null,
+          revoked_at: null,
+        },
+      ].map(JSON.stringify).join("\n");
+
+      expectError(await fx.callRaw("POST", "/v1/import", { key: limited.key, body }), 403, "FORBIDDEN");
+      expectError(await fx.call("GET", "/v1/audit", { key: forgedKey }), 401, "UNAUTHENTICATED");
     },
   },
   {

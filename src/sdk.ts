@@ -161,6 +161,7 @@ export type SemanticDiagnostic =
   | "vector_initialization_failed"
   | "vector_dependency_unavailable"
   | "vector_storage_conflict"
+  | "index_projection_pending"
   | "index_backfill_required"
   | "index_fingerprint_missing"
   | "index_fingerprint_mismatch"
@@ -172,33 +173,44 @@ export type EnrichmentJobState =
   | "idle"
   | "disabled"
   | "unavailable";
+export type ReadinessExtractionResponseMode =
+  | "json_schema"
+  | "json_object"
+  | "custom"
+  | "disabled"
+  | "configured_error";
+
+export interface ReadinessChecks {
+  canonical_sql: "ok" | "unavailable";
+  migrations: "ok" | "failed" | `invalid or pending (applied ${number}, expected ${number})`;
+  signing_secrets: "ok" | "failed";
+  semantic_index: "ok" | "disabled" | SemanticDiagnostic;
+  extraction: CapabilityState;
+  background_enrichment: CapabilityState;
+  enrichment_jobs?: { state: EnrichmentJobState };
+}
+
+export interface ReadinessCapabilities {
+  version: 1;
+  fts: "enabled";
+  vector: CapabilityState;
+  embedding: CapabilityState;
+  extraction: CapabilityState;
+  extraction_response_mode: ReadinessExtractionResponseMode;
+  background_enrichment: CapabilityState;
+  /** @deprecated Use `embedding`. */
+  model: CapabilityState;
+  background_repair: "enabled" | "stale" | "disabled";
+  export_import: "enabled";
+}
 
 export interface Readiness {
   ready: boolean;
   runtime: string;
   revision: string;
   schema: { applied: number; expected: number; verified: boolean };
-  checks: {
-    canonical_sql: "ok" | "unavailable";
-    migrations: "ok" | "failed" | `invalid or pending (applied ${number}, expected ${number})`;
-    signing_secrets: "ok" | "failed";
-    semantic_index: "ok" | "disabled" | SemanticDiagnostic;
-    extraction: CapabilityState;
-    background_enrichment: CapabilityState;
-    enrichment_jobs?: { state: EnrichmentJobState };
-  };
-  capabilities: {
-    version: 1;
-    fts: "enabled";
-    vector: CapabilityState;
-    embedding: CapabilityState;
-    extraction: CapabilityState;
-    background_enrichment: CapabilityState;
-    /** @deprecated Use `embedding`. */
-    model: CapabilityState;
-    background_repair: "enabled" | "stale" | "disabled";
-    export_import: "enabled";
-  };
+  checks: ReadinessChecks;
+  capabilities: ReadinessCapabilities;
 }
 
 export interface TitenEvent {

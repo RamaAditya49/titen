@@ -64,12 +64,22 @@ if grep -Eq 'src/|\.ts["'\'']' node_modules/titen-memory/dist/npm/sdk.d.ts; then
 fi
 mkdir "$work/types"
 cat >"$work/types/consumer.mts" <<'EOF'
-import { TitenClient, type Claim, type Readiness } from "titen-memory";
+import {
+  TitenClient,
+  type Claim,
+  type Readiness,
+  type ReadinessCapabilities,
+  type ReadinessChecks,
+} from "titen-memory";
 import { TitenClient as SubpathClient } from "titen-memory/sdk";
 
 const client = new TitenClient({ url: "https://example.test", key: "key" });
 const subpath = new SubpathClient({ url: "https://example.test", key: "key" });
 const ready: Promise<Readiness> = client.ready();
+declare const checks: ReadinessChecks;
+declare const capabilities: ReadinessCapabilities;
+const pendingProjection: ReadinessChecks["semantic_index"] = "index_projection_pending";
+const responseMode = capabilities.extraction_response_mode;
 const events: AsyncIterable<import("titen-memory").TitenEvent> = client.iterateEvents();
 const claim: Claim = {
   kind: "semantic_fact",
@@ -98,7 +108,7 @@ const badVisibility: Claim = {
   // @ts-expect-error unknown visibility must fail in a packed consumer
   visibility: "public",
 };
-void [subpath, ready, events, claim, badKind, badTrust, badVisibility];
+void [subpath, ready, checks, pendingProjection, responseMode, events, claim, badKind, badTrust, badVisibility];
 EOF
 cat >"$work/types/consumer.cts" <<'EOF'
 async function loadFromCommonJs() {

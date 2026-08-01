@@ -46,6 +46,8 @@ test("health and readiness resolve through the client", async () => {
   assert.equal(health.status, "ok");
   const ready = await titen.ready();
   assert.equal(ready.ready, true);
+  assert.equal(ready.capabilities.extraction_response_mode, "disabled");
+  assert.equal(ready.checks.enrichment_jobs?.state, "disabled");
 });
 
 test("the client drives the whole Level 5 loop", async () => {

@@ -1,4 +1,4 @@
-import { assertTrustCeiling, hasScope, requireScope, SCOPES } from "./auth";
+import { assertTrustCeiling, hasScope, requestedScopes, requireScope, SCOPES } from "./auth";
 import { auditStatement } from "./audit";
 import { authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import { purgedEvidenceGuardStatement } from "./claims";
@@ -988,10 +988,11 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
       "type", "id", "principal_id", "principal_kind", "key_hash", "label", "scopes",
       "max_trust", "created_at", "not_before", "expires_at", "last_used_at", "revoked_at",
     ], "credential");
-    const scopes = requireString(row, "scopes", SCOPES.join(" ").length + 1_000, "import.scopes")
-      .split(" ").filter(Boolean);
-    if (scopes.some((scope) => scope !== "*" && !SCOPES.includes(scope as never)))
-      throw validationError("Imported credential contains an unknown scope.");
+    const scopes = requestedScopes(
+      requireString(row, "scopes", SCOPES.join(" ").length + 1_000, "import.scopes")
+        .split(" ").filter(Boolean),
+      principal,
+    );
     const maxTrust = requireEnum(row, "max_trust", TRUST_LEVELS);
     assertTrustCeiling(principal, maxTrust);
     const notBefore = timestamp(row, "not_before")!;

@@ -1,5 +1,5 @@
 import type { Db } from "./db";
-import { forbidden, unauthenticated } from "./errors";
+import { forbidden, unauthenticated, validationError } from "./errors";
 import { newId, randomToken, sha256Hex } from "./ids";
 import { TRUST_RANK, type Trust } from "./validate";
 
@@ -116,6 +116,22 @@ export function hasScope(principal: Principal, scope: string): boolean {
 
 export function requireScope(principal: Principal, scope: string): void {
   if (!hasScope(principal, scope)) throw forbidden(`Missing required scope "${scope}".`);
+}
+
+export function requestedScopes(value: unknown, principal: Principal): string[] {
+  if (!Array.isArray(value) || value.length === 0)
+    throw validationError('Field "scopes" must be a non-empty array.');
+  const scopes = value.map((entry) => {
+    if (typeof entry !== "string") throw validationError("Each scope must be a string.");
+    if (entry !== "*" && !SCOPES.includes(entry as never))
+      throw validationError(`Unknown scope "${entry}".`);
+    return entry;
+  });
+  // No credential creation or restore path may exceed its caller's authority.
+  for (const scope of scopes)
+    if (!hasScope(principal, scope))
+      throw forbidden(`This credential may not grant scope "${scope}".`);
+  return [...new Set(scopes)];
 }
 
 /** A principal can never assert evidence more trusted than its own ceiling. */

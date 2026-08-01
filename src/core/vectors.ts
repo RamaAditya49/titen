@@ -272,6 +272,7 @@ export type SemanticDiagnostic =
   | "vector_initialization_failed"
   | "vector_dependency_unavailable"
   | "vector_storage_conflict"
+  | "index_projection_pending"
   | "index_backfill_required"
   | "index_fingerprint_missing"
   | "index_fingerprint_mismatch"

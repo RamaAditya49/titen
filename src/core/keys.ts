@@ -1,4 +1,4 @@
-import { createApiKey, hasScope, SCOPES, type Principal } from "./auth";
+import { createApiKey, requestedScopes } from "./auth";
 import { auditStatement } from "./audit";
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
@@ -15,22 +15,6 @@ import {
   requireString,
   type Trust,
 } from "./validate";
-
-function requestedScopes(value: unknown, principal: Principal): string[] {
-  if (!Array.isArray(value) || value.length === 0)
-    throw validationError('Field "scopes" must be a non-empty array.');
-  const scopes = value.map((entry) => {
-    if (typeof entry !== "string") throw validationError("Each scope must be a string.");
-    if (entry !== "*" && !SCOPES.includes(entry as never))
-      throw validationError(`Unknown scope "${entry}".`);
-    return entry;
-  });
-  // A key can never mint more authority than the key that created it.
-  for (const scope of scopes)
-    if (!hasScope(principal, scope))
-      throw forbidden(`This credential may not grant scope "${scope}".`);
-  return [...new Set(scopes)];
-}
 
 export async function createKey(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
