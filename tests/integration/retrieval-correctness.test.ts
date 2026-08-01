@@ -26,7 +26,7 @@ test("lexical planning normalizes Unicode and drops only bounded function words"
   assert.ok(long.termsDropped > 0);
 });
 
-test("packing covers kinds first, fills the remaining budget, and suppresses duplicates", () => {
+test("packing preserves full-fit rank, then uses diversity under pressure", () => {
   const packed = packUnderBudget([
     { value: "a1", kind: "a", tokens: 2 },
     { value: "a2", kind: "a", tokens: 2 },
@@ -35,8 +35,19 @@ test("packing covers kinds first, fills the remaining budget, and suppresses dup
     { value: "b1", kind: "b", tokens: 2 },
   ], 10);
   assert.deepEqual(packed, {
-    selected: ["a1", "b1", "a2", "a3", "a4"],
+    selected: ["a1", "a2", "a3", "a4", "b1"],
     usedTokens: 10,
+  });
+
+  assert.deepEqual(packUnderBudget([
+    { value: "a1", kind: "a", tokens: 2 },
+    { value: "a2", kind: "a", tokens: 2 },
+    { value: "a3", kind: "a", tokens: 2 },
+    { value: "a4", kind: "a", tokens: 2 },
+    { value: "b1", kind: "b", tokens: 2 },
+  ], 8), {
+    selected: ["a1", "b1", "a2", "a3"],
+    usedTokens: 8,
   });
 
   assert.deepEqual(packUnderBudget([

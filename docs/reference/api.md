@@ -282,7 +282,10 @@ stronger normalized signal. The final score is:
 Every factor is returned in `score_components`. A zero-span positive matched
 signal is assigned `1` for each matched candidate; absent lexical or vector
 signals, including vector similarity `0`, are `0`. Confidence is therefore an
-explicit weighted factor, not a hidden multiplier.
+explicit weighted factor, not a hidden multiplier. The conflict component is
+`1` for a conflict-free claim and `0` for a disputed claim, so contradictory
+evidence lowers relative rank by `0.05` while remaining visible in the item
+status and `conflicts`.
 
 Lexical planning removes Unicode format characters, preserves combining marks,
 normalizes to NFC, and drops a bounded English/Indonesian function-word set;
@@ -294,10 +297,11 @@ no searchable term and `used` otherwise. The existing `remove_diacritics 2`
 tradeoff remains: diacritic-only distinctions fold together, while separate
 letters such as `ł` and `ß` do not.
 
-Packing selects one fitting claim per available kind before filling the
-remaining token budget in deterministic rank order. Byte-identical active claim
-statements appear at most once in a context pack; canonical claims and their
-evidence remain unchanged.
+Packing preserves deterministic rank order when every deduplicated candidate
+fits. Under actual token pressure it selects one fitting claim per available
+kind before filling the remaining budget in rank order. Byte-identical active
+claim statements appear at most once in a context pack; canonical claims and
+their evidence remain unchanged.
 
 ### `POST /v1/context/:id/feedback`
 

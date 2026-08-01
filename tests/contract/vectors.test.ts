@@ -400,6 +400,19 @@ test("confidence is an explicit weighted and auditable ranking factor", () => {
   assert.equal(ranked[0]!.score - ranked[1]!.score, 0.07);
 });
 
+test("dispute is an explicit ranking penalty, never a bonus", () => {
+  const clean = rankInput("clean", 0.8);
+  const disputed = { ...rankInput("disputed", 0.8), disputed: true };
+  const ranked = rankCandidates(
+    [disputed, clean],
+    new Date("2026-07-30T00:00:00.000Z"),
+  );
+  assert.equal(ranked[0]!.candidate.id, "clean");
+  assert.equal(ranked[0]!.components.conflict, 1);
+  assert.equal(ranked[1]!.components.conflict, 0);
+  assert.ok(Math.abs(ranked[0]!.score - ranked[1]!.score - 0.05) < 1e-9);
+});
+
 async function pendingCount() {
   const rows = await db.all<{ count: number }>(
     `SELECT COUNT(*) AS count FROM index_outbox WHERE state = 'pending'`,
