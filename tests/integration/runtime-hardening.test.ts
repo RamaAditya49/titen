@@ -10,6 +10,7 @@ import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { observedSemanticReadiness } from "../../src/core/vectors";
 import cloudflareWorker from "../../src/runtime/cloudflare/worker";
+import { verifyPassword } from "../../src/core/accounts";
 import {
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
@@ -79,6 +80,13 @@ test("schema readiness verifies the complete migration contract in one read", as
   }), { applied: SCHEMA_VERSION, expected: SCHEMA_VERSION, verified: false });
   assert.equal(reads, 1);
   database.close();
+});
+
+test("legacy single-pass password verifiers remain valid on capable runtimes", async () => {
+  assert.equal(await verifyPassword(
+    "legacy compatibility passphrase",
+    "pbkdf2-sha256$600000$AAECAwQFBgcICQoLDA0ODw$cv6fs9_--8nyEa9H_XHuSrNecS8oClhLO4T590URCKU",
+  ), true);
 });
 
 test("a failed migration version rolls back fully and succeeds on retry", async () => {

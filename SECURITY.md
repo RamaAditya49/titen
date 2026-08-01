@@ -29,9 +29,9 @@ Useful reports include:
 - Memory content and model output are untrusted.
 - Tenant/organization authority comes from authentication.
 - API keys are high entropy, hashed at rest, scoped, labeled, and revocable.
-- Human operator passwords use unique salts and versioned PBKDF2-HMAC-SHA-256
-  verifiers with 600,000 iterations; submitted passwords are never stored,
-  exported, logged, or echoed.
+- Human operator passwords use unique salts and versioned, six-stage
+  PBKDF2-HMAC-SHA-256 verifiers with 100,000 iterations per serial stage;
+  submitted passwords are never stored, exported, logged, or echoed.
 - Bootstrap and Add User reveal a random temporary password once. Its login has
   no product scopes; replacement revokes all dashboard sessions for that
   principal and requires fresh authentication.

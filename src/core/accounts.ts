@@ -15,7 +15,10 @@ import {
 } from "./validate";
 
 const PASSWORD_ALGORITHM = "pbkdf2-sha256";
-const PASSWORD_ITERATIONS = 600_000;
+const PASSWORD_ITERATIONS = 100_000;
+const PASSWORD_ROUNDS = 6;
+const PASSWORD_WORK_FACTOR = `${PASSWORD_ITERATIONS}x${PASSWORD_ROUNDS}`;
+const LEGACY_PASSWORD_ITERATIONS = 600_000;
 const PASSWORD_MIN_LENGTH = 15;
 const PASSWORD_MAX_LENGTH = 128;
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -61,8 +64,8 @@ function bytes(value: string): Uint8Array | undefined {
   }
 }
 
-async function derive(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+async function derive(material: Uint8Array, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey("raw", material, "PBKDF2", false, ["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-256", salt, iterations },
     key,
@@ -70,10 +73,21 @@ async function derive(password: string, salt: Uint8Array, iterations: number): P
   ));
 }
 
+async function derivePassword(password: string, salt: Uint8Array): Promise<Uint8Array> {
+  let material = encoder.encode(password);
+  for (let round = 0; round < PASSWORD_ROUNDS; round += 1) {
+    const roundSalt = new Uint8Array(salt.length + 1);
+    roundSalt.set(salt);
+    roundSalt[salt.length] = round;
+    material = await derive(material, roundSalt, PASSWORD_ITERATIONS);
+  }
+  return material;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const hash = await derive(password.normalize("NFC"), salt, PASSWORD_ITERATIONS);
-  return `${PASSWORD_ALGORITHM}$${PASSWORD_ITERATIONS}$${base64Url(salt)}$${base64Url(hash)}`;
+  const hash = await derivePassword(password.normalize("NFC"), salt);
+  return `${PASSWORD_ALGORITHM}$${PASSWORD_WORK_FACTOR}$${base64Url(salt)}$${base64Url(hash)}`;
 }
 
 export async function verifyPassword(password: string, verifier: string): Promise<boolean> {
@@ -81,9 +95,19 @@ export async function verifyPassword(password: string, verifier: string): Promis
   const iterations = Number(rawIterations);
   const salt = rawSalt ? bytes(rawSalt) : undefined;
   const expected = rawHash ? bytes(rawHash) : undefined;
-  if (algorithm !== PASSWORD_ALGORITHM || iterations < PASSWORD_ITERATIONS
-    || iterations > 2_000_000 || salt?.length !== 16 || expected?.length !== 32 || rest.length) return false;
-  const actual = await derive(password.normalize("NFC"), salt, iterations);
+  const chained = rawIterations === PASSWORD_WORK_FACTOR;
+  if (algorithm !== PASSWORD_ALGORITHM
+    || (!chained && (iterations < LEGACY_PASSWORD_ITERATIONS || iterations > 2_000_000))
+    || salt?.length !== 16 || expected?.length !== 32 || rest.length) return false;
+  let actual: Uint8Array;
+  try {
+    actual = chained
+      ? await derivePassword(password.normalize("NFC"), salt)
+      : await derive(encoder.encode(password.normalize("NFC")), salt, iterations);
+  } catch (error) {
+    if (!chained && error instanceof DOMException && error.name === "NotSupportedError") return false;
+    throw error;
+  }
   let mismatch = actual.length ^ expected.length;
   for (let index = 0; index < expected.length; index++) mismatch |= actual[index]! ^ expected[index]!;
   return mismatch === 0;

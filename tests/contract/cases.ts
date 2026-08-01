@@ -1578,7 +1578,7 @@ export const CASES: Case[] = [
            FROM operator_accounts a WHERE a.username = ?`,
         [username],
       );
-      assert.match(stored!.password_verifier, /^pbkdf2-sha256\$600000\$/);
+      assert.match(stored!.password_verifier, /^pbkdf2-sha256\$100000x6\$/);
       assert.ok(!stored!.password_verifier.includes(temporaryPassword));
       assert.equal(stored!.memberships, 1);
       assert.equal(stored!.must_change_password, 1);

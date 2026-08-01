@@ -22,6 +22,9 @@ Spec: [cloudflare-live-production](../../specs/active/2026-08-01-cloudflare-live
       account-specific Wrangler config without changing the generic OSS config.
 - [ ] Add the smallest manual deploy/verify documentation and status updates;
       do not add a dependency, Queue, provider abstraction, or GitHub Action.
+- [ ] Replace the unsupported single 600,000-iteration Worker password call
+      with six serial native 100,000-iteration stages and retain the legacy Bun
+      verifier contract.
 - [ ] Run focused browser/config checks, the full local Cloudflare/Bun contracts,
       integration/browser suites, workflow checks, package install, and audit.
 - [ ] Provision `titen-test-db` and `titen-test-claims-v1`, record a D1 Time
@@ -60,6 +63,9 @@ Spec: [cloudflare-live-production](../../specs/active/2026-08-01-cloudflare-live
   code rollback without a database rollback.
 - AC-CFL-009: terminal spec/plan evidence, workflow checks, exact commit/tag,
   npm/GitHub metadata, titen.dev manifest, and remote branch list agree.
+- AC-CFL-010: direct Cloudflare Web Crypto probe, shared Bun/workerd account
+  contracts, legacy verifier fixture, and live forced-change/login smoke prove
+  the six-stage format and compatibility boundary without secret output.
 
 ## Verification
 

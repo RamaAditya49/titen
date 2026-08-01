@@ -176,7 +176,7 @@ test("bootstrap creates owner login with a one-time random password", () => {
     assert.equal(account.username, "owner");
     assert.equal(account.role, "owner");
     assert.equal(account.must_change_password, 1);
-    assert.match(account.password_verifier, /^pbkdf2-sha256\$600000\$/);
+    assert.match(account.password_verifier, /^pbkdf2-sha256\$100000x6\$/);
     assert.ok(!account.password_verifier.includes(temporary));
   } finally {
     database.close();

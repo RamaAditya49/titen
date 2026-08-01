@@ -31,6 +31,8 @@ deployment.
   deploy one exact revision, and verify live authentication, isolation,
   canonical persistence, semantic retrieval, dashboard-adapter behavior, and
   rollback/redeploy;
+- preserve the 600,000-operation password work factor within Cloudflare's
+  100,000-iteration PBKDF2 call ceiling without adding a crypto dependency;
 - update the Cloudflare runbook, repository maturity evidence, README status,
   package release, GitHub release, and stable titen.dev discovery only after all
   live gates pass.
@@ -57,6 +59,9 @@ deployment.
 - BGE-M3 output must match the immutable 1024-dimension cosine index contract.
   The deployment fingerprint identifies the observed Cloudflare catalog entry;
   it is not an independent attestation of provider weight immutability.
+- Cloudflare Web Crypto rejects a single PBKDF2 call above 100,000 iterations.
+  New verifiers therefore use six serial salted stages; legacy single-call
+  verifiers remain readable on runtimes that support their recorded work factor.
 - Worker rollback does not reverse D1 migrations. A pre-change Time Travel
   bookmark and schema-compatible prior Worker version are required.
 
@@ -97,6 +102,11 @@ deployment.
   non-secret evidence, update the status from Planned, publish one exact stable
   npm/GitHub version, update titen.dev stable discovery, and leave no active work
   artifact or unabsorbed release branch.
+- **AC-CFL-010 — Event-driven:** When a dashboard password is created or changed,
+  Titen shall store a uniquely salted, versioned six-stage PBKDF2-HMAC-SHA-256
+  verifier with 100,000 iterations per serial stage, verify it on live
+  Cloudflare and Bun, and retain Bun verification of legacy 600,000-iteration
+  verifiers without storing or logging the password.
 
 ## Done conditions
 

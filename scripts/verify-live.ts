@@ -126,7 +126,7 @@ ok(`${claimIds.length} claims materialized under subject ${SUBJECT}`);
 // service runs a maintenance pass on an interval, and a caller should never need
 // to know that embedding is asynchronous.
 if (vectorEnabled) {
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 120_000;
   let waited = 0;
   let ready = false;
   while (Date.now() < deadline) {
