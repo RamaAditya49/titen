@@ -222,6 +222,62 @@ test("key lifecycle flags survive listing and verified backup", async () => {
   }
 });
 
+test("local key administration fails closed for missing organizations and keys", () => {
+  const missingCases = [
+    ["list", ["key", "list", "--db", "missing.db"]],
+    ["revoke", ["key", "revoke", "--db", "missing.db", "--id", "key_missing"]],
+    ["create", ["key", "create", "--db", "missing.db", "--org-id", "org_missing"]],
+  ] as const;
+  for (const [name, args] of missingCases) {
+    const result = run(`key-missing-${name}`, [...args]);
+    assert.notEqual(result.exitCode, 0);
+    assert.match(result.output, /error: database does not exist: missing\.db/);
+    assert.doesNotMatch(result.output, /SQLiteError|node_modules|src\/runtime|\n\s+at /);
+    assert.deepEqual(result.files, []);
+  }
+
+  const boot = run("key-fail-closed", ["bootstrap", "--db", "keys.db"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const ownerKey = /^key_id: (key_[^\s]+)/m.exec(boot.output)?.[1];
+  assert.ok(ownerKey);
+  const path = join(root, "key-fail-closed", "keys.db");
+  const countKeys = () => {
+    const database = openDatabase(path, { create: false, readonly: true });
+    try {
+      return Number((database.query("SELECT COUNT(*) AS count FROM api_keys").get() as { count: number }).count);
+    } finally {
+      database.close();
+    }
+  };
+
+  const before = countKeys();
+  const unknownOrganization = run("key-fail-closed", [
+    "key", "create", "--db", "keys.db", "--org-id", "org_missing",
+  ]);
+  assert.notEqual(unknownOrganization.exitCode, 0);
+  assert.equal(unknownOrganization.output, "error: organization not found: org_missing\n");
+  assert.doesNotMatch(unknownOrganization.output, /api_key:|SQLiteError|\n\s+at /);
+  assert.equal(countKeys(), before);
+
+  const unknownKey = run("key-fail-closed", [
+    "key", "revoke", "--db", "keys.db", "--id", "key_missing",
+  ]);
+  assert.notEqual(unknownKey.exitCode, 0);
+  assert.equal(unknownKey.output, "error: key not found: key_missing\n");
+
+  const revoked = run("key-fail-closed", [
+    "key", "revoke", "--db", "keys.db", "--id", ownerKey,
+  ]);
+  assert.equal(revoked.exitCode, 0, revoked.output);
+  assert.equal(revoked.output, `revoked ${ownerKey}\n`);
+
+  const repeated = run("key-fail-closed", [
+    "key", "revoke", "--db", "keys.db", "--id", ownerKey,
+  ]);
+  assert.notEqual(repeated.exitCode, 0);
+  assert.equal(repeated.output, `error: key already revoked: ${ownerKey}\n`);
+});
+
 test("backup refuses a missing source and atomically refreshes a fixed target", async () => {
   const missing = run("backup-missing", ["backup", "--db", "missing.db", "--out", "latest.db"]);
   assert.notEqual(missing.exitCode, 0);

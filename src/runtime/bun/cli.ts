@@ -149,6 +149,41 @@ async function withDb<T>(
   }
 }
 
+class CliFailure extends Error {}
+
+async function withReadyDatabase<T>(
+  path: string,
+  run: (
+    database: ReturnType<typeof openDatabase>,
+    db: ReturnType<typeof createSqliteDb>,
+  ) => Promise<T> | T,
+  readonly = false,
+): Promise<T> {
+  if (!existsSync(path)) throw new CliFailure(`database does not exist: ${path}`);
+  const database = openDatabase(path, { create: false, readonly });
+  try {
+    const db = createSqliteDb(database);
+    const schema = await schemaState(db);
+    if (!schema.verified || schema.applied !== schema.expected)
+      throw new CliFailure(`database schema is not ready (${schema.applied}/${schema.expected})`);
+    return await run(database, db);
+  } finally {
+    database.close();
+  }
+}
+
+async function existingDatabase<T>(
+  path: string,
+  run: Parameters<typeof withReadyDatabase<T>>[1],
+  readonly = false,
+): Promise<T> {
+  try {
+    return await withReadyDatabase(path, run, readonly);
+  } catch (error) {
+    fail(error instanceof CliFailure ? error.message : "database operation failed");
+  }
+}
+
 const { flags, command, action } = parseArgs(process.argv.slice(2));
 const dbPath = text(flags.db, "titen.db");
 
@@ -322,12 +357,18 @@ switch (command) {
         console.error(`api_key: ${key.key}`);
         break;
       }
-      await withDb(dbPath, (db) => db.batch([key.statement]));
+      await existingDatabase(dbPath, (database) => {
+        const organization = database.query("SELECT 1 FROM organizations WHERE id = ?").get(orgId);
+        if (!organization) throw new CliFailure(`organization not found: ${orgId}`);
+        database.transaction(() => {
+          database.query(key.statement.sql).run(...key.statement.params);
+        })();
+      });
       printKey(key.key, key.id);
       break;
     }
     if (action === "list") {
-      const rows = await withDb(dbPath, (db) =>
+      const rows = await existingDatabase(dbPath, (_database, db) =>
         db.all<{
           id: string;
           org_id: string;
@@ -343,8 +384,7 @@ switch (command) {
           `SELECT id, org_id, label, principal_id, scopes, max_trust,
                   not_before, expires_at, last_used_at, revoked_at
              FROM api_keys ORDER BY created_at`,
-        ),
-      );
+        ), true);
       const at = new Date().toISOString();
       for (const row of rows) {
         const status = keyLifecycleStatus({
@@ -362,14 +402,17 @@ switch (command) {
     if (action === "revoke") {
       const id = text(flags.id, "");
       if (!id) fail("--id is required");
-      await withDb(dbPath, (db) =>
-        db.batch([
-          {
-            sql: `UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL`,
-            params: [new Date().toISOString(), id],
-          },
-        ]),
-      );
+      await existingDatabase(dbPath, (database) => {
+        const result = database.query(
+          `UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL`,
+        ).run(new Date().toISOString(), id);
+        if (Number(result.changes) === 1) return;
+        const key = database.query("SELECT revoked_at FROM api_keys WHERE id = ?").get(id) as
+          | { revoked_at: string | null }
+          | null;
+        if (!key) throw new CliFailure(`key not found: ${id}`);
+        throw new CliFailure(`key already revoked: ${id}`);
+      });
       console.log(`revoked ${id}`);
       break;
     }

@@ -305,9 +305,12 @@ letters such as `ł` and `ß` do not.
 
 Packing preserves deterministic rank order when every deduplicated candidate
 fits. Under actual token pressure it selects one fitting claim per available
-kind before filling the remaining budget in rank order. Byte-identical active
-claim statements appear at most once in a context pack; canonical claims and
-their evidence remain unchanged.
+kind before filling the remaining budget in rank order. `budget` reports
+`selected_items`, authorized `omitted_items`, `deduplicated_items`, and the
+explicit `budget_exhausted` boolean, so an empty corpus is distinguishable from
+authorized candidates that could not fit. Hidden records never contribute to
+these counts. Byte-identical active claim statements appear at most once in a
+context pack; canonical claims and their evidence remain unchanged.
 
 ### `POST /v1/context/:id/feedback`
 

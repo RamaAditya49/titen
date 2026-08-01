@@ -293,7 +293,14 @@ export interface ContextPack {
     project_mode: "project" | "unscoped" | "cross_project";
     broad_access_reason: "credential_scope:context:compile:all" | null;
   };
-  budget: { max_tokens: number; used_tokens: number };
+  budget: {
+    max_tokens: number;
+    used_tokens: number;
+    selected_items: number;
+    omitted_items: number;
+    deduplicated_items: number;
+    budget_exhausted: boolean;
+  };
   items: Array<{
     untrusted: true;
     claim_id: string;

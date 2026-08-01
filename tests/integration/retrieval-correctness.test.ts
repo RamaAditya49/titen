@@ -37,6 +37,9 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
   assert.deepEqual(packed, {
     selected: ["a1", "a2", "a3", "a4", "b1"],
     usedTokens: 10,
+    omittedCount: 0,
+    deduplicatedCount: 0,
+    budgetExhausted: false,
   });
 
   assert.deepEqual(packUnderBudget([
@@ -48,13 +51,32 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
   ], 8), {
     selected: ["a1", "b1", "a2", "a3"],
     usedTokens: 8,
+    omittedCount: 1,
+    deduplicatedCount: 0,
+    budgetExhausted: true,
   });
 
   assert.deepEqual(packUnderBudget([
     { value: "top", kind: "a", tokens: 1, dedupeKey: "same bytes" },
     { value: "duplicate", kind: "b", tokens: 1, dedupeKey: "same bytes" },
     { value: "other", kind: "b", tokens: 1, dedupeKey: "other bytes" },
-  ], 3).selected, ["top", "other"]);
+  ], 3), {
+    selected: ["top", "other"],
+    usedTokens: 2,
+    omittedCount: 0,
+    deduplicatedCount: 1,
+    budgetExhausted: false,
+  });
+
+  assert.deepEqual(packUnderBudget([
+    { value: "too-large", kind: "a", tokens: 9 },
+  ], 8), {
+    selected: [],
+    usedTokens: 0,
+    omittedCount: 1,
+    deduplicatedCount: 0,
+    budgetExhausted: true,
+  });
 });
 
 test("hot retrieval SQL bounds candidates and drives evidence from claim sources", async () => {

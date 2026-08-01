@@ -659,6 +659,25 @@ export const CASES: Case[] = [
         sum + ((2 ** gains.get(id)! - 1) / Math.log2(index + 2)), 0);
       assert.equal(reciprocalRank, 0.5);
       assert.equal(Number((dcg / ideal).toFixed(6)), 1);
+
+      const pressured = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: subject,
+          task: "final pack metric marker",
+          max_tokens: 500,
+          at: "2026-08-02T00:00:00.000Z",
+        },
+      });
+      expectOk(pressured);
+      assert.ok(pressured.body.data.items.length > 0);
+      assert.ok(pressured.body.data.items.length < definitions.length);
+      assert.equal(pressured.body.data.budget.selected_items, pressured.body.data.items.length);
+      assert.equal(
+        pressured.body.data.budget.omitted_items,
+        definitions.length - pressured.body.data.items.length,
+      );
+      assert.equal(pressured.body.data.budget.budget_exhausted, true);
     },
   },
   {
@@ -672,6 +691,9 @@ export const CASES: Case[] = [
       });
       expectOk(res);
       assert.ok(res.body.data.budget.used_tokens <= 128);
+      assert.equal(res.body.data.budget.selected_items, res.body.data.items.length);
+      assert.ok(res.body.data.budget.omitted_items >= 1);
+      assert.equal(res.body.data.budget.budget_exhausted, true);
       for (const item of res.body.data.items)
         assert.ok(
           item.claim.endsWith(".") || item.claim.length > 0,
@@ -696,6 +718,14 @@ export const CASES: Case[] = [
       assert.deepEqual(res.body.data.items, []);
       assert.deepEqual(res.body.data.conflicts, []);
       assert.equal(res.body.data.budget.used_tokens, 0);
+      assert.deepEqual(res.body.data.budget, {
+        max_tokens: 900,
+        used_tokens: 0,
+        selected_items: 0,
+        omitted_items: 0,
+        deduplicated_items: 0,
+        budget_exhausted: false,
+      });
     },
   },
   {

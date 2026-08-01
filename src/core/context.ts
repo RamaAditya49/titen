@@ -57,7 +57,14 @@ const ENVELOPE_TOKENS = estimateJsonTokens({
   context_id: "ctx_00000000000000000000000000000000",
   query: "",
   instructions: CONTEXT_INSTRUCTIONS,
-  budget: { max_tokens: 0, used_tokens: 0 },
+  budget: {
+    max_tokens: 0,
+    used_tokens: 0,
+    selected_items: 0,
+    omitted_items: 0,
+    deduplicated_items: 0,
+    budget_exhausted: false,
+  },
 });
 
 export async function compileContext(ctx: RequestContext): Promise<Result> {
@@ -241,7 +248,14 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       context_id: contextId,
       query: task,
       scope: effectiveScope(subjectId, projectId, projectMode),
-      budget: { max_tokens: maxTokens, used_tokens: usedTokens },
+      budget: {
+        max_tokens: maxTokens,
+        used_tokens: usedTokens,
+        selected_items: items.length,
+        omitted_items: packed.omittedCount,
+        deduplicated_items: packed.deduplicatedCount,
+        budget_exhausted: packed.budgetExhausted,
+      },
       items,
       conflicts,
       policy_snapshot: policySnapshot,

@@ -169,7 +169,24 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
 export function packUnderBudget<T>(
   entries: { value: T; kind: string; tokens: number; dedupeKey?: string }[],
   budget: number,
-): { selected: T[]; usedTokens: number } {
+): {
+  selected: T[];
+  usedTokens: number;
+  omittedCount: number;
+  deduplicatedCount: number;
+  budgetExhausted: boolean;
+} {
+  const uniqueDedupe = new Set<string>();
+  let eligibleCount = 0;
+  let deduplicatedCount = 0;
+  for (const entry of entries) {
+    if (entry.dedupeKey && uniqueDedupe.has(entry.dedupeKey)) {
+      deduplicatedCount += 1;
+      continue;
+    }
+    if (entry.dedupeKey) uniqueDedupe.add(entry.dedupeKey);
+    eligibleCount += 1;
+  }
   const ranked: T[] = [];
   const rankedDedupe = new Set<string>();
   let rankedTokens = 0;
@@ -184,7 +201,13 @@ export function packUnderBudget<T>(
     rankedTokens += entry.tokens;
     if (entry.dedupeKey) rankedDedupe.add(entry.dedupeKey);
   }
-  if (allFit) return { selected: ranked, usedTokens: rankedTokens };
+  if (allFit) return {
+    selected: ranked,
+    usedTokens: rankedTokens,
+    omittedCount: 0,
+    deduplicatedCount,
+    budgetExhausted: false,
+  };
 
   const selected: T[] = [];
   const kinds = new Set<string>();
@@ -207,5 +230,12 @@ export function packUnderBudget<T>(
     if (!kinds.has(entry.kind)) take(entry, index);
   }
   for (const [index, entry] of entries.entries()) take(entry, index);
-  return { selected, usedTokens };
+  const omittedCount = eligibleCount - selected.length;
+  return {
+    selected,
+    usedTokens,
+    omittedCount,
+    deduplicatedCount,
+    budgetExhausted: omittedCount > 0,
+  };
 }
