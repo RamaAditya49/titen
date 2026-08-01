@@ -127,6 +127,7 @@ TITEN_EXTRACT_MODEL=<model-id>
 TITEN_EXTRACT_MODEL_FINGERPRINT=<64-lowercase-hex-revision>
 TITEN_EXTRACT_API_KEY=<optional-bearer-key>
 TITEN_EXTRACT_TIMEOUT_MS=30000
+TITEN_EXTRACT_RESPONSE_MODE=json_schema
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
@@ -149,8 +150,11 @@ pre-inspected threshold is bundled.
 
 Extraction uses the separate `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`,
 and immutable 64-hex `TITEN_EXTRACT_MODEL_FINGERPRINT` tuple. The API key and
-timeout are optional. A partial or invalid tuple reports `configured_error`;
-an absent tuple remains `disabled`. A positive maintenance interval drains one
+timeout are optional. Strict `json_schema` output is the default. Set
+`TITEN_EXTRACT_RESPONSE_MODE=json_object` only for a provider that cannot enforce
+strict schemas; Titen then sends the exact schema with the bounded input and
+still applies the same local validator. A partial or invalid tuple or response
+mode reports `configured_error`; an absent tuple remains `disabled`. A positive maintenance interval drains one
 shared bounded queue in the background, while `POST /v1/enrichment/drain`
 provides an authorized manual path. Do not expose credentials through readiness.
 

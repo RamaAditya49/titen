@@ -154,7 +154,11 @@ Cron Trigger drains one job per bounded pass and is the background durability
 guarantee; `POST /v1/enrichment/drain?limit=1` is the authorized manual path.
 Set `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`, and a 64-hex
 `TITEN_EXTRACT_MODEL_FINGERPRINT`; store `TITEN_EXTRACT_API_KEY` as a Worker
-secret. `TITEN_D1_PLAN=paid` is required, and background execution additionally
+secret. Strict `TITEN_EXTRACT_RESPONSE_MODE=json_schema` is the default; select
+`json_object` explicitly only when the provider cannot enforce strict schemas.
+That compatibility mode sends the exact schema and bounds but keeps local
+validation unchanged. The configured mode is visible in readiness without the
+endpoint or secret. `TITEN_D1_PLAN=paid` is required, and background execution additionally
 requires `TITEN_ENRICHMENT_BACKGROUND=1` plus an actual Cron Trigger. Local
 schema and ID validation remains mandatory for every provider response.
 

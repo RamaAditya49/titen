@@ -27,6 +27,7 @@ export interface Env {
   TITEN_EXTRACT_MODEL_FINGERPRINT?: string;
   TITEN_EXTRACT_API_KEY?: string;
   TITEN_EXTRACT_TIMEOUT_MS?: string;
+  TITEN_EXTRACT_RESPONSE_MODE?: string;
   /** Explicit declared D1 plan required before enrichment can mutate. */
   TITEN_D1_PLAN?: string;
   /** Set to "1" only when an enrichment Cron Trigger is provisioned. */
@@ -47,6 +48,7 @@ function extraction(env: Env): ReturnType<typeof configureHttpExtraction> {
     timeoutMs: env.TITEN_EXTRACT_TIMEOUT_MS === undefined
       ? undefined
       : Number(env.TITEN_EXTRACT_TIMEOUT_MS),
+    responseMode: env.TITEN_EXTRACT_RESPONSE_MODE,
   });
   if (
     configured.state === "enabled"

@@ -160,6 +160,83 @@ d1Test("D1 replays bounded model enrichment", async () => {
   await assertEnrichmentContract(db, "cloudflare-d1");
 }, 120_000);
 
+d1Test("workerd dispatches JSON-object extraction without following redirects", async () => {
+  const extractionPersist = mkdtempSync(join(tmpdir(), "titen-d1-extraction-"));
+  let providerRequests = 0;
+  let providerBody: any;
+  const extractionRuntime = runtime({
+    modules: true,
+    scriptPath,
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-extraction" },
+    d1Persist: extractionPersist,
+    bindings: {
+      TITEN_REVISION: "extraction",
+      TITEN_AUTO_MIGRATE: "0",
+      TITEN_D1_PLAN: "paid",
+      TITEN_ENRICHMENT_BACKGROUND: "1",
+      TITEN_EXTRACT_BASE_URL: "https://provider.example.test/v1",
+      TITEN_EXTRACT_MODEL: "compat",
+      TITEN_EXTRACT_MODEL_FINGERPRINT: "e".repeat(64),
+      TITEN_EXTRACT_RESPONSE_MODE: "json_object",
+      TITEN_SECRET_KEYS: JSON.stringify({ active: "test-v1", keys: { "test-v1": TEST_SECRET_KEY } }),
+    },
+    outboundService: async (request) => {
+      providerRequests += 1;
+      providerBody = await request.json();
+      return Response.json({
+        choices: [{
+          finish_reason: "stop",
+          message: { content: '{"action":"abstain","claims":null}' },
+        }],
+      });
+    },
+  });
+  try {
+    await extractionRuntime.ready;
+    const extractionDb = createD1Db(
+      (await extractionRuntime.getD1Database("DB")) as never,
+    );
+    await migrate(extractionDb);
+    const principal = await provisionWith(extractionDb, { scopes: ["*"] });
+    const observation = await extractionRuntime.dispatchFetch(`${origin}/v1/observations`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${principal.key}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        subject_id: "subject_workerd_extraction",
+        kind: "user_statement",
+        content: "Synthetic workerd extraction evidence.",
+        source: { type: "test" },
+      }),
+    });
+    assert.equal(observation.status, 201);
+
+    await (await extractionRuntime.getWorker()).scheduled({
+      cron: "* * * * *",
+      scheduledTime: Date.now(),
+    });
+    assert.equal(providerRequests, 1);
+    assert.equal(providerBody.response_format.type, "json_object");
+    assert.match(providerBody.messages[1].content, /^REQUIRED_OUTPUT_SCHEMA_JSON/u);
+    assert.match(providerBody.messages[1].content, /"max_claims":1/u);
+    assert.deepEqual(await extractionDb.all(
+      `SELECT state, error_class FROM enrichment_jobs`,
+    ), [{ state: "done", error_class: null }]);
+    const readiness = await extractionRuntime.dispatchFetch(`${origin}/readyz`);
+    assert.equal(readiness.status, 200);
+    assert.equal(
+      (await readiness.json() as any).data.capabilities.extraction_response_mode,
+      "json_object",
+    );
+  } finally {
+    await dispose(extractionRuntime);
+    rmSync(extractionPersist, { recursive: true, force: true });
+  }
+}, 60_000);
+
 d1Test("auto-migrate off blocks API traffic on a stale D1 schema", async () => {
   const stalePersist = mkdtempSync(join(tmpdir(), "titen-d1-stale-"));
   const stale = runtime({

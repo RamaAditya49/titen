@@ -1,4 +1,5 @@
 export type EnrichmentLane = "derivation" | "reflection";
+export type ExtractionResponseMode = "json_schema" | "json_object";
 
 export interface ExtractionRequest {
   lane: EnrichmentLane;
@@ -11,6 +12,8 @@ export interface ExtractionRequest {
 export interface ExtractionCapability {
   modelId: string;
   modelFingerprint: string;
+  /** Observable request contract used by configured HTTP providers. */
+  responseMode?: ExtractionResponseMode;
   /** Non-secret provider identity folded into durable job provenance. */
   providerIdentity?: string;
   generate(request: ExtractionRequest): Promise<unknown>;
@@ -25,6 +28,9 @@ export function isExtractionCapability(value: unknown): value is ExtractionCapab
     && capability.modelId.length <= 200
     && typeof capability.modelFingerprint === "string"
     && /^[a-f0-9]{64}$/u.test(capability.modelFingerprint)
+    && (capability.responseMode === undefined
+      || capability.responseMode === "json_schema"
+      || capability.responseMode === "json_object")
     && (capability.providerIdentity === undefined
       || (typeof capability.providerIdentity === "string"
         && capability.providerIdentity.length > 0
@@ -42,6 +48,9 @@ export function snapshotExtractionCapability(value: unknown): ExtractionCapabili
     snapshot = {
       modelId: source.modelId,
       modelFingerprint: source.modelFingerprint,
+      ...(source.responseMode === undefined
+        ? {}
+        : { responseMode: source.responseMode }),
       ...(source.providerIdentity === undefined
         ? {}
         : { providerIdentity: source.providerIdentity }),
@@ -148,6 +157,7 @@ export function createHttpExtraction(config: {
   modelFingerprint: string;
   apiKey?: string;
   timeoutMs?: number;
+  responseMode?: ExtractionResponseMode;
   fetch?: typeof fetch;
 }): ExtractionCapability {
   const baseUrl = endpoint(config.baseUrl);
@@ -157,11 +167,15 @@ export function createHttpExtraction(config: {
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > MAX_TIMEOUT_MS)
     throw new Error(`Extraction timeout must be between 1000 and ${MAX_TIMEOUT_MS} milliseconds.`);
+  const responseMode = config.responseMode ?? "json_schema";
+  if (responseMode !== "json_schema" && responseMode !== "json_object")
+    throw new Error("Extraction response mode must be json_schema or json_object.");
   const dispatch = config.fetch ?? fetch;
 
   return {
     modelId,
     modelFingerprint,
+    responseMode,
     providerIdentity: baseUrl,
     async generate(request) {
       const headers: Record<string, string> = { "content-type": "application/json" };
@@ -170,7 +184,7 @@ export function createHttpExtraction(config: {
       try {
         response = await dispatch(`${baseUrl}/chat/completions`, {
           method: "POST",
-          redirect: "error",
+          redirect: "manual",
           headers,
           signal: AbortSignal.timeout(timeoutMs),
           body: JSON.stringify({
@@ -181,17 +195,21 @@ export function createHttpExtraction(config: {
               { role: "system", content: request.system },
               {
                 role: "user",
-                content: `UNTRUSTED_INPUT_JSON\n${JSON.stringify(request.input)}`,
+                content: responseMode === "json_object"
+                  ? `REQUIRED_OUTPUT_SCHEMA_JSON\n${JSON.stringify(request.schema)}\n\nUNTRUSTED_INPUT_JSON\n${JSON.stringify(request.input)}`
+                  : `UNTRUSTED_INPUT_JSON\n${JSON.stringify(request.input)}`,
               },
             ],
-            response_format: {
-              type: "json_schema",
-              json_schema: {
-                name: `titen_${request.lane}_proposal`,
-                strict: true,
-                schema: request.schema,
-              },
-            },
+            response_format: responseMode === "json_schema"
+              ? {
+                  type: "json_schema",
+                  json_schema: {
+                    name: `titen_${request.lane}_proposal`,
+                    strict: true,
+                    schema: request.schema,
+                  },
+                }
+              : { type: "json_object" },
           }),
         });
       } catch {
@@ -218,7 +236,10 @@ export function createHttpExtraction(config: {
       } catch {
         throw new ExtractionProviderError("provider_protocol", false);
       }
-      const content = (body as any)?.choices?.[0]?.message?.content;
+      const completion = (body as any)?.choices?.[0];
+      if (completion?.finish_reason !== "stop")
+        throw new ExtractionProviderError("provider_protocol", false);
+      const content = completion?.message?.content;
       if (typeof content !== "string" || content.length > 64 * 1024)
         throw new ExtractionProviderError("provider_protocol", false);
       try {
@@ -237,10 +258,11 @@ export function configureHttpExtraction(config: {
   modelFingerprint?: string;
   apiKey?: string;
   timeoutMs?: number;
+  responseMode?: ExtractionResponseMode | string;
   fetch?: typeof fetch;
 }): { capability?: ExtractionCapability; state: ExtractionConfigurationState } {
   const required = [config.baseUrl, config.model, config.modelFingerprint];
-  const supplied = [...required, config.apiKey, config.timeoutMs]
+  const supplied = [...required, config.apiKey, config.timeoutMs, config.responseMode]
     .some((value) => value !== undefined && value !== "");
   if (!supplied)
     return { state: "disabled" };
@@ -255,6 +277,7 @@ export function configureHttpExtraction(config: {
         modelFingerprint: config.modelFingerprint!,
         apiKey: config.apiKey,
         timeoutMs: config.timeoutMs,
+        responseMode: config.responseMode as ExtractionResponseMode | undefined,
         fetch: config.fetch,
       }),
     };

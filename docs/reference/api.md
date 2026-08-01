@@ -643,7 +643,10 @@ derived cache/vector or release-status maintenance job is stale.
 - `GET /readyz`: canonical SQL, migration integrity, signing-secret
   decryptability, and capability-contract version 1. Capability states include
   FTS, vector, embedding, extraction, background enrichment,
-  `background_repair`, and export/import. `disabled`, `enabled`, and
+  `extraction_response_mode`, `background_repair`, and export/import. The
+  response mode is `json_schema`, explicit compatibility mode `json_object`,
+  `custom` for an injected extractor, or the matching disabled/error state; it
+  never exposes a provider endpoint or credential. `disabled`, `enabled`, and
   `configured_error` distinguish intentional omission from broken opt-in
   configuration.
 

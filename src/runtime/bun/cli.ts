@@ -195,6 +195,7 @@ switch (command) {
       timeoutMs: process.env.TITEN_EXTRACT_TIMEOUT_MS === undefined
         ? undefined
         : Number(process.env.TITEN_EXTRACT_TIMEOUT_MS),
+      responseMode: process.env.TITEN_EXTRACT_RESPONSE_MODE,
     });
     let started: Awaited<ReturnType<typeof serve>>;
     try {
