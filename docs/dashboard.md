@@ -44,11 +44,13 @@ pnpm dashboard:adapter
 
 Open `http://127.0.0.1:4322/dashboard/` and sign in with an operator username and
 password. The API verifies the password, issues a short-lived API key to the
-adapter only, and gives the browser an opaque `HttpOnly; SameSite=Strict`
-cookie. Established sessions expire after eight hours and are discarded on
-logout, revocation, password change, or adapter restart. A new login for the
-same principal replaces its previous session; one adapter holds at most 128
-active sessions.
+adapter, which seals it with AES-GCM inside an opaque
+`HttpOnly; SameSite=Strict` cookie. The raw key never enters browser-visible
+JSON or Web Storage. Sessions expire after eight hours and fail closed after
+logout, revocation, password change, tampering, or key rotation. With no
+`TITEN_DASHBOARD_SESSION_KEY`, startup creates an ephemeral key and restart logs
+everyone out. Replicas may share a base64url-encoded 32-byte key through their
+secret manager when restart-stable sessions are required.
 
 `titen bootstrap` creates username `owner` and prints a random temporary
 password once. A temporary password opens only the **Set a new password** page;

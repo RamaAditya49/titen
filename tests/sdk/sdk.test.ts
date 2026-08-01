@@ -88,7 +88,9 @@ test("the client drives the whole Level 5 loop", async () => {
   assert.match(context.context_id, /^ctx_/);
   assert.ok(context.budget.used_tokens <= 900);
   assert.match(context.instructions, /untrusted reference data/i);
-  assert.deepEqual(context.scope, {
+  const { as_of: asOf, ...scope } = context.scope;
+  assert.match(asOf, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(scope, {
     subject_id: "user_sdk",
     project_id: project.project_id,
     project_mode: "project",

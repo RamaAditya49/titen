@@ -444,7 +444,7 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
       (await real.all<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_accounts'",
       )).length,
-      0,
+      1,
     );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
     assert.equal(

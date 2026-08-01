@@ -4,9 +4,8 @@
  * The shared core depends only on this boundary. Each runtime provides its own
  * implementation: sqlite-vec for Bun, Vectorize for Cloudflare. When no vector
  * provider is configured, the system falls back to FTS5 alone.
- *
- * ponytail: one shared boundary and one persisted fingerprint, without a
- * provider factory or network probe in readiness.
+ * Readiness uses the persisted fingerprint and canonical repair evidence; it
+ * never performs provider network I/O.
  */
 
 import { chunk, MAX_BOUND_PARAMS, type Db, type Stmt } from "./db";
@@ -32,6 +31,8 @@ export interface VectorStore {
   query(vector: Float32Array, options: { topK: number; namespace?: string; filter?: Partial<VectorMetadata> }): Promise<VectorMatch[]>;
   /** Remove vectors by ID. */
   remove(ids: string[]): Promise<void>;
+  /** Return which IDs exist without exposing embedding values. */
+  present?(ids: string[]): Promise<Set<string>>;
 }
 
 export interface EmbeddingProvider {
@@ -473,6 +474,37 @@ export async function ensureSemanticIndexReconciliation(
     })));
 }
 
+/** Record only the canonical statement hash after a confirmed external write. */
+export async function recordSemanticIndexHashes(
+  db: Db,
+  orgId: string,
+  entries: { recordId: string; statementHash: string }[],
+  at: string,
+): Promise<void> {
+  for (const group of chunk([...new Map(entries.map((entry) => [entry.recordId, entry])).values()]))
+    await db.batch(group.map((entry) => ({
+      sql: `INSERT INTO semantic_index_records (org_id, record_id, statement_hash, indexed_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (org_id, record_id) DO UPDATE SET
+              statement_hash = excluded.statement_hash,
+              indexed_at = excluded.indexed_at`,
+      params: [orgId, entry.recordId, entry.statementHash, at],
+    })));
+}
+
+export async function removeSemanticIndexRecords(
+  db: Db,
+  orgId: string,
+  recordIds: string[],
+): Promise<void> {
+  for (const group of chunk([...new Set(recordIds)], MAX_BOUND_PARAMS - 1))
+    await db.batch([{
+      sql: `DELETE FROM semantic_index_records
+             WHERE org_id = ? AND record_id IN (${group.map(() => "?").join(", ")})`,
+      params: [orgId, ...group],
+    }]);
+}
+
 /** Release owned pending work without consuming an attempt. */
 export async function releaseSemanticIndexWork(
   db: Db,
@@ -861,9 +893,8 @@ export async function prepareSemanticReadiness(
         diagnostic: "index_backfill_required",
       };
     if (stored && initialization.vectors?.indexEmpty) {
-      // ponytail: this catches the canonical-only restore case without a second
-      // index metadata protocol. Partial external index loss still requires the
-      // documented drain/query smoke to detect.
+      // Catch a canonical-only restore at startup; bounded `/v1/index/verify`
+      // detects partial provider loss without putting network I/O in readiness.
       const missingPending = await db.all<{ present: number }>(
         `SELECT 1 AS present FROM claims c
           WHERE c.status IN ('active', 'disputed')

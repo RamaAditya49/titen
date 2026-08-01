@@ -135,6 +135,13 @@ Actual `wrangler.jsonc`:
     "TITEN_REVISION": "dev",
     "TITEN_AUTO_MIGRATE": "0"
   },
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMITER",
+      "namespace_id": "52054",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -266,13 +273,15 @@ Re-verified on 2026-08-01 from Cloudflare's official documentation:
 
 ## Rate limiting, telemetry, and rollback
 
-Keep rate limiting at Cloudflare's authenticated ingress. Use [WAF Rate
-Limiting Rules](https://developers.cloudflare.com/waf/rate-limiting-rules/) to
-match protected write routes, choose a plan-supported counting characteristic,
-and reject excess requests before Worker execution. Do not copy raw
-`Authorization` values into rule metadata, logs, or audits, and do not make
-Titen trust forwarded-address headers. An isolate-local token bucket would be
-inconsistent across isolates and is not an authorization boundary.
+The public password-login route uses Cloudflare's native [Rate Limiting
+binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+after each failed verifier check, keyed by the normalized account bucket rather
+than an IP address or password. The existing account throttle remains the
+canonical defense because binding counters are intentionally permissive and
+location-local. Keep `namespace_id` unique for this rule when copying the
+template. WAF Rate Limiting Rules may additionally reject broad write abuse at
+the ingress. Never copy raw `Authorization` values into rule metadata, logs, or
+audits, and never trust forwarded-address headers for authorization.
 
 The checked-in `observability.enabled` setting uses [Workers
 Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/)

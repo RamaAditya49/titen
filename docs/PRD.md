@@ -476,7 +476,8 @@ The dashboard information architecture is accepted when all six canonical
 areas use live same-origin responses, capability discovery hides unauthorized
 areas, failures clear stale private data, and no area substitutes fixtures.
 Session mode is accepted when each operator uses its own revocable principal,
-logout/restart invalidates the browser session, and an owner/admin can add one
+sealed cookies fail closed, logout/key rotation invalidates the browser session,
+an omitted shared key preserves restart invalidation, and an owner/admin can add one
 human password account plus membership and explicit role atomically. API keys
 remain the authentication contract for agents, services, SDKs, and recovery.
 Bootstrap and Add User temporary passwords are accepted only for a required

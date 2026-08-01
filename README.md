@@ -1,11 +1,12 @@
 <h1 align="center">Titen</h1>
 
 <p align="center">
-  Collaborative memory for AI agents, with evidence you can trace back to its source.
+  <strong>The Level 6 collaborative memory fabric for AI agents.</strong><br>
+  Evidence-grounded recall, coordinated work, and governed sharing on infrastructure you control.
 </p>
 
 <p align="center">
-  <a href="https://titen.dev"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/brand/titen-readme-hero.svg" alt="Titen collaborative memory for AI agents" width="100%"></a>
+  <a href="https://titen.dev"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/brand/titen-readme-hero.svg" alt="Titen, the Level 6 collaborative memory fabric for AI agents" width="100%"></a>
 </p>
 
 <p align="center">
@@ -25,23 +26,46 @@
   Built with <a href="https://cadis.digital/">C.A.D.I.S Agent</a>.
 </p>
 
-Titen is a self-hosted memory service for teams of AI agents. It keeps source
-observations separate from derived claims, compiles context within the caller's
-scope, and gives parallel agents explicit checkpoints, leases, and handoffs.
+## Memory for a team, not a chatbot
 
-Canonical records live in SQL. Full-text and optional vector indexes are
-rebuildable. Retrieved memory is untrusted reference data, not an instruction.
+A storage-only memory saves text. A retrieval-only memory embeds it and returns
+nearby passages. Both leave the caller to decide what is current, permitted, or
+true, and neither stops two agents from quietly claiming the same work.
 
-## What it provides
+Titen's Level 5 kernel turns source observations into evidence-linked, temporal
+claims and compiles only the context a caller is allowed to see. Level 6 joins
+that kernel to checkpoints, leases, handoffs, governance, audit, and signed
+federation.
 
-- Append-only observations with provenance and timestamps.
-- Evidence-linked claims that preserve contradictions and supersession history.
-- Token-bounded context compilation after tenant, subject, and visibility checks.
-- Authenticated REST, Streamable HTTP MCP, and a TypeScript SDK.
-- Collaboration state for checkpoints, leases, handoffs, feedback, and events.
-- Enterprise roles, approvals, releases, retention, legal holds, and identity mappings.
-- Opt-in signed federation for recallable canonical claims and their evidence.
-- Versioned JSONL export and import. Titen does not run agent loops.
+<p align="center">
+  <code>Level 6 = evidence-grounded context + coordinated work + governance</code>
+</p>
+
+| Memory model | What it can do | Where it stops |
+| --- | --- | --- |
+| Logs and files | Keep past text | The caller must decide what is current, trusted, and relevant |
+| Vector recall | Find semantically similar passages | Similarity does not prove provenance, permission, or truth |
+| Titen Level 5 kernel | Compile bounded context from scoped evidence, claims, time, trust, and conflicts | It remembers well, but does not coordinate parallel work by itself |
+| Titen Level 6 fabric | Add task ownership, resumable state, handoffs, policy, audit, and federation | Titen records coordination; your agents or orchestrator still choose what runs next |
+
+Level 6 is Titen's product model, not an external certification. The distinction
+is observable in the API: memory and collaboration share one authorization,
+evidence, and audit boundary.
+
+## The questions Titen answers
+
+| Question | Titen's answer |
+| --- | --- |
+| Where did this memory come from? | Every claim points back to source observations and keeps its version history. |
+| May this agent see it? | Organization, subject, project, workspace, and visibility checks run before retrieval. |
+| What if two sources disagree? | Contradictions remain visible until an explicit lifecycle action resolves them. |
+| Who is doing the work? | Leases prevent silent double ownership; checkpoints and handoffs make work resumable. |
+| Can we audit or move it? | Canonical records live in SQL, with authenticated audit trails and versioned JSONL export/import. |
+| Do we need an LLM or vector database? | No. FTS-only Titen is useful on day one; embeddings and model enrichment are opt-in projections. |
+
+Agents connect through authenticated REST, Streamable HTTP MCP, or the
+TypeScript SDK. Titen never treats retrieved memory as an instruction, and it
+does not run agent loops.
 
 ## Project status
 

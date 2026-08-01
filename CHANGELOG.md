@@ -17,6 +17,50 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.5] — 2026-08-02
+
+### Upgrade notes
+
+- The canonical schema advances from 20 to 21. Take a verified backup and run
+  `titen migrate --dry-run` before starting 0.5.5. The migration is additive;
+  rollback restores the backup with the 0.5.4 binary.
+- Dashboard replicas that must preserve sessions across restarts share one
+  base64url-encoded 32-byte `TITEN_DASHBOARD_SESSION_KEY`. Without it, each
+  process uses an ephemeral key and restart signs everyone out.
+
+### Added
+
+- Context compilation accepts an explicit historical `at` instant and a
+  bounded `max_candidates` value through REST, MCP, and the TypeScript SDK.
+- Stable source IDs and canonical claim hashes converge exact re-ingestion after
+  the request idempotency window while changed evidence remains append-only.
+- `POST /v1/index/verify` checks a bounded set of active claims against
+  Vectorize or `sqlite-vec` and queues repairs without reading embedding values.
+- The publishable OpenClaw bundle now includes remote Streamable HTTP MCP, and
+  the Cursor package includes the metadata and documentation expected by its
+  public plugin repository.
+
+### Changed
+
+- Dashboard login state is an authenticated AES-GCM HttpOnly cookie instead of
+  process-local memory, so a shared key supports replicas without a session
+  database.
+- Confirmed semantic statement hashes avoid duplicate embedding calls; explicit
+  reconciliation still forces a provider repair when an index record is absent.
+- Context budget units now use deterministic UTF-8 bytes across runtimes, and
+  Vectorize queries retain the native 100-result ceiling.
+- The README now leads with Titen's Level 6 collaboration model and distinguishes
+  evidence-grounded context from storage-only and similarity-only memory.
+
+### Security
+
+- Public Cloudflare login failures consume the canonical account throttle and a
+  native Rate Limiting binding. The key contains no password or client IP.
+- Password changes reject common and account-context values before a verifier is
+  stored, while retaining the 15-character minimum and forced first change.
+- Sealed dashboard sessions reject forged, expired, or undecipherable cookies;
+  raw short-lived API credentials remain outside browser storage.
+
 ## [0.5.4] — 2026-08-01
 
 ### Added
@@ -543,7 +587,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.5
 [0.5.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.4
 [0.5.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.3
 [0.5.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.2

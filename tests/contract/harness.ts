@@ -178,6 +178,7 @@ export function fakeVectors(): VectorCapability & {
   embedCalls: () => number;
   metadataFor(id: string): Record<string, string> | undefined;
   lastFilter: () => Record<string, string> | undefined;
+  drop(id: string): void;
 } {
   const scores = new Map<string, number>();
   const metadata = new Map<string, Record<string, string>>();
@@ -206,6 +207,10 @@ export function fakeVectors(): VectorCapability & {
     embedCalls: () => calls,
     metadataFor: (id) => metadata.get(id),
     lastFilter: () => filter,
+    drop: (id) => {
+      scores.delete(id);
+      metadata.delete(id);
+    },
     fingerprint: {
       provider: "contract",
       model: "contract-stub",
@@ -254,6 +259,9 @@ export function fakeVectors(): VectorCapability & {
           scores.delete(id);
           metadata.delete(id);
         }
+      },
+      async present(ids: string[]) {
+        return new Set(ids.filter((id) => metadata.has(id)));
       },
     },
   };

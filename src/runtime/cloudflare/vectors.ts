@@ -15,6 +15,7 @@ export interface VectorizeIndex {
   upsert(vectors: { id: string; values: number[]; metadata?: Record<string, string> }[]): Promise<unknown>;
   query(vector: number[], options: { topK: number; filter?: Record<string, unknown> }): Promise<{ matches: { id: string; score: number }[] }>;
   deleteByIds(ids: string[]): Promise<unknown>;
+  getByIds(ids: string[]): Promise<{ id: string }[]>;
 }
 
 /** Minimal Workers AI binding interface. */
@@ -40,6 +41,10 @@ export function createVectorizeStore(index: VectorizeIndex): VectorStore {
     },
     async remove(ids) {
       await index.deleteByIds(ids);
+    },
+    async present(ids) {
+      if (ids.length === 0) return new Set();
+      return new Set((await index.getByIds(ids)).map(({ id }) => id));
     },
   };
 }
@@ -88,7 +93,8 @@ export function tryCreateVectorize(env: {
     env.VECTORIZE &&
     typeof env.VECTORIZE.upsert === "function" &&
     typeof env.VECTORIZE.query === "function" &&
-    typeof env.VECTORIZE.deleteByIds === "function"
+    typeof env.VECTORIZE.deleteByIds === "function" &&
+    typeof env.VECTORIZE.getByIds === "function"
   );
   if (
     !model.trim() ||

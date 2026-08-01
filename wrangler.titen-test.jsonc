@@ -15,6 +15,13 @@
     "TITEN_EMBED_PROFILE": "raw-unit-v1",
     "TITEN_EMBED_MIN_COSINE": "0.50"
   },
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMITER",
+      "namespace_id": "52055",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

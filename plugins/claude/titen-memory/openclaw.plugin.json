@@ -2,7 +2,7 @@
   "id": "titen-memory",
   "name": "Titen Memory",
   "description": "Use Titen's evidence-grounded collaborative memory through its existing authenticated MCP server.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "skills": ["skills/titen-memory"],
   "configSchema": {
     "type": "object",

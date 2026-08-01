@@ -9,6 +9,13 @@
     "TITEN_REVISION": "dev",
     "TITEN_AUTO_MIGRATE": "0"
   },
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMITER",
+      "namespace_id": "52054",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

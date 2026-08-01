@@ -208,8 +208,8 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       (await db.all<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_accounts'",
       )).length,
-      0,
-      `migration ${migration.version} must roll back its account table after statement ${failureAfter + 1}`,
+      1,
+      `completed migration 20 must retain its account table after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at

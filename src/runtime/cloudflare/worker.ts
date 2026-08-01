@@ -12,6 +12,9 @@ import { newRequestId, success } from "../../core/http";
 
 export interface Env {
   DB: D1Database;
+  LOGIN_RATE_LIMITER?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+  };
   /** Non-secret build marker surfaced by health and readiness. */
   TITEN_REVISION?: string;
   /** Set to "1" to apply pending migrations from the Worker itself. */
@@ -157,6 +160,9 @@ export default {
       secretStorageReady,
       secretCipher,
       webhookSecurity: testWebhookSecurity(env),
+      loginRateLimit: env.LOGIN_RATE_LIMITER
+        ? { limit: (key) => env.LOGIN_RATE_LIMITER!.limit({ key: `account:${key}` }) }
+        : undefined,
     });
     return app(request);
   },

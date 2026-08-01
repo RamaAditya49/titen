@@ -3,7 +3,7 @@ import { first, type Db, type Stmt } from "./db";
 import { notFound, validationError } from "./errors";
 import { eventStatement } from "./events";
 import { newId, sha256Hex } from "./ids";
-import { commitIdempotent, idempotencyKey } from "./idempotency";
+import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { isRedactedObservation } from "./observations";
 import { historyStatement, outboxStatement, purgedEvidenceGuardStatement } from "./writes";
 export { purgedEvidenceGuardStatement } from "./writes";
@@ -53,6 +53,17 @@ interface SourceRow {
   actor_id: string;
   content: string;
   content_hash: string;
+}
+
+interface ClaimReplayRow {
+  id: string;
+  kind: string;
+  confidence: number;
+  trust: Trust;
+  visibility: Visibility;
+  status: string;
+  valid_from: string;
+  valid_to: string | null;
 }
 
 function parseSources(value: unknown, path: string): SourceInput[] {
@@ -129,6 +140,8 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     validFrom: string;
     validTo: string | null;
     sources: SourceInput[];
+    canonicalHash: string;
+    existing: boolean;
   }[] = [];
 
   for (const [index, entry] of claims.entries()) {
@@ -183,25 +196,71 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       seen.add(key);
     }
 
-    const validFrom = optionalTimestamp(claim, "valid_from", `${path}.valid_from`) ?? ctx.app.now().toISOString();
+    const requestedValidFrom = optionalTimestamp(claim, "valid_from", `${path}.valid_from`);
+    const validFrom = requestedValidFrom ?? ctx.app.now().toISOString();
     const validTo = optionalTimestamp(claim, "valid_to", `${path}.valid_to`);
     assertTimestampOrder(validFrom, validTo, `${path}.valid_from`, `${path}.valid_to`);
 
-    prepared.push({
-      id: newId("claim"),
+    const observerId = optionalString(claim, "observer_id", LIMITS.identifier, `${path}.observer_id`);
+    const canonicalHash = await sha256Hex(canonicalJson({
+      actor_id: principal.principalId,
+      subject_id: subjectId,
+      project_id: projectId,
+      workspace_id: workspaceId,
       kind,
       statement,
       confidence: confidenceValue,
       trust,
       visibility,
+      observer_id: observerId,
+      valid_from: requestedValidFrom,
+      valid_to: validTo,
+      position: index,
+      sources: [...sources]
+        .sort((left, right) => left.observationId.localeCompare(right.observationId)
+          || left.relation.localeCompare(right.relation))
+        .map(({ observationId, relation }) => ({ observation_id: observationId, relation })),
+    }));
+    const existing = await first<ClaimReplayRow>(ctx.app.db,
+      `SELECT id, kind, confidence, trust, visibility, status, valid_from, valid_to FROM claims
+        WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
+      [principal.orgId, principal.principalId, canonicalHash]);
+    prepared.push({
+      id: existing?.id ?? newId("claim"),
+      kind: existing?.kind ?? kind,
+      statement,
+      confidence: existing?.confidence ?? confidenceValue,
+      trust: existing?.trust ?? trust,
+      visibility: existing?.visibility ?? visibility,
       // Contradicting evidence is preserved as a dispute, never resolved here.
-      status: sources.some((source) => source.relation === "contradicts") ? "disputed" : "active",
-      observerId: optionalString(claim, "observer_id", LIMITS.identifier, `${path}.observer_id`),
-      validFrom,
-      validTo,
+      status: existing?.status
+        ?? (sources.some((source) => source.relation === "contradicts") ? "disputed" : "active"),
+      observerId,
+      validFrom: existing?.valid_from ?? validFrom,
+      validTo: existing?.valid_to ?? validTo,
       sources,
+      canonicalHash,
+      existing: Boolean(existing),
     });
   }
+
+  const responseData = () => ({
+    subject_id: subjectId,
+    project_id: projectId,
+    workspace_id: workspaceId,
+    model_used: false,
+    claims: prepared.map((claim) => ({
+      claim_id: claim.id,
+      kind: claim.kind,
+      status: claim.status,
+      trust: claim.trust,
+      visibility: claim.visibility,
+      confidence: claim.confidence,
+      valid_from: claim.validFrom,
+      valid_to: claim.validTo,
+      evidence_ids: claim.sources.map((source) => source.observationId),
+    })),
+  });
 
   try {
     const result = await commitIdempotent(
@@ -215,6 +274,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       const at = ctx.app.now().toISOString();
       const statements: Stmt[] = [];
       for (const claim of prepared) {
+        if (claim.existing) continue;
         statements.push(purgedEvidenceGuardStatement(
           principal.orgId,
           claim.id,
@@ -224,8 +284,9 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
         statements.push({
           sql: `INSERT INTO claims
                   (id, org_id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement,
-                   confidence, trust, visibility, status, version, valid_from, valid_to, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+                   confidence, trust, visibility, status, version, valid_from, valid_to,
+                   canonical_hash, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
           params: [
             claim.id,
             principal.orgId,
@@ -242,6 +303,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
             claim.status,
             claim.validFrom,
             claim.validTo,
+            claim.canonicalHash,
             at,
           ],
         });
@@ -292,34 +354,46 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       }
       return {
         status: 201,
-        data: {
-          subject_id: subjectId,
-          project_id: projectId,
-          workspace_id: workspaceId,
-          model_used: false,
-          claims: prepared.map((claim) => ({
-            claim_id: claim.id,
-            kind: claim.kind,
-            status: claim.status,
-            trust: claim.trust,
-            visibility: claim.visibility,
-            confidence: claim.confidence,
-            valid_from: claim.validFrom,
-            valid_to: claim.validTo,
-            evidence_ids: claim.sources.map((source) => source.observationId),
-          })),
-        },
+        data: responseData(),
         statements,
       };
       },
     );
 
+    const canonicalReplay = prepared.every((claim) => claim.existing);
     return {
-      status: result.replayed ? 200 : result.status,
+      status: result.replayed || canonicalReplay ? 200 : result.status,
       data: result.data,
-      meta: { replayed: result.replayed, model: "disabled" },
+      meta: {
+        replayed: result.replayed || canonicalReplay,
+        canonical_replays: prepared.filter((claim) => claim.existing).length,
+        model: "disabled",
+      },
     };
   } catch (error) {
+    if (error instanceof Error && /UNIQUE.*canonical_hash/i.test(error.message)) {
+      for (const claim of prepared) {
+        const raced = await first<ClaimReplayRow>(ctx.app.db,
+          `SELECT id, kind, confidence, trust, visibility, status, valid_from, valid_to FROM claims
+            WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
+          [principal.orgId, principal.principalId, claim.canonicalHash]);
+        if (!raced) throw error;
+        claim.id = raced.id;
+        claim.kind = raced.kind;
+        claim.confidence = raced.confidence;
+        claim.trust = raced.trust;
+        claim.visibility = raced.visibility;
+        claim.status = raced.status;
+        claim.validFrom = raced.valid_from;
+        claim.validTo = raced.valid_to;
+        claim.existing = true;
+      }
+      return {
+        status: 200,
+        data: responseData(),
+        meta: { replayed: true, canonical_replays: prepared.length, model: "disabled" },
+      };
+    }
     if (error instanceof Error && /FOREIGN KEY/i.test(error.message)) {
       for (const claim of prepared) {
         for (const source of claim.sources) {

@@ -7,11 +7,8 @@ import type { Db } from "./db";
  * (D1 rejects most), parents before children so foreign keys hold, and no
  * destructive statement without its own work item.
  *
- * ponytail: forward-only, with no `down` statements. The ceiling is that
- * recovery from a bad upgrade is restore-from-snapshot, which makes a verified
- * backup a precondition of every deploy rather than a convenience. Upgrade
- * path: none planned — instead, document the snapshot runbook and add a
- * `migrate --dry-run` so the pending statements can be reviewed first (#116).
+ * Recovery uses a verified pre-deploy snapshot; `migrate --dry-run` exposes the
+ * exact forward plan before mutation on both runtimes.
  */
 export const MIGRATIONS: { version: number; statements: string[] }[] = [
   {
@@ -1327,6 +1324,27 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          BEGIN
            SELECT RAISE(ABORT, 'OPERATOR_MEMBERSHIP_REQUIRED');
          END`,
+    ],
+  },
+  {
+    version: 21,
+    statements: [
+      `ALTER TABLE context_runs ADD COLUMN as_of TEXT`,
+      `ALTER TABLE observations ADD COLUMN canonical_hash TEXT`,
+      `CREATE UNIQUE INDEX observations_canonical_replay
+         ON observations (org_id, actor_id, canonical_hash)
+         WHERE canonical_hash IS NOT NULL`,
+      `ALTER TABLE claims ADD COLUMN canonical_hash TEXT`,
+      `CREATE UNIQUE INDEX claims_canonical_replay
+         ON claims (org_id, actor_id, canonical_hash)
+         WHERE canonical_hash IS NOT NULL`,
+      `CREATE TABLE semantic_index_records (
+         org_id TEXT NOT NULL,
+         record_id TEXT NOT NULL,
+         statement_hash TEXT NOT NULL,
+         indexed_at TEXT NOT NULL,
+         PRIMARY KEY (org_id, record_id)
+       )`,
     ],
   },
 ];

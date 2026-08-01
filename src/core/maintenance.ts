@@ -8,9 +8,12 @@ import {
   embedForRetrieval,
   prepareSemanticIndexWrites,
   preserveSemanticIndexReconciliation,
+  recordSemanticIndexHashes,
+  removeSemanticIndexRecords,
   recordSemanticDependencyFailure,
   type VectorCapability,
 } from "./vectors";
+import { sha256Hex } from "./ids";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
 import { eventAccessSql } from "./events";
@@ -26,11 +29,8 @@ import { drainEnrichment } from "./enrichment";
  * fact. Before this existed a deployment with a vector capability searched a
  * permanently empty index, and a registered webhook never received anything,
  * unless something external called the drain endpoints on a schedule.
- *
- * ponytail: one pass over every organization per tick, ordered by queue age and
- * bounded per tick. The ceiling is that a very busy tenant can delay others
- * within a tick; the upgrade path is per-organization cursors, which the outbox
- * schema already supports.
+ * Organizations are selected by their oldest pending work, and every selected
+ * organization receives one bounded pass per tick.
  */
 export interface MaintenanceResult {
   enriched: number;
@@ -159,6 +159,9 @@ export async function indexPendingForOrg(
     statement: string;
     subjectId: string;
     projectId: string | null;
+    statementHash: string;
+    operation: string;
+    indexedHash: string | null;
   }[] = [];
   for (const row of pending) {
     if (row.record_type !== "claim") {
@@ -174,9 +177,14 @@ export async function indexPendingForOrg(
       status: string;
       subject_id: string;
       project_id: string | null;
+      indexed_hash: string | null;
     }>(
-      `SELECT statement, status, subject_id, project_id
-         FROM claims WHERE id = ? AND org_id = ?`,
+      `SELECT c.statement, c.status, c.subject_id, c.project_id,
+              r.statement_hash AS indexed_hash
+         FROM claims c
+         LEFT JOIN semantic_index_records r
+           ON r.org_id = c.org_id AND r.record_id = c.id
+        WHERE c.id = ? AND c.org_id = ?`,
       [row.record_id, orgId],
     );
     const found = claim[0];
@@ -188,6 +196,9 @@ export async function indexPendingForOrg(
         statement: found.statement,
         subjectId: found.subject_id,
         projectId: found.project_id,
+        statementHash: await sha256Hex(found.statement),
+        operation: row.operation,
+        indexedHash: found.indexed_hash,
       });
     else removals.push({ outboxId: row.id, recordId: row.record_id });
   }
@@ -240,16 +251,28 @@ export async function indexPendingForOrg(
       orgId,
       removalLease.token,
     );
+    await removeSemanticIndexRecords(
+      db,
+      orgId,
+      preparedRemovals
+        .filter(({ outboxId }) => confirmed.has(outboxId))
+        .map(({ recordId }) => recordId),
+    );
   }
 
   let indexed = 0;
+  const unchanged = eligible.filter(
+    (entry) => entry.operation !== "reconcile" && entry.indexedHash === entry.statementHash,
+  );
+  retire.push(...unchanged.map((entry) => entry.outboxId));
+  const needsIndex = eligible.filter((entry) => !unchanged.includes(entry));
   const eligibleLease = await claimSemanticIndexWork(
     db,
-    eligible.map((entry) => entry.outboxId),
+    needsIndex.map((entry) => entry.outboxId),
   );
   if (eligibleLease.ids.length > 0) onSemanticLease?.(eligibleLease.token);
   const ownedEligibleIds = new Set(eligibleLease.ids);
-  const ownedEligible = eligible.filter((entry) => ownedEligibleIds.has(entry.outboxId));
+  const ownedEligible = needsIndex.filter((entry) => ownedEligibleIds.has(entry.outboxId));
   if (ownedEligible.length > 0) {
     let embeddings: Float32Array[];
     try {
@@ -326,6 +349,17 @@ export async function indexPendingForOrg(
     indexed = prepared.filter(
       ({ outboxId, recordId }) => confirmed.has(outboxId) && !staleRecords.has(recordId),
     ).length;
+    await recordSemanticIndexHashes(
+      db,
+      orgId,
+      prepared
+        .filter(({ outboxId, recordId }) => confirmed.has(outboxId) && !staleRecords.has(recordId))
+        .map((write) => ({
+          recordId: write.recordId,
+          statementHash: eligibleById.get(write.sourceOutboxId)!.entry.statementHash,
+        })),
+      new Date().toISOString(),
+    );
   }
 
   const retireLease = await claimSemanticIndexWork(db, retire);

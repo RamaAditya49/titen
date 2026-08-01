@@ -28,6 +28,13 @@ const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPT_BUCKETS = 256;
 const MEMBER_ROLES = ["owner", "admin", "member", "reader"] as const;
 const encoder = new TextEncoder();
+const COMMON_PASSWORDS = new Set([
+  "123456789012345", "111111111111111", "adminadminadmin", "administrator",
+  "changemechangeme", "correcthorsebatterystaple", "iloveyouiloveyou",
+  "letmeinletmeinlet", "monkeymonkeymonkey", "password123456789",
+  "passwordpassword", "qwerty1234567890", "qwertyuiopasdfgh",
+  "titen-dashboard", "titenadministrator", "welcome123456789",
+]);
 
 interface AccountRow {
   id: string;
@@ -42,9 +49,6 @@ interface AccountRow {
 
 interface AttemptBucket { failures: number; blockedUntil: number; touchedAt: number }
 
-// ponytail: bounded per-process throttling covers the single adapter/service
-// deployment. Add an edge rate-limit binding only when multiple public API
-// replicas make this local ceiling bypassable.
 const attempts = new Map<string, AttemptBucket>();
 let dummyVerifier: Promise<string> | undefined;
 
@@ -139,16 +143,14 @@ function password(value: unknown, login: boolean, usernameValue?: string): strin
   }
   if (!login) {
     const folded = normalized.toLowerCase();
-    const blocked = new Set([
-      "123456789012345", "passwordpassword", "qwertyuiopasdfgh", "letmeinletmeinlet",
-      "titen-dashboard", "titenadministrator", usernameValue,
-      usernameValue ? `${usernameValue}123456` : undefined,
-      usernameValue ? `${usernameValue}-password` : undefined,
-    ]);
-    // ponytail: a small local blocklist catches context-specific and common
-    // values. Use a maintained offline breach corpus when self-registration is
-    // introduced; a network password check would add a new secret boundary now.
-    if (blocked.has(folded)) throw validationError('Field "password" is too common; choose a longer passphrase.');
+    const contextual = usernameValue && [
+      usernameValue,
+      `${usernameValue}123456`,
+      `${usernameValue}-password`,
+      `${usernameValue}@titen`,
+    ].includes(folded);
+    if (contextual || COMMON_PASSWORDS.has(folded))
+      throw validationError('Field "password" is too common; choose a longer passphrase.');
   }
   return normalized;
 }
@@ -296,6 +298,8 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
   const valid = await verifyPassword(secret ?? "invalid password candidate", account?.password_verifier ?? await dummyVerifier);
   if (!account || !secret || !valid) {
     failedAttempt(key, now.getTime());
+    if (ctx.app.loginRateLimit && !(await ctx.app.loginRateLimit.limit(key)).success)
+      throw new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
     throw invalidLogin();
   }
   attempts.delete(key);

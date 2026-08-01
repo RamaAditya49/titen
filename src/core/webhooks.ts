@@ -457,8 +457,7 @@ export async function processWebhooks(options: {
       ) ORDER BY e.created_at, e.id LIMIT ?`,
     [options.orgId, options.principalId ?? null, options.principalId ?? null, options.limit],
   );
-  // ponytail: queue one bounded page per pass; if measured tenant backlog
-  // exceeds the maintenance freshness window, add per-organization cursors.
+  // The durable delivery uniqueness rule advances later pages across passes.
   for (const event of events)
     await queueEvent(options.db, options.orgId, event, options.now, options.principalId);
   const result = await drainWebhookQueue(options);

@@ -1,5 +1,6 @@
 import { first } from "./db";
 import { unavailable, validationError } from "./errors";
+import { sha256Hex } from "./ids";
 import type { RequestContext, Result } from "./http";
 import {
   claimSemanticIndexWork,
@@ -9,6 +10,9 @@ import {
   embedForRetrieval,
   prepareSemanticIndexWrites,
   preserveSemanticIndexReconciliation,
+  ensureSemanticIndexReconciliation,
+  recordSemanticIndexHashes,
+  removeSemanticIndexRecords,
   recordSemanticDependencyFailure,
 } from "./vectors";
 
@@ -23,12 +27,37 @@ import {
  * model over the network, and a canonical write must not wait on one. An
  * operator runs this from a cron trigger or a timer.
  *
- * ponytail: claims only, and re-embeds a claim's current statement rather than
- * tracking which version was indexed. The ceiling is wasted embedding calls when
- * a claim is written repeatedly; the upgrade path is storing the indexed
- * statement hash on the outbox row and skipping unchanged ones.
+ * Only canonical claims are searchable; confirmed statement hashes avoid
+ * duplicate model calls while reconciliation work always repairs the provider.
  */
 const MAX_BATCH = 100;
+
+export async function verifyIndex(ctx: RequestContext): Promise<Result> {
+  const principal = ctx.principal!;
+  if (!ctx.app.vectors?.store.present)
+    throw validationError("The configured vector store does not support bounded verification.");
+  const limit = Number(ctx.url.searchParams.get("limit") ?? "100");
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_BATCH)
+    throw validationError(`Query "limit" must be an integer between 1 and ${MAX_BATCH}.`);
+  const after = ctx.url.searchParams.get("after") ?? "";
+  if (after.length > 200) throw validationError('Query "after" is too long.');
+  const rows = await ctx.app.db.all<{ id: string }>(
+    `SELECT id FROM claims
+      WHERE org_id = ? AND status IN ('active', 'disputed') AND id > ?
+      ORDER BY id LIMIT ?`,
+    [principal.orgId, after, limit],
+  );
+  const present = await ctx.app.vectors.store.present(rows.map(({ id }) => id));
+  const missing = rows.map(({ id }) => id).filter((id) => !present.has(id));
+  await ensureSemanticIndexReconciliation(ctx.app.db, principal.orgId, missing);
+  return { data: {
+    checked: rows.length,
+    present: rows.length - missing.length,
+    missing: missing.length,
+    repairs_queued: missing.length,
+    next_after: rows.length === limit ? rows.at(-1)!.id : null,
+  } };
+}
 
 export async function drainIndex(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
@@ -86,6 +115,9 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     statement: string;
     subjectId: string;
     projectId: string | null;
+    statementHash: string;
+    operation: string;
+    indexedHash: string | null;
   }[] = [];
   for (const row of claimRows) {
     const claim = await first<{
@@ -93,10 +125,15 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
       status: string;
       subject_id: string;
       project_id: string | null;
+      indexed_hash: string | null;
     }>(
       ctx.app.db,
-      `SELECT statement, status, subject_id, project_id
-         FROM claims WHERE id = ? AND org_id = ?`,
+      `SELECT c.statement, c.status, c.subject_id, c.project_id,
+              r.statement_hash AS indexed_hash
+         FROM claims c
+         LEFT JOIN semantic_index_records r
+           ON r.org_id = c.org_id AND r.record_id = c.id
+        WHERE c.id = ? AND c.org_id = ?`,
       [row.record_id, principal.orgId],
     );
     if (claim && (claim.status === "active" || claim.status === "disputed"))
@@ -106,6 +143,9 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
         statement: claim.statement,
         subjectId: claim.subject_id,
         projectId: claim.project_id,
+        statementHash: await sha256Hex(claim.statement),
+        operation: row.operation,
+        indexedHash: claim.indexed_hash,
       });
     else removals.push(row);
   }
@@ -161,15 +201,36 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
       removalLease.token,
     );
     removed = confirmed.size;
+    await removeSemanticIndexRecords(
+      ctx.app.db,
+      principal.orgId,
+      preparedRemovals
+        .filter(({ outboxId }) => confirmed.has(outboxId))
+        .map(({ recordId }) => recordId),
+    );
   }
 
   let indexed = 0;
+  const unchanged = eligible.filter(
+    (entry) => entry.operation !== "reconcile" && entry.indexedHash === entry.statementHash,
+  );
+  const unchangedLease = await claimSemanticIndexWork(
+    ctx.app.db,
+    unchanged.map((entry) => entry.outboxId),
+  );
+  const unchangedSkipped = (await completeSemanticIndexWork(
+    ctx.app.db,
+    unchangedLease.ids,
+    false,
+    unchangedLease.token,
+  )).length;
+  const needsIndex = eligible.filter((entry) => !unchanged.includes(entry));
   const eligibleLease = await claimSemanticIndexWork(
     ctx.app.db,
-    eligible.map((entry) => entry.outboxId),
+    needsIndex.map((entry) => entry.outboxId),
   );
   const ownedEligibleIds = new Set(eligibleLease.ids);
-  const ownedEligible = eligible.filter((entry) => ownedEligibleIds.has(entry.outboxId));
+  const ownedEligible = needsIndex.filter((entry) => ownedEligibleIds.has(entry.outboxId));
   if (ownedEligible.length > 0) {
     // One embedding request for the batch, then one index write.
     let vectors;
@@ -265,13 +326,24 @@ export async function drainIndex(ctx: RequestContext): Promise<Result> {
     indexed = prepared.filter(
       ({ outboxId, recordId }) => confirmed.has(outboxId) && !staleRecords.has(recordId),
     ).length;
+    await recordSemanticIndexHashes(
+      ctx.app.db,
+      principal.orgId,
+      prepared
+        .filter(({ outboxId, recordId }) => confirmed.has(outboxId) && !staleRecords.has(recordId))
+        .map((write) => ({
+          recordId: write.recordId,
+          statementHash: eligibleById.get(write.sourceOutboxId)!.entry.statementHash,
+        })),
+      at,
+    );
   }
 
   const otherLease = await claimSemanticIndexWork(
     ctx.app.db,
     others.map((row) => row.id),
   );
-  const skipped = (await completeSemanticIndexWork(
+  const skipped = unchangedSkipped + (await completeSemanticIndexWork(
     ctx.app.db,
     otherLease.ids,
     false,

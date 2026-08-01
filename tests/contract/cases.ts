@@ -315,6 +315,51 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "stable source identities and canonical claims converge outside request-key replay",
+    async run(fx) {
+      const agent = await fx.provision();
+      const body = observation({
+        subject_id: `resync_${fx.runtime}`,
+        source: { type: "import", ref: "archive/page-7", id: `source-event-${fx.runtime}-7` },
+      });
+      const first = await fx.call("POST", "/v1/observations", { key: agent.key, body });
+      expectOk(first, 201);
+      const replay = await fx.call("POST", "/v1/observations", { key: agent.key, body });
+      expectOk(replay, 200);
+      assert.equal(replay.body.data.observation_id, first.body.data.observation_id);
+      assert.equal(replay.body.meta.replayed, true);
+
+      const consolidationBody = {
+        subject_id: body.subject_id,
+        claims: [{
+          kind: "procedural",
+          statement: "Stable resync evidence converges on one canonical claim.",
+          sources: [{ observation_id: first.body.data.observation_id, relation: "supports" }],
+        }],
+      };
+      const materialized = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: consolidationBody,
+      });
+      expectOk(materialized, 201);
+      const claimReplay = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: consolidationBody,
+      });
+      expectOk(claimReplay, 200);
+      assert.equal(claimReplay.body.data.claims[0].claim_id, materialized.body.data.claims[0].claim_id);
+      assert.equal(claimReplay.body.data.claims[0].valid_from, materialized.body.data.claims[0].valid_from);
+      assert.equal(claimReplay.body.meta.replayed, true);
+
+      const distinct = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: { ...body, content: "A changed source event remains distinct evidence." },
+      });
+      expectOk(distinct, 201);
+      assert.notEqual(distinct.body.data.observation_id, first.body.data.observation_id);
+    },
+  },
+  {
     name: "a project from another organization is not found",
     async run(fx) {
       const other = await fx.provision();
@@ -479,7 +524,11 @@ export const CASES: Case[] = [
           }],
         },
       });
-      expectOk(secondDispute, 201);
+      expectOk(secondDispute, 200);
+      assert.equal(
+        secondDispute.body.data.claims[0].claim_id,
+        res.body.data.claims[0].claim_id,
+      );
       const clean = await fx.call("POST", "/v1/consolidations", {
         key: agent.key,
         body: {
@@ -502,10 +551,7 @@ export const CASES: Case[] = [
         },
       });
       expectOk(compiled);
-      const disputedIds = [
-        res.body.data.claims[0].claim_id,
-        secondDispute.body.data.claims[0].claim_id,
-      ];
+      const disputedIds = [res.body.data.claims[0].claim_id];
       assert.deepEqual(
         compiled.body.data.conflicts.map((conflict: any) => conflict.claim_id).sort(),
         [...disputedIds].sort(),
@@ -678,6 +724,55 @@ export const CASES: Case[] = [
         definitions.length - pressured.body.data.items.length,
       );
       assert.equal(pressured.body.data.budget.budget_exhausted, true);
+    },
+  },
+  {
+    name: "historical context and candidate bounds are explicit and fail closed",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = `historical_${fx.runtime}`;
+      const seeded = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Historical cobalt release procedure evidence." },
+        claim: {
+          statement: "Historical cobalt release procedure was active in January.",
+          valid_from: "2026-01-01T00:00:00.000Z",
+          valid_to: "2026-02-01T00:00:00.000Z",
+        },
+      });
+      const historical = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: subject,
+          task: "historical cobalt release procedure",
+          max_tokens: 900,
+          max_candidates: 1,
+          at: "2026-01-15T12:00:00Z",
+        },
+      });
+      expectOk(historical);
+      assert.equal(historical.body.data.scope.as_of, "2026-01-15T12:00:00.000Z");
+      assert.deepEqual(historical.body.data.items.map((item: any) => item.claim_id), [seeded.claimId]);
+      assert.equal(historical.body.meta.candidates, 1);
+
+      const later = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: subject,
+          task: "historical cobalt release procedure",
+          max_tokens: 900,
+          at: "2026-03-01T00:00:00.000Z",
+        },
+      });
+      expectOk(later);
+      assert.equal(later.body.data.items.length, 0);
+      expectError(await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: subject, task: "bad bound", max_tokens: 900, max_candidates: 0 },
+      }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: subject, task: "bad time", max_tokens: 900, at: "not-a-time" },
+      }), 400, "VALIDATION_ERROR");
     },
   },
   {
@@ -932,7 +1027,9 @@ export const CASES: Case[] = [
 
       const omitted = await compile(member.key);
       expectOk(omitted);
-      assert.deepEqual(omitted.body.data.scope, {
+      const { as_of: omittedAsOf, ...omittedScope } = omitted.body.data.scope;
+      assert.match(omittedAsOf, /^\d{4}-\d{2}-\d{2}T/);
+      assert.deepEqual(omittedScope, {
         subject_id: subjectId,
         project_id: null,
         project_mode: "unscoped",
@@ -974,7 +1071,9 @@ export const CASES: Case[] = [
 
       const broad = await compile(member.key, { cross_project: true });
       expectOk(broad);
-      assert.deepEqual(broad.body.data.scope, {
+      const { as_of: broadAsOf, ...broadScope } = broad.body.data.scope;
+      assert.match(broadAsOf, /^\d{4}-\d{2}-\d{2}T/);
+      assert.deepEqual(broadScope, {
         subject_id: subjectId,
         project_id: null,
         project_mode: "cross_project",
@@ -1016,6 +1115,7 @@ export const CASES: Case[] = [
               task: marker,
               max_tokens: 4000,
               cross_project: true,
+              at: broadAsOf,
             },
           },
         },
@@ -1613,6 +1713,14 @@ export const CASES: Case[] = [
       expectError(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
         key: sessionKey,
         body: { password: temporaryPassword },
+      }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
+        key: sessionKey,
+        body: { password: "password123456789" },
+      }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
+        key: sessionKey,
+        body: { password: `${username}-password` },
       }), 400, "VALIDATION_ERROR");
       expectOk(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
         key: sessionKey,

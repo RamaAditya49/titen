@@ -69,6 +69,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/identity-mappings`
 - `POST /v1/import`
 - `POST /v1/index/drain`
+- `POST /v1/index/verify`
 - `POST /v1/keys`
 - `POST /v1/knowledge-releases`
 - `POST /v1/knowledge-releases/:id/activate`
@@ -259,7 +260,8 @@ Append evidence.
   "content": "Production smoke returned 200 application/json.",
   "source": {
     "type": "tool",
-    "ref": "deploy_456#smoke"
+    "ref": "deploy_456#smoke",
+    "id": "deployment-event-456-smoke"
   },
   "trust": "verified",
   "visibility": "team"
@@ -272,6 +274,12 @@ promoted by the approval workflow.
 Visibility defaults to `private`. `team` requires `workspace_id` and an active
 non-reader membership; this predicate is applied before retrieval, export,
 events, Atlas limits/counts, and webhook delivery.
+
+`source.id` is an optional stable source-event identity. Re-ingesting the exact
+same normalized observation with that ID converges on the original canonical
+record even after the request `Idempotency-Key` expires. Reusing the ID with
+different content or scope creates a distinct canonical hash; `source.ref`
+remains a provenance pointer and is not treated as a uniqueness key.
 
 ### `DELETE /v1/observations/:id`
 
@@ -341,11 +349,17 @@ Compile a task-specific context pack.
   "project_id": "project_titen",
   "task": "prepare a safe deployment",
   "max_tokens": 1200,
+  "max_candidates": 300,
+  "at": "2026-08-01T09:00:00.000Z",
   "include_checkpoints": true
 }
 ```
 
-`max_tokens` accepts 128 through 32,000. The response includes selected claims,
+`max_tokens` accepts 128 through 32,000. `max_candidates` optionally accepts 1
+through 1,000 and defaults to 200; Vectorize requests remain capped at its
+native 100-match boundary. `at` optionally supplies an ISO-8601 point-in-time
+eligibility anchor and defaults to the server's current instant. The response
+scope reports the normalized `as_of` instant. The response includes selected claims,
 evidence IDs, trust, temporal validity, conflicts, score components, token usage,
 and a `context_id`. Each item carries `untrusted: true`; this is structured
 provenance for the caller, not an instruction-enforcement claim.
@@ -435,6 +449,15 @@ vector per input and reject non-numeric or non-finite coordinates. Provider
 indices, when present, must be the ordered contiguous range starting at zero.
 Malformed successful provider output follows the same safe retryable embedder
 failure path before any vector upsert; canonical SQL and FTS remain available.
+
+### `POST /v1/index/verify`
+
+Check up to 100 active or disputed canonical claim IDs against the configured
+vector store without reading embedding values. `limit` accepts 1 through 100;
+`after` is the previous `next_after` cursor. Missing IDs receive one durable
+`reconcile` row and are rebuilt by the normal drain. The route requires
+`index:write`, remains organization-scoped, and returns checked, present,
+missing, queued-repair, and next-cursor counts.
 
 ### `GET /v1/claims/:id/evidence`
 

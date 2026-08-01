@@ -110,9 +110,10 @@ Rules at every boundary:
   hidden existence through topology, labels, aggregate counts, caches, or scope
   preview.
 - A dashboard session API key crosses only the service-to-adapter exchange and
-  then exists in adapter memory, never Web Storage, HTML, browser-visible JSON,
-  URL, or normal logs; its session is opaque, bounded, and invalid after logout,
-  password change, expiry, restart, or key revocation.
+  then exists only inside an AES-GCM-sealed HttpOnly cookie, never Web Storage,
+  HTML, browser-visible JSON, URL, or normal logs; its session is opaque,
+  bounded, and invalid after logout, password change, expiry, tampering, key
+  rotation, key revocation, or an ephemeral-key restart.
 - Human passwords exist only at the input boundary and as salted versioned
   verifiers. A generated temporary password is shown once, grants no product
   scope, and must be replaced before the private dashboard shell opens.
@@ -149,7 +150,7 @@ Rules at every boundary:
 | TM-26 | remote model egress exposes more memory than required or leaks a credential                                    | minimum authorized source content, TLS/VPC endpoint policy, secret store, no redirects/logging, per-deployment processing disclosure                                                                | captured request contains only allowlisted fields; keys/prompts/raw output absent from logs/export                   |
 | TM-27 | duplicate drain, crash, or retry creates duplicate claims or unbounded spend                                   | persistent lease/expiry, unique job fingerprint, bounded timeout/attempt/backoff/concurrency, atomic result-plus-done transaction                                                                    | concurrent/expired-lease/crash fixtures create at most one semantic result and terminate within declared bounds      |
 | TM-28 | omitted project scope silently broadens context across otherwise-visible projects                              | treat omission as unscoped-only in FTS, vector filter, and hydration; require explicit `cross_project` plus `context:compile:all`; return effective scope and grant reason                            | two-org/two-project REST/MCP fixture proves omission, foreign substitution, visibility, membership, and broad-grant isolation |
-| TM-29 | dashboard login, cookie replay, CSRF, Host confusion, or stale browser state exposes another principal's data   | exact Host/Origin checks; HTTPS remote origin; opaque HttpOnly SameSite cookie; absolute TTL; process-local key isolation; clear state on denial/logout/restart; fixed routes and bounded bodies       | integration and browser tests prove two-session isolation, invalid/revoked key rejection, origin/body limits, logout/restart invalidation, and stale-state clearing |
+| TM-29 | dashboard login, cookie replay, CSRF, Host confusion, or stale browser state exposes another principal's data   | exact Host/Origin checks; HTTPS remote origin; AES-GCM-sealed HttpOnly SameSite cookie; absolute TTL; optional shared 32-byte key; clear state on denial/logout/rotation; fixed routes and bounded bodies | integration and browser tests prove isolation, tamper/expiry/revocation rejection, shared-key cross-process acceptance, origin/body limits, logout and stale-state clearing |
 | TM-30 | a public tunnel bypasses intended identity controls or exposes the loopback API                                  | keep API and adapter on loopback; Tailscale grants or Cloudflare Access default-deny before routing; separate API hostname/policy when required; retain Titen bearer auth; no Funnel                   | remote ingress reaches only the adapter hostname; direct ports deny; unauthenticated dashboard/API operations fail |
 
 ## Memory-poisoning controls by lifecycle

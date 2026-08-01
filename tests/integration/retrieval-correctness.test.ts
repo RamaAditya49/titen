@@ -7,6 +7,15 @@ import { packUnderBudget } from "../../src/core/rank";
 import { planFtsQuery, retrieveClaimCandidates } from "../../src/core/retrieval";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { assertPopulatedV10RetrievalMigration } from "../contract/retrieval-migration";
+import { estimateTokens } from "../../src/core/tokens";
+
+test("portable budget units count UTF-8 bytes across scripts", () => {
+  assert.equal(estimateTokens("abc"), 1);
+  assert.equal(estimateTokens("abcdef"), 2);
+  assert.equal(estimateTokens("界"), 1);
+  assert.equal(estimateTokens("😀"), 2);
+  assert.equal(estimateTokens(""), 0);
+});
 
 test("lexical planning normalizes Unicode and drops only bounded function words", () => {
   assert.equal(planFtsQuery("q\u200du\u200da\u200dr\u200dt\u200dz").match, '"quartz"');

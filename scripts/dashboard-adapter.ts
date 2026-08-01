@@ -15,7 +15,6 @@ const root = await realpath(process.env.TITEN_DASHBOARD_ROOT
   : fileURLToPath(new URL("../dist/", import.meta.url)));
 const SESSION_COOKIE = "titen_dashboard_session";
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-const MAX_SESSIONS = 128;
 const BODY_LIMIT = 32_768;
 
 if (enabled && (!upstream || (!sessionMode && !apiKey))) {
@@ -104,9 +103,25 @@ interface Session {
   expiresAt: number;
 }
 
-// ponytail: process-local sessions fit one adapter; use a shared encrypted
-// session store only if multiple dashboard adapter replicas become necessary.
-const sessions = new Map<string, Session>();
+function base64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+function decodeBase64Url(value: string): Uint8Array | undefined {
+  try {
+    const binary = atob(value.replaceAll("-", "+").replaceAll("_", "/")
+      .padEnd(Math.ceil(value.length / 4) * 4, "="));
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  } catch { return; }
+}
+const sessionKey = sessionMode ? await (async () => {
+  const configured = process.env.TITEN_DASHBOARD_SESSION_KEY;
+  const material = configured ? decodeBase64Url(configured) : crypto.getRandomValues(new Uint8Array(32));
+  if (material?.length !== 32)
+    throw new Error("TITEN_DASHBOARD_SESSION_KEY must be a base64url-encoded 32-byte key");
+  return crypto.subtle.importKey("raw", material, "AES-GCM", false, ["encrypt", "decrypt"]);
+})() : undefined;
 function safePrincipal(value: unknown): DashboardPrincipal | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return;
   const row = value as Record<string, unknown>;
@@ -137,40 +152,48 @@ function sessionId(request: Request): string | undefined {
     if (name === SESSION_COOKIE) return value.join("=");
   }
 }
-function sessionFor(request: Request): [string, Session] | undefined {
-  const id = sessionId(request);
-  const session = id ? sessions.get(id) : undefined;
-  if (!id || !session) return;
-  if (session.expiresAt <= Date.now()) { sessions.delete(id); return; }
-  return [id, session];
+async function sessionFor(request: Request): Promise<Session | undefined> {
+  const token = sessionId(request);
+  if (!token || token.length > 8192 || !sessionKey) return;
+  const [version, rawIv, rawCiphertext, ...rest] = token.split(".");
+  const iv = rawIv ? decodeBase64Url(rawIv) : undefined;
+  const ciphertext = rawCiphertext ? decodeBase64Url(rawCiphertext) : undefined;
+  if (version !== "v1" || iv?.length !== 12 || !ciphertext?.length || rest.length) return;
+  try {
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sessionKey, ciphertext);
+    const value = JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>;
+    const principal = safePrincipal(value.principal);
+    if (typeof value.key !== "string" || !value.key.startsWith("titen_sk_")
+      || value.key.length > 512 || typeof value.expiresAt !== "number"
+      || !Number.isSafeInteger(value.expiresAt) || value.expiresAt <= Date.now() || !principal) return;
+    return { key: value.key, principal, expiresAt: value.expiresAt };
+  } catch { return; }
 }
-function rememberSession(key: string, principal: DashboardPrincipal): string {
-  const now = Date.now();
-  for (const [id, session] of sessions)
-    if (session.expiresAt <= now
-      || (session.principal.organization_id === principal.organization_id
-        && session.principal.principal_id === principal.principal_id)) sessions.delete(id);
-  while (sessions.size >= MAX_SESSIONS) {
-    const oldest = sessions.keys().next().value;
-    if (!oldest) break;
-    sessions.delete(oldest);
-  }
-  const id = crypto.randomUUID().replaceAll("-", "");
-  sessions.set(id, { key, principal, expiresAt: now + SESSION_TTL_MS });
-  return id;
+async function rememberSession(key: string, principal: DashboardPrincipal): Promise<string> {
+  if (!sessionKey) throw new Error("Dashboard session key is unavailable.");
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify({
+    key,
+    principal,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  }));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    sessionKey,
+    plaintext,
+  ));
+  return `v1.${base64Url(iv)}.${base64Url(ciphertext)}`;
 }
 function cookie(id: string, maxAge = SESSION_TTL_MS / 1000): string {
   return `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${publicOrigin ? "; Secure" : ""}`;
 }
-function clearSession(request: Request): HeadersInit {
-  const id = sessionId(request);
-  if (id) sessions.delete(id);
+function clearSession(_request?: Request): HeadersInit {
   return { "set-cookie": cookie("", 0) };
 }
-function credential(request: Request): { key: string; sessionId?: string } | undefined {
+async function credential(request: Request): Promise<{ key: string } | undefined> {
   if (!sessionMode) return apiKey ? { key: apiKey } : undefined;
-  const found = sessionFor(request);
-  return found ? { key: found[1].key, sessionId: found[0] } : undefined;
+  const found = await sessionFor(request);
+  return found ? { key: found.key } : undefined;
 }
 
 async function bodyObject(request: Request, limit = BODY_LIMIT): Promise<Record<string, unknown> | undefined> {
@@ -223,7 +246,7 @@ function upstreamMessage(status: number): string {
 }
 async function proxyJson(request: Request, path: string, init?: RequestInit): Promise<Response> {
   if (!enabled) return error(503, "DASHBOARD_DISCONNECTED", "Live dashboard integration is not enabled.");
-  const auth = credential(request);
+  const auth = await credential(request);
   if (!auth) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.");
   try {
     const response = await upstreamRequest(path, auth.key, init);
@@ -232,7 +255,8 @@ async function proxyJson(request: Request, path: string, init?: RequestInit): Pr
     if (!payload || typeof payload !== "object") return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned invalid JSON.", clear);
     if (!response.ok) {
       const status = [400, 401, 403, 404, 409, 413, 503].includes(response.status) ? response.status : 502;
-      return error(status, `UPSTREAM_${status}`, upstreamMessage(status), clear);
+      const code = status === 401 && sessionMode ? "DASHBOARD_AUTH_REQUIRED" : `UPSTREAM_${status}`;
+      return error(status, code, upstreamMessage(status), clear);
     }
     return json(payload, response.status);
   } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
@@ -259,7 +283,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
   const url = new URL(request.url);
   if (!authorized(request)) return error(403, "FORBIDDEN", "Dashboard adapter is loopback same-origin only.");
   if (url.pathname === "/dashboard-api/status" && request.method === "GET") {
-    const loggedIn = sessionMode ? Boolean(sessionFor(request)) : enabled;
+    const loggedIn = sessionMode ? Boolean(await sessionFor(request)) : enabled;
     return json({
       mode: enabled ? "live" : "disconnected",
       endpoint: enabled ? new URL(upstream!).host : null,
@@ -294,13 +318,13 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       const principal = safePrincipal(data);
       if (!response.ok || !principal) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid principal.");
       if (!key) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid session.");
-      const id = rememberSession(key, principal);
+      const id = await rememberSession(key, principal);
       return json({ data: principal }, 201, { "set-cookie": cookie(id) });
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
   }
   if (url.pathname === "/dashboard-api/session" && request.method === "GET") {
-    const found = sessionMode ? sessionFor(request) : undefined;
-    const key = sessionMode ? found?.[1].key : apiKey;
+    const found = sessionMode ? await sessionFor(request) : undefined;
+    const key = sessionMode ? found?.key : apiKey;
     if (!key) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.");
     try {
       const { response, principal } = await introspect(key);
@@ -309,18 +333,17 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       if (response.status === 503) return error(503, "UPSTREAM_503", "Titen is not ready.");
       if (!response.ok || !principal) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid principal.");
       if (found) {
-        principal.password_change_required = found[1].principal.password_change_required;
-        found[1].principal = principal;
+        principal.password_change_required = found.principal.password_change_required;
       }
       return json({ data: principal });
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
   }
   if (url.pathname === "/dashboard-api/session" && request.method === "DELETE") {
     if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
-    const found = sessionMode ? sessionFor(request) : undefined;
+    const found = sessionMode ? await sessionFor(request) : undefined;
     if (found) {
       try {
-        const response = await upstreamRequest("/v1/dashboard-sessions/current", found[1].key, { method: "DELETE" });
+        const response = await upstreamRequest("/v1/dashboard-sessions/current", found.key, { method: "DELETE" });
         if (!response.ok && response.status !== 401)
           return error(502, "UPSTREAM_UNAVAILABLE", "Titen could not revoke the dashboard session.");
       } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
@@ -330,13 +353,13 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
   if (url.pathname === "/dashboard-api/password" && request.method === "PATCH") {
     if (!sessionMode) return error(404, "NOT_FOUND", "Password changes require dashboard session mode.");
     if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
-    const found = sessionFor(request);
+    const found = await sessionFor(request);
     if (!found) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.");
     const body = await bodyObject(request, 2048);
     const password = typeof body?.password === "string" && body.password.length <= 256 ? body.password : undefined;
     if (!password) return error(400, "INVALID_REQUEST", "A new password is required.");
     try {
-      const response = await upstreamRequest("/v1/operator-accounts/current/password", found[1].key, {
+      const response = await upstreamRequest("/v1/operator-accounts/current/password", found.key, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ password }),
