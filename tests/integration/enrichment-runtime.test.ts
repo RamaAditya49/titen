@@ -199,9 +199,11 @@ test("an incomplete HTTP completion leaves no durable semantic output", async ()
     assert.deepEqual(await db.all(
       `SELECT (SELECT COUNT(*) FROM claims) AS claims,
               (SELECT COUNT(*) FROM claim_sources) AS sources,
+              (SELECT COUNT(*) FROM claim_links) AS links,
               (SELECT COUNT(*) FROM enrichment_commits) AS commits,
-              (SELECT COUNT(*) FROM claims_fts) AS fts_rows`,
-    ), [{ claims: 0, sources: 0, commits: 0, fts_rows: 0 }]);
+              (SELECT COUNT(*) FROM claims_fts) AS fts_rows,
+              (SELECT COUNT(*) FROM index_outbox) AS vector_work`,
+    ), [{ claims: 0, sources: 0, links: 0, commits: 0, fts_rows: 0, vector_work: 0 }]);
   } finally {
     database.close();
     await running.stop();

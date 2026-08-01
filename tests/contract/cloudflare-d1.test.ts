@@ -163,7 +163,9 @@ d1Test("D1 replays bounded model enrichment", async () => {
 d1Test("workerd dispatches JSON-object extraction without following redirects", async () => {
   const extractionPersist = mkdtempSync(join(tmpdir(), "titen-d1-extraction-"));
   let providerRequests = 0;
+  let redirectedRequests = 0;
   let providerBody: any;
+  let providerMode: "complete" | "redirect" | "incomplete" = "complete";
   const extractionRuntime = runtime({
     modules: true,
     scriptPath,
@@ -183,11 +185,24 @@ d1Test("workerd dispatches JSON-object extraction without following redirects", 
     },
     outboundService: async (request) => {
       providerRequests += 1;
+      if (new URL(request.url).hostname === "redirected.example.test") {
+        redirectedRequests += 1;
+        return new Response(null, { status: 500 });
+      }
       providerBody = await request.json();
+      if (providerMode === "redirect")
+        return new Response(null, {
+          status: 302,
+          headers: { location: "https://redirected.example.test/v1/chat/completions" },
+        });
       return Response.json({
         choices: [{
-          finish_reason: "stop",
-          message: { content: '{"action":"abstain","claims":null}' },
+          finish_reason: providerMode === "incomplete" ? "length" : "stop",
+          message: {
+            content: providerMode === "incomplete"
+              ? '{"action":"add","claims":[]}'
+              : '{"action":"abstain","claims":null}',
+          },
         }],
       });
     },
@@ -199,25 +214,30 @@ d1Test("workerd dispatches JSON-object extraction without following redirects", 
     );
     await migrate(extractionDb);
     const principal = await provisionWith(extractionDb, { scopes: ["*"] });
-    const observation = await extractionRuntime.dispatchFetch(`${origin}/v1/observations`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${principal.key}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        subject_id: "subject_workerd_extraction",
-        kind: "user_statement",
-        content: "Synthetic workerd extraction evidence.",
-        source: { type: "test" },
-      }),
-    });
-    assert.equal(observation.status, 201);
-
-    await (await extractionRuntime.getWorker()).scheduled({
+    const observe = async (suffix: string) => {
+      const response = await extractionRuntime.dispatchFetch(`${origin}/v1/observations`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${principal.key}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          subject_id: `subject_workerd_extraction_${suffix}`,
+          kind: "user_statement",
+          content: `Synthetic workerd extraction evidence ${suffix}.`,
+          source: { type: "test" },
+        }),
+      });
+      assert.equal(response.status, 201);
+    };
+    const schedule = () => (extractionRuntime.getWorker()).then((worker) => worker.scheduled({
       cron: "* * * * *",
       scheduledTime: Date.now(),
-    });
+    }));
+
+    await observe("complete");
+
+    await schedule();
     assert.equal(providerRequests, 1);
     assert.equal(providerBody.response_format.type, "json_object");
     assert.match(providerBody.messages[1].content, /^REQUIRED_OUTPUT_SCHEMA_JSON/u);
@@ -231,6 +251,45 @@ d1Test("workerd dispatches JSON-object extraction without following redirects", 
       (await readiness.json() as any).data.capabilities.extraction_response_mode,
       "json_object",
     );
+
+    providerMode = "redirect";
+    providerRequests = 0;
+    await observe("redirect");
+    await schedule();
+    assert.equal(providerRequests, 1);
+    assert.equal(redirectedRequests, 0);
+
+    providerMode = "incomplete";
+    providerRequests = 0;
+    await observe("incomplete");
+    await schedule();
+    assert.equal(providerRequests, 1);
+    const jobs = await extractionDb.all<{
+      subject_id: string; state: string; error_class: string | null; output_hash: string | null;
+    }>(
+      `SELECT subject_id, state, error_class, output_hash FROM enrichment_jobs`,
+    );
+    const bySubject = new Map(jobs.map((job) => [job.subject_id, job]));
+    const complete = bySubject.get("subject_workerd_extraction_complete");
+    assert.match(complete?.output_hash ?? "", /^[a-f0-9]{64}$/u);
+    assert.deepEqual(
+      [...bySubject].map(([subject, job]) => [subject, job.state, job.error_class]).sort(),
+      [
+        ["subject_workerd_extraction_complete", "done", null],
+        ["subject_workerd_extraction_incomplete", "failed", "provider_protocol"],
+        ["subject_workerd_extraction_redirect", "failed", "provider_rejected"],
+      ],
+    );
+    assert.deepEqual(await extractionDb.all(
+      `SELECT (SELECT COUNT(*) FROM claims) AS claims,
+              (SELECT COUNT(*) FROM claim_sources) AS sources,
+              (SELECT COUNT(*) FROM claim_links) AS links,
+              (SELECT COUNT(*) FROM enrichment_commits c
+                 JOIN enrichment_jobs j ON j.id = c.job_id
+                WHERE j.state = 'failed') AS failed_commits,
+              (SELECT COUNT(*) FROM claims_fts) AS fts_rows,
+              (SELECT COUNT(*) FROM index_outbox) AS vector_work`,
+    ), [{ claims: 0, sources: 0, links: 0, failed_commits: 0, fts_rows: 0, vector_work: 0 }]);
   } finally {
     await dispose(extractionRuntime);
     rmSync(extractionPersist, { recursive: true, force: true });
