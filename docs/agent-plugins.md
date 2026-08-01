@@ -14,6 +14,22 @@ export TITEN_API_KEY='replace-with-an-agent-specific-key'
 `TITEN_MCP_URL` is the complete MCP endpoint, including `/mcp`. Give every
 agent its own narrow, revocable key. Never paste a key into a repository file.
 
+Hosts with native Streamable HTTP support should connect to that URL directly.
+For a host that can launch only a local stdio MCP server, install the CLI and
+register this inherited-environment command instead:
+
+```json
+{
+  "command": "titen",
+  "args": ["mcp"]
+}
+```
+
+The bridge stores no state, opens no local socket, and writes only MCP messages
+to stdout. Keep both environment variables in the host's secret-aware process
+environment; do not copy their values into the command arguments or project
+configuration.
+
 ## What ships
 
 | Host | Shipped artifact | Installation surface |

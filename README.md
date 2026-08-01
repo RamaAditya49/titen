@@ -63,9 +63,9 @@ evidence, and audit boundary.
 | Can we audit or move it? | Canonical records live in SQL, with authenticated audit trails and versioned JSONL export/import. |
 | Do we need an LLM or vector database? | No. FTS-only Titen is useful on day one; embeddings and model enrichment are opt-in projections. |
 
-Agents connect through authenticated REST, Streamable HTTP MCP, or the
-TypeScript SDK. Titen never treats retrieved memory as an instruction, and it
-does not run agent loops.
+Agents connect through authenticated REST, Streamable HTTP MCP, the `titen mcp`
+stdio bridge, or the TypeScript SDK. Titen never treats retrieved memory as an
+instruction, and it does not run agent loops.
 
 ## Project status
 

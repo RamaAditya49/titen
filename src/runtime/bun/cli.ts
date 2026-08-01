@@ -12,6 +12,7 @@ import { parseSecretCipher } from "../../core/secrets";
 import { TITEN_VERSION } from "../../core/version";
 import { createBunWebhookSecurity } from "./webhooks";
 import { fetchStableRelease, stableVersionStatus } from "./release";
+import { runMcpStdio } from "./mcp-stdio";
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -21,6 +22,7 @@ const USAGE = `titen — self-hosted memory service
 Usage:
   titen --version
   titen version    [--check]
+  titen mcp        bridge inherited TITEN_MCP_URL and TITEN_API_KEY to stdio
   titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
   titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--username owner] [--label owner] [--print-sql]
@@ -46,6 +48,7 @@ function fail(message: string): never {
 
 const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> = {
   version: { values: [], booleans: ["check"] },
+  mcp: { values: [] },
   serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
   bootstrap: { values: ["db", "org", "username", "label"], booleans: ["print-sql"] },
@@ -200,6 +203,15 @@ const { flags, command, action } = parseArgs(process.argv.slice(2));
 const dbPath = text(flags.db, "titen.db");
 
 switch (command) {
+  case "mcp": {
+    try {
+      await runMcpStdio();
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "MCP bridge failed");
+    }
+    break;
+  }
+
   case "version": {
     if (!flags.check) {
       console.log(TITEN_VERSION);

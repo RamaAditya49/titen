@@ -110,6 +110,11 @@ test("the portable skill keeps the nine-tool and security boundaries", () => {
   assert.doesNotMatch(pluginText, /Authorization\s*[:=]\s*Bearer/i);
   assert.doesNotMatch(pluginText, /\$\{TITEN_URL\}|127\.0\.0\.1:\d+\/mcp/);
   assert.doesNotMatch(pluginText, /https?:\/\/[^\s"'`]+\/mcp\b/i);
+
+  const integrationGuide = readFileSync(join(root, "docs/agent-plugins.md"), "utf8");
+  assert.match(integrationGuide, /"command": "titen"[\s\S]*"args": \["mcp"\]/);
+  assert.match(integrationGuide, /writes only MCP messages\s+to stdout/);
+  assert.match(integrationGuide, /do not copy their values into the command arguments/);
 });
 
 function assertRemoteConfig(

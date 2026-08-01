@@ -47,6 +47,7 @@ test("help is side-effect free for every documented command", () => {
   const cases = [
     ["top", ["--help"]],
     ["version", ["version", "--help"]],
+    ["mcp", ["mcp", "--help"]],
     ["serve", ["serve", "--help"]],
     ["migrate", ["migrate", "--help"]],
     ["bootstrap", ["bootstrap", "--help"]],
@@ -137,6 +138,7 @@ test("version check validates and reports the stable CLI and plugin release", as
 test("malformed flags fail before side effects for every command", () => {
   const cases = [
     ["serve", ["serve", "--port", "nope"]],
+    ["mcp", ["mcp", "--api-key", "must-not-be-accepted"]],
     ["migrate", ["migrate", "--db"]],
     ["bootstrap", ["bootstrap", "--org"]],
     ["key-create", ["key", "create", "--org-id"]],

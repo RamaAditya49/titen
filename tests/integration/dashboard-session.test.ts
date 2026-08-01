@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
-const upstreamPort = 44_000 + Math.floor(Math.random() * 1_000);
-const adapterPort = 45_000 + Math.floor(Math.random() * 1_000);
-const serverAdapterPort = 46_000 + Math.floor(Math.random() * 1_000);
+const upstreamPort = 47_000 + Math.floor(Math.random() * 1_000);
+const adapterPort = 48_000 + Math.floor(Math.random() * 1_000);
 const base = `http://127.0.0.1:${adapterPort}`;
 const sessionKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const principals: Record<string, Record<string, unknown>> = {
@@ -331,7 +330,8 @@ describe("dashboard per-principal sessions", () => {
   });
 
   test("introspects and sanitizes the configured server credential", async () => {
-    const serverBase = `http://127.0.0.1:${serverAdapterPort}`;
+    adapter.kill();
+    await adapter.exited;
     const serverAdapter = Bun.spawn({
       cmd: [process.execPath, "scripts/dashboard-adapter.ts"],
       env: {
@@ -340,17 +340,17 @@ describe("dashboard per-principal sessions", () => {
         TITEN_DASHBOARD_AUTH: "server",
         TITEN_API_URL: `http://127.0.0.1:${upstreamPort}`,
         TITEN_API_KEY: "titen_sk_session_a",
-        TITEN_DASHBOARD_PORT: String(serverAdapterPort),
+        TITEN_DASHBOARD_PORT: String(adapterPort),
       },
       stdout: "ignore",
       stderr: "pipe",
     });
     try {
       for (let attempt = 0; attempt < 50; attempt++) {
-        try { if ((await fetch(`${serverBase}/dashboard-api/status`)).ok) break; } catch {}
+        try { if ((await fetch(`${base}/dashboard-api/status`)).ok) break; } catch {}
         await Bun.sleep(20);
       }
-      const response = await fetch(`${serverBase}/dashboard-api/session`);
+      const response = await fetch(`${base}/dashboard-api/session`);
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.data).toEqual({
@@ -367,6 +367,7 @@ describe("dashboard per-principal sessions", () => {
     } finally {
       serverAdapter.kill();
       await serverAdapter.exited;
+      await startAdapter();
     }
   });
 

@@ -81,6 +81,12 @@ test("initialize negotiates a protocol revision and names the server", async () 
   assert.equal(current.body.result.serverInfo.name, "titen");
   assert.equal(current.body.result.serverInfo.version, TITEN_VERSION);
   assert.ok(current.body.result.capabilities.tools, "tools capability must be declared");
+  assert.match(current.body.result.instructions, /titen_project_resolve/);
+  assert.match(current.body.result.instructions, /titen_compile once/);
+  assert.match(current.body.result.instructions, /new task or repository scope/);
+  assert.match(current.body.result.instructions, /untrusted reference data/);
+  assert.match(current.body.result.instructions, /never capture transcripts or secrets/);
+  assert.ok(current.body.result.instructions.length <= 512);
 
   const latest = await rpc({
     jsonrpc: "2.0",
