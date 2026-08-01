@@ -22,7 +22,8 @@ Usage:
   titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--label owner] [--print-sql]
   titen key create [--db titen.db] --org-id <id> [--principal <id>] [--kind agent]
-                   [--scopes "a,b"] [--trust asserted] [--label name] [--print-sql]
+                   [--scopes "a,b"] [--trust asserted] [--label name]
+                   [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
   titen key list   [--db titen.db]
   titen key revoke [--db titen.db] --id <key id>
   titen backup     [--db titen.db] --out <file>   verified online copy
@@ -45,7 +46,10 @@ const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> =
   migrate: { values: ["db"], booleans: ["dry-run"] },
   bootstrap: { values: ["db", "org", "label"], booleans: ["print-sql"] },
   "key create": {
-    values: ["db", "org-id", "principal", "kind", "scopes", "trust", "label"],
+    values: [
+      "db", "org-id", "principal", "kind", "scopes", "trust", "label",
+      "not-before", "expires-at",
+    ],
     booleans: ["print-sql"],
   },
   "key list": { values: ["db"] },
@@ -102,6 +106,14 @@ function port(value: string | boolean | undefined): number {
   const parsed = Number(raw);
   if (!/^\d+$/.test(raw) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
     fail("--port must be an integer between 1 and 65535");
+  return parsed;
+}
+
+function timestamp(value: string | boolean | undefined, flag: string): Date | undefined {
+  if (typeof value !== "string") return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || !/^\d{4}-/u.test(parsed.toISOString()))
+    fail(`--${flag} must be an ISO-8601 timestamp`);
   return parsed;
 }
 
@@ -288,6 +300,11 @@ switch (command) {
         if (scope !== "*" && !SCOPES.includes(scope as never)) fail(`unknown scope "${scope}"`);
       const kind = text(flags.kind, "agent");
       if (!["human", "agent", "service"].includes(kind)) fail("--kind must be human, agent, or service");
+      const issuedAt = new Date();
+      const notBefore = timestamp(flags["not-before"], "not-before") ?? issuedAt;
+      const expiresAt = timestamp(flags["expires-at"], "expires-at");
+      if (expiresAt && notBefore.getTime() >= expiresAt.getTime())
+        fail("--not-before must be earlier than --expires-at");
       const key = await createApiKey({
         orgId,
         principalId: text(flags.principal, newId("agent")),
@@ -295,7 +312,9 @@ switch (command) {
         label: text(flags.label, "agent key"),
         scopes,
         maxTrust: trust,
-      });
+        notBefore,
+        ...(expiresAt ? { expiresAt } : {}),
+      }, issuedAt);
       if (flags["print-sql"]) {
         console.log(renderStatement(key.statement));
         console.error(`key_id: ${key.id}`);
@@ -315,15 +334,19 @@ switch (command) {
           principal_id: string;
           scopes: string;
           max_trust: string;
+          not_before: string;
+          expires_at: string | null;
+          last_used_at: string | null;
           revoked_at: string | null;
         }>(
-          `SELECT id, org_id, label, principal_id, scopes, max_trust, revoked_at
+          `SELECT id, org_id, label, principal_id, scopes, max_trust,
+                  not_before, expires_at, last_used_at, revoked_at
              FROM api_keys ORDER BY created_at`,
         ),
       );
       for (const row of rows)
         console.log(
-          `${row.id}  ${row.revoked_at ? "revoked" : "active "}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]`,
+          `${row.id}  ${row.revoked_at ? "revoked" : "active "}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}`,
         );
       if (!rows.length) console.log("no keys");
       break;

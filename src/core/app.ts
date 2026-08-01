@@ -506,7 +506,7 @@ export function createApp(context: {
       };
 
       if (matched.route.scope) {
-        ctx.principal = await authenticate(app.db, request);
+        ctx.principal = await authenticate(app.db, request, app.now());
         requireScope(ctx.principal, matched.route.scope);
       }
 

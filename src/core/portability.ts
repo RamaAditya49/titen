@@ -1,4 +1,4 @@
-import { assertTrustCeiling, hasScope, requireScope } from "./auth";
+import { assertTrustCeiling, hasScope, requireScope, SCOPES } from "./auth";
 import { auditStatement } from "./audit";
 import { authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import { purgedEvidenceGuardStatement } from "./claims";
@@ -32,10 +32,11 @@ import {
   type Visibility,
 } from "./validate";
 
-export const EXPORT_FORMAT_VERSION = 3;
-export const EXPORT_TYPES = ["workspaces", "memberships", "projects", "observations", "claims"] as const;
+export const EXPORT_FORMAT_VERSION = 4;
+export const EXPORT_TYPES = ["keys", "workspaces", "memberships", "projects", "observations", "claims"] as const;
 export const EXPORT_DEPENDENCY_ORDER = [...EXPORT_TYPES];
 export const EXPORT_DEPENDENCIES: Record<(typeof EXPORT_TYPES)[number], string[]> = {
+  keys: [],
   workspaces: [],
   memberships: ["workspaces"],
   projects: [],
@@ -61,6 +62,11 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
     throw validationError('Query "all" must be "true" or "false".');
   const wholeDeployment = all === "true";
   if (wholeDeployment) requireScope(principal, "export:all");
+  if (type === "keys") {
+    requireScope(principal, "keys:manage");
+    if (!wholeDeployment)
+      throw validationError('Credential export requires query "all=true".');
+  }
   const after = ctx.url.searchParams.get("after") ?? "";
   const limit = Number(ctx.url.searchParams.get("limit") ?? "500");
   if (!Number.isInteger(limit) || limit < 1 || limit > EXPORT_MAX_LIMIT)
@@ -68,7 +74,15 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
 
   let rows: Record<string, unknown>[];
   let scan: ExportScan | undefined;
-  if (type === "workspaces") {
+  if (type === "keys") {
+    rows = await ctx.app.db.all<Record<string, unknown>>(
+      `SELECT id, principal_id, principal_kind, key_hash, label, scopes, max_trust,
+              created_at, not_before, expires_at, last_used_at, revoked_at
+         FROM api_keys
+        WHERE org_id = ? AND id > ? ORDER BY id LIMIT ?`,
+      [principal.orgId, after, limit],
+    );
+  } else if (type === "workspaces") {
     rows = await ctx.app.db.all<Record<string, unknown>>(
       `SELECT w.id, w.name, w.created_at FROM workspaces w
         WHERE w.org_id = ? AND w.id > ?
@@ -593,6 +607,7 @@ async function exportPage(
   scan?: ExportScan,
 ): Promise<Result> {
   const lineType: Record<ExportType, string> = {
+    keys: "api_key",
     workspaces: "workspace",
     memberships: "membership",
     projects: "project",
@@ -720,7 +735,7 @@ type PreparedEnrichment = Prepared & {
   links: EnrichmentLink[];
 };
 type PreparedClaim = Prepared & { sources: Source[]; enrichments: PreparedEnrichment[] };
-type VersionedRow = { row: Record<string, unknown>; formatVersion: 1 | 2 | 3; sourceOrgId: string };
+type VersionedRow = { row: Record<string, unknown>; formatVersion: 1 | 2 | 3 | 4; sourceOrgId: string };
 
 const optionalText = (row: Record<string, unknown>, field: string, max: number): string | null => {
   return optionalString(row, field, max, `import.${field}`);
@@ -907,12 +922,12 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const lines = (await ctx.rawBody()).split("\n").map((line) => line.trim()).filter(Boolean);
   if (!lines.length) throw validationError("Import body must contain at least one record.");
-  const rawByType: Record<"workspace" | "membership" | "project" | "observation" | "claim", VersionedRow[]> = {
-    workspace: [], membership: [], project: [], observation: [], claim: [],
+  const rawByType: Record<"api_key" | "workspace" | "membership" | "project" | "observation" | "claim", VersionedRow[]> = {
+    api_key: [], workspace: [], membership: [], project: [], observation: [], claim: [],
   };
   const actorMappings = new Map<string, string>();
   const usedActorMappings = new Set<string>();
-  let formatVersion: 1 | 2 | 3 = 1;
+  let formatVersion: 1 | 2 | 3 | 4 = 1;
   let sourceOrgId = principal.orgId;
   let recordCount = 0;
   for (const line of lines) {
@@ -922,7 +937,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     if (!isRecord(parsed)) throw validationError("Every import line must be a JSON object.");
     if (parsed.type === "titen.export.header") {
       if (parsed.format_version !== 1 && parsed.format_version !== 2
-        && parsed.format_version !== EXPORT_FORMAT_VERSION)
+        && parsed.format_version !== 3 && parsed.format_version !== EXPORT_FORMAT_VERSION)
         throw validationError(`Unsupported export format version "${String(parsed.format_version)}".`);
       formatVersion = parsed.format_version;
       sourceOrgId = formatVersion >= 2
@@ -945,7 +960,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
         throw validationError(`Import accepts at most ${IMPORT_MAX_LINES} actor mappings per request.`);
       continue;
     }
-    if (!["workspace", "membership", "project", "observation", "claim"].includes(String(parsed.type)))
+    if (!["api_key", "workspace", "membership", "project", "observation", "claim"].includes(String(parsed.type)))
       throw validationError(`Unknown record type "${String(parsed.type ?? "")}".`);
     recordCount += 1;
     if (recordCount > IMPORT_MAX_LINES)
@@ -953,16 +968,55 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     rawByType[parsed.type as keyof typeof rawByType].push({ row: parsed, formatVersion, sourceOrgId });
   }
 
+  if (rawByType.api_key.length) requireScope(principal, "keys:manage");
   if (rawByType.workspace.length) requireScope(principal, "workspaces:write");
   if (rawByType.membership.length) requireScope(principal, "memberships:write");
   const at = ctx.app.now().toISOString();
   const workspaces = new Map<string, Prepared>();
+  const keys = new Map<string, Prepared>();
   const memberships = new Map<string, Prepared>();
   const projects = new Map<string, Prepared>();
   const observations = new Map<string, Prepared>();
   const redactedObservations = new Set<string>();
   const claims = new Map<string, PreparedClaim>();
   const legacyClaims = new Set<string>();
+
+  for (const { row, formatVersion: rowVersion } of rawByType.api_key) {
+    if (rowVersion < 4)
+      throw validationError("Credential records require export format version 4.");
+    exactFields(row, [
+      "type", "id", "principal_id", "principal_kind", "key_hash", "label", "scopes",
+      "max_trust", "created_at", "not_before", "expires_at", "last_used_at", "revoked_at",
+    ], "credential");
+    const scopes = requireString(row, "scopes", SCOPES.join(" ").length + 1_000, "import.scopes")
+      .split(" ").filter(Boolean);
+    if (scopes.some((scope) => scope !== "*" && !SCOPES.includes(scope as never)))
+      throw validationError("Imported credential contains an unknown scope.");
+    const maxTrust = requireEnum(row, "max_trust", TRUST_LEVELS);
+    assertTrustCeiling(principal, maxTrust);
+    const notBefore = timestamp(row, "not_before")!;
+    const expiresAt = timestamp(row, "expires_at", false);
+    const lastUsedAt = timestamp(row, "last_used_at", false);
+    if (expiresAt !== null && notBefore >= expiresAt)
+      throw validationError("Imported credential not_before must precede expires_at.");
+    if (lastUsedAt !== null && (lastUsedAt < notBefore || (expiresAt !== null && lastUsedAt >= expiresAt)))
+      throw validationError("Imported credential last_used_at is outside its validity window.");
+    const prepared: Prepared = {
+      id: requireString(row, "id", LIMITS.identifier),
+      principal_id: requireString(row, "principal_id", LIMITS.identifier),
+      principal_kind: requireEnum(row, "principal_kind", ["human", "agent", "service"] as const),
+      key_hash: fingerprint(row, "key_hash"),
+      label: requireString(row, "label", LIMITS.label),
+      scopes: scopes.join(" "),
+      max_trust: maxTrust,
+      created_at: timestamp(row, "created_at"),
+      not_before: notBefore,
+      expires_at: expiresAt,
+      last_used_at: lastUsedAt,
+      revoked_at: timestamp(row, "revoked_at", false),
+    };
+    addUnique(keys, prepared.id as string, prepared);
+  }
 
   for (const { row } of rawByType.workspace) {
     const prepared: Prepared = {
@@ -1139,6 +1193,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
   await assertEnrichmentGraph(ctx, observations, claims, memberships, enrichments);
 
   const existingWorkspaces = await loadExisting(ctx, "workspaces", [...workspaces.keys()]);
+  const existingKeys = await loadExisting(ctx, "api_keys", [...keys.keys()]);
   const existingMemberships = await loadExisting(ctx, "memberships", [...memberships.keys()]);
   const existingProjects = await loadExisting(ctx, "projects", [...projects.keys()]);
   const existingObservations = await loadExisting(ctx, "observations", [...observations.keys()]);
@@ -1149,6 +1204,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
   const existingEnrichmentLinks = await loadExistingEnrichmentLinks(ctx, [...enrichments.keys()]);
   const statements: Stmt[] = [];
   const inserted = {
+    api_key: 0,
     workspace: 0,
     membership: 0,
     project: 0,
@@ -1159,6 +1215,54 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     claim: 0,
     claim_source: 0,
   };
+
+  for (const row of keys.values()) {
+    const existing = existingKeys.get(row.id as string);
+    const shape = (value: Record<string, unknown>): Prepared => ({
+      id: value.id,
+      principal_id: value.principal_id,
+      principal_kind: value.principal_kind,
+      key_hash: value.key_hash,
+      label: value.label,
+      scopes: value.scopes,
+      max_trust: value.max_trust,
+      created_at: value.created_at,
+      not_before: value.not_before,
+      expires_at: value.expires_at,
+    });
+    if (existing) {
+      const immutable = { ...row };
+      delete immutable.last_used_at;
+      delete immutable.revoked_at;
+      assertSame("credential", shape(existing), immutable);
+      statements.push({
+        sql: `UPDATE api_keys
+                 SET last_used_at = CASE
+                       WHEN ? IS NOT NULL AND (last_used_at IS NULL OR last_used_at < ?) THEN ?
+                       ELSE last_used_at
+                     END,
+                     revoked_at = COALESCE(revoked_at, ?)
+               WHERE id = ? AND org_id = ?`,
+        params: [
+          row.last_used_at, row.last_used_at, row.last_used_at,
+          row.revoked_at, row.id, principal.orgId,
+        ],
+      });
+      continue;
+    }
+    inserted.api_key += 1;
+    statements.push({
+      sql: `INSERT INTO api_keys
+              (id, org_id, principal_id, principal_kind, key_hash, label, scopes, max_trust,
+               created_at, not_before, expires_at, last_used_at, revoked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [
+        row.id, principal.orgId, row.principal_id, row.principal_kind, row.key_hash,
+        row.label, row.scopes, row.max_trust, row.created_at, row.not_before,
+        row.expires_at, row.last_used_at, row.revoked_at,
+      ],
+    });
+  }
 
   for (const row of workspaces.values()) {
     const existing = existingWorkspaces.get(row.id as string);
@@ -1351,7 +1455,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
       params: [row.updated_at, row.id, principal.orgId, row.commit.lease_token],
     });
   }
-  if (actorMappings.size || workspaces.size || memberships.size) statements.push(auditStatement(
+  if (keys.size || actorMappings.size || workspaces.size || memberships.size) statements.push(auditStatement(
     principal.orgId,
     principal.principalId,
     "portability.import",
@@ -1360,6 +1464,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     null,
     JSON.stringify({
       workspaces: workspaces.size,
+      keys: keys.size,
       memberships: memberships.size,
       projects: projects.size,
       observations: observations.size,
@@ -1378,6 +1483,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     throw error;
   }
   const received = {
+    api_key: keys.size,
     workspace: workspaces.size,
     membership: memberships.size,
     project: projects.size,
