@@ -17,6 +17,26 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-08-02
+
+### Added
+
+- `titen mcp` bridges newline-delimited stdio MCP clients to an existing
+  authenticated Titen `/mcp` endpoint, so hosts without native remote MCP can
+  use the same nine tools without another memory implementation.
+
+### Changed
+
+- MCP initialization now tells compatible hosts to resolve the repository and
+  compile authorized memory once at each task or scope boundary while keeping
+  durable writes explicit and typed.
+
+### Security
+
+- The stdio bridge accepts its endpoint and revocable key only through the
+  inherited environment, rejects credential-bearing or ambiguous URLs, emits no
+  notification reply, and sanitizes upstream failures without exposing the key.
+
 ## [0.5.5] — 2026-08-02
 
 ### Upgrade notes
@@ -587,7 +607,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.6
 [0.5.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.5
 [0.5.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.4
 [0.5.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.3

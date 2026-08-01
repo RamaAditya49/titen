@@ -184,10 +184,12 @@ Cursor's `${env:NAME}` interpolation, distinct from Claude's `${NAME}` syntax.
 selected by the operator. The package intentionally has no extension code with
 ambient process authority.
 
-**Other agents.** If they support MCP, they receive the same tools. Otherwise a
-tiny REST client implements the same operations. An `AGENTS.md`, `CLAUDE.md`,
-or equivalent file should contain usage rules, not credentials or a large dump
-of recalled memory.
+**Other agents.** If they support remote MCP, they receive the same tools over
+Streamable HTTP. If they support only local stdio MCP, run `titen mcp` with
+`TITEN_MCP_URL` and `TITEN_API_KEY` inherited from the host's secret-aware
+environment. Otherwise a tiny REST client implements the same operations. An
+`AGENTS.md`, `CLAUDE.md`, or equivalent file should contain usage rules, not
+credentials or a large dump of recalled memory.
 
 ## MCP configuration examples
 

@@ -239,6 +239,25 @@ titen_project_resolve
 titen_remember'
 [ "$tool_names" = "$expected_tools" ] \
   || { echo "FAIL: installed MCP tool list differs" >&2; exit 1; }
+
+stdio="$(printf '%s\n%s\n%s' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"pack-verify-stdio","version":"0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  | TITEN_MCP_URL="http://127.0.0.1:$port/mcp" TITEN_API_KEY="$api_key" \
+    ./node_modules/.bin/titen mcp)"
+printf '%s' "$stdio" | node --input-type=module -e '
+  let input = "";
+  for await (const chunk of process.stdin) input += chunk;
+  const messages = input.split("\n").filter(Boolean).map(JSON.parse);
+  if (messages.length !== 2 ||
+      !messages[0]?.result?.instructions?.includes("titen_compile once") ||
+      messages[1]?.result?.tools?.length !== 9)
+    throw new Error("installed stdio bridge failed its MCP handshake");
+' || { echo "FAIL: installed stdio MCP bridge failed" >&2; exit 1; }
+case "$stdio" in
+  *"$api_key"*) echo "FAIL: installed stdio MCP bridge exposed its API key" >&2; exit 1 ;;
+esac
 kill "$server" 2>/dev/null || true
 
 # A production install intentionally omits sqlite-vec. Once semantic retrieval
