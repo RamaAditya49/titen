@@ -77,11 +77,17 @@ features explicitly listed as proposed are not routes.
 ## API keys
 
 `POST /v1/keys` accepts a label, scopes, and optional `max_trust`,
-`principal_id`, and `principal_kind`. Its one-time creation response includes
+`principal_id`, `principal_kind`, `not_before`, and `expires_at`. Timestamps are
+canonical UTC; `not_before` is inclusive, `expires_at` is exclusive, and the
+former must precede the latter. The lifecycle window is immutable. Unknown
+creation fields are rejected so a client cannot mistake an ignored security
+control for an enforced one. Its one-time creation response includes
 the raw `api_key`, credential `key_id`, and the caller-supplied or generated
 `principal_id`. Use `principal_id` for handoff targets; `key_id` identifies the
 revocable credential and is not an agent identity. `GET /v1/keys` returns the
-same non-secret identity metadata but never returns the raw key.
+same non-secret identity metadata plus `not_before`, `expires_at`, monotonic
+nullable `last_used_at`, and `pending|active|expired|revoked` status, but never
+returns the raw key.
 
 ## Webhook delivery
 
@@ -472,6 +478,9 @@ or raw memory feed. Public cursors remain stable event IDs; the database maps
 them to a monotonic local sequence, so equal-timestamp pages and federation
 pulls do not order by random UUIDs or skip committed events. An exhausted page
 echoes its incoming cursor so a poller can continue from the same position.
+The SDK's `iterateEvents()` treats an empty page as terminal before comparing
+cursors, rejects a non-advancing/cyclic cursor or repeated event ID, and forwards
+the caller's abort signal and configured request timeout.
 
 ### Federation routes
 
@@ -754,8 +763,8 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Compatibility
 
-- Export format v3 is versioned independently from HTTP API v1. Import still
-  accepts v1/v2 files; because v1 carried no transferable actor authority, its
+- Export format v4 is versioned independently from HTTP API v1. Import still
+  accepts v1/v2/v3 files; because v1 carried no transferable actor authority, its
   observations and claims are owned by the authenticated importing principal.
 - Breaking request/response changes require a new API version or migration path.
 - A future Mem0 import adapter maps scopes and re-embeds; Titen does not promise
@@ -763,9 +772,9 @@ authorized operator clients use its read-only REST endpoint.
 
 ## Portability and backup restore
 
-`GET /v1/export?type=workspaces|memberships|projects|observations|claims`
-returns one canonical NDJSON stream. Retain all five streams and headers for a
-logical migration. Headers declare format v3, source organization, scope,
+`GET /v1/export?type=keys|workspaces|memberships|projects|observations|claims`
+returns one canonical NDJSON stream. Retain the five non-credential streams and
+headers for a logical data migration. Headers declare format v4, source organization, scope,
 deterministic dependency order, count, completion state, and the next opaque
 cursor. Pages contain at most 2,000 records and are cut on UTF-8 byte length so
 the complete response remains within the import request limit. Follow
@@ -788,6 +797,12 @@ workspaces, and membership export includes only the caller. `all=true` requires
 the separate `export:all` scope, exports the whole authenticated organization,
 and appends a metadata-only audit entry for each page. It never crosses the
 organization derived from the API key.
+
+Credential backup is deliberately explicit: `type=keys&all=true` additionally
+requires `keys:manage` and `export:all`. It exports hashes and complete lifecycle
+metadata, never the one-time raw bearer token. Protect this stream like a
+database backup. Version 4 import requires `keys:manage`, restores the same
+immutable window, monotonic last-use and revocation state, and is idempotent.
 
 `POST /v1/import` preflights the complete request before mutation, accepts
 canonical records independent of NDJSON line order, and writes in dependency
@@ -822,8 +837,9 @@ mapped actor, while import history records the authenticated importer. That
 administrative scope may restore team records on behalf of mapped members;
 without it, the importer must be an active non-reader in each workspace.
 
-Logical JSONL is not a full deployment snapshot. It deliberately excludes API
-keys, encrypted integration bindings, checkpoints, leases, context runs and
+Logical JSONL is not a full deployment snapshot. Unless the separately guarded
+credential stream is requested, it excludes API keys. It always excludes
+encrypted integration bindings, checkpoints, leases, context runs and
 feedback, audit/event/history rows, and rebuildable indexes or vectors. Use
 `titen backup` for complete Bun/SQLite disaster recovery and a provider-native
 database snapshot for Cloudflare rollback.

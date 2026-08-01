@@ -26,13 +26,13 @@
   },
   "exports": {
     ".": {
-      "types": "./src/sdk.ts",
-      "bun": "./src/sdk.ts",
+      "types": "./dist/npm/sdk.d.ts",
+      "bun": "./dist/npm/sdk.js",
       "default": "./dist/npm/sdk.js"
     },
     "./sdk": {
-      "types": "./src/sdk.ts",
-      "bun": "./src/sdk.ts",
+      "types": "./dist/npm/sdk.d.ts",
+      "bun": "./dist/npm/sdk.js",
       "default": "./dist/npm/sdk.js"
     },
     "./package.json": "./package.json"
@@ -66,7 +66,7 @@
     "test:d1": "bun test tests/contract/d1-harness.test.ts && bun build tests/contract/cloudflare-d1.test.ts --outfile dist/test/cloudflare-d1.test.mjs --target node --format esm --external miniflare && node --test dist/test/cloudflare-d1.test.mjs",
     "test:all": "pnpm test:api && pnpm test:integration && pnpm verify:dashboard-live && pnpm test && pnpm check:workflow",
     "build:worker": "WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir dist/worker",
-    "build:npm": "bun build src/sdk.ts --outfile dist/npm/sdk.js --target node --format esm",
+    "build:npm": "bun build src/sdk.ts --outfile dist/npm/sdk.js --target node --format esm && tsc -p tsconfig.sdk.json && tsc -p tsconfig.sdk-contract.json",
     "prepack": "bun run build:npm",
     "deploy:worker": "WRANGLER_SEND_METRICS=false wrangler deploy",
     "titen": "bun src/runtime/bun/cli.ts",
@@ -89,6 +89,7 @@
     "astro": "7.1.4",
     "miniflare": "4.20260730.0",
     "wrangler": "4.116.0",
-    "sqlite-vec": "0.1.9"
+    "sqlite-vec": "0.1.9",
+    "typescript": "5.9.3"
   }
 }

@@ -110,13 +110,15 @@ still avoid encoding a shared key as an identity.
 Credential metadata; never the raw secret.
 
 Required fields: `id`, `organization_id`, `principal_id`, `label`,
-`secret_hash`, bounded capability/scope data, `created_at`, `last_used_at`,
-`expires_at`, and `revoked_at`.
+`secret_hash`, bounded capability/scope data, `created_at`, immutable
+`not_before` and `expires_at`, monotonic nullable `last_used_at`, and
+`revoked_at`.
 
 Rules:
 
 - raw key material is displayed once and never stored;
 - key listings exclude hashes and secrets;
+- validity uses canonical UTC with an inclusive not-before and exclusive expiry;
 - rotation creates a new record and may keep the prior key valid only for an
   explicit bounded overlap;
 - revocation is checked on every request.

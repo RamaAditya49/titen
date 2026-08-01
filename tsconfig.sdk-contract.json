@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.sdk.json",
+  "compilerOptions": {
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "exactOptionalPropertyTypes": false,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/sdk.ts", "src/core/validate.ts", "tests/sdk/type-contract.ts"]
+}

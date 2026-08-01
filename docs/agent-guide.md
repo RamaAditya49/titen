@@ -32,6 +32,7 @@ checked against the client prototype.
 | Coordination | `acquireLease`, `releaseLease`, `createHandoff`, `listHandoffs`, `resolveHandoff` |
 | Operator view | `compileView` |
 | API keys | `createKey`, `listKeys`, `revokeKey` |
+| Events | `listEvents`, `iterateEvents` |
 
 Use `request()` for another JSON-envelope route, `requestWithMeta()` when the
 caller needs `request_id` or `replayed`, and `requestRaw()` for a raw or streaming
@@ -39,10 +40,10 @@ response such as JSONL export. All attach the configured credential;
 passing an `Authorization` header is rejected rather than overriding it.
 
 ```typescript
-const page = await titen.request<{ events: unknown[]; cursor: string | null }>(
-  "GET",
-  "/v1/events?limit=50",
-);
+const page = await titen.listEvents({ limit: 50 });
+for await (const event of titen.iterateEvents(page.cursor ? { after: page.cursor } : {})) {
+  console.log(event.kind, event.resource_id);
+}
 const exported = await titen.requestRaw(
   "GET",
   "/v1/export?type=observations&limit=500",
@@ -243,6 +244,8 @@ const key = await titen.createKey({
     "feedback:write",
   ],
   max_trust: "asserted",
+  not_before: new Date().toISOString(),
+  expires_at: new Date(Date.now() + 86_400_000).toISOString(),
 });
 // key.api_key → store this, it won't be shown again
 // key.principal_id → use this as handoff.to_principal; key_id identifies the credential
@@ -251,6 +254,9 @@ const key = await titen.createKey({
 Titen returns the caller-supplied or generated `principal_id` at creation so
 the new agent can receive a handoff immediately. Do not use `key_id` as an agent
 identity.
+The server enforces the immutable UTC window on every request and updates the
+nullable `last_used_at` monotonically. Key listings distinguish pending,
+active, expired, and revoked credentials.
 
 ## Error handling
 

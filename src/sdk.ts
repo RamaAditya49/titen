@@ -51,6 +51,13 @@ export type ObservationKind =
   | "imported_source"
   | "decision"
   | "system_event";
+export type ClaimKind =
+  | "semantic_fact"
+  | "episodic_event"
+  | "preference"
+  | "procedural"
+  | "decision"
+  | "relationship";
 
 export interface Observation {
   subject_id: string;
@@ -67,15 +74,15 @@ export interface Observation {
 }
 
 export interface Claim {
-  kind: string;
+  kind: ClaimKind;
   statement: string;
   confidence?: number;
   sources: {
     observation_id: string;
     relation: "supports" | "contradicts" | "qualifies";
   }[];
-  trust?: string;
-  visibility?: string;
+  trust?: Trust;
+  visibility?: Visibility;
   valid_from?: string;
   valid_to?: string;
 }
@@ -128,6 +135,8 @@ export interface CreateKeyOptions {
   max_trust?: "unverified" | "asserted" | "verified" | "policy_approved";
   principal_id?: string;
   principal_kind?: "human" | "agent" | "service";
+  not_before?: string;
+  expires_at?: string;
 }
 
 export interface CreatedKey {
@@ -138,7 +147,80 @@ export interface CreatedKey {
   label: string;
   scopes: string[];
   max_trust: "unverified" | "asserted" | "verified" | "policy_approved";
+  not_before: string;
+  expires_at: string | null;
+  last_used_at: null;
   warning: string;
+}
+
+export type CapabilityState = "disabled" | "enabled" | "configured_error";
+export type SemanticDiagnostic =
+  | "embedding_configuration_invalid"
+  | "embedding_dependency_unavailable"
+  | "semantic_dependencies_unavailable"
+  | "vector_initialization_failed"
+  | "vector_dependency_unavailable"
+  | "vector_storage_conflict"
+  | "index_backfill_required"
+  | "index_fingerprint_missing"
+  | "index_fingerprint_mismatch"
+  | "index_metadata_unavailable";
+export type EnrichmentJobState =
+  | "configured_error"
+  | "terminal_error"
+  | "backlog"
+  | "idle"
+  | "disabled"
+  | "unavailable";
+
+export interface Readiness {
+  ready: boolean;
+  runtime: string;
+  revision: string;
+  schema: { applied: number; expected: number; verified: boolean };
+  checks: {
+    canonical_sql: "ok" | "unavailable";
+    migrations: "ok" | "failed" | `invalid or pending (applied ${number}, expected ${number})`;
+    signing_secrets: "ok" | "failed";
+    semantic_index: "ok" | "disabled" | SemanticDiagnostic;
+    extraction: CapabilityState;
+    background_enrichment: CapabilityState;
+    enrichment_jobs?: { state: EnrichmentJobState };
+  };
+  capabilities: {
+    version: 1;
+    fts: "enabled";
+    vector: CapabilityState;
+    embedding: CapabilityState;
+    extraction: CapabilityState;
+    background_enrichment: CapabilityState;
+    /** @deprecated Use `embedding`. */
+    model: CapabilityState;
+    background_repair: "enabled" | "stale" | "disabled";
+    export_import: "enabled";
+  };
+}
+
+export interface TitenEvent {
+  id: string;
+  kind: string;
+  actor_id: string;
+  resource_type: string;
+  resource_id: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface EventPage {
+  events: TitenEvent[];
+  cursor: string | null;
+}
+
+export interface ListEventsOptions {
+  after?: string;
+  limit?: number;
+  kind?: string;
+  signal?: AbortSignal;
 }
 
 export interface TitenResponseMeta extends Record<string, unknown> {
@@ -380,8 +462,11 @@ export interface KeyRecord {
   scopes: string[];
   max_trust: Trust;
   created_at: string;
+  not_before: string;
+  expires_at: string | null;
+  last_used_at: string | null;
   revoked_at: string | null;
-  status: "active" | "revoked";
+  status: "pending" | "active" | "expired" | "revoked";
 }
 
 /** Typed convenience methods intentionally kept to the common agent path. */
@@ -409,13 +494,15 @@ export const TITEN_SDK_TYPED_ROUTES = [
   ["createKey", "POST /v1/keys"],
   ["listKeys", "GET /v1/keys"],
   ["revokeKey", "DELETE /v1/keys/:id"],
+  ["listEvents", "GET /v1/events"],
+  ["iterateEvents", "GET /v1/events"],
 ] as const;
 
 export class TitenError extends Error {
   status: number;
   code: string;
-  requestId?: string;
-  meta?: Record<string, unknown>;
+  requestId: string | undefined;
+  meta: Record<string, unknown> | undefined;
 
   constructor(
     status: number,
@@ -579,13 +666,13 @@ export class TitenClient {
     if (target.origin !== new URL(this.url).origin)
       throw new TypeError("path must remain on the configured origin");
     const timeout = AbortSignal.timeout(this.timeoutMs);
+    const body = options.json !== undefined
+      ? JSON.stringify(options.json)
+      : options.body;
     const res = await this.f(target, {
       method,
       headers,
-      body:
-        options.json !== undefined
-          ? JSON.stringify(options.json)
-          : options.body,
+      ...(body !== undefined ? { body } : {}),
       signal: options.signal
         ? AbortSignal.any([options.signal, timeout])
         : timeout,
@@ -600,14 +687,7 @@ export class TitenClient {
     return this.request("GET", "/healthz");
   }
 
-  async ready(): Promise<{
-    ready: boolean;
-    runtime: string;
-    revision: string;
-    schema: { applied: number; expected: number; verified: boolean };
-    checks: Record<string, string>;
-    capabilities: Record<string, unknown>;
-  }> {
+  async ready(): Promise<Readiness> {
     return this.request("GET", "/readyz");
   }
 
@@ -626,7 +706,7 @@ export class TitenClient {
   ): Promise<ObservationRecord> {
     return this.request("POST", "/v1/observations", {
       json: observation,
-      idempotencyKey: options.idempotencyKey,
+      ...(options.idempotencyKey !== undefined ? { idempotencyKey: options.idempotencyKey } : {}),
     });
   }
 
@@ -647,7 +727,7 @@ export class TitenClient {
         project_id,
         workspace_id: options.workspaceId,
       },
-      idempotencyKey: options.idempotencyKey,
+      ...(options.idempotencyKey !== undefined ? { idempotencyKey: options.idempotencyKey } : {}),
     });
   }
 
@@ -662,7 +742,7 @@ export class TitenClient {
   ): Promise<FeedbackResult> {
     return this.request("POST", `/v1/context/${contextId}/feedback`, {
       json: feedback,
-      idempotencyKey: options.idempotencyKey,
+      ...(options.idempotencyKey !== undefined ? { idempotencyKey: options.idempotencyKey } : {}),
     });
   }
 
@@ -803,6 +883,57 @@ export class TitenClient {
   ): Promise<{ key_id: string; revoked_at: string; revoked: true }> {
     return this.request("DELETE", `/v1/keys/${keyId}`);
   }
+
+  // --- Events ---
+
+  async listEvents(options: ListEventsOptions = {}): Promise<EventPage> {
+    const params = new URLSearchParams();
+    if (options.after !== undefined) params.set("after", options.after);
+    if (options.limit !== undefined) {
+      if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 200)
+        throw new TypeError("event limit must be an integer between 1 and 200");
+      params.set("limit", String(options.limit));
+    }
+    if (options.kind !== undefined) params.set("kind", options.kind);
+    const query = params.size ? `?${params}` : "";
+    return this.request("GET", `/v1/events${query}`, {
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
+    });
+  }
+
+  async *iterateEvents(options: ListEventsOptions = {}): AsyncGenerator<TitenEvent, void> {
+    let cursor = options.after;
+    const cursors = new Set<string>();
+    const eventIds = new Set<string>();
+    if (cursor !== undefined) cursors.add(cursor);
+    while (true) {
+      options.signal?.throwIfAborted();
+      const page = await this.listEvents({
+        ...(cursor !== undefined ? { after: cursor } : {}),
+        ...(options.limit !== undefined ? { limit: options.limit } : {}),
+        ...(options.kind !== undefined ? { kind: options.kind } : {}),
+        ...(options.signal !== undefined ? { signal: options.signal } : {}),
+      });
+      if (!page || !Array.isArray(page.events))
+        throw invalidEventPage("Event response did not contain an events array.");
+      if (page.events.length === 0) return;
+      if (typeof page.cursor !== "string" || page.cursor === cursor || cursors.has(page.cursor))
+        throw invalidEventPage("Event cursor did not advance.");
+      for (const event of page.events) {
+        if (!event || typeof event.id !== "string" || eventIds.has(event.id))
+          throw invalidEventPage("Event response repeated or omitted an event id.");
+        eventIds.add(event.id);
+        options.signal?.throwIfAborted();
+        yield event;
+      }
+      cursor = page.cursor;
+      cursors.add(cursor);
+    }
+  }
+}
+
+function invalidEventPage(message: string): TitenError {
+  return new TitenError(502, "INVALID_RESPONSE", message);
 }
 
 function isJson(response: Response): boolean {
