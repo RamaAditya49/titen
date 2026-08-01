@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { createApiKey, organizationStatement, SCOPES } from "../../core/auth";
+import { createApiKey, keyLifecycleStatus, organizationStatement, SCOPES } from "../../core/auth";
 import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
@@ -345,10 +345,17 @@ switch (command) {
              FROM api_keys ORDER BY created_at`,
         ),
       );
-      for (const row of rows)
+      const at = new Date().toISOString();
+      for (const row of rows) {
+        const status = keyLifecycleStatus({
+          notBefore: row.not_before,
+          expiresAt: row.expires_at,
+          revokedAt: row.revoked_at,
+        }, at);
         console.log(
-          `${row.id}  ${row.revoked_at ? "revoked" : "active "}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}`,
+          `${row.id}  ${status.padEnd(7)}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}`,
         );
+      }
       if (!rows.length) console.log("no keys");
       break;
     }

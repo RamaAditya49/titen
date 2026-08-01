@@ -134,6 +134,18 @@ export function requestedScopes(value: unknown, principal: Principal): string[] 
   return [...new Set(scopes)];
 }
 
+export type KeyLifecycleStatus = "pending" | "active" | "expired" | "revoked";
+
+export function keyLifecycleStatus(
+  key: { notBefore: string; expiresAt: string | null; revokedAt: string | null },
+  at: string,
+): KeyLifecycleStatus {
+  if (key.revokedAt) return "revoked";
+  if (key.notBefore > at) return "pending";
+  if (key.expiresAt !== null && key.expiresAt <= at) return "expired";
+  return "active";
+}
+
 /** A principal can never assert evidence more trusted than its own ceiling. */
 export function assertTrustCeiling(principal: Principal, trust: Trust): void {
   if (TRUST_RANK[trust] > TRUST_RANK[principal.maxTrust])

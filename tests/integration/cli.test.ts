@@ -169,8 +169,8 @@ test("key lifecycle flags survive listing and verified backup", async () => {
   assert.equal(boot.exitCode, 0, boot.output);
   const orgId = /^organization: (org_[^ ]+)/m.exec(boot.output)?.[1];
   assert.ok(orgId);
-  const notBefore = "2026-08-02T10:00:00.000Z";
-  const expiresAt = "2026-08-02T11:00:00.000Z";
+  const notBefore = new Date(Date.now() + 86_400_000).toISOString();
+  const expiresAt = new Date(Date.now() + 90_000_000).toISOString();
   const created = run("key-lifecycle", [
     "key", "create", "--db", "source.db", "--org-id", orgId,
     "--not-before", notBefore, "--expires-at", expiresAt,
@@ -180,7 +180,19 @@ test("key lifecycle flags survive listing and verified backup", async () => {
   assert.ok(keyId);
   const listed = run("key-lifecycle", ["key", "list", "--db", "source.db"]);
   assert.equal(listed.exitCode, 0, listed.output);
-  assert.match(listed.output, new RegExp(`${keyId}.*not_before=${notBefore}.*expires_at=${expiresAt}`));
+  assert.match(listed.output, new RegExp(`${keyId}  pending.*not_before=${notBefore}.*expires_at=${expiresAt}`));
+
+  const expiredBefore = new Date(Date.now() - 7_200_000).toISOString();
+  const expiredAt = new Date(Date.now() - 3_600_000).toISOString();
+  const expired = run("key-lifecycle", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--not-before", expiredBefore, "--expires-at", expiredAt,
+  ]);
+  assert.equal(expired.exitCode, 0, expired.output);
+  const expiredId = /^key_id: (key_[^\s]+)/m.exec(expired.output)?.[1];
+  assert.ok(expiredId);
+  const relisted = run("key-lifecycle", ["key", "list", "--db", "source.db"]);
+  assert.match(relisted.output, new RegExp(`${expiredId}  expired`));
 
   const invalid = run("key-lifecycle", [
     "key", "create", "--db", "source.db", "--org-id", orgId,

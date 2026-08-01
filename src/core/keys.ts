@@ -1,4 +1,4 @@
-import { createApiKey, requestedScopes } from "./auth";
+import { createApiKey, keyLifecycleStatus, requestedScopes } from "./auth";
 import { auditStatement } from "./audit";
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
@@ -110,13 +110,11 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
         expires_at: row.expires_at,
         last_used_at: row.last_used_at,
         revoked_at: row.revoked_at,
-        status: row.revoked_at
-          ? "revoked"
-          : String(row.not_before) > ctx.app.now().toISOString()
-            ? "pending"
-            : row.expires_at && String(row.expires_at) <= ctx.app.now().toISOString()
-              ? "expired"
-              : "active",
+        status: keyLifecycleStatus({
+          notBefore: String(row.not_before),
+          expiresAt: row.expires_at === null ? null : String(row.expires_at),
+          revokedAt: row.revoked_at === null ? null : String(row.revoked_at),
+        }, ctx.app.now().toISOString()),
       })),
     },
   };
