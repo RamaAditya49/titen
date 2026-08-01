@@ -135,7 +135,7 @@ export const REFLECTION_SCHEMA: Record<string, unknown> = {
   },
 };
 
-type FailureClass =
+export type FailureClass =
   | "provider_unavailable"
   | "provider_rejected"
   | "provider_protocol"
@@ -143,7 +143,7 @@ type FailureClass =
   | "unsafe_output"
   | "source_changed";
 
-class EnrichmentFailure extends Error {
+export class EnrichmentFailure extends Error {
   constructor(
     readonly failureClass: FailureClass,
     readonly retryable = false,
@@ -214,19 +214,23 @@ interface InputId {
   version?: number;
 }
 
-interface LoadedInput {
+export interface EnrichmentProposalInput {
   lane: EnrichmentLane;
-  promptInput: unknown;
   allowedIds: Set<string>;
   defaultValidFrom: string;
+  temporalSupportByPremise: Map<string, Set<string>>;
+  premiseRows: Array<{ id: string; status: string; valid_from: string }>;
+}
+
+interface LoadedInput extends EnrichmentProposalInput {
+  promptInput: unknown;
   visibility: Visibility;
   sourceIdsByPremise: Map<string, string[]>;
-  temporalSupportByPremise: Map<string, Set<string>>;
   premiseRows: ClaimRow[];
   observation?: ObservationRow;
 }
 
-interface Addition {
+export interface Addition {
   kind: (typeof CLAIM_KINDS)[number];
   statement: string;
   validFrom: string;
@@ -234,13 +238,13 @@ interface Addition {
   citedIds: string[];
 }
 
-interface LinkProposal {
+export interface LinkProposal {
   sourceClaimId: string;
   targetClaimId: string;
   relation: LinkRelation;
 }
 
-type ValidProposal =
+export type ValidProposal =
   | { action: "abstain"; additions: []; links: [] }
   | { action: "add"; additions: Addition[]; links: [] }
   | { action: "link"; additions: []; links: LinkProposal[] };
@@ -1208,7 +1212,7 @@ function citedIds(value: unknown, allowed: Set<string>, max: number): string[] {
 function additions(
   value: unknown,
   idField: "evidence_ids" | "premise_ids",
-  input: LoadedInput,
+  input: EnrichmentProposalInput,
 ): Addition[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > ENRICHMENT_MAX_ADDITIONS)
     throw new EnrichmentFailure("invalid_output");
@@ -1257,7 +1261,7 @@ function additions(
   return parsed;
 }
 
-function links(value: unknown, input: LoadedInput): LinkProposal[] {
+function links(value: unknown, input: EnrichmentProposalInput): LinkProposal[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > ENRICHMENT_MAX_LINKS)
     throw new EnrichmentFailure("invalid_output");
   const seen = new Set<string>();
@@ -1316,10 +1320,10 @@ async function boundedLinkProposal(
     : proposal;
 }
 
-function validateEnrichmentProposal(
+export function validateEnrichmentProposal(
   lane: EnrichmentLane,
   raw: unknown,
-  input: LoadedInput,
+  input: EnrichmentProposalInput,
 ): ValidProposal {
   if (!isRecord(raw)) throw new EnrichmentFailure("invalid_output");
   if (typeof raw.action !== "string") throw new EnrichmentFailure("invalid_output");

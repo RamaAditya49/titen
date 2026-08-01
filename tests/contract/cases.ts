@@ -568,6 +568,56 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "a full-fit public context preserves rank and ideal final-pack metrics",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = "final_pack_ranking";
+      const definitions = [
+        ["procedural", 1, "Final pack metric marker alpha."],
+        ["procedural", 0.9, "Final pack metric marker bravo."],
+        ["preference", 0.8, "Final pack metric marker delta."],
+        ["semantic_fact", 0.7, "Final pack metric marker gamma."],
+        ["episodic_event", 0.6, "Final pack metric marker omega."],
+      ] as const;
+      const seeded = [];
+      for (const [kind, confidence, statement] of definitions)
+        seeded.push(await seedClaim(fx, agent.key, {
+          observation: {
+            subject_id: subject,
+            content: `Evidence for ${statement}`,
+          },
+          claim: { kind, confidence, statement },
+        }));
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: subject,
+          task: "final pack metric marker",
+          max_tokens: 4_000,
+          at: "2026-08-02T00:00:00.000Z",
+        },
+      });
+      expectOk(compiled);
+      const expected = seeded.map(({ claimId }) => claimId);
+      const emitted = compiled.body.data.items.map((item: any) => item.claim_id as string);
+      assert.deepEqual(emitted, expected);
+      assert.deepEqual(
+        compiled.body.data.items.map((item: any) => item.score),
+        [...compiled.body.data.items.map((item: any) => item.score)].sort((a, b) => b - a),
+      );
+
+      const reciprocalRank = 1 / (emitted.indexOf(expected[1]!) + 1);
+      const gains = new Map(expected.map((id, index) => [id, expected.length - index]));
+      const dcg = emitted.reduce((sum: number, id: string, index: number) =>
+        sum + ((2 ** gains.get(id)! - 1) / Math.log2(index + 2)), 0);
+      const ideal = expected.reduce((sum, id, index) =>
+        sum + ((2 ** gains.get(id)! - 1) / Math.log2(index + 2)), 0);
+      assert.equal(reciprocalRank, 0.5);
+      assert.equal(Number((dcg / ideal).toFixed(6)), 1);
+    },
+  },
+  {
     name: "a tiny budget drops whole items instead of truncating them",
     async run(fx) {
       const agent = await fx.provision();

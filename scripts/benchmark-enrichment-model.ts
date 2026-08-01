@@ -16,18 +16,23 @@ import { fileURLToPath } from "node:url";
 import {
   DERIVATION_PROMPT,
   DERIVATION_SCHEMA,
+  EnrichmentFailure,
   ENRICHMENT_MAX_ADDITIONS,
   ENRICHMENT_MAX_LINKS,
   ENRICHMENT_MAX_PREMISES,
   REFLECTION_PROMPT,
   REFLECTION_SCHEMA,
+  supportedObservationTemporalBounds,
+  validateEnrichmentProposal,
+  type EnrichmentProposalInput,
 } from "../src/core/enrichment";
 
-const RUNNER_VERSION = "enrichment-model-gate-runner-v2";
+const RUNNER_VERSION = "enrichment-model-gate-runner-v3";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RUNNER_REPO_PATH = "scripts/benchmark-enrichment-model.ts";
 const FIXTURE_REPO_PATH = "tests/fixtures/enrichment-model-gate-v3.json";
 const CONTRACT_REPO_PATH = "src/core/enrichment.ts";
+const VALIDATION_REPO_PATH = "src/core/validate.ts";
 const FIXTURE_PATH = resolve(REPO_ROOT, FIXTURE_REPO_PATH);
 const CLAIM_KINDS = [
   "semantic_fact",
@@ -135,9 +140,9 @@ interface Fixture {
 interface LoadedCase {
   fixture: FixtureCase;
   input: unknown;
-  allowedIds: Set<string>;
   orderedIds: string[];
   defaultValidFrom: string;
+  validationInput: EnrichmentProposalInput;
 }
 
 interface NormalizedClaim {
@@ -362,6 +367,7 @@ interface SourceSnapshot {
   runnerSha256: string;
   fixtureSha256: string;
   contractSha256: string;
+  validationSha256: string;
 }
 
 function frozenSourceSnapshot(expected?: SourceSnapshot): SourceSnapshot {
@@ -373,13 +379,16 @@ function frozenSourceSnapshot(expected?: SourceSnapshot): SourceSnapshot {
   const runnerRaw = readFileSync(resolve(REPO_ROOT, RUNNER_REPO_PATH));
   const fixtureRaw = readFileSync(resolve(REPO_ROOT, FIXTURE_REPO_PATH));
   const contractRaw = readFileSync(resolve(REPO_ROOT, CONTRACT_REPO_PATH));
+  const validationRaw = readFileSync(resolve(REPO_ROOT, VALIDATION_REPO_PATH));
   const runnerSha256 = sha256(runnerRaw);
   const fixtureSha256 = sha256(fixtureRaw);
   const contractSha256 = sha256(contractRaw);
+  const validationSha256 = sha256(validationRaw);
   assert.equal(sha256(execFileSync("git", ["show", `${commit}:${RUNNER_REPO_PATH}`], { cwd: REPO_ROOT })), runnerSha256);
   assert.equal(sha256(execFileSync("git", ["show", `${commit}:${FIXTURE_REPO_PATH}`], { cwd: REPO_ROOT })), fixtureSha256);
   assert.equal(sha256(execFileSync("git", ["show", `${commit}:${CONTRACT_REPO_PATH}`], { cwd: REPO_ROOT })), contractSha256);
-  const dirty = execFileSync("git", ["status", "--porcelain=v1", "--", RUNNER_REPO_PATH, FIXTURE_REPO_PATH, CONTRACT_REPO_PATH], {
+  assert.equal(sha256(execFileSync("git", ["show", `${commit}:${VALIDATION_REPO_PATH}`], { cwd: REPO_ROOT })), validationSha256);
+  const dirty = execFileSync("git", ["status", "--porcelain=v1", "--", RUNNER_REPO_PATH, FIXTURE_REPO_PATH, CONTRACT_REPO_PATH, VALIDATION_REPO_PATH], {
     cwd: REPO_ROOT,
     encoding: "utf8",
   });
@@ -389,8 +398,9 @@ function frozenSourceSnapshot(expected?: SourceSnapshot): SourceSnapshot {
     assert.equal(runnerSha256, expected.runnerSha256);
     assert.equal(fixtureSha256, expected.fixtureSha256);
     assert.equal(contractSha256, expected.contractSha256);
+    assert.equal(validationSha256, expected.validationSha256);
   }
-  return { commit, runnerRaw, runnerSha256, fixtureSha256, contractSha256 };
+  return { commit, runnerRaw, runnerSha256, fixtureSha256, contractSha256, validationSha256 };
 }
 
 function corpusCoverage(fixture: Fixture): Record<string, unknown> {
@@ -421,9 +431,22 @@ function loadedCase(fixture: FixtureCase): LoadedCase {
         observation: { observation_id: observationId, ...fixture.observation },
         bounds: { max_claims: ENRICHMENT_MAX_ADDITIONS },
       },
-      allowedIds: new Set([observationId]),
       orderedIds: [observationId],
       defaultValidFrom: fixture.observation.occurred_at ?? fixture.observation.ingested_at,
+      validationInput: {
+        lane: "derivation",
+        allowedIds: new Set([observationId]),
+        defaultValidFrom: fixture.observation.occurred_at ?? fixture.observation.ingested_at,
+        temporalSupportByPremise: new Map([[
+          observationId,
+          supportedObservationTemporalBounds(
+            fixture.observation.content,
+            fixture.observation.occurred_at,
+            fixture.observation.ingested_at,
+          ),
+        ]]),
+        premiseRows: [],
+      },
     };
   }
   const ids = fixture.premises.map((_, index) =>
@@ -439,9 +462,22 @@ function loadedCase(fixture: FixtureCase): LoadedCase {
       })),
       bounds: { max_claims: ENRICHMENT_MAX_ADDITIONS, max_links: ENRICHMENT_MAX_LINKS },
     },
-    allowedIds: new Set(ids),
     orderedIds: ids,
     defaultValidFrom: fixture.premises[0]!.valid_from,
+    validationInput: {
+      lane: "reflection",
+      allowedIds: new Set(ids),
+      defaultValidFrom: fixture.premises[0]!.valid_from,
+      temporalSupportByPremise: new Map(fixture.premises.map((premise, index) => [
+        ids[index]!,
+        new Set([premise.valid_from, ...(premise.valid_to ? [premise.valid_to] : [])]),
+      ])),
+      premiseRows: fixture.premises.map((premise, index) => ({
+        id: ids[index]!,
+        status: "active",
+        valid_from: premise.valid_from,
+      })),
+    },
   };
 }
 
@@ -511,121 +547,28 @@ function schemaFailureReason(lane: Lane, value: unknown): string | null {
 
 const schemaValid = (lane: Lane, value: unknown) => schemaFailureReason(lane, value) === null;
 
-function exactKeys(value: Record<string, unknown>, allowed: readonly string[]): void {
-  if (allowed.some((key) => !Object.hasOwn(value, key)))
-    throw new ProposalFailure("invalid_output", "missing_required_key");
-  if (Object.keys(value).some((key) => !allowed.includes(key)))
-    throw new ProposalFailure("unsafe_output", "extra_key");
-}
-
-function nullWhenPresent(value: Record<string, unknown>, fields: readonly string[]): void {
-  if (fields.some((field) => field in value && value[field] !== null))
-    throw new ProposalFailure("unsafe_output", "inactive_field_non_null");
-}
-
-function safeStatement(value: unknown): string {
-  if (typeof value !== "string" || value.trim() === "" || value.length > 4_000)
-    throw new ProposalFailure("invalid_output", "statement_shape");
-  if (!value.isWellFormed() || /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u.test(value))
-    throw new ProposalFailure("invalid_output", "statement_unicode");
-  return value;
-}
-
-function timestamp(value: unknown): string | null {
-  if (value === null) return null;
-  if (typeof value !== "string" || Number.isNaN(Date.parse(value)))
-    throw new ProposalFailure("invalid_output", "timestamp_shape");
-  const normalized = new Date(value).toISOString();
-  if (!/^\d{4}-/u.test(normalized)) throw new ProposalFailure("invalid_output", "timestamp_year");
-  return normalized;
-}
-
-function citedIds(value: unknown, allowed: Set<string>, max: number): string[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > max
-    || !value.every((entry) => typeof entry === "string"))
-    throw new ProposalFailure("invalid_output", "citation_shape");
-  const ids = [...new Set(value as string[])];
-  if (ids.length !== value.length || ids.some((id) => !allowed.has(id)))
-    throw new ProposalFailure("unsafe_output", "citation_not_allowed");
-  return ids;
-}
-
-function claims(value: unknown, lane: Lane, input: LoadedCase): NormalizedClaim[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > ENRICHMENT_MAX_ADDITIONS)
-    throw new ProposalFailure("invalid_output", "claims_container");
-  const idField = lane === "derivation" ? "evidence_ids" : "premise_ids";
-  const parsed = value.map((entry) => {
-    if (!isRecord(entry)) throw new ProposalFailure("invalid_output", "claim_object");
-    exactKeys(entry, ["kind", "statement", "valid_from", "valid_to", idField]);
-    if (typeof entry.kind !== "string" || !CLAIM_KINDS.includes(entry.kind as ClaimKind))
-      throw new ProposalFailure("invalid_output", "claim_kind");
-    const validFrom = timestamp(entry.valid_from) ?? input.defaultValidFrom;
-    const validTo = timestamp(entry.valid_to);
-    if (validTo !== null && validTo <= validFrom)
-      throw new ProposalFailure("invalid_output", "timestamp_order");
-    return {
-      kind: entry.kind as ClaimKind,
-      statement: safeStatement(entry.statement),
-      validFrom,
-      validTo,
-      citedIds: citedIds(
-        entry[idField],
-        input.allowedIds,
-        lane === "derivation" ? 1 : ENRICHMENT_MAX_PREMISES,
-      ),
-    };
-  });
-  const identities = new Set(parsed.map((entry) => JSON.stringify([
-    entry.kind,
-    entry.statement,
-    entry.validFrom,
-    entry.validTo,
-  ])));
-  if (identities.size !== parsed.length)
-    throw new ProposalFailure("unsafe_output", "duplicate_claim");
-  return parsed;
-}
-
-function links(value: unknown, input: LoadedCase): NormalizedLink[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > ENRICHMENT_MAX_LINKS)
-    throw new ProposalFailure("invalid_output", "links_container");
-  const seen = new Set<string>();
-  return value.map((entry) => {
-    if (!isRecord(entry)) throw new ProposalFailure("invalid_output", "link_object");
-    exactKeys(entry, ["source_claim_id", "target_claim_id", "relation"]);
-    const source = entry.source_claim_id;
-    const target = entry.target_claim_id;
-    const relation = entry.relation;
-    if (typeof source !== "string" || typeof target !== "string"
-      || !input.allowedIds.has(source) || !input.allowedIds.has(target) || source === target
-      || typeof relation !== "string" || !LINK_RELATIONS.includes(relation as LinkRelation))
-      throw new ProposalFailure("unsafe_output", "link_not_allowed");
-    const identity = `${source}\0${target}\0${relation}`;
-    if (seen.has(identity)) throw new ProposalFailure("unsafe_output", "duplicate_link");
-    seen.add(identity);
-    return { source, target, relation: relation as LinkRelation };
-  });
-}
-
 function validateProposal(lane: Lane, raw: unknown, input: LoadedCase): ValidProposal {
-  if (!isRecord(raw)) throw new ProposalFailure("invalid_output", "top_level_object");
-  if (typeof raw.action !== "string") throw new ProposalFailure("invalid_output", "action_shape");
-  if (raw.action === "abstain") {
-    exactKeys(raw, lane === "derivation" ? ["action", "claims"] : ["action", "claims", "links"]);
-    nullWhenPresent(raw, lane === "derivation" ? ["claims"] : ["claims", "links"]);
-    return { action: "abstain", claims: [], links: [] };
+  let proposal: ReturnType<typeof validateEnrichmentProposal>;
+  try {
+    proposal = validateEnrichmentProposal(lane, raw, input.validationInput);
+  } catch (error) {
+    if (error instanceof EnrichmentFailure
+      && (error.failureClass === "invalid_output" || error.failureClass === "unsafe_output"))
+      throw new ProposalFailure(error.failureClass, "production_validator");
+    throw error;
   }
-  if (raw.action === "add") {
-    exactKeys(raw, lane === "derivation" ? ["action", "claims"] : ["action", "claims", "links"]);
-    nullWhenPresent(raw, lane === "reflection" ? ["links"] : []);
-    return { action: "add", claims: claims(raw.claims, lane, input), links: [] };
-  }
-  if (lane === "reflection" && raw.action === "link") {
-    exactKeys(raw, ["action", "claims", "links"]);
-    nullWhenPresent(raw, ["claims"]);
-    return { action: "link", claims: [], links: links(raw.links, input) };
-  }
-  throw new ProposalFailure("unsafe_output", "action_not_allowed");
+  if (proposal.action === "abstain") return { action: "abstain", claims: [], links: [] };
+  if (proposal.action === "add")
+    return { action: "add", claims: proposal.additions as NormalizedClaim[], links: [] };
+  return {
+    action: "link",
+    claims: [],
+    links: proposal.links.map(({ sourceClaimId, targetClaimId, relation }) => ({
+      source: sourceClaimId,
+      target: targetClaimId,
+      relation,
+    })),
+  };
 }
 
 function resolveId(value: string, loaded: LoadedCase): string {
@@ -1351,6 +1294,7 @@ function assertArtifactSafety(options: {
 }
 
 function selfTest(): void {
+  frozenSourceSnapshot();
   const { fixture, raw: fixtureRaw } = loadFixture();
   assert.equal(round(clusterBootstrapLowerBound(Array(24).fill(-0.01), 7)), -0.01);
   const nonInferiorityRecords = [
@@ -1475,38 +1419,20 @@ function selfTest(): void {
   }, channel);
   assert.equal(scoreProposal(unstable, channel).lexicalPass, false, "token substring must fail");
   const preference = loadedCase(fixture.cases.find(({ id }) => id === "d-id-preference")!);
-  const temporalMutation = validateProposal("derivation", {
-    action: "add",
-    claims: [{
-      kind: "preference",
-      statement: "Laporan mingguan dipilih dalam format PDF.",
-      valid_from: "2099-01-01T00:00:00.000Z",
-      valid_to: null,
-      evidence_ids: preference.orderedIds,
-    }],
-  }, preference);
-  const temporalMutationScore = scoreProposal(temporalMutation, preference);
-  assert.equal(temporalMutationScore.claimTp, 1);
-  assert.equal(temporalMutationScore.temporalPass, false);
-  assert.equal(temporalMutationScore.lexicalPass, false, "invented future validity must fail");
-  const endMutation = validateProposal("derivation", {
-    action: "add",
-    claims: [{
-      kind: "preference",
-      statement: "Laporan mingguan dipilih dalam format PDF.",
-      valid_from: null,
-      valid_to: "2099-01-01T00:00:00.000Z",
-      evidence_ids: preference.orderedIds,
-    }],
-  }, preference);
-  const endMutationScore = scoreProposal(endMutation, preference);
-  assert.equal(endMutationScore.claimTp, 1);
-  assert.equal(endMutationScore.temporalPass, false);
-  assert.notEqual(
-    decisionFingerprint(temporalMutation, temporalMutationScore),
-    decisionFingerprint(endMutation, endMutationScore),
-    "distinct wrong dates must not collapse into one repeat outcome",
-  );
+  for (const temporal of [
+    { valid_from: "2099-01-01T00:00:00.000Z", valid_to: null },
+    { valid_from: null, valid_to: "2099-01-01T00:00:00.000Z" },
+  ])
+    assert.throws(() => validateProposal("derivation", {
+      action: "add",
+      claims: [{
+        kind: "preference",
+        statement: "Laporan mingguan dipilih dalam format PDF.",
+        ...temporal,
+        evidence_ids: preference.orderedIds,
+      }],
+    }, preference), (error: unknown) =>
+      error instanceof ProposalFailure && error.code === "unsafe_output");
   const derivation = loadedCase(fixture.cases.find(({ id }) => id === "d-id-preference")!);
   const observationId = derivation.orderedIds[0]!;
   const add = {
@@ -1547,6 +1473,35 @@ function selfTest(): void {
       valid_to: "2026-08-01T00:00:00.000Z",
     }],
   }, derivation), (error: unknown) => error instanceof ProposalFailure && error.code === "invalid_output");
+  const reflectionAdd = loadedCase(fixture.cases.find(({ id }) => id === "r-en-pattern")!);
+  const reflectionClaim = {
+    kind: "procedural",
+    statement: "Rollback rehearsal improves release recovery.",
+    valid_from: null,
+    valid_to: null,
+    premise_ids: reflectionAdd.orderedIds,
+  };
+  assert.equal(validateProposal("reflection", {
+    action: "add",
+    claims: [reflectionClaim],
+    links: null,
+  }, reflectionAdd).action, "add");
+  for (const premiseIds of [
+    reflectionAdd.orderedIds.slice(0, -1),
+    [...reflectionAdd.orderedIds].reverse(),
+  ])
+    assert.throws(() => validateProposal("reflection", {
+      action: "add",
+      claims: [{ ...reflectionClaim, premise_ids: premiseIds }],
+      links: null,
+    }, reflectionAdd), (error: unknown) =>
+      error instanceof ProposalFailure && error.code === "unsafe_output");
+  assert.throws(() => validateProposal("reflection", {
+    action: "add",
+    claims: [{ ...reflectionClaim, valid_from: "2099-01-01T00:00:00.000Z" }],
+    links: null,
+  }, reflectionAdd), (error: unknown) =>
+    error instanceof ProposalFailure && error.code === "unsafe_output");
   const reflection = loadedCase(fixture.cases.find(({ id }) => id === "r-en-conflict")!);
   const wrongLinkA = validateProposal("reflection", {
     action: "link",
@@ -1680,6 +1635,7 @@ async function main(): Promise<void> {
     fixture: { path: FIXTURE_REPO_PATH, sha256: source.fixtureSha256 },
     runner: { path: RUNNER_REPO_PATH, sha256: source.runnerSha256 },
     production_contract: { path: CONTRACT_REPO_PATH, sha256: source.contractSha256 },
+    production_validation: { path: VALIDATION_REPO_PATH, sha256: source.validationSha256 },
     prompts: promptHashes,
     schemas: schemaHashes,
     mode: options.mode,

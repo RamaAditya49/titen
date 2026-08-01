@@ -2,10 +2,8 @@
 /**
  * Cycle-1, side-by-side retrieval benchmark for Titen 0.3.0 and self-hosted Mem0.
  *
- * Required environment:
- *   TITEN_URL=http://127.0.0.1:18787 TITEN_KEY=... \
- *   MEM0_URL=http://127.0.0.1:18888 MEM0_KEY=... \
- *   bun scripts/benchmark-mem0-replacement.ts --out /safe/result/path
+ * This historical lane is archived. Live execution is disabled; retain the
+ * source only to interpret its checked-in 0.3.0 artifacts.
  *
  * The output contains fixture IDs and aggregate scores, never credentials,
  * memory text, queries, provider responses, or embeddings.
@@ -246,9 +244,17 @@ function parseArgs(argv: string[]): Options | "self-test" | "help" {
 function usage() {
   return [
     "Usage:",
-    "  bun scripts/benchmark-mem0-replacement.ts --out DIR [--repeats 10] [--seed 20260731] [--concurrency 1] [--native-mem0]",
     "  bun scripts/benchmark-mem0-replacement.ts --self-test",
+    "  bun scripts/benchmark-mem0-replacement.ts --help",
+    "",
+    "Live execution is archived; create a release-bound runner for a new comparison.",
   ].join("\n");
+}
+
+function refuseArchivedLiveRun(): never {
+  throw new Error(
+    "This runner is an archived Titen 0.3.0 evidence lane. Create a new release-bound spec and runner for live comparisons.",
+  );
 }
 
 function rng(seed: number) {
@@ -933,6 +939,7 @@ async function selfTest() {
   assert.equal((parseArgs(["--out", "result", "--concurrency", "32"]) as Options).concurrency, 32);
   for (const invalid of ["0", "33", "1.5", "9007199254740992"])
     assert.throws(() => parseArgs(["--concurrency", invalid]));
+  assert.throws(refuseArchivedLiveRun, /archived Titen 0\.3\.0 evidence lane/);
   let active = 0;
   let peak = 0;
   const pooled = await mapBounded([0, 1, 2, 3, 4, 5], 3, async (value) => {
@@ -950,4 +957,4 @@ async function selfTest() {
 const parsed = parseArgs(process.argv.slice(2));
 if (parsed === "help") console.log(usage());
 else if (parsed === "self-test") await selfTest();
-else await run(parsed);
+else refuseArchivedLiveRun();

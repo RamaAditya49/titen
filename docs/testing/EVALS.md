@@ -281,8 +281,10 @@ open.
 
 [`scripts/benchmark-mem0-replacement.ts`](../../scripts/benchmark-mem0-replacement.ts)
 preserves this exact historical 0.3.0 lane; do not retarget it to a later
-release or reinterpret its artifacts as current capability evidence. A future
-replacement attempt needs a new release-bound spec and runner. It must not reuse
+release or reinterpret its artifacts as current capability evidence. Its CLI
+retains only `--help` and `--self-test`; a live invocation fails before service
+I/O or artifact creation. A future replacement attempt needs a new release-bound
+spec and runner. It must not reuse
 this tiny corpus as a production quality claim, compare its workstation
 telemetry as service-host telemetry, or count an external LLM harness as Titen
 enrichment.

@@ -122,9 +122,26 @@ test("readiness reports the vector capability only when one is configured", asyn
   assert.equal(off.body.data.capabilities.vector, "disabled");
   assert.equal(off.body.data.capabilities.model, "disabled");
 
+  const pending = await withVectors().call("GET", "/readyz");
+  assert.equal(pending.status, 503);
+  assert.equal(pending.body.meta.checks.semantic_index, "index_projection_pending");
+  const drained = await withVectors().call("POST", "/v1/index/drain?limit=100", { key });
+  assert.equal(drained.status, 200);
+
   const on = await withVectors().call("GET", "/readyz");
+  assert.equal(on.status, 200);
   assert.equal(on.body.data.capabilities.vector, "enabled");
   assert.equal(on.body.data.capabilities.model, "enabled");
+
+  // Preserve the pending fixture expected by the outage/recovery cases below.
+  await vectors.store.remove(claimIds);
+  await db.batch([{
+    sql: `UPDATE index_outbox
+             SET state = 'pending', attempts = 0,
+                 lease_token = NULL, lease_expires_at = NULL
+           WHERE record_id IN (${claimIds.map(() => "?").join(", ")})`,
+    params: claimIds,
+  }]);
 });
 
 test("compilation reports vector retrieval as used and calls the embedder", async () => {

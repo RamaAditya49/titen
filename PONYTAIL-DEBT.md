@@ -23,7 +23,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 | --- | --- | --- | --- |
 | `src/core/context.ts:85` | Anchor compilation to the current time | Point-in-time recall is unavailable | A caller needs historical recall; accept and thread an optional `at` through retrieval (#118) |
 | `src/core/db.ts:41` | Use one global SQL parameter chunk size | Wide lists multiply expensive statement round trips | A bounded query remains dominated by round trips after its SQL shape is fixed |
-| `src/core/enrichment.ts:603` | Use one durable cursor per scope and pipeline instead of a queue framework | A fixed 100-row page must eventually cover old anchors | **No source trigger.** |
+| `src/core/enrichment.ts:607` | Use one durable cursor per scope and pipeline instead of a queue framework | A fixed 100-row page must eventually cover old anchors | **No source trigger.** |
 | `src/core/idempotency.ts:21` | Keep a fixed 24-hour replay window | A re-ingest after one day can duplicate every record | Re-sync must converge independently of the replay window; add statement/content-hash uniqueness (#101) |
 | `src/core/indexing.ts:26` | Re-embed the current claim statement without tracking the indexed version | Repeated claim writes waste embedding calls | Store the indexed statement hash when measured repeated embeddings are material |
 | `src/core/maintenance.ts:30` | Run one bounded organization-ordered pass per tick | A busy tenant can delay others within a tick | Measured delay breaches the maintenance freshness window; add per-organization cursors |
@@ -40,7 +40,7 @@ is local and uses tracked Git content; it does not require hosted automation.
 
 | Location | Deliberate shortcut | Ceiling | Upgrade trigger |
 | --- | --- | --- | --- |
-| `scripts/benchmark-enrichment-model.ts:658` | Use locked lexical aliases as a deterministic contract scorer | It cannot judge free-form semantic quality | A free-form production corpus becomes a release gate; use blinded independent adjudication |
+| `scripts/benchmark-enrichment-model.ts:601` | Use locked lexical aliases as a deterministic contract scorer | It cannot judge free-form semantic quality | A free-form production corpus becomes a release gate; use blinded independent adjudication |
 
 ## Summary
 
