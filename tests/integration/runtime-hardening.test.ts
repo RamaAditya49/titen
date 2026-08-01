@@ -1,6 +1,6 @@
 import { afterEach, test } from "bun:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Db, Stmt } from "../../src/core/db";
@@ -308,4 +308,26 @@ test("the explicit WAL checkpoint policy stays bounded and survives restart", as
   const reopened = openDatabase(path);
   assert.equal((reopened.query("SELECT COUNT(*) AS count FROM writes").get() as { count: number }).count, 30_000);
   reopened.close();
+});
+
+test("canonical SQLite files stay owner-only across create and restart", () => {
+  const path = join(temporary(), "owner-only.db");
+  const previousUmask = process.umask(0o022);
+  try {
+    const database = openDatabase(path);
+    database.run("CREATE TABLE private_values (value TEXT NOT NULL)");
+    database.run("INSERT INTO private_values VALUES ('synthetic')");
+    for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+      assert.ok(existsSync(file), `${file} was not created`);
+      assert.equal(statSync(file).mode & 0o777, 0o600, `${file} is not owner-only`);
+    }
+    database.close();
+
+    chmodSync(path, 0o644);
+    const reopened = openDatabase(path);
+    assert.equal(statSync(path).mode & 0o777, 0o600);
+    reopened.close();
+  } finally {
+    process.umask(previousUmask);
+  }
 });

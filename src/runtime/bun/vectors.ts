@@ -15,6 +15,7 @@ import {
   embeddingProfileMatchesModel,
   validateEmbeddingResponse,
 } from "../../core/vectors";
+import { openDatabase } from "./sqlite";
 
 function normalizedFilePath(path: string): string {
   const absolute = resolve(path);
@@ -60,7 +61,7 @@ export function createSqliteVecStore(
     return null;
   let db: Database;
   try {
-    db = new Database(dbPath, { create: true });
+    db = openDatabase(dbPath);
   } catch {
     return null;
   }

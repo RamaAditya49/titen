@@ -89,6 +89,8 @@ Docker is not required.
   rather than a deployment-dependent default. With 4 KiB pages, the tested steady-state WAL
   stays below 5 MiB; the audited live WAL was about 4.0 MiB.
 - Service user: non-root `titen`.
+- Canonical, WAL, shared-memory, and optional vector database files are created
+  and reopened as owner-only (`0600`), independent of the service umask.
 - Configuration/credential files: mode `0600`.
 - TLS/public ingress: Caddy, Nginx, Cloudflare Tunnel, or private network.
 
