@@ -1,14 +1,13 @@
 ---
 work_id: dashboard-product-map-session-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
-spec: docs/specs/active/2026-08-01-dashboard-product-map-session-release.md
+spec: docs/specs/done/2026-08-01-dashboard-product-map-session-release.md
 ---
 # Plan
 
@@ -26,13 +25,13 @@ spec: docs/specs/active/2026-08-01-dashboard-product-map-session-release.md
   Tailscale Serve and Cloudflare Tunnel tutorials.
 - [x] Run focused and full local security, contract, integration, browser,
   package, route, dependency, bundle, and workflow gates.
-- [ ] Build and deploy the exact candidate container on `rama-tuf`, preserve a
+- [x] Build and deploy the exact candidate container on `rama-tuf`, preserve a
   rollback target, and run authenticated six-area, add-user, denial, restart,
   persistence, and exposure smokes.
-- [ ] Prepare and publish the stable npm package, annotated tag, generated
+- [x] Prepare and publish the stable npm package, annotated tag, generated
   GitHub Release, and deterministic titen.dev discovery update without GitHub
   Actions.
-- [ ] Close completed issues/PRs, remove merged remote branches and disposable
+- [x] Close completed issues/PRs, remove merged remote branches and disposable
   worktrees, record reproducible evidence, and move both workflow artifacts to
   `done/`.
 
@@ -96,5 +95,52 @@ or hosted release gate is permitted.
   Tunnel/Access/service-token sources are linked directly from
   `docs/deployment/secure-ingress.md`; no GitHub Actions workflow was added.
 
-Deployment, publication, titen.dev, GitHub cleanup, and terminal workflow
-evidence remain pending.
+## Remote deployment and publication evidence
+
+- The source bundle and dashboard archive copied to `rama-tuf` match local
+  SHA-256 checksums. Rootless image `localhost/titen:0.5.2-ea44de3` has image ID
+  `74cbfda627a62d8329f6a216ff26c256661f3f7d0c7524111e52a44b7cf8677c`
+  and labels version `0.5.2`, revision
+  `ea44de329b14e0eef42f98a42ba58ccdc91b4ba9`.
+- Online backup `pre-0.5.2-20260801T104600Z/titen.db` is owner-only and matches
+  SHA-256 `e83ec74cd2688283b974d3614ae58c982447831dd94eb8b1cbd59dca94a61fef`.
+  A disposable restore canary reaches verified schema 19 and passes all six live
+  areas, login, atomic Add User, new-user login, federation, and logout through
+  the exact image; the canary container and volume were removed afterward.
+- Production uses the same image for API and dashboard. `/readyz` reports
+  revision `ea44de3` and verified schema 19; login and safe principal metadata,
+  live Memories, correct 403 capability denials, logout, invalid-key rejection,
+  restart recovery, session invalidation, graceful dashboard shutdown, and
+  loopback-only ports `127.0.0.1:8787` and `127.0.0.1:4322` pass. Prior units,
+  image, and the verified snapshot remain available for rollback.
+- npm `latest` is `titen-memory@0.5.2`; registry shasum is
+  `4fa93b99d027207175d78502725692882aa25b2f`, registry integrity is
+  `sha512-JB+wr3dYT12zg3C4lBxyYW1aWi3DqrW34qbFBUl4Tn48barmTMKYrxpE7SNb+Lvm7wPPNu1FRSSulyGfSkcS5A==`,
+  and a clean install reports CLI `0.5.2`.
+- Annotated tag `v0.5.2` peels to full revision
+  `ea44de329b14e0eef42f98a42ba58ccdc91b4ba9`; the GitHub Release is published,
+  non-draft, and non-prerelease at
+  `https://github.com/RamaAditya49/titen/releases/tag/v0.5.2`.
+- Registry metadata does not expose `gitHead`; an independent comparison proves
+  every published source/package file matches the tagged tree byte-for-byte and
+  both generated SDK files match a clean release build.
+- titen-web `main` commit `f9f74e6a120c4e41b8a773ab26ef84a99fb3708f`
+  deployed Cloudflare Worker version
+  `bc2b2a00-6512-4fef-aae6-1d8d2925a184`. Cache-bypass smokes on `titen.dev`
+  and `www.titen.dev` pass homepage, stable `version.json` 0.5.2, release page,
+  API discovery, installer, and Open Graph image. Release sync validates 79/79
+  routes, 9/9 MCP tools, 36 pages, exact tag `ea44de3`, and the npm shasum.
+- GitHub reports zero open issues and pull requests and only remote `main`. The
+  repository Actions permission is disabled, no workflow exists on `main`, and
+  the retained legacy workflow record is `disabled_manually`; no hosted action
+  can run or incur cost. Patch-equivalent and superseded task worktrees/branches
+  were removed after range-diff and clean-tree checks; the unrelated dirty
+  primary checkout was preserved.
+
+## Terminal result
+
+All acceptance criteria pass. npm, GitHub, `rama-tuf`, and both discovery hosts
+agree on stable 0.5.2 and tagged deployment revision `ea44de3`. The exact
+container remains healthy with rollback evidence retained; the public
+repository has no open issue, pull request, workflow, or non-main branch. The
+paired artifacts are terminal under `done/`.

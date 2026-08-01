@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-product-map-session-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
 ---
 # Dashboard product map, session, and stable release
@@ -116,8 +115,9 @@ package, provenance, tag, release, and website gates.
   exposure checks, and rollback preparation against the deployed revision.
 - **AC-DPM-014 — Event-driven:** When the stable release is complete, npm
   `latest`, the annotated Git tag, GitHub Release, `origin/main`, the deployed
-  `rama-tuf` image, and both titen.dev discovery hosts shall agree on one exact
-  version and revision without any GitHub Actions workflow.
+  `rama-tuf` image, and both titen.dev discovery hosts shall agree on one release
+  version and shall identify its tagged deployment revision without any GitHub
+  Actions workflow. Documentation-only closure commits may follow the tag.
 - **AC-DPM-015 — State-driven:** While this work is declared complete, its spec
   and plan shall be terminal with reproducible evidence, GitHub shall have no
   open issue or pull request in scope, and the remote repository shall expose

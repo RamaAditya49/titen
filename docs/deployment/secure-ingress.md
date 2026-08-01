@@ -44,6 +44,19 @@ proxies to the loopback adapter, and applies the tailnet policy to connections.
   `443`.
 - The dashboard build and adapter pass their local verification.
 
+Install and authenticate the official stable Linux client on the host:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+tailscale status
+```
+
+The final command must list the host in the intended tailnet. Operators also
+install Tailscale on their own device using the platform link from the official
+install page. If piping an installer is disallowed, use Tailscale's stable
+distribution package instructions instead.
+
 On Linux, `tailscaled` normally runs as root. Either run the Serve commands with
 `sudo`, or delegate daemon management once to a trusted local account:
 
@@ -147,6 +160,7 @@ Stopping the adapter and removing Serve changes no canonical data.
 
 Official references:
 
+- [Install Tailscale on Linux](https://tailscale.com/docs/install/linux)
 - [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)
 - [`tailscale serve` command](https://tailscale.com/docs/reference/tailscale-cli/serve)
 - [Linux operator permission](https://tailscale.com/docs/reference/troubleshooting/linux/linux-operator-permission)
@@ -166,6 +180,34 @@ DNS, so create the Access application before adding the tunnel route.
 - `cloudflared` can reach Cloudflare on outbound port `7844`.
 - One human Access policy identifies dashboard operators.
 - Automated API clients, when needed, have a separate Service Auth policy.
+
+### Install `cloudflared` on Linux
+
+Use Cloudflare's signed package repository. On Debian or Ubuntu:
+
+```bash
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+  | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+  | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt-get update
+sudo apt-get install cloudflared
+cloudflared --version
+```
+
+On RHEL, Fedora, or a compatible distribution:
+
+```bash
+curl -fsSL https://pkg.cloudflare.com/cloudflared.repo \
+  | sudo tee /etc/yum.repos.d/cloudflared.repo >/dev/null
+sudo dnf install cloudflared
+cloudflared --version
+```
+
+The dashboard-generated command may install the remotely managed tunnel as a
+service after the binary is present. Its embedded token is a secret; run it
+only on the target host and do not paste it into an issue, log, or repository.
 
 ### Protect the hostname first
 
@@ -286,6 +328,7 @@ shared history.
 
 Official references:
 
+- [`cloudflared` downloads and packages](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/)
 - [Create a remotely managed tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/)
 - [Published applications and DNS](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/)
 - [Protect a self-hosted public application](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)
