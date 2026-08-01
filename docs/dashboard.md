@@ -22,14 +22,14 @@ Build once, then start the existing loopback adapter with a least-privilege key:
 pnpm build
 TITEN_DASHBOARD_LIVE=true \
 TITEN_API_URL=http://127.0.0.1:8787 \
-TITEN_API_KEY='replace-with-a-key-that-has-views:compile' \
+TITEN_API_KEY='replace-with-a-dashboard-read-key' \
 TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
 pnpm dashboard:adapter
 ```
 
 Open `http://127.0.0.1:4322/dashboard/`. The browser calls only same-origin
 `/dashboard-api/*` routes. The adapter keeps the upstream URL and API key in its
-process environment, forwards `/healthz`, `/readyz`, and the four current
+process environment, forwards `/healthz`, `/readyz`, and the six current
 read-only Atlas lenses, and never returns the key. Nothing is written to Web
 Storage.
 
@@ -37,12 +37,20 @@ Supported lenses:
 
 - Neighborhood and Conflict & freshness require a subject ID;
 - Evidence trace requires a focus claim ID;
-- Review queue accepts an optional subject filter.
+- Review queue accepts an optional subject filter;
+- Scope preview requires a focus principal ID;
+- Knowledge releases accepts an optional channel ID and otherwise returns all
+  authorized channel releases up to the requested limit.
+
+The four memory lenses need `views:compile`. Scope preview also needs
+`governance:read`; Knowledge releases also needs `releases:read`. Use all three
+scopes only when the dashboard must expose all six lenses.
 
 Empty, loading, disconnected, not-ready, unauthorized, forbidden, and upstream
 failure are distinct states. A failed request never falls back to synthetic
 records. Atlas remains the only active dashboard route; the product-map labels
-are non-interactive orientation until their backend and UI gates complete.
+are non-interactive and describe whether an area is visible through Atlas or
+remains headless.
 
 ## Verification
 
@@ -56,8 +64,10 @@ pnpm check:workflow
 
 The real smoke provisions a temporary Bun/SQLite service and proves health,
 readiness, evidence trace, neighborhood, conflict/freshness, review queue, and
-cross-subject exclusion through the adapter. Browser tests cover no-secret,
-no-storage, disconnected, loading, empty, denial, mobile, and keyboard paths.
+cross-subject exclusion through the adapter. Browser and adapter tests also
+cover the exact Scope preview and Knowledge releases input contracts, including
+an empty principal timestamp. Browser tests cover no-secret, no-storage,
+disconnected, loading, empty, denial, mobile, and keyboard paths.
 
 Refresh documentation captures explicitly with `pnpm screenshots`; ordinary
 test runs do not rewrite tracked images.

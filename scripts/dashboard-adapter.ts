@@ -15,7 +15,7 @@ if (upstream) { const parsed = new URL(upstream); if (!/^https?:$/.test(parsed.p
 const publicOrigin = publicOriginValue ? new URL(publicOriginValue) : null;
 if (publicOrigin && (!/^https?:$/.test(publicOrigin.protocol) || publicOrigin.username || publicOrigin.password || publicOrigin.pathname !== "/" || publicOrigin.search || publicOrigin.hash)) throw new Error("TITEN_DASHBOARD_ORIGIN must be an http(s) origin without credentials, path, query, or fragment");
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
-const lenses = new Set(["evidence_trace", "neighborhood", "conflict_freshness", "review_queue"]);
+const lenses = new Set(["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "knowledge_release"]);
 const reviewReasons = new Set(["all", "disputed", "contradiction", "low_confidence", "negative_feedback"]);
 function authorized(request: Request): boolean {
   const host = request.headers.get("host")?.toLowerCase();
@@ -83,7 +83,7 @@ Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     if (!lenses.has(lens) || subjectId === null || focusId === null || ownerId === null || cursor === null
       || !Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 100
       || !reviewReasons.has(reviewReason)
-      || (lens === "evidence_trace" && !focusId)
+      || ((lens === "evidence_trace" || lens === "scope_preview") && !focusId)
       || ((lens === "neighborhood" || lens === "conflict_freshness") && !subjectId))
       return json({ error: { code: "INVALID_REQUEST", message: "The selected lens requires bounded subject/focus input and limit 1..100." } }, 400);
     const payload = {

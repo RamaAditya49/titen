@@ -399,8 +399,10 @@ does not expose a verifiable address-pinning primitive.
 
 ## Optional live dashboard
 
-Build the static Astro client and run its adapter beside the loopback API. The
-key needs only `views:compile` and never enters browser assets or responses:
+Build the static Astro client and run its adapter beside the loopback API. A
+base dashboard key needs `views:compile`; add `governance:read` and
+`releases:read` only when exposing the two governance lenses. The key never
+enters browser assets or responses:
 
 ```bash
 pnpm build

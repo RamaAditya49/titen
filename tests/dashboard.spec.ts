@@ -98,3 +98,39 @@ test("validates lens-specific input and remains keyboard/mobile usable", async (
   await expect(page.locator(".inactive-area")).toHaveCount(6);
   await expect(page.locator(".inactive-area a")).toHaveCount(0);
 });
+
+test("compiles governance lenses with their exact focus contracts", async ({ page }) => {
+  await mockService(page);
+  const bodies: Record<string, unknown>[] = [];
+  await page.route("**/dashboard-api/atlas/compile", async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    bodies.push(body);
+    const node = body.lens === "scope_preview"
+      ? { id: "principal_ops", type: "principal", label: "agent", trust: "n/a", status: "active", created_at: "" }
+      : { id: "release_1", type: "release", label: "Reviewed rollback procedure", trust: "reviewed_snapshot", status: "active", created_at: "2026-08-01T00:00:00Z" };
+    await route.fulfill({ json: { data: { lens: body.lens, focus_id: body.focus_id ?? null, nodes: [node], edges: [], metadata: {} } } });
+  });
+  await page.goto("/dashboard/");
+
+  await page.getByText("Scope preview", { exact: true }).click();
+  await expect(page.getByLabel("Focus principal ID")).toHaveAttribute("required", "");
+  await expect(page.getByText("Required for Scope preview.")).toBeVisible();
+  await page.getByLabel("Focus principal ID").fill("principal_ops");
+  await page.getByRole("button", { name: "Compile authorized view" }).click();
+  await expect(page.locator("[data-inspector-title]")).toHaveText("agent");
+  await expect(page.getByText("Invalid Date")).toHaveCount(0);
+
+  await page.getByText("Knowledge releases", { exact: true }).click();
+  await expect(page.getByLabel("Focus channel ID")).not.toHaveAttribute("required", "");
+  await expect(page.getByText("Optional; leave blank to include all authorized channels.")).toBeVisible();
+  await page.getByLabel("Focus channel ID").clear();
+  await page.getByRole("button", { name: "Compile authorized view" }).click();
+  await expect(page.locator("[data-inspector-title]")).toHaveText("Reviewed rollback procedure");
+
+  expect(bodies).toEqual([
+    { lens: "scope_preview", limit: 50, focus_id: "principal_ops" },
+    { lens: "knowledge_release", limit: 50 },
+  ]);
+  await expect(page.locator(".inactive-area").filter({ hasText: "Governance" })).toContainText("2 live lenses");
+  await expect(page.locator(".inactive-area").filter({ hasText: "Federation" })).toContainText("canonical recall");
+});

@@ -6,12 +6,21 @@ import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
 import packageJson from "../../../package.json";
 
-const productAreas = ["Memories", "Context", "Work", "Audit", "Governance", "Federation"];
+const productAreas = [
+  { name: "Memories", status: "4 live lenses" },
+  { name: "Context", status: "headless API" },
+  { name: "Work", status: "headless API" },
+  { name: "Audit", status: "Atlas refs" },
+  { name: "Governance", status: "2 live lenses" },
+  { name: "Federation", status: "canonical recall" },
+];
 const lenses = [
   { id: "neighborhood", label: "Neighborhood", needs: "subject" },
   { id: "evidence_trace", label: "Evidence trace", needs: "focus" },
   { id: "conflict_freshness", label: "Conflict & freshness", needs: "subject" },
   { id: "review_queue", label: "Review queue", needs: "optional" },
+  { id: "scope_preview", label: "Scope preview", needs: "focus" },
+  { id: "knowledge_release", label: "Knowledge releases", needs: "optional" },
 ];
 ---
 
@@ -39,7 +48,7 @@ const lenses = [
           <p>Memory</p>
           <a href="/dashboard/" aria-current="page">Memory Atlas</a>
           <p>Product map</p>
-          {productAreas.map((area) => <span class="inactive-area">{area}<small>not wired</small></span>)}
+          {productAreas.map((area) => <span class="inactive-area">{area.name}<small>{area.status}</small></span>)}
         </nav>
 
         <section class="credential-note" aria-label="Credential handling">
@@ -110,7 +119,7 @@ const lenses = [
                 <small data-subject-help>Required for the selected lens.</small>
               </label>
               <label>
-                <span>Focus claim ID</span>
+                <span data-focus-label>Focus claim ID</span>
                 <input name="focus_id" autocomplete="off" maxlength="200" placeholder="claim ID for evidence trace" />
                 <small data-focus-help>Used only by Evidence trace.</small>
               </label>
@@ -221,10 +230,26 @@ const lenses = [
         const selected = one<HTMLInputElement>('input[name="lens"]:checked');
         const subject = form.elements.namedItem("subject_id") as HTMLInputElement;
         const focus = form.elements.namedItem("focus_id") as HTMLInputElement;
+        const lens = selected.value;
         subject.required = selected.dataset.needs === "subject";
         focus.required = selected.dataset.needs === "focus";
-        text("[data-subject-help]", subject.required ? "Required for the selected lens." : "Optional filter for Review queue.");
-        text("[data-focus-help]", focus.required ? "Required for Evidence trace." : "Used only by Evidence trace.");
+        text("[data-subject-help]", subject.required ? "Required for the selected lens." : lens === "review_queue" ? "Optional filter for Review queue." : "Not used by the selected lens.");
+        const focusCopy = lens === "evidence_trace"
+          ? ["Focus claim ID", "claim ID for evidence trace", "Required for Evidence trace."]
+          : lens === "scope_preview"
+            ? ["Focus principal ID", "principal ID to preview", "Required for Scope preview."]
+            : lens === "knowledge_release"
+              ? ["Focus channel ID", "optional channel ID", "Optional; leave blank to include all authorized channels."]
+              : ["Focus ID", "not used by selected lens", "Not used by the selected lens."];
+        text("[data-focus-label]", focusCopy[0]);
+        focus.placeholder = focusCopy[1];
+        text("[data-focus-help]", focusCopy[2]);
+      }
+
+      function formatDate(value: string, detailed = false): string | undefined {
+        if (!value) return;
+        const date = new Date(value);
+        return Number.isNaN(date.valueOf()) ? undefined : detailed ? date.toLocaleString() : date.toLocaleDateString();
       }
 
       function addField(list: HTMLDListElement, label: string, value: unknown) {
@@ -247,7 +272,7 @@ const lenses = [
         addField(fields, "Type", node.type);
         addField(fields, "Trust", node.trust);
         addField(fields, "Status", node.status);
-        addField(fields, "Created", new Date(node.created_at).toLocaleString());
+        addField(fields, "Created", formatDate(node.created_at, true));
         addField(fields, "Freshness", node.freshness === undefined ? undefined : `${node.freshness} days`);
         addField(fields, "Confidence", node.confidence);
         addField(fields, "Priority", node.priority);
@@ -293,7 +318,7 @@ const lenses = [
           kind.textContent = node.type;
           kind.className = "record-kind";
           label.textContent = node.label;
-          detail.textContent = `${node.trust} · ${node.status} · ${new Date(node.created_at).toLocaleDateString()}`;
+          detail.textContent = [node.trust, node.status, formatDate(node.created_at)].filter(Boolean).join(" · ");
           button.append(kind, label, detail);
           button.addEventListener("click", () => inspect(node));
           records.append(button);

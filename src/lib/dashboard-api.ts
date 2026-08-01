@@ -1,7 +1,7 @@
 /** Browser-safe client for the same-origin dashboard adapter. */
 export interface AtlasNode {
   id: string;
-  type: "claim" | "observation";
+  type: "claim" | "observation" | "principal" | "release";
   label: string;
   trust: string;
   status: string;
@@ -19,7 +19,7 @@ export interface AtlasNode {
 
 export interface AtlasEdge { from: string; to: string; relation: string; }
 export interface AtlasView {
-  lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue";
+  lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue" | "scope_preview" | "knowledge_release";
   focus_id: string | null;
   nodes: AtlasNode[];
   edges: AtlasEdge[];

@@ -14,11 +14,13 @@ pnpm dashboard:adapter
 # open http://127.0.0.1:4322/dashboard/
 ```
 
-Use a least-privilege key with `views:compile`. Never put credentials in
+Use a least-privilege key with `views:compile`; add `governance:read` for Scope
+preview and `releases:read` for Knowledge releases. Never put credentials in
 `PUBLIC_*` variables: Astro embeds those in browser assets. The adapter exposes
-an exact `/dashboard-api/*` allowlist, validates lens-specific input, caps the
-limit at 100, times out upstream calls after five seconds, uses no-store JSON,
-and preserves generic 401/403/404/503 states without relaying upstream secrets.
+an exact `/dashboard-api/*` allowlist, validates lens-specific subject, claim,
+principal, and optional channel input, caps the limit at 100, times out upstream
+calls after five seconds, uses no-store JSON, and preserves generic
+401/403/404/503 states without relaying upstream secrets.
 
 The adapter still binds loopback when `TITEN_DASHBOARD_ORIGIN` is set; that
 value only allowlists one exact reverse-proxy Host/Origin. It supports an HTTPS
