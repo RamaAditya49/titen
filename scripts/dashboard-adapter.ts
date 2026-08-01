@@ -41,7 +41,7 @@ async function staticFile(raw: string): Promise<Response> {
     const canonicalRel = relative(root, canonical);
     if (canonicalRel.startsWith(`..${sep}`) || canonicalRel === ".." || isAbsolute(canonicalRel)) return new Response("Not found", { status: 404 });
     return new Response(Bun.file(canonical), { headers: {
-      "content-security-policy": "default-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
+      "content-security-policy": "default-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
       "referrer-policy": "no-referrer",
       "x-content-type-options": "nosniff",
     } });

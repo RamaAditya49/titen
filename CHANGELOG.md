@@ -17,6 +17,13 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-08-01
+
+### Fixed
+
+- The dashboard content security policy now permits its bundled Titen mark data
+  URI, so the release logo renders without allowing remote image sources.
+
 ## [0.5.0] — 2026-08-01
 
 ### Upgrade notes

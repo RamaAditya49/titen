@@ -230,7 +230,7 @@ client. It uses a loopback same-origin adapter, keeps the API key server-side,
 and shows no fixture fallback when disconnected or denied. Its six lenses cover
 evidence trace, neighborhood, conflict and freshness, review work, governance
 scope, and knowledge releases. An external URL is intentionally absent until
-the `0.5.0` deployment smoke passes. The
+the `0.5.1` deployment smoke passes. The
 [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
 documents configuration, tests, and the hosting boundary.
 
