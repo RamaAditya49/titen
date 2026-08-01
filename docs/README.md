@@ -38,13 +38,13 @@ context without a documentation-site dependency.
 
 | Surface                            | Current state                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Astro dashboard | Six authorized Atlas lenses use the live same-origin adapter; local Bun/SQLite checks pass and external `0.5.0` deployment evidence is pending |
+| Astro dashboard | Six authorized Atlas lenses use the live same-origin adapter; `0.5.1` passes local browser checks and the exact Podman deployment smoke on `rama-tuf` |
 | Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
 | Enterprise governance | Roles, policies, approvals, releases, retention, legal holds, identity mappings, and two governance Atlas lenses pass the shared contract |
 | Canonical federation | Opt-in signed claim/evidence bundles preserve provenance and conflicts; filtered import, replay, source binding, and cross-scope failures pass the shared contract |
 | Optional embedding/indexing | Implemented on Bun and in Cloudflare adapter code; deployment evidence varies |
 | Automatic LLM derivation/reflection | Implemented and dual-runtime tested; opt-in and not production-activated |
-| Live deployment | One earlier Bun/container embedding smoke is recorded; the exact `0.5.0` API and dashboard smoke is still pending |
+| Live deployment | Exact `0.5.1` API and dashboard run as rootless Quadlets on `rama-tuf`; restart, backup/restore, read-only migration, six-lens adapter, and loopback-only API checks pass |
 
 ## Documentation rules
 

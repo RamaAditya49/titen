@@ -1,12 +1,11 @@
 ---
 work_id: enterprise-canonical-stable-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
 ---
 # Enterprise, canonical federation, live dashboard, and stable release
@@ -92,3 +91,20 @@ stable replacement candidate.
 Every criterion has current reproducible evidence, domain specs/plans are in
 `done`, this pair is in `done` with no unchecked step, the public package/tag and
 deployed revision agree, and the final dashboard URL passes a fresh smoke.
+
+## Terminal evidence
+
+- `main`, `v0.5.1`, the GitHub Release, npm `latest`, the `rama-tuf` images, and
+  the live dashboard all resolve to release `0.5.1`; the deployed revision is
+  `3d53431`.
+- Bun/vector/SDK passed 129/129, integration passed 182/182, browser passed 5/5,
+  D1 passed all 105 cases, package install passed 9/9, and the production
+  dependency audit reported no known vulnerabilities.
+- `rama-tuf` passed schema 19 readiness, signed canonical federation recall,
+  six Atlas lenses, restart persistence, disposable restore, a read-only
+  migration probe, visual dashboard inspection, and direct API denial.
+- `titen.dev` and `www.titen.dev` publish stable discovery `0.5.1`; GitHub has no
+  open issue or PR and the remote has only `main`.
+- The operator link `http://127.0.0.1:4322/dashboard/` passes through an
+  SSH-over-Tailnet loopback tunnel; no public firewall port or GitHub Action was
+  introduced.

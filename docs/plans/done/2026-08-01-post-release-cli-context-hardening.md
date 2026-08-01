@@ -1,14 +1,13 @@
 ---
 work_id: post-release-cli-context-hardening-20260801
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
-spec: docs/specs/active/2026-08-01-post-release-cli-context-hardening.md
+spec: docs/specs/done/2026-08-01-post-release-cli-context-hardening.md
 ---
 # Plan
 
@@ -28,10 +27,19 @@ spec: docs/specs/active/2026-08-01-post-release-cli-context-hardening.md
   replacement NO-GO report that stops at the failed hard gate.
 - [x] Run focused then complete local verification, package smoke, workflow,
   audit, secret, and diff gates; record deployment as not applicable.
-- [ ] Push the verified exact commit to `main`, comment and close #208–#212 with
+- [x] Push the verified exact commit to `main`, comment and close #208–#212 with
   exact evidence, and leave no temporary remote branch.
-- [ ] Move this pair to `done/`, record terminal evidence, rerun workflow checks,
+- [x] Move this pair to `done/`, record terminal evidence, rerun workflow checks,
   and push the closure while leaving the primary dirty checkout unchanged.
+
+## Verification
+
+- CLI integration 11/11 covers missing/unready databases, unknown organization
+  and key, active/already-revoked outcomes, output bounds, and filesystem state.
+- Bun/vector/SDK 129/129, workerd/D1 all 105 cases, integration 182/182,
+  package 9/9, workflow, dependency audit, and diff checks pass.
+- Issues #208-#212 contain closure evidence; the checksummed `0.4.1` report stays
+  terminal NO-GO while the fixes ship in stable `0.5.1`.
 
 ## Acceptance evidence mapping
 

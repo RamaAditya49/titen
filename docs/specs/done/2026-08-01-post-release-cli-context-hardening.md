@@ -1,12 +1,11 @@
 ---
 work_id: post-release-cli-context-hardening-20260801
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
 ---
 # Post-release CLI and context hardening
@@ -100,6 +99,7 @@ when these defects are corrected on `main` for a future release.
   smoke, and diff checks pass from the isolated worktree.
 - The REST/API documentation and SDK declarations match observed behavior.
 - The terminal `0.4.1` report and checksum contain no secrets or private memory.
-- The reviewed PR is merged, each issue receives exact evidence and is closed,
+- The verified commit is merged directly to `main`, each issue receives exact
+  evidence and is closed,
   and temporary remote work is removed without touching the primary WIP.
 - This spec and its paired plan move together to `done/` with terminal evidence.

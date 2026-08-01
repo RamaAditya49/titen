@@ -1,18 +1,17 @@
 ---
 work_id: enterprise-canonical-stable-release
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
-spec: docs/specs/active/2026-08-01-enterprise-canonical-stable-release.md
+spec: docs/specs/done/2026-08-01-enterprise-canonical-stable-release.md
 ---
 # Plan — enterprise, canonical federation, dashboard, and stable release
 
-Spec: [enterprise-canonical-stable-release](../../specs/active/2026-08-01-enterprise-canonical-stable-release.md)
+Spec: [enterprise-canonical-stable-release](../../specs/done/2026-08-01-enterprise-canonical-stable-release.md)
 
 - [x] Audit current main, live host, open issues, roadmap gaps, and architecture.
 - [x] Implement and verify the paired enterprise-governance work item.
@@ -23,12 +22,12 @@ Spec: [enterprise-canonical-stable-release](../../specs/active/2026-08-01-enterp
       weakening cross-scope or lifecycle guarantees.
 - [x] Run complete Bun, workerd/D1, integration, type, build, workflow, Ponytail,
       package-install, and clean-tree checks.
-- [ ] Build and deploy the exact candidate on `rama-tuf`; run live, restart,
+- [x] Build and deploy the exact candidate on `rama-tuf`; run live, restart,
       persistence, backup/restore, and dashboard browser/HTTP smokes.
-- [ ] Merge the verified commit to `main`, publish npm and GitHub release assets,
+- [x] Merge the verified commit to `main`, publish npm and GitHub release assets,
       update stable release discovery, and verify a clean install.
-- [ ] Comment on and close #208-#212, sweep merged/obsolete branches, move every
-      paired artifact to `done`, and record terminal evidence.
+- [x] Comment on and close #208-#212 and sweep merged/obsolete remote branches.
+- [x] Move every paired artifact to `done`, and record terminal evidence.
 
 ## Acceptance evidence mapping
 
@@ -55,10 +54,24 @@ Spec: [enterprise-canonical-stable-release](../../specs/active/2026-08-01-enterp
 - AC-ECS-009: final local gates pass D1 105/105, Bun/vector/SDK 129/129,
   integration 182/182, browser 5/5, 78 route docs, workflow, package 9/9, and
   production dependency audit without GitHub Actions.
-- AC-ECS-010: pending final `rama-tuf` production switch, restart/restore smoke,
-  tailnet dashboard smoke, and direct-API denial evidence.
-- AC-ECS-011: pending exact main/tag/npm/GitHub/titen.dev publication and issue
-  closure evidence.
+- AC-ECS-010: rootless Quadlets run exact `3d53431` on `rama-tuf`; schema 19,
+  signed canonical recall, six Atlas lenses, restart persistence, disposable
+  restore, read-only migration, visual logo, and direct-tailnet API denial pass.
+  The operator URL is served through an SSH-over-Tailnet loopback tunnel because
+  native Serve requires one operator-level sudo registration on the host.
+- AC-ECS-011: exact `main`, `v0.5.1`, GitHub Release, npm `latest`, titen.dev
+  discovery, zero open issues/PRs, and the main-only remote branch are verified.
+
+## Verification
+
+- Local: D1 105/105; Bun/vector/SDK 129/129; integration 182/182; browser
+  5/5; route docs 78; workflow and Ponytail debt; package 9/9; production audit
+  with no known vulnerability.
+- Distribution: npm `titen-memory@0.5.1` clean install, CLI version, plain-Node
+  SDK import, annotated tag, GitHub Release, and titen.dev stable manifest pass.
+- Runtime: exact image/revision `3d53431`, schema 19, canonical federation,
+  six Atlas lenses, restart, backup/restore, read-only migration, visual UI,
+  loopback API, and the operator tunnel URL pass on `rama-tuf`.
 
 ## Rollback
 
