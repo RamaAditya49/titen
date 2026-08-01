@@ -56,8 +56,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   or key and no longer report a false revocation success.
 - `titen backup` reapplies owner-only permissions after atomic replacement, so
   container bind mounts cannot leave the finished backup group- or world-readable.
-- `titen migrate --dry-run` no longer changes file permissions, so it works on
-  a read-only pre-upgrade database mount.
+- `titen migrate --dry-run` no longer changes file permissions or requires a
+  writable database directory, so it works on a read-only pre-upgrade mount.
 
 ### Security
 

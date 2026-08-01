@@ -348,10 +348,18 @@ test("migrate dry-run is read-only and schema output is deterministic", () => {
   assert.deepEqual(fresh.files, []);
 
   assert.equal(run("dry-run-current", ["bootstrap", "--db", "current.db"]).exitCode, 0);
-  chmodSync(join(root, "dry-run-current", "current.db"), 0o400);
-  const before = statSync(join(root, "dry-run-current", "current.db"));
-  const current = run("dry-run-current", ["migrate", "--db", "current.db", "--dry-run"]);
-  const after = statSync(join(root, "dry-run-current", "current.db"));
+  const currentDirectory = join(root, "dry-run-current");
+  const currentPath = join(currentDirectory, "current.db");
+  chmodSync(currentPath, 0o400);
+  const before = statSync(currentPath);
+  chmodSync(currentDirectory, 0o500);
+  let current: ReturnType<typeof run>;
+  try {
+    current = run("dry-run-current", ["migrate", "--db", "current.db", "--dry-run"]);
+  } finally {
+    chmodSync(currentDirectory, 0o700);
+  }
+  const after = statSync(currentPath);
   assert.equal(current.exitCode, 0, current.output);
   assert.match(current.output, /-- 0 migration\(s\) pending; database unchanged/);
   assert.equal(after.size, before.size);

@@ -10,7 +10,8 @@ import { parseSecretCipher } from "../../core/secrets";
 import { TITEN_VERSION } from "../../core/version";
 import { createBunWebhookSecurity } from "./webhooks";
 import { fetchStableRelease, stableVersionStatus } from "./release";
-import { chmodSync, existsSync, renameSync, rmSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
 const USAGE = `titen — self-hosted memory service
@@ -141,11 +142,19 @@ async function withDb<T>(
   run: (db: ReturnType<typeof createSqliteDb>) => Promise<T>,
   options?: Parameters<typeof openDatabase>[1],
 ) {
-  const database = openDatabase(path, options);
+  const sidecars = [`${path}-wal`, `${path}-shm`, `${path}-journal`];
+  const snapshotDirectory = options?.readonly && !sidecars.some(existsSync)
+    ? mkdtempSync(join(tmpdir(), "titen-readonly-"))
+    : undefined;
+  const databasePath = snapshotDirectory ? join(snapshotDirectory, basename(path)) : path;
+  let database: ReturnType<typeof openDatabase> | undefined;
   try {
+    if (snapshotDirectory) copyFileSync(path, databasePath);
+    database = openDatabase(databasePath, options);
     return await run(createSqliteDb(database));
   } finally {
-    database.close();
+    database?.close();
+    if (snapshotDirectory) rmSync(snapshotDirectory, { recursive: true, force: true });
   }
 }
 
