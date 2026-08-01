@@ -1,7 +1,7 @@
 ---
 work_id: enterprise-canonical-stable-release
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-01

@@ -14,22 +14,22 @@ spec: docs/specs/active/2026-08-01-post-release-cli-context-hardening.md
 
 - [x] Inventory issues #208–#212, preserve the dirty primary checkout, and
   create an isolated branch from current `origin/main`.
-- [ ] Reproduce the exact `0.4.1` CLI failures in an isolated install and retain
+- [x] Reproduce the exact `0.4.1` CLI failures in an isolated install and retain
   only bounded package identity and outcome evidence.
-- [ ] Add one existing-database/schema guard for local key commands, preflight
+- [x] Add one existing-database/schema guard for local key commands, preflight
   organization authority, and make revocation outcomes explicit.
-- [ ] Add focused CLI regressions for missing/unready databases, unknown
+- [x] Add focused CLI regressions for missing/unready databases, unknown
   organizations and keys, active revocation, and already-revoked behavior.
-- [ ] Extend the existing packer result with deduplicated omission counts and
+- [x] Extend the existing packer result with deduplicated omission counts and
   surface additive budget metadata through REST and SDK types.
-- [ ] Add all-too-large, partial-fit, full-fit, and duplicate-only regressions to
+- [x] Add all-too-large, partial-fit, full-fit, and duplicate-only regressions to
   the shared dual-runtime contract and focused packing tests.
-- [ ] Update the API reference and write a sanitized, checksummed `0.4.1`
+- [x] Update the API reference and write a sanitized, checksummed `0.4.1`
   replacement NO-GO report that stops at the failed hard gate.
-- [ ] Run focused then complete local verification, package smoke, workflow,
+- [x] Run focused then complete local verification, package smoke, workflow,
   audit, secret, and diff gates; record deployment as not applicable.
-- [ ] Commit with CADIS attribution, push a review branch, merge the PR, comment
-  and close #208–#212 with exact evidence, and remove the merged remote branch.
+- [ ] Push the verified exact commit to `main`, comment and close #208–#212 with
+  exact evidence, and leave no temporary remote branch.
 - [ ] Move this pair to `done/`, record terminal evidence, rerun workflow checks,
   and push the closure while leaving the primary dirty checkout unchanged.
 
