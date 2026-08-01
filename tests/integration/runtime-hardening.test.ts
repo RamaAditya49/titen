@@ -9,6 +9,7 @@ import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { observedSemanticReadiness } from "../../src/core/vectors";
+import cloudflareWorker from "../../src/runtime/cloudflare/worker";
 import {
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
@@ -25,6 +26,33 @@ const temporary = () => {
 afterEach(() => {
   for (const directory of directories.splice(0))
     rmSync(directory, { recursive: true, force: true });
+});
+
+test("Cloudflare health returns before touching a stalled D1 binding", async () => {
+  let calls = 0;
+  const stalled = new Promise<never>(() => {});
+  const statement = {
+    bind() { return statement; },
+    all() { calls += 1; return stalled; },
+    run() { calls += 1; return stalled; },
+  };
+  const response = await Promise.race([
+    cloudflareWorker.fetch(new Request("https://titen.test/healthz?probe=1"), {
+      DB: {
+        prepare() { calls += 1; return statement; },
+        batch() { calls += 1; return stalled; },
+      },
+      TITEN_REVISION: "health-probe",
+    }),
+    Bun.sleep(100).then(() => { throw new Error("health waited on D1"); }),
+  ]);
+  assert.equal(response.status, 200);
+  assert.equal(calls, 0);
+  assert.deepEqual((await response.json() as any).data, {
+    status: "ok",
+    runtime: "cloudflare-d1",
+    revision: "health-probe",
+  });
 });
 
 test("a failed migration version rolls back fully and succeeds on retry", async () => {

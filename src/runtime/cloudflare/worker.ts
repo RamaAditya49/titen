@@ -8,6 +8,7 @@ import { parseSecretCipher, prepareSigningSecrets } from "../../core/secrets";
 import type { WebhookSecurity } from "../../core/webhook-security";
 import { configureHttpExtraction } from "../../core/extraction";
 import { withD1Budget } from "./d1-budget";
+import { newRequestId, success } from "../../core/http";
 
 export interface Env {
   DB: D1Database;
@@ -98,6 +99,14 @@ let secretPreparation: Promise<boolean> | undefined;
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method === "GET" && new URL(request.url).pathname === "/healthz")
+      return success({
+        data: {
+          status: "ok",
+          runtime: "cloudflare-d1",
+          revision: env.TITEN_REVISION ?? "dev",
+        },
+      }, newRequestId());
     const extractionConfig = extraction(env);
     const unbudgeted = createD1Db(env.DB);
     const db = extractionConfig.capability ? withD1Budget(unbudgeted).db : unbudgeted;

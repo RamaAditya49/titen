@@ -33,7 +33,7 @@ export function createVectorizeStore(index: VectorizeIndex): VectorStore {
     },
     async query(vector, options) {
       const result = await index.query(Array.from(vector), {
-        topK: options.topK,
+        topK: Math.min(options.topK, 100),
         filter: options.filter,
       });
       return result.matches.map(m => ({ id: m.id, score: m.score }));

@@ -240,6 +240,22 @@ test("Vectorize receives the same canonical metadata and query filter", async ()
   assert.deepEqual(queried, { topK: 2, filter: scope });
 });
 
+test("Vectorize caps native queries without changing scope filters", async () => {
+  let queried: unknown;
+  const store = createVectorizeStore({
+    async upsert() {},
+    async query(_vector, options) {
+      if (options.topK > 100) throw new Error("maximum topK is 100");
+      queried = options;
+      return { matches: [] };
+    },
+    async deleteByIds() {},
+  });
+  const filter = { org_id: "org", subject_id: "subject", project_id: "project" };
+  await store.query(new Float32Array([1, 0]), { topK: 200, filter });
+  assert.deepEqual(queried, { topK: 100, filter });
+});
+
 test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
   // With no vector signal, record the order lexical scoring alone produces.
   const lexical = await withoutVectors().call("POST", "/v1/context/compile", {
