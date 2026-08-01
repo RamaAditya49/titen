@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "titen-test-api",
+  "account_id": "1f03ef9341578616b38680e5c3d5d103",
+  "main": "src/runtime/cloudflare/worker.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "TITEN_REVISION": "dev",
+    "TITEN_AUTO_MIGRATE": "0",
+    "TITEN_EMBED_MODEL": "@cf/baai/bge-m3",
+    "TITEN_EMBED_DIMS": "1024",
+    "TITEN_EMBED_REVISION": "cloudflare-catalog-eed32bc1-8775-4985-89ce-dd1405508ad8-observed-2026-08-01",
+    "TITEN_EMBED_PROFILE": "raw-unit-v1",
+    "TITEN_EMBED_MIN_COSINE": "0.50"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "titen-test-db",
+      "database_id": "c14eba7b-2e16-4983-838e-e526c2513a17",
+      "remote": true
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "titen-test-claims-v1",
+      "remote": true
+    }
+  ],
+  "ai": { "binding": "AI", "remote": true },
+  "triggers": { "crons": ["*/5 * * * *"] }
+}

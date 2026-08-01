@@ -82,7 +82,7 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   } }));
   await page.route("**/dashboard-api/session", async (route) => {
     if (route.request().method() === "POST") {
-      expect(route.request().postDataJSON()).toEqual({ username: "rama", password: "correct horse battery staple" });
+      expect(route.request().postDataJSON()).toEqual({ username: "owner", password: "correct horse battery staple" });
       loggedIn = true;
       return route.fulfill({ status: 201, headers: { "set-cookie": "titen_dashboard_session=opaque; Path=/; HttpOnly; SameSite=Strict" }, json: { data: principal } });
     }
@@ -143,7 +143,8 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await expect(page.locator(".sidebar")).toBeHidden();
   await expect(page.locator(".topbar")).toBeHidden();
   await expect(page.getByLabel("Username").first()).toBeVisible();
-  await page.locator('[data-login-form] input[name="username"]').fill("rama");
+  await expect(page.locator('[data-login-form] input[name="username"]')).toHaveAttribute("placeholder", "owner");
+  await page.locator('[data-login-form] input[name="username"]').fill("owner");
   await page.locator('[data-login-form] input[name="password"]').fill("correct horse battery staple");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
