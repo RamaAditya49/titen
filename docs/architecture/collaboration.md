@@ -168,16 +168,15 @@ Enterprise capabilities are layered onto the same model:
 SSO, SCIM, and policy language are integration boundaries, not mandatory kernel
 dependencies.
 
-## Signed federation event exchange
+## Signed federation event and canonical-memory exchange
 
-The implemented federation feature exchanges authorized, signed event records
-between Titen deployments. It is a transport and conflict-observation boundary,
-not canonical recallable-memory federation. Receiving an event does not by
-itself ingest the remote observation or claim into the destination canonical
-store, authorize it for recall, index it, or make it appear in compiled context.
-Those canonical federation semantics remain **Planned** and require a separate
-work item. Event exchange is needed only when one deployment cannot satisfy
-ownership, region, or network boundaries.
+The implemented default exchanges authorized signed event records between
+Titen deployments. `include_memory=true` adds one explicit mode for active or
+disputed organization-visible direct claims: the source hydrates the complete
+authorized evidence graph, and the signed destination push imports it into
+canonical SQL only under the destination principal's peer and import authority.
+Private/team memory, incomplete evidence, and model-enrichment graphs are
+rejected rather than widened or partially copied.
 
 Event-exchange constraints:
 
@@ -189,6 +188,26 @@ Event-exchange constraints:
 - never replicate credentials;
 - preserve conflicts instead of last-write-wins;
 - allow a scope to stop sharing without corrupting local history.
+
+Canonical-import constraints:
+
+- require explicit claim filters on both peers plus source `export:read` and
+  destination `import:write`; project creation additionally needs
+  `projects:create`;
+- bind one source organization to the destination peer on its first successful
+  canonical import; the peer row and record trigger make that binding immutable
+  and race-safe;
+- bind every remote observation and claim identity to one immutable payload
+  hash and deterministic local ID in `federated_records`;
+- store canonical actors as the destination principal while retaining remote
+  actor, source organization, timestamp, ID, and payload hash as provenance;
+- rebuild FTS and optional vector work from canonical SQL, preserve disputed
+  status and contradicting evidence, and use the normal context compiler;
+- make exact or alternate-event replay idempotent and reject changed content
+  under an existing remote identity; the same event ID must also resolve to the
+  identical stored wrapper and canonical provenance graph;
+- reject remote `policy_approved` observations and claims; only a local approval
+  decision may promote the imported destination claim to that trust.
 
 Do not choose CRDT or consensus algorithms until concrete offline/concurrent
 mutation cases are measured.

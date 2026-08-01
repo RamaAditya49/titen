@@ -13,8 +13,8 @@ Titen helps AI agents remember and work together. It stores immutable evidence,
 derives temporal claims, compiles task-specific context, and records whether
 that context helped. A collaboration layer adds private, team, and organization
 visibility plus checkpoints, leases, handoffs, policy, and audit. Signed
-federation event exchange is available; canonical recallable-memory federation
-remains planned.
+federation event exchange and opt-in canonical federation of authorized
+organization-visible direct claims are available.
 An enterprise release layer lets authorized CRM/chatbot gateways serve reviewed
 knowledge snapshots without exposing canonical memory.
 
@@ -145,7 +145,8 @@ evidence coverage of recalled claims, context usefulness, and time-to-resume.
   customer-facing knowledge;
 - governed Scope Preview and Knowledge Release lenses for authorized operators;
 - governed signed event exchange between deployments when required by region or
-  data ownership; canonical recallable-memory federation remains planned.
+  data ownership, including destination-authorized canonical federation for
+  organization-visible direct claims and complete evidence graphs.
 
 ## 7. Functional requirements
 
@@ -319,6 +320,30 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   Production activation requires a locked multilingual evaluation and real
   Cloudflare, VPS, and local-computer smoke evidence.
 
+### FR-14 — canonical recallable-memory federation
+
+- Canonical federation MUST be an explicit option on the signed peer protocol;
+  ordinary event exchange MUST remain metadata-only and compatible.
+- Source export authority, current record visibility, and an explicit claim
+  filter MUST authorize a complete direct-claim/evidence bundle before it
+  leaves a deployment.
+- Destination peer ownership, HMAC, explicit claim filter, import authority,
+  trust ceiling, organization visibility, subject, project, and evidence
+  integrity MUST pass before one atomic canonical import.
+- The first successful canonical import MUST bind one immutable remote source
+  organization to the destination peer; later mismatches MUST fail atomically.
+- Federated observations and claims MUST NOT enter as `policy_approved`; only a
+  destination-local claim approval may assign that trust after import.
+- Imported records MUST retain source identity, actor, timestamp, payload hash,
+  conflict status, and evidence relations without treating the remote actor as
+  a local principal.
+- Replay MUST create no duplicate canonical record; reuse of a remote identity
+  with different content, including an event ID paired with a new canonical
+  graph, MUST fail closed.
+- Credentials, private/team memory, workspaces, memberships, enrichment jobs,
+  vectors, lifecycle deletion, CRDTs, and consensus MUST NOT federate through
+  this contract.
+
 ## 8. Non-functional requirements
 
 ### Security
@@ -376,6 +401,10 @@ GET  /v1/events
 GET  /v1/audit/events
 ```
 
+Signed federation uses `POST /v1/federation/pull` and
+`POST /v1/federation/push`. `include_memory=true` is the explicit canonical
+mode; the default remains event-only.
+
 Optional read-only operator views are added with v0.2:
 
 ```text
@@ -416,6 +445,14 @@ Company collaboration is accepted when two agents can claim separate work,
 observe shared checkpoints, hand off one task, preserve a disputed claim, and
 complete the flow without reading each other's private memories. A signed event
 may wake an external orchestrator, but webhook failure cannot roll back memory.
+
+Canonical federation is accepted when two deployments exchange one explicitly
+filtered organization-visible disputed claim and its complete evidence, the
+destination recalls it in the same project/subject context, and cross-org,
+unsigned, tampered, private/team, `policy_approved`, changed-source, and replay
+attempts create no unauthorized or duplicate canonical rows. Concurrent first
+imports from different claimed source organizations must commit exactly one
+peer binding and one complete graph.
 
 Channel knowledge is accepted when a service gateway can serve one approved
 claim snapshot to the intended audience, cannot retrieve internal or another
@@ -481,8 +518,8 @@ planned area in documentation is not implementation evidence.
   external-subject mapping boundary;
 - asymmetric or centrally rotated assertion issuers beyond the implemented
   per-channel encrypted HMAC secret contract;
-- transport/orchestration and canonical recallable-memory federation semantics
-  after a real multi-node requirement exists;
+- automated peer scheduling, key rotation protocol, deletion propagation, and
+  broader private/team or model-derived federation after measured demand;
 - measured Memory Atlas server-side caps after the authorized reference fixture
   exists;
 - the first post-Atlas dashboard area, selected only after its operator journey

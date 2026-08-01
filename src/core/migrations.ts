@@ -1010,7 +1010,7 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
           AND (NEW.last_used_at IS NULL OR NEW.last_used_at < OLD.last_used_at)
          BEGIN
            SELECT RAISE(ABORT, 'API_KEY_LAST_USED_NOT_MONOTONIC');
-         END`,
+       END`,
     ],
   },
   {
@@ -1253,6 +1253,48 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          WHERE removed_at IS NULL`,
       `CREATE INDEX external_identity_principal
          ON external_identity_mappings (org_id, principal_id, removed_at)`,
+    ],
+  },
+  {
+    version: 19,
+    statements: [
+      `ALTER TABLE federation_peers ADD COLUMN source_org_id TEXT`,
+      `CREATE TABLE federated_records (
+         peer_id TEXT NOT NULL REFERENCES federation_peers(id),
+         source_org_id TEXT NOT NULL,
+         resource_type TEXT NOT NULL CHECK (resource_type IN ('observation', 'claim')),
+         remote_id TEXT NOT NULL,
+         local_id TEXT NOT NULL UNIQUE,
+         payload_hash TEXT NOT NULL CHECK (
+           length(payload_hash) = 64 AND payload_hash NOT GLOB '*[^0-9a-f]*'
+         ),
+         remote_actor_id TEXT NOT NULL,
+         remote_created_at TEXT NOT NULL,
+         received_at TEXT NOT NULL,
+         PRIMARY KEY (peer_id, resource_type, remote_id)
+       )`,
+      `CREATE INDEX federated_records_local ON federated_records (local_id)`,
+      `CREATE TRIGGER federated_records_immutable
+         BEFORE UPDATE ON federated_records
+         BEGIN
+           SELECT RAISE(ABORT, 'FEDERATED_RECORD_IMMUTABLE');
+         END`,
+      `CREATE TRIGGER federation_peer_source_immutable
+         BEFORE UPDATE OF source_org_id ON federation_peers
+         WHEN OLD.source_org_id IS NOT NULL
+          AND NEW.source_org_id IS NOT OLD.source_org_id
+         BEGIN
+           SELECT RAISE(ABORT, 'FEDERATION_SOURCE_ORG_IMMUTABLE');
+         END`,
+      `CREATE TRIGGER federated_records_source_org
+         BEFORE INSERT ON federated_records
+         WHEN NOT EXISTS (
+           SELECT 1 FROM federation_peers p
+            WHERE p.id = NEW.peer_id AND p.source_org_id = NEW.source_org_id
+         )
+         BEGIN
+           SELECT RAISE(ABORT, 'FEDERATION_SOURCE_ORG_MISMATCH');
+         END`,
     ],
   },
 ];

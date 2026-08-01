@@ -523,12 +523,40 @@ the caller's abort signal and configured request timeout.
 ### Federation routes
 
 Each federation peer and cursor belongs to the principal that registered it.
-Signed push input proves the configured transport peer, not a local actor or
-canonical record. Accepted input is stored as an owner-visible
-`federation.received` event with resource type `federated_event`; the complete
-remote event remains untrusted under `payload.untrusted_remote_event`. Remote
-actor, resource type, and resource ID therefore never grant local feed or
-webhook visibility and never create canonical observations or claims.
+The default `POST /v1/federation/pull` response remains event-only. Passing
+`include_memory: true` requires `export:read` and an explicit `claim` filter;
+eligible active/disputed organization-visible direct-claim events then carry a
+version-1 `memory` object containing the claim, project identity, observations,
+and evidence relations. Canonical pulls return at most one claim event so its
+relay body stays below the existing request limit. Any hidden or incomplete
+graph is omitted.
+
+`POST /v1/federation/push` always requires an HMAC over the exact raw JSON body.
+An event with `memory` additionally requires an explicit destination claim
+filter and `import:write`; creating its project reference requires
+`projects:create`. The destination accepts only complete organization-visible
+same-subject/project graphs within the importing credential's trust ceiling.
+Remote observations and claims with `policy_approved` trust are rejected; a
+local claim approval must assign that trust after import.
+
+The first successful canonical push binds its `memory.source_org_id` to the
+destination peer. `GET /v1/federation/peers` exposes the nullable
+`source_org_id`; after binding it cannot change. A later or concurrent push
+claiming another source organization returns 409 and its complete batch rolls
+back. This is a trust-on-first-use provenance boundary, not proof that the peer
+controls a globally registered organization name.
+
+The accepted batch writes canonical SQL, FTS, optional index work, audit/event
+metadata, and immutable `federated_records` provenance. The result adds
+`canonical_claim_id`; exact or alternate-event replay returns `replayed`
+without duplicating memory. The same event ID is replayable only when its stored
+wrapper and every canonical provenance mapping are identical; changed content
+or new records under that event identity return 409 before canonical mutation.
+
+Event-only accepted input remains an owner-visible `federation.received`
+wrapper. A memory wrapper excludes copied content and contains only remote event
+metadata plus local claim ID, source IDs, and payload hash. A remote actor or ID
+never becomes local authority.
 
 ### Proposed legacy webhook-subscription shape (not implemented)
 

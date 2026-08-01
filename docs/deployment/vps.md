@@ -369,6 +369,23 @@ remain preserved. Readiness can then recover; the legacy peer stays suspended
 and fail-closed. A missing or wrong keyring for any non-`NULL`
 persisted secret keeps readiness failed until the correct key is restored.
 
+Canonical federation remains operator-driven transport. The source peer needs
+an explicit `claim` filter and a principal with `federation:write export:read`;
+request `include_memory: true`, then relay only the returned `events` in a new
+body containing the destination peer ID. Sign that exact destination JSON body
+with the shared HMAC secret before `POST /v1/federation/push`. The destination
+principal needs `federation:write import:write`, plus `projects:create` only when
+an imported project reference does not exist. Do not log the response bundle or
+place the secret in a command argument. Event-only pulls remain the default and
+need none of these canonical-import scopes.
+
+The first successful canonical import trust-on-first-use binds its
+`source_org_id` to the destination peer. Confirm the expected value through
+`GET /v1/federation/peers` before relaying further bundles; a mismatch requires
+a separately registered peer rather than rebinding the existing one. Remote
+`policy_approved` memory is intentionally rejected and must be imported below
+that trust, reviewed, and approved locally.
+
 To rotate, add `v2` while retaining `v1`, make `v2` active, restart and verify
 readiness, then remove `v1` and restart again. Never put either key in SQL,
 exports, logs, or command history.

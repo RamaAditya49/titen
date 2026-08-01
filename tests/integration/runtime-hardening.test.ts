@@ -104,7 +104,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
-    assert.equal(Number(version[0]!.version), migration.version - 1);
+    assert.equal(Number(version[0]!.version), MIGRATIONS.at(-2)!.version);
     const integrity = await db.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
         WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata', 'enrichment_jobs')
@@ -139,15 +139,36 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       `completed migration 16 must retain its lease columns after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(
-      (await db.all<{ name: string }>("PRAGMA table_info(policies)"))
-        .filter(({ name }) => ["version", "created_by"].includes(name)),
-      [],
-      `migration ${migration.version} must roll back its policy columns after statement ${failureAfter + 1}`,
+      (await db.all<{ name: string }>("PRAGMA table_info(api_keys)"))
+        .filter(({ name }) => ["not_before", "expires_at", "last_used_at"].includes(name))
+        .map(({ name }) => name),
+      ["not_before", "expires_at", "last_used_at"],
+      `completed migration 17 must retain its lifecycle columns after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(
-      await db.all<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'channels'"),
-      [],
-      `migration ${migration.version} must roll back its channel table after statement ${failureAfter + 1}`,
+      (await db.all<{ name: string }>("PRAGMA table_info(policies)"))
+        .filter(({ name }) => ["version", "created_by"].includes(name))
+        .map(({ name }) => name),
+      ["version", "created_by"],
+      `completed migration 18 must retain its policy columns after statement ${failureAfter + 1}`,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'channels'")).length,
+      1,
+      `completed migration 18 must retain its channel table after statement ${failureAfter + 1}`,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
+        .some(({ name }) => name === "source_org_id"),
+      false,
+      `migration ${migration.version} must roll back its peer binding after statement ${failureAfter + 1}`,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'federated_records'",
+      )).length,
+      0,
+      `migration ${migration.version} must roll back its table after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at
@@ -175,6 +196,17 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
         .map(({ name }) => name)
         .sort(),
       ["lease_expires_at", "lease_token"],
+    );
+    assert.equal(
+      (await db.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'federated_records'",
+      )).length,
+      1,
+    );
+    assert.equal(
+      (await db.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
+        .some(({ name }) => name === "source_org_id"),
+      true,
     );
     database.close();
   }
@@ -304,7 +336,7 @@ test("a pre-v14 schema with vectors still returns sanitized migration readiness"
     assert.equal(readiness.status, 503);
     const body = (await readiness.json()) as any;
     assert.equal(body.error.code, "NOT_READY");
-    assert.equal(body.meta.schema.applied, SCHEMA_VERSION - 1);
+    assert.equal(body.meta.schema.applied, MIGRATIONS.at(-2)!.version);
     assert.equal(body.meta.schema.expected, SCHEMA_VERSION);
     assert.equal(body.meta.checks.migrations, "failed");
   } finally {

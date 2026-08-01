@@ -53,6 +53,7 @@ flowchart TB
     XM -. proposed .-> OAI
     E --> W[Optional signed webhooks]
     E --> F[Signed federation event exchange]
+    F -. explicit authorized claim bundle .-> S
 ```
 
 ## Component responsibilities
@@ -67,7 +68,7 @@ flowchart TB
 | Dashboard client   | progressively shipped operator interface               | domain authority  |
 | Memory Atlas       | bounded authorized read-only projections               | canonical storage |
 | Event delivery     | post-commit events, retries, signed webhooks           | agent selection   |
-| Federation exchange | signed filtered event transport and cursors           | canonical remote recall |
+| Federation exchange | signed events plus explicit authorized direct-claim/evidence import | peer scheduling or consensus |
 | SQL adapter        | canonical transactions, FTS, hydration, outbox         | semantic policy   |
 | Vector adapter     | rebuildable embedding index                            | canonical content |
 | Embedding gateway  | vectors for candidate retrieval                         | classification    |
@@ -105,9 +106,9 @@ maturity matrix](../ROADMAP.md#maturity-matrix).
 
 The Astro dashboard is a live read-only client of health, readiness, and the
 authorized Memory Atlas compiler through a same-origin loopback adapter. A
-local build or disconnected page is not deployment evidence. Signed federation event exchange is implemented;
-turning remote events into authorized, indexed, recallable canonical memory is
-planned.
+local build or disconnected page is not deployment evidence. Signed federation
+event exchange and its explicit organization-visible canonical claim/evidence
+import mode are implemented; event-only exchange remains the default.
 
 Automatic model-assisted derivation/reflection is implemented as an optional,
 disabled-by-default capability. Maintenance drains its durable ledger only when
@@ -218,7 +219,9 @@ remain source-tool calls instead of stale knowledge releases.
   their non-interactive labels.
 - Expired lease/checkpoint never becomes a durable fact.
 - Signed event-exchange failure never changes local canonical event history;
-  remote events do not become recallable canonical memory implicitly.
+  remote events become recallable only when an explicit claim filter,
+  `include_memory`, peer HMAC, destination import authority, and complete
+  canonical validation all pass in one SQL batch.
 
 ## Dependency budget
 

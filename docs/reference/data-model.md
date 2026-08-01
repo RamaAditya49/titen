@@ -500,6 +500,22 @@ paging. Pre-migration equal-timestamp events are backfilled deterministically by
 timestamp and ID; every event committed after migration follows database write
 order even when timestamps are identical.
 
+### `federated_records`
+
+Migration 19 adds nullable `federation_peers.source_org_id` and maps one
+`(peer_id, resource_type, remote_id)` to a deterministic destination observation
+or claim ID. The first successful canonical import sets the peer source
+organization. Triggers make that binding immutable and require every inserted
+mapping to match it, including when first-use requests race. This is
+trust-on-first-use provenance binding, not external organization attestation.
+
+Each mapping stores source organization, remote actor/timestamp, payload hash,
+and receive time; rows are immutable. The mapping is the idempotency and
+provenance boundary for opt-in canonical federation.
+Canonical content remains in `observations`, `claims`, and `claim_sources`;
+FTS and vectors remain rebuildable projections. Reusing a remote identity with
+different content is a conflict, never an update.
+
 ### `semantic_index_metadata`
 
 Migration 13 stores one immutable `claims` row containing credential-free

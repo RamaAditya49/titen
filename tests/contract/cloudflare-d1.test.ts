@@ -414,15 +414,38 @@ d1Test("a D1 migration batch rolls back on fault and concurrent retries converge
       ["lease_expires_at", "lease_token"],
     );
     assert.deepEqual(
-      (await real.all<{ name: string }>("PRAGMA table_info(policies)"))
-        .filter(({ name }) => ["version", "created_by"].includes(name)),
-      [],
+      (await real.all<{ name: string }>("PRAGMA table_info(api_keys)"))
+        .filter(({ name }) => ["not_before", "expires_at", "last_used_at"].includes(name))
+        .map(({ name }) => name),
+      ["not_before", "expires_at", "last_used_at"],
     );
     assert.deepEqual(
-      await real.all<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'channels'"),
-      [],
+      (await real.all<{ name: string }>("PRAGMA table_info(policies)"))
+        .filter(({ name }) => ["version", "created_by"].includes(name))
+        .map(({ name }) => name),
+      ["version", "created_by"],
+    );
+    assert.equal(
+      (await real.all<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'channels'")).length,
+      1,
+    );
+    assert.equal(
+      (await real.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
+        .some(({ name }) => name === "source_org_id"),
+      false,
+    );
+    assert.equal(
+      (await real.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'federated_records'",
+      )).length,
+      0,
     );
     assert.deepEqual(await Promise.all([migrate(real), migrate(real)]), [SCHEMA_VERSION, SCHEMA_VERSION]);
+    assert.equal(
+      (await real.all<{ name: string }>("PRAGMA table_info(federation_peers)"))
+        .some(({ name }) => name === "source_org_id"),
+      true,
+    );
     assert.deepEqual(
       (await real.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
         .filter(({ name }) => name === "lease_token" || name === "lease_expires_at")

@@ -63,7 +63,7 @@ The minimum useful path must work without an LLM or vector database.
 | v0.1    | complete Level 5 kernel, caller-supplied consolidation, temporal/conflict lifecycle, evidence inspection, private checkpoints, API-key lifecycle, export/import                                      | one agent can remember, verify, resume, and move its data safely                   |
 | v0.2    | identities and memberships, visibility, shared checkpoints, leases, handoffs, observer-specific claims, audit, stateless MCP, events/webhooks, read-only Memory Atlas, progressive dashboard boundary | two agents collaborate and operators diagnose memory without private-data leakage  |
 | v0.3    | roles and policy, approvals, channel knowledge releases, retention/legal hold, identity boundary, audit/recovery, governance Atlas lenses                                                             | company and enterprise policy, release, channel-isolation, and recovery tests pass |
-| v1      | signed federation event exchange                                                                                                                                                                      | authorized scopes exchange signed events without losing provenance or conflicts    |
+| v1      | signed federation event exchange plus explicit organization-visible direct-claim/evidence import                                                                                                      | authorized scopes exchange and recall canonical evidence without widening policy    |
 
 No feature in a later release is required to implement an earlier gate.
 Automatic model-assisted derivation/reflection is a separately gated optional
@@ -1069,12 +1069,13 @@ Acceptance:
 - backup and audit export contain no credentials or embeddings;
 - a failed restore cannot overwrite the currently active canonical store.
 
-## 13. Signed federation event exchange and planned memory federation
+## 13. Signed federation event and canonical-memory exchange
 
-The current feature boundary is signed, filtered event transport. Remote events
-do not become destination canonical claims, indexes, or recallable context by
-virtue of exchange. Canonical recallable-memory federation is planned and must
-define destination ingestion, authorization, lifecycle, and recall separately.
+The default feature boundary is signed, filtered event transport. Canonical
+recall is a separate explicit mode on that protocol: `include_memory=true`
+hydrates a complete authorized organization-visible direct-claim graph, and a
+signed push imports it only after destination policy validation. No event
+implicitly becomes memory.
 
 ### FED-001 — Governed event exchange
 
@@ -1097,6 +1098,36 @@ Acceptance:
 - replay creates no duplicates;
 - network partition preserves both local histories and exposes unresolved
   conflicts after reconnect.
+
+### FED-002 — Canonical direct-claim import
+
+**Release:** v1, opt-in
+
+Required behavior:
+
+- require explicit source and destination claim filters, source export scope,
+  destination import scope, HMAC verification, and owned active peers;
+- bind the first successful source organization immutably to the destination
+  peer and reject later or concurrent provenance-domain mismatches;
+- transfer only active/disputed organization-visible direct claims with their
+  complete same-subject/project evidence graph;
+- preserve remote IDs, actors, timestamps, hashes, claim version/status, and
+  evidence relations in append-only destination provenance;
+- atomically append canonical observations, claim, evidence links, history,
+  FTS, optional index work, audit, and event metadata;
+- create no duplicate on exact or alternate-event replay and reject changed
+  payload under an existing remote record identity, including an event ID
+  reused for a different canonical graph;
+- reject federated `policy_approved` observations and claims; imported claims
+  may reach that trust only through the destination's local approval workflow.
+
+Acceptance:
+
+- both Bun/SQLite and workerd/D1 recall an imported disputed claim through the
+  normal project/subject context compiler with both evidence IDs;
+- cross-org, unsigned, tampered, private/team, `policy_approved`, changed-source,
+  over-trust, incomplete, and replay inputs create no unauthorized or duplicate
+  canonical rows; a concurrent first-source race has one atomic winner.
 
 CRDTs, consensus services, and global strong consistency are not requirements
 until measured concurrent/offline mutation cases prove they are necessary.

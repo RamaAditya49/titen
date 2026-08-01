@@ -4082,6 +4082,455 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "signed canonical federation imports complete evidence once and recalls conflicts",
+    async run(fx) {
+      const source = await fx.provision({
+        principalId: "federation_source",
+        scopes: ["*"],
+      });
+      const destination = await fx.provision({
+        principalId: "federation_destination",
+        scopes: ["*"],
+      });
+      const project = await fx.call("POST", "/v1/projects/resolve", {
+        key: source.key,
+        body: { reference: "rama/federated-memory", create: true },
+      });
+      expectOk(project, 201);
+      const projectId = project.body.data.project_id as string;
+      const supporting = await fx.call("POST", "/v1/observations", {
+        key: source.key,
+        body: observation({
+          subject_id: "federated_subject",
+          project_id: projectId,
+          visibility: "organization",
+          content: "Federated rollback marker phoenix-731 is required.",
+        }),
+      });
+      expectOk(supporting, 201);
+      const contradicting = await fx.call("POST", "/v1/observations", {
+        key: source.key,
+        body: observation({
+          subject_id: "federated_subject",
+          project_id: projectId,
+          visibility: "organization",
+          content: "Federated rollback marker phoenix-731 is disputed by staging evidence.",
+        }),
+      });
+      expectOk(contradicting, 201);
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: source.key,
+        body: {
+          subject_id: "federated_subject",
+          project_id: projectId,
+          claims: [{
+            kind: "procedural",
+            statement: "Federated rollback phoenix-731 remains required but disputed.",
+            confidence: 0.91,
+            visibility: "organization",
+            sources: [
+              { observation_id: supporting.body.data.observation_id, relation: "supports" },
+              { observation_id: contradicting.body.data.observation_id, relation: "contradicts" },
+            ],
+          }],
+        },
+      });
+      expectOk(consolidated, 201);
+
+      const secret = "canonical-federation-shared-secret";
+      const unfilteredPeer = await fx.call("POST", "/v1/federation/peers", {
+        key: source.key,
+        body: {
+          name: "canonical-unfiltered",
+          endpoint: "https://canonical-unfiltered.example.test",
+          shared_secret: secret,
+          direction: "pull",
+        },
+      });
+      expectOk(unfilteredPeer, 201);
+      expectError(await fx.call("POST", "/v1/federation/pull", {
+        key: source.key,
+        body: { peer_id: unfilteredPeer.body.data.peer_id, include_memory: true },
+      }), 403);
+      const sourcePeer = await fx.call("POST", "/v1/federation/peers", {
+        key: source.key,
+        body: {
+          name: "canonical-source",
+          endpoint: "https://canonical-source.example.test",
+          shared_secret: secret,
+          direction: "pull",
+        },
+      });
+      expectOk(sourcePeer, 201);
+      expectOk(await fx.call("POST", `/v1/federation/peers/${sourcePeer.body.data.peer_id}/filters`, {
+        key: source.key,
+        body: { resource_type: "claim" },
+      }), 201);
+      const pulled = await fx.call("POST", "/v1/federation/pull", {
+        key: source.key,
+        body: { peer_id: sourcePeer.body.data.peer_id, include_memory: true },
+      });
+      expectOk(pulled);
+      assert.equal(pulled.body.data.events.length, 1);
+      assert.equal(pulled.body.data.events[0].kind, "claim.materialized");
+      assert.equal(pulled.body.data.events[0].memory.format_version, 1);
+      assert.equal(pulled.body.data.events[0].memory.observations.length, 2);
+
+      const destinationPeer = await fx.call("POST", "/v1/federation/peers", {
+        key: destination.key,
+        body: {
+          name: "canonical-destination",
+          endpoint: "https://canonical-destination.example.test",
+          shared_secret: secret,
+          direction: "push",
+        },
+      });
+      expectOk(destinationPeer, 201);
+      expectOk(await fx.call("POST", `/v1/federation/peers/${destinationPeer.body.data.peer_id}/filters`, {
+        key: destination.key,
+        body: { resource_type: "claim" },
+      }), 201);
+      const body = {
+        peer_id: destinationPeer.body.data.peer_id,
+        events: pulled.body.data.events,
+      };
+      const reidentify = (
+        input: typeof body,
+        peerId: string,
+        sourceOrgId: string,
+        suffix: string,
+      ) => {
+        const next = structuredClone(input);
+        next.peer_id = peerId;
+        const event = next.events[0];
+        event.id = `evt_canonical_${suffix}`;
+        event.memory.source_org_id = sourceOrgId;
+        const observationIds = new Map<string, string>();
+        for (const [index, evidence] of event.memory.observations.entries()) {
+          const remoteId = `obs_canonical_${suffix}_${index}`;
+          observationIds.set(evidence.id, remoteId);
+          evidence.id = remoteId;
+        }
+        for (const source of event.memory.claim.sources)
+          source.observation_id = observationIds.get(source.observation_id)!;
+        event.memory.claim.id = `claim_canonical_${suffix}`;
+        event.resource_id = event.memory.claim.id;
+        return next;
+      };
+
+      const filteredPeer = await fx.call("POST", "/v1/federation/peers", {
+        key: destination.key,
+        body: {
+          name: "canonical-filtered-destination",
+          endpoint: "https://canonical-filtered.example.test",
+          shared_secret: secret,
+          direction: "push",
+        },
+      });
+      expectOk(filteredPeer, 201);
+      expectOk(await fx.call("POST", `/v1/federation/peers/${filteredPeer.body.data.peer_id}/filters`, {
+        key: destination.key,
+        body: { resource_type: "claim", exclude_subjects: "federated_subject" },
+      }), 201);
+      const filteredBody = { ...body, peer_id: filteredPeer.body.data.peer_id };
+      const filtered = await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: filteredBody,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(filteredBody))}` },
+      });
+      expectOk(filtered);
+      assert.equal(filtered.body.data.results[0].status, "rejected");
+
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: source.key,
+        body,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(body))}` },
+      }), 404);
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body,
+      }), 403);
+      const transportOnly = await fx.provision({
+        orgId: destination.orgId,
+        principalId: destination.principalId,
+        scopes: ["federation:write"],
+      });
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: transportOnly.key,
+        body,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(body))}` },
+      }), 403);
+      const tampered = structuredClone(body);
+      tampered.events[0].memory.claim.statement = "Tampered federation payload.";
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: tampered,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(body))}` },
+      }), 403);
+      const approvedClaimAttempt = structuredClone(body);
+      approvedClaimAttempt.events[0].id = "evt_canonical_policy_claim_attempt";
+      approvedClaimAttempt.events[0].payload.trust = "policy_approved";
+      approvedClaimAttempt.events[0].memory.claim.trust = "policy_approved";
+      for (const evidence of approvedClaimAttempt.events[0].memory.observations)
+        evidence.trust = "policy_approved";
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: approvedClaimAttempt,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(approvedClaimAttempt))}` },
+      }), 400);
+      const approvedEvidenceAttempt = structuredClone(body);
+      approvedEvidenceAttempt.events[0].id = "evt_canonical_policy_evidence_attempt";
+      approvedEvidenceAttempt.events[0].memory.observations[0].trust = "policy_approved";
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: approvedEvidenceAttempt,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(approvedEvidenceAttempt))}` },
+      }), 400);
+      const orphanAttempt = structuredClone(body);
+      orphanAttempt.events[0].id = "evt_canonical_orphan_attempt";
+      const orphan = structuredClone(orphanAttempt.events[0].memory.observations[0]);
+      orphan.id = "obs_remote_orphan_injection";
+      orphan.content = "Orphan evidence must not enter canonical SQL.";
+      orphan.content_hash = await sha256Hex(orphan.content);
+      orphanAttempt.events[0].memory.observations.push(orphan);
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: orphanAttempt,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(orphanAttempt))}` },
+      }), 400);
+      assert.deepEqual(await fx.query<{
+        observations: number; claims: number; provenance: number; import_audits: number;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+           (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims,
+           (SELECT COUNT(*) FROM federated_records WHERE peer_id = ?) AS provenance,
+           (SELECT COUNT(*) FROM audit_log
+             WHERE org_id = ? AND action = 'federation.memory.import') AS import_audits`,
+        [
+          destination.orgId,
+          destination.orgId,
+          destinationPeer.body.data.peer_id,
+          destination.orgId,
+        ],
+      ), [{ observations: 0, claims: 0, provenance: 0, import_audits: 0 }]);
+      assert.equal((await fx.query<{ source_org_id: string | null }>(
+        `SELECT source_org_id FROM federation_peers WHERE id = ?`,
+        [destinationPeer.body.data.peer_id],
+      ))[0]!.source_org_id, null);
+
+      const pushed = await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(body))}` },
+      });
+      expectOk(pushed);
+      assert.equal(pushed.body.data.results[0].status, "success");
+      const localClaimId = pushed.body.data.results[0].canonical_claim_id as string;
+      const provenance = await fx.query<{ resource_type: string; remote_id: string; local_id: string }>(
+        `SELECT resource_type, remote_id, local_id FROM federated_records
+          WHERE peer_id = ? ORDER BY resource_type, remote_id`,
+        [destinationPeer.body.data.peer_id],
+      );
+      assert.equal(provenance.length, 3);
+      assert.ok(provenance.some((row) => row.resource_type === "claim" && row.local_id === localClaimId));
+      assert.equal((await fx.query<{ source_org_id: string | null }>(
+        `SELECT source_org_id FROM federation_peers WHERE id = ?`,
+        [destinationPeer.body.data.peer_id],
+      ))[0]!.source_org_id, pulled.body.data.events[0].memory.source_org_id);
+      const boundPeers = await fx.call("GET", "/v1/federation/peers", { key: destination.key });
+      expectOk(boundPeers);
+      assert.equal(
+        boundPeers.body.data.peers.find(
+          ({ peer_id }: { peer_id: string }) => peer_id === destinationPeer.body.data.peer_id,
+        )?.source_org_id,
+        pulled.body.data.events[0].memory.source_org_id,
+      );
+      const sourceMismatch = reidentify(
+        body,
+        destinationPeer.body.data.peer_id,
+        "org_spoofed_remote_source",
+        "source_mismatch",
+      );
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: sourceMismatch,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(sourceMismatch))}` },
+      }), 409);
+      const destinationFeed = await fx.call("GET", "/v1/events?limit=200", { key: destination.key });
+      expectOk(destinationFeed);
+      const wrapper = destinationFeed.body.data.events.find(
+        (event: any) => event.payload?.canonical_import?.claim_id === localClaimId,
+      );
+      assert.equal(wrapper?.kind, "federation.received");
+      assert.ok(!JSON.stringify(wrapper).includes("phoenix-731"), "event metadata must not copy memory content");
+      const destinationProject = await fx.query<{ id: string }>(
+        `SELECT id FROM projects WHERE org_id = ? AND reference = 'rama/federated-memory'`,
+        [destination.orgId],
+      );
+      assert.equal(destinationProject.length, 1);
+      const context = await fx.call("POST", "/v1/context/compile", {
+        key: destination.key,
+        body: {
+          subject_id: "federated_subject",
+          project_id: destinationProject[0]!.id,
+          task: "phoenix-731 rollback disputed",
+          max_tokens: 900,
+        },
+      });
+      expectOk(context);
+      const imported = context.body.data.items.find((item: any) => item.claim_id === localClaimId);
+      assert.equal(imported?.status, "disputed");
+      assert.equal(imported?.evidence_ids.length, 2);
+      assert.ok(context.body.data.conflicts.some((item: any) => item.claim_id === localClaimId));
+
+      const beforeReplay = await fx.query<{
+        observations: number; claims: number; provenance: number; audits: number;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+           (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims,
+           (SELECT COUNT(*) FROM federated_records WHERE peer_id = ?) AS provenance,
+           (SELECT COUNT(*) FROM audit_log WHERE org_id = ? AND action = 'federation.memory.import') AS audits`,
+        [destination.orgId, destination.orgId, destinationPeer.body.data.peer_id, destination.orgId],
+      );
+      const replay = await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(body))}` },
+      });
+      expectOk(replay);
+      assert.equal(replay.body.data.results[0].status, "replayed");
+      const reusedEventIdentity = reidentify(
+        body,
+        destinationPeer.body.data.peer_id,
+        pulled.body.data.events[0].memory.source_org_id,
+        "reused_event_new_records",
+      );
+      reusedEventIdentity.events[0].id = body.events[0].id;
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: reusedEventIdentity,
+        headers: {
+          "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(reusedEventIdentity))}`,
+        },
+      }), 409);
+      const alternateReplay = structuredClone(body);
+      alternateReplay.events[0].id = "evt_canonical_alternate_replay";
+      const alternate = await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: alternateReplay,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(alternateReplay))}` },
+      });
+      expectOk(alternate);
+      assert.equal(alternate.body.data.results[0].status, "replayed");
+      const afterReplay = await fx.query<{
+        observations: number; claims: number; provenance: number; audits: number;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+           (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims,
+           (SELECT COUNT(*) FROM federated_records WHERE peer_id = ?) AS provenance,
+           (SELECT COUNT(*) FROM audit_log WHERE org_id = ? AND action = 'federation.memory.import') AS audits`,
+        [destination.orgId, destination.orgId, destinationPeer.body.data.peer_id, destination.orgId],
+      );
+      assert.deepEqual(afterReplay, beforeReplay);
+
+      const conflictingReplay = structuredClone(body);
+      conflictingReplay.events[0].id = "evt_canonical_conflicting_replay";
+      conflictingReplay.events[0].memory.claim.statement = "Same remote id, changed canonical claim.";
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: conflictingReplay,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(conflictingReplay))}` },
+      }), 409);
+      const privateAttempt = structuredClone(body);
+      privateAttempt.events[0].id = "evt_canonical_private_attempt";
+      privateAttempt.events[0].memory.claim.visibility = "private";
+      expectError(await fx.call("POST", "/v1/federation/push", {
+        key: destination.key,
+        body: privateAttempt,
+        headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(privateAttempt))}` },
+      }), 403);
+
+      const racePeer = await fx.call("POST", "/v1/federation/peers", {
+        key: destination.key,
+        body: {
+          name: "canonical-source-binding-race",
+          endpoint: "https://canonical-source-race.example.test",
+          shared_secret: secret,
+          direction: "push",
+        },
+      });
+      expectOk(racePeer, 201);
+      expectOk(await fx.call("POST", `/v1/federation/peers/${racePeer.body.data.peer_id}/filters`, {
+        key: destination.key,
+        body: { resource_type: "claim" },
+      }), 201);
+      const beforeRace = await fx.query<{ observations: number; claims: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+           (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims`,
+        [destination.orgId, destination.orgId],
+      );
+      const raceA = reidentify(
+        body,
+        racePeer.body.data.peer_id,
+        pulled.body.data.events[0].memory.source_org_id,
+        "race_a",
+      );
+      const raceB = reidentify(body, racePeer.body.data.peer_id, "org_race_b", "race_b");
+      const raceResponses = await Promise.all([raceA, raceB].map(async (candidate) =>
+        fx.call("POST", "/v1/federation/push", {
+          key: destination.key,
+          body: candidate,
+          headers: { "x-titen-peer-signature": `sha256=${await signPayload(secret, JSON.stringify(candidate))}` },
+        })));
+      assert.deepEqual(raceResponses.map(({ status }) => status).sort(), [200, 409]);
+      const winner = raceResponses.find(({ status }) => status === 200)!;
+      expectOk(winner);
+      const raceSource = (await fx.query<{ source_org_id: string }>(
+        `SELECT source_org_id FROM federation_peers WHERE id = ?`,
+        [racePeer.body.data.peer_id],
+      ))[0]!.source_org_id;
+      assert.ok([
+        pulled.body.data.events[0].memory.source_org_id,
+        "org_race_b",
+      ].includes(raceSource));
+      const raceProvenance = await fx.query<{ source_org_id: string }>(
+        `SELECT source_org_id FROM federated_records WHERE peer_id = ?`,
+        [racePeer.body.data.peer_id],
+      );
+      assert.equal(raceProvenance.length, 3);
+      assert.ok(raceProvenance.every(({ source_org_id }) => source_org_id === raceSource));
+      const afterRace = await fx.query<{ observations: number; claims: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+           (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims`,
+        [destination.orgId, destination.orgId],
+      );
+      assert.equal(Number(afterRace[0]!.observations) - Number(beforeRace[0]!.observations), 2);
+      assert.equal(Number(afterRace[0]!.claims) - Number(beforeRace[0]!.claims), 1);
+      await assert.rejects(() => fx.query(
+        `UPDATE federation_peers SET source_org_id = 'org_trigger_spoof' WHERE id = ?`,
+        [racePeer.body.data.peer_id],
+      ));
+      await assert.rejects(() => fx.query(
+        `INSERT INTO federated_records
+           (peer_id, source_org_id, resource_type, remote_id, local_id, payload_hash,
+            remote_actor_id, remote_created_at, received_at)
+         VALUES (?, 'org_trigger_spoof', 'claim', 'claim_trigger_spoof',
+                 'claim_trigger_spoof_local', ?, 'remote_actor', ?, ?)`,
+        [
+          racePeer.body.data.peer_id,
+          "0".repeat(64),
+          "2026-08-01T00:00:00.000Z",
+          "2026-08-01T00:00:00.000Z",
+        ],
+      ));
+    },
+  },
+  {
     name: "team memory is visible only to active workspace members across projections",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });

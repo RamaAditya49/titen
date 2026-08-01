@@ -33,8 +33,8 @@ locally verified but has no live deployment evidence.
 | Containerized Bun service with `embeddinggemma` | Historical live evidence: 0.3.0 canary | [evaluation record](./testing/EVALS.md), [cycle 1](./testing/2026-07-31-mem0-replacement-cycle1.md), [cycle 2](./testing/2026-07-31-mem0-replacement-cycle2.md), [end-to-end script](../scripts/verify-live.ts) | The evaluated npm 0.3.0 canary ran loopback-only on Wulan with explicit `sqlite-vec`; this is not evidence for a later package, systemd, or Cloudflare. |
 | Model-assisted derivation and reflection | Implemented; Verified locally; activation gated | [ADR-0004](./decisions/0004-model-assisted-memory-enrichment.md), [paired work spec](./specs/done/2026-07-31-model-assisted-enrichment-0136.md), [dual-runtime contracts](../tests/contract/enrichment.ts), [model gate](./testing/2026-07-31-enrichment-model-gate-luna-full.md) | Durable jobs, provider, and validator are shipped opt-in. No tested candidate passed the frozen activation gate; revision attestation and three-target runtime smoke remain absent. |
 | Replace Wulan Mem0 with Titen | Historical 0.3.0 evaluation: NO-GO | [cycle 1](./testing/2026-07-31-mem0-replacement-cycle1.md), [cycle 2](./testing/2026-07-31-mem0-replacement-cycle2.md), [cycle 3](./testing/2026-07-31-mem0-replacement-cycle3.md), [cycle 4](./testing/2026-07-31-mem0-replacement-cycle4.md) | The evaluated 0.3.0 canary did not pass ranking, abstention, native LLM, production migration, real Cloudflare/local, exact resource, and soak gates. This does not describe later source or package state. |
-| Signed federation event exchange | Implemented; Verified locally | [collaboration federation boundary](./architecture/collaboration.md#signed-federation-event-exchange), [contract tests](../tests/contract/) | Exchanges filtered signed events and cursors. It does not make remote memory canonically recallable. |
-| Canonical recallable-memory federation | Planned | [FRD federation feature](./FRD.md#13-signed-federation-event-exchange-and-planned-memory-federation), [collaboration boundary](./architecture/collaboration.md#signed-federation-event-exchange) | Destination ingestion, authorization, indexing, lifecycle, and recall semantics require new work and evidence. |
+| Signed federation event exchange | Implemented; Verified locally | [collaboration federation boundary](./architecture/collaboration.md#signed-federation-event-and-canonical-memory-exchange), [contract tests](../tests/contract/) | Exchanges filtered signed events and cursors; event-only remains the default. |
+| Canonical recallable-memory federation | Implemented; Verified locally | [FRD federation feature](./FRD.md#13-signed-federation-event-and-canonical-memory-exchange), [completed work spec](./specs/done/2026-08-01-canonical-memory-federation.md), [dual-runtime contracts](../tests/contract/) | Opt-in import covers organization-visible active/disputed direct claims and complete evidence. Private/team memory, enrichment graphs, deletion propagation, and automated transport are excluded. |
 | Real Cloudflare deployment; live Vectorize/Workers AI | Planned | [Cloudflare guide](./deployment/cloudflare.md) | Configuration and local emulation are not live deployment evidence. |
 | Provisioned VPS systemd/Caddy install | Planned | [VPS guide](./deployment/vps.md) | Container execution does not verify the systemd and reverse-proxy path. |
 | Agent loop/orchestrator, graph database, global consensus | Out of scope | [PRD non-goals](./PRD.md#12-non-goals) | Titen records coordination and keeps SQL canonical. |
@@ -80,13 +80,16 @@ The current module registers peers, filters outbound events, advances cursors,
 verifies signatures, preserves replay conflicts, and supports suspension and
 revocation. Network scheduling remains an operator/orchestrator concern.
 
-### Future — canonical recallable-memory federation
+### v1 canonical recallable-memory federation
 
-A future slice may define how remote evidence becomes destination canonical
-records, how destination policy authorizes it, how indexes are rebuilt, and
-how compiled context cites and resolves remote lifecycle/conflicts. It must not
-be inferred from event transport and needs its own requirements and runtime
-verification.
+The explicit `include_memory` slice turns a filtered active/disputed
+organization-visible direct claim and its complete evidence into destination
+canonical SQL after peer HMAC and destination import authorization. Replay is
+idempotent, the peer is immutably bound to its first successful source
+organization, remote policy approval is not inherited, conflicts remain
+disputed, and normal context compilation recalls the imported claim. Automated
+transport, private/team mappings, enrichment graphs, deletion propagation, and
+consensus remain out of scope.
 
 ## Dashboard expansion rule
 
