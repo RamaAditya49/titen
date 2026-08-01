@@ -1,12 +1,11 @@
 ---
 work_id: ponytail-zero-20260801
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-02
-review_after: 2026-08-15
 owner: maintainer
 ---
 
@@ -85,6 +84,42 @@ details, without inflated or unsupported claims.
   existing outbox remain the repair authority.
 - Cloudflare and public registry changes are rolled back by the prior immutable
   Worker version/package version; SQL changes remain forward-only and additive.
+
+## Delivery evidence
+
+- Release source `35ea5552095cd6509f412266fc4c5458cc7c8b10` merged to
+  `main` as `83adb1496c0c4addbfa80a737ffd6037e76038be` in
+  [PR #213](https://github.com/RamaAditya49/titen/pull/213).
+- `titen-memory@0.5.5` is npm `latest`; a clean registry install exposed CLI
+  `0.5.5` and `TitenClient`. The registry SHA-1 is
+  `46bd52e9e8a63f0c19acc71a61c96cff630747ae`.
+- [GitHub release v0.5.5](https://github.com/RamaAditya49/titen/releases/tag/v0.5.5)
+  is public and targets the merge commit above.
+- [titen-web PR #11](https://github.com/RamaAditya49/titen-web/pull/11)
+  synchronized the stable discovery manifest and release page, documented all
+  84 routes, and deployed Cloudflare version
+  `9d8bdc91-1119-477b-83eb-e441e723f979`. Both `titen.dev` hostnames report
+  CLI `0.5.5`, and a clean installed CLI reports itself up to date.
+- The isolated `titen-test-*` Worker runs schema 21 with D1, BGE-M3 through
+  Workers AI, Vectorize metadata filtering, Cron repair, replay convergence,
+  historical recall, bounded index verification, scope denial, and rollback
+  recovery. Final Worker version:
+  `dcbcc314-311a-47e5-8da9-08c98c0db081`.
+- `rama-tuf` runs exact rootless image `localhost/titen:0.5.5-35ea555` for the
+  API and dashboard. Schema 21 readiness, restored-data canary, Add User, all
+  six product areas, service restart, backup/restore rollback, and loopback-only
+  listeners passed. Pre-deploy backup SHA-256:
+  `d988fe0bc9c2650f0e22ea80cc995c3534e7646a881b6f889c0d67442cfd2e3f`.
+- The public [OpenClaw bundle 0.2.0](https://clawhub.ai/packages/@ramaaditya49/titen-memory)
+  passed the current registry scan and remained downloadable. Artifact SHA-256:
+  `ca3966b4e93b9cf1c777a55f189ad06dbf5352fb0822deb39f64c1fdcf073870`.
+- The smallest validated Cursor package was submitted upstream in
+  [cursor/plugins#184](https://github.com/cursor/plugins/pull/184). Vendor
+  review is external distribution state, not unfinished Titen product code.
+- `pnpm test:all`, both runtime contract suites, integration and browser checks,
+  package verification, `pnpm audit --prod`, workflow validation, route checks,
+  and the zero-marker ledger passed manually. GitHub Actions remains disabled
+  to keep the repository free of hosted automation cost.
 
 ## Done conditions
 

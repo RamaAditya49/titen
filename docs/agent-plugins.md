@@ -21,8 +21,8 @@ agent its own narrow, revocable key. Never paste a key into a repository file.
 | Codex | Native repo-marketplace plugin | `.agents/plugins/marketplace.json` |
 | Claude Code | Native marketplace plugin | `.claude-plugin/marketplace.json` |
 | ZCode | Claude-compatible marketplace plugin | import `RamaAditya49/titen` |
-| OpenClaw | Public ClawHub skill, staged bundle plugin, and native MCP config | ClawHub + `integrations/openclaw` |
-| Cursor | Native marketplace plugin | `.cursor-plugin/marketplace.json` |
+| OpenClaw | Public ClawHub bundle and native MCP config | ClawHub + `integrations/openclaw` |
+| Cursor | Native marketplace plugin; upstream submission pending review | `.cursor-plugin/marketplace.json` |
 | Hermes | Native Python skill plugin | `plugins/hermes/titen-memory` |
 | Pi | Native Pi skill package | `plugins/pi/titen-memory` |
 | OpenCode | Native MCP config + Agent Skill | `integrations/opencode` + `.agents/skills` |
@@ -97,36 +97,37 @@ so the key stays in the environment. See [ZCode plugins](https://zcode.z.ai/en/d
 
 ## OpenClaw and ClawHub
 
-Install the verified public [Titen Memory skill](https://clawhub.ai/ramaaditya49/skills/titen-memory)
+Install the public [Titen Memory bundle 0.2.0](https://clawhub.ai/packages/@ramaaditya49/titen-memory)
 from ClawHub:
 
 ```bash
-clawhub install titen-memory
-clawhub skill verify titen-memory
+openclaw plugins install clawhub:@ramaaditya49/titen-memory
+openclaw gateway restart
+openclaw mcp doctor titen --probe
 ```
 
-The public `titen-memory@0.1.0` skill remains the verified earlier seven-tool
-snapshot. Do not claim the current nine-tool skill is published until a new
-ClawHub package passes the external inspector.
+The public bundle exposes the current nine-tool skill and remote Streamable HTTP
+MCP declaration. Version 0.2.0 passed the current ClawHub scan and is available
+for download. The older standalone
+[skill 0.1.0](https://clawhub.ai/ramaaditya49/skills/titen-memory) remains a
+seven-tool compatibility snapshot.
 
-Merge only the `mcp.servers.titen` entry from
-`integrations/openclaw/openclaw.json` into the OpenClaw config, then run:
+For a repository-only install instead of ClawHub, merge only the
+`mcp.servers.titen` entry from `integrations/openclaw/openclaw.json` into the
+OpenClaw config, then run:
 
 ```bash
 openclaw gateway restart
 openclaw mcp doctor titen --probe
 ```
 
-OpenClaw loads this Claude-compatible bundle's skill and remote HTTP MCP server
+OpenClaw loads the bundle's skill and remote HTTP MCP server
 without arbitrary in-process plugin code. Its exposed tool names use
 `titen__<canonical-name>`. See [OpenClaw bundles](https://docs.openclaw.ai/plugins/bundles)
 and [native MCP configuration](https://docs.openclaw.ai/cli/mcp).
 
-The bundle-plugin package installs as
-`openclaw plugins install clawhub:@ramaaditya49/titen-memory`. The older
-standalone skill remains a compatibility surface; new installs should use the
-bundle so the skill and MCP declaration arrive together. The source repository
-and bundle package remain Apache-2.0.
+New installs should use the bundle so the skill and MCP declaration arrive
+together. The source repository and bundle package remain Apache-2.0.
 
 ## Cursor
 
@@ -136,6 +137,10 @@ two environment variables set. The plugin uses Cursor's documented
 `${env:NAME}` interpolation in `mcp.json`; `/add-plugin titen-memory` installs it
 after the marketplace is available. The format follows Cursor's
 [official plugin specification](https://github.com/cursor/plugins).
+
+The same validated package is under public vendor review in
+[cursor/plugins#184](https://github.com/cursor/plugins/pull/184). Until Cursor
+merges it, the repository marketplace above remains the install path.
 
 ## Hermes
 
@@ -228,5 +233,6 @@ and [Agent sharing security](https://www.trae.ai/blog/product_thought_0526).
   or autonomous loops.
 - No package embeds an endpoint or credential.
 - No package reimplements Titen's server, authorization, or memory policy.
-- Public vendor-catalog review is separate from the repository marketplaces;
-  ClawHub is the only public external registry publication in this release.
+- Public vendor-catalog review is separate from repository marketplaces.
+  ClawHub 0.2.0 is published; the Cursor catalog submission is pending vendor
+  review.

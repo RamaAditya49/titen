@@ -28,3 +28,9 @@ is local and requires no hosted automation.
   operators share one 32-byte key.
 - Current OpenClaw bundles import remote HTTP MCP configuration directly; agent
   lifecycle capture remains an intentional explicit-invocation privacy boundary.
+
+The zero-marker release is public as
+[`titen-memory@0.5.5`](https://www.npmjs.com/package/titen-memory/v/0.5.5) and
+[GitHub release v0.5.5](https://github.com/RamaAditya49/titen/releases/tag/v0.5.5).
+Exact Cloudflare, `rama-tuf`, registry, and rollback identifiers live in the
+[terminal delivery evidence](./docs/specs/done/2026-08-01-ponytail-zero.md#delivery-evidence).

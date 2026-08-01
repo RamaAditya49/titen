@@ -257,5 +257,6 @@ test("the host guide distinguishes packages from config-only integrations", () =
   }
   assert.match(guide, /TRAE's share\/import flow scans Agent and MCP\nconfiguration for credentials/);
   assert.match(guide, /Pi has no built-in MCP client/);
-  assert.match(guide, /ClawHub is the only public external registry publication/);
+  assert.match(guide, /ClawHub 0\.2\.0 is published/);
+  assert.match(guide, /Cursor catalog submission is pending vendor/);
 });
