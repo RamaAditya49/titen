@@ -64,13 +64,14 @@ test("renders live service checks and authorized Atlas records", async ({ page }
   await expect(page.locator("[data-records] button")).toHaveCount(0);
 });
 
-test("clears a successful projection before and after denial", async ({ page }) => {
+test("keeps success, denial, unauthenticated, and empty states distinct", async ({ page }) => {
   await mockService(page);
-  let mode: "success" | "denied" | "unauthenticated" = "success";
+  let mode: "success" | "denied" | "unauthenticated" | "empty" = "success";
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     if (mode === "denied") return route.fulfill({ status: 403, json: { error: { code: "UPSTREAM_403", message: "denied" } } });
     if (mode === "unauthenticated") return route.fulfill({ status: 401, json: { error: { code: "UPSTREAM_401", message: "unauthenticated" } } });
+    if (mode === "empty") return route.fulfill({ json: { data: { ...view, nodes: [], edges: [], metadata: { subject_id: "empty" } } } });
     return route.fulfill({ json: { data: view } });
   });
   await page.goto("/dashboard/");
@@ -95,6 +96,11 @@ test("clears a successful projection before and after denial", async ({ page }) 
   mode = "unauthenticated";
   await page.getByRole("button", { name: "Compile authorized view" }).click();
   await expect(page.locator("[data-query-error]")).toContainText("Authentication failed");
+
+  mode = "empty";
+  await page.getByRole("button", { name: "Compile authorized view" }).click();
+  await expect(page.getByText("No authorized records found.")).toBeVisible();
+  await expect(page.locator("[data-projection]")).toHaveText("Empty");
 });
 
 test("validates lens-specific input and remains keyboard/mobile usable", async ({ page }) => {
