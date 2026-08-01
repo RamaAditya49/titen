@@ -70,7 +70,7 @@
     "prepack": "bun run build:npm",
     "deploy:worker": "WRANGLER_SEND_METRICS=false wrangler deploy",
     "titen": "bun src/runtime/bun/cli.ts",
-    "screenshots": "playwright test tests/dashboard-screenshots.spec.ts",
+    "screenshots": "UPDATE_DASHBOARD_SCREENSHOTS=1 playwright test tests/dashboard-screenshots.spec.ts",
     "check:routes": "node scripts/check-route-docs.mjs",
     "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test && node scripts/check-ponytail-debt.mjs",
     "check:ponytail": "node scripts/check-ponytail-debt.mjs",

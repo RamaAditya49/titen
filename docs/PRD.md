@@ -277,8 +277,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Titen MUST treat the dashboard as an optional authenticated REST client;
   disabling it MUST leave complete headless REST/MCP behavior unchanged.
 - The initial implemented frontend MUST expose Memory Atlas as its first and
-  only active product area and MUST identify its data as a synthetic fixture
-  until the authorized view compiler is integrated.
+  only active product area and MUST display only responses from the authorized
+  view compiler; disconnected or failed integration MUST show no fixture data.
 - Later dashboard areas MUST follow the canonical groups defined in
   [DESIGN](./DESIGN.md): Memory, Collaboration, Operations, Administration, and
   Governance.

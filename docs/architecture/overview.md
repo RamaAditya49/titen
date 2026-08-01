@@ -102,9 +102,9 @@ SQL migrations, Cloudflare and Bun entrypoints, and a shared dual-runtime
 contract suite. Their precise verification boundary is centralized in the
 [roadmap maturity matrix](../ROADMAP.md#maturity-matrix).
 
-The Astro dashboard is an interactive prototype backed by a frozen synthetic
-fixture. Live dashboard/API integration is separate evidence and must not be
-inferred from the preview. Signed federation event exchange is implemented;
+The Astro dashboard is a live read-only client of health, readiness, and the
+authorized Memory Atlas compiler through a same-origin loopback adapter. A
+local build or disconnected page is not deployment evidence. Signed federation event exchange is implemented;
 turning remote events into authorized, indexed, recallable canonical memory is
 planned.
 

@@ -99,30 +99,30 @@ the label non-interactive rather than shipped.
 
 ## 5. Release shape
 
-### v0.3.1 final frontend preview
+### Live Memory Atlas frontend
 
 The implemented Astro dashboard exposes only **Memory > Atlas** at
 `/dashboard/`. It reproduces Rama's approved final mockup and includes the full
 canonical area map as non-interactive orientation. It does not add routes for
 the other labels or claim that their backend behavior exists.
 
-Atlas provides:
+Atlas provides live authorized:
 
 - Evidence Trace;
 - Memory Neighborhood;
 - Conflict & Freshness;
-- Scope Preview as a synthetic policy-eligibility demonstration;
-- one exact authorized focus;
-- a bounded SVG overview synchronized with an accessible evidence/detail list;
-- search dialog, disconnect/reconnect, responsive phone trails/table cards,
-  and selected-record inspectors.
+- Review Queue;
+- bounded subject or focus input;
+- health and readiness state;
+- responsive result lists and selected-record inspectors.
 
 The exact implementation contract lives in the
 [Astro dashboard spec](./specs/done/2026-07-29-dashboard-final-astro-v0-3.md),
 and the operational boundary lives in the [dashboard guide](./dashboard.md).
 
-Every visible value is a synthetic fixture. The live authorized view compiler,
-credential flow, and runtime deployment remain separate work.
+Every visible record comes from the authorized view compiler through the
+same-origin adapter. Credentials remain server-only; disconnected or failed
+integration displays no fixture data.
 
 ### Later capability-backed slices
 
@@ -201,7 +201,7 @@ channels. Color alone never carries meaning.
 
 ## 10. Privacy and security
 
-- Credentials live only in memory for the current tab unless a later session
+- Credentials live only in the server adapter process unless a later session
   contract explicitly replaces this rule.
 - Credentials, private IDs, response content, and view data never enter URLs,
   browser storage, analytics, third-party requests, service workers, or logs.
@@ -211,8 +211,8 @@ channels. Color alone never carries meaning.
   SQLite, vector indexes, models, or provider bindings directly.
 - Disabling the dashboard changes no canonical data and leaves headless
   REST/MCP behavior complete.
-- The current frontend preview makes no API request, persists no state, and
-  labels its data as synthetic in public documentation.
+- The current frontend persists no state and calls only the same-origin
+  read-only adapter routes.
 
 ## 11. Design acceptance
 

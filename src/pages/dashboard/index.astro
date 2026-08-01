@@ -4,170 +4,14 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
-import { isConnected, endpointLabel } from "../../lib/dashboard-api";
+import packageJson from "../../../package.json";
 
-// The static build is always credential-free and starts in explicit demo mode.
-// A same-origin adapter may opt into live data after the page loads.
-const live = isConnected();
-const runtimeLabel = endpointLabel();
-
-const navigation = [
-  {
-    label: "Memory",
-    items: [
-      { icon: "atlas-dark", name: "Atlas", current: true },
-      { icon: "observation", name: "Memories", suffix: "1,284" },
-      { icon: "context", name: "Context" },
-    ],
-  },
-  {
-    label: "Collaboration",
-    items: [{ icon: "work", name: "Work", badge: "6" }],
-  },
-  {
-    label: "Operations",
-    items: [
-      { icon: "audit", name: "Audit & Events" },
-      { icon: "system", name: "System", status: "degraded" },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [{ icon: "access", name: "Access" }],
-  },
-  {
-    label: "Governance",
-    items: [
-      { icon: "governance", name: "Approvals", count: "3" },
-      { icon: "release", name: "Releases" },
-    ],
-  },
-];
-
+const productAreas = ["Memories", "Context", "Work", "Audit", "Governance", "Federation"];
 const lenses = [
-  { id: "evidence", label: "Evidence Trace" },
-  { id: "neighborhood", label: "Neighborhood" },
-  { id: "conflict", label: "Conflict & Freshness" },
-  { id: "scope", label: "Scope Preview" },
-];
-
-const FIXTURE_CONFLICT_ROWS = [
-  {
-    claim: "Budget is 250 ms vs 400 ms",
-    status: "disputed",
-    trust: "asserted",
-    scope: "team",
-    evidence: "3",
-    changed: "13d",
-    tone: "danger",
-    selectable: true,
-  },
-  {
-    claim: "Escalation contact is the platform lead",
-    status: "stale",
-    trust: "unverified",
-    scope: "org",
-    evidence: "1",
-    changed: "94d",
-    tone: "warning",
-  },
-  {
-    claim: "Refund cap is IDR 5,000,000",
-    status: "expiring",
-    trust: "verified",
-    scope: "org",
-    evidence: "2",
-    changed: "in 6d",
-    tone: "warning",
-  },
-  {
-    claim: "p95 budget is 250 ms",
-    status: "superseded",
-    trust: "asserted",
-    scope: "team",
-    evidence: "1",
-    changed: "25d",
-    tone: "muted",
-  },
-  {
-    claim: "Sandbox keys rotate weekly",
-    status: "expired",
-    trust: "asserted",
-    scope: "team",
-    evidence: "1",
-    changed: "41d",
-    tone: "muted",
-  },
-];
-
-// Build-time fetch. With an endpoint configured the Conflict & Freshness lens
-// shows the deployment's real claims; with none it shows the frozen fixture. The
-// shell states which of the two it is rather than leaving the reader to guess.
-const liveConflict = live
-  ? await compileView("conflict_freshness", { subject_id: atlasSubject(), limit: 5 })
-  : null;
-
-const conflictRows =
-  liveConflict && liveConflict.nodes.length > 0
-    ? liveConflict.nodes.slice(0, 5).map((node) => ({
-        claim: node.label,
-        status: node.status ?? "active",
-        trust: node.trust,
-        scope: "org",
-        evidence: "—",
-        changed: node.freshness === undefined ? "—" : `${node.freshness}d`,
-        tone:
-          node.status === "disputed"
-            ? "danger"
-            : node.status === "expired" || node.status === "superseded"
-              ? "muted"
-              : "warning",
-        selectable: node.status === "disputed",
-      }))
-    : FIXTURE_CONFLICT_ROWS;
-
-
-const scopeRows = [
-  {
-    icon: "claim",
-    record: "p95 budget stays at 400 ms",
-    visibility: "team",
-    eligible: "yes",
-    reason: "workspace member",
-    tone: "success",
-  },
-  {
-    icon: "observation",
-    record: "load-test-0714.json",
-    visibility: "org",
-    eligible: "yes",
-    reason: "organization scope",
-    tone: "success",
-  },
-  {
-    icon: "observation",
-    record: "Draft note · retry policy",
-    visibility: "private",
-    eligible: "no",
-    reason: "another agent's private",
-    tone: "danger",
-  },
-  {
-    icon: "release",
-    record: "crm-web release · anonymous",
-    visibility: "channel",
-    eligible: "metadata only",
-    reason: "not a release approver",
-    tone: "warning",
-  },
-];
-
-const compileSteps = [
-  ["authenticate + scope", "platform-team"],
-  ["resolve focus", "clm_01J8QK4T"],
-  ["expand authorized edges", "39 → 38"],
-  ["hydrate + recheck", "31 current"],
-  ["apply limits", "truncated · depth"],
+  { id: "neighborhood", label: "Neighborhood", needs: "subject" },
+  { id: "evidence_trace", label: "Evidence trace", needs: "focus" },
+  { id: "conflict_freshness", label: "Conflict & freshness", needs: "subject" },
+  { id: "review_queue", label: "Review queue", needs: "optional" },
 ];
 ---
 
@@ -175,1069 +19,352 @@ const compileSteps = [
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light" />
     <meta name="referrer" content="no-referrer" />
-    <meta
-      name="description"
-      content="Titen Memory Atlas — a read-only, evidence-grounded memory workspace for AI agent operators."
-    />
-    <title>Titen · Memory Atlas</title>
+    <meta name="description" content="Titen Memory Atlas — live, authorized memory inspection." />
+    <title>Titen · Live Memory Atlas</title>
   </head>
   <body>
-    <svg class="symbol-sheet" aria-hidden="true">
-      <defs>
-        <symbol id="observation" viewBox="0 0 100 100">
-          <rect
-            x="24"
-            y="16"
-            width="52"
-            height="68"
-            rx="3"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6"></rect>
-          <g stroke="currentColor" stroke-width="6" stroke-linecap="round">
-            <path d="M36 38 H64"></path><path d="M36 52 H64"></path>
-          </g>
-          <path
-            d="M36 66 H52"
-            stroke="#A9552A"
-            stroke-width="6"
-            stroke-linecap="round"></path>
-        </symbol>
-        <symbol id="claim" viewBox="0 0 100 100">
-          <circle cx="26" cy="42" r="12" fill="currentColor"></circle>
-          <path
-            d="M44 42 H84"
-            stroke="currentColor"
-            stroke-width="7"
-            stroke-linecap="round"></path>
-          <path
-            d="M26 68 H70"
-            stroke="#A9552A"
-            stroke-width="7"
-            stroke-linecap="round"></path>
-        </symbol>
-        <symbol id="context" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="11" fill="currentColor"></circle>
-          <g
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M14 34 L26 46 L14 58"></path>
-            <path d="M86 34 L74 46 L86 58"></path>
-          </g>
-          <path
-            d="M36 84 L48 72 L60 84"
-            fill="none"
-            stroke="#A9552A"
-            stroke-width="6.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </symbol>
-        <symbol id="atlas-dark" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="10" fill="#C97A44"></circle>
-          <g fill="currentColor">
-            <circle cx="20" cy="24" r="7"></circle>
-            <circle cx="80" cy="24" r="7"></circle>
-            <circle cx="20" cy="76" r="7"></circle>
-            <circle cx="80" cy="76" r="7"></circle>
-          </g>
-          <g
-            stroke="currentColor"
-            stroke-width="4"
-            stroke-linecap="round"
-            opacity=".5"
-          >
-            <path d="M27 29 L43 44"></path><path d="M73 29 L57 44"></path>
-            <path d="M27 71 L43 56"></path><path d="M73 71 L57 56"></path>
-          </g>
-        </symbol>
-        <symbol id="work" viewBox="0 0 100 100">
-          <path
-            d="M28 16 V84"
-            stroke="currentColor"
-            stroke-width="7"
-            stroke-linecap="round"></path>
-          <path
-            d="M28 22 H76 L64 40 L76 58 H28"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6"></path>
-          <circle cx="28" cy="76" r="8" fill="#A9552A"></circle>
-        </symbol>
-        <symbol id="audit" viewBox="0 0 100 100">
-          <g fill="currentColor">
-            <circle cx="24" cy="30" r="5"></circle>
-            <circle cx="24" cy="50" r="5"></circle>
-            <circle cx="24" cy="70" r="5"></circle>
-          </g>
-          <g stroke="currentColor" stroke-width="6" stroke-linecap="round">
-            <path d="M42 30 H84"></path><path d="M42 50 H84"></path>
-          </g>
-          <path
-            d="M42 70 H68"
-            stroke="#A9552A"
-            stroke-width="6"
-            stroke-linecap="round"></path>
-        </symbol>
-        <symbol id="system" viewBox="0 0 100 100">
-          <path
-            d="M10 54 H30 L38 32 L50 74 L60 54 H90"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </symbol>
-        <symbol id="access" viewBox="0 0 100 100">
-          <circle
-            cx="34"
-            cy="50"
-            r="16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6.4"></circle>
-          <path
-            d="M50 50 H88"
-            stroke="currentColor"
-            stroke-width="6.4"
-            stroke-linecap="round"></path>
-          <g stroke="#A9552A" stroke-width="6.4" stroke-linecap="round">
-            <path d="M70 50 V64"></path><path d="M84 50 V62"></path>
-          </g>
-        </symbol>
-        <symbol id="governance" viewBox="0 0 100 100">
-          <path
-            d="M50 12 L80 24 V52 C80 70 66 82 50 88 C34 82 20 70 20 52 V24 Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6.4"></path>
-          <path
-            d="M36 50 L47 61 L66 40"
-            fill="none"
-            stroke="#A9552A"
-            stroke-width="6.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </symbol>
-        <symbol id="release" viewBox="0 0 100 100">
-          <rect
-            x="16"
-            y="26"
-            width="46"
-            height="52"
-            rx="3"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="6"></rect>
-          <path
-            d="M62 38 H88"
-            stroke="#A9552A"
-            stroke-width="6"
-            stroke-linecap="round"></path>
-          <path
-            d="M78 28 L88 38 L78 48"
-            fill="none"
-            stroke="#A9552A"
-            stroke-width="6"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </symbol>
-        <symbol id="search" viewBox="0 0 24 24">
-          <circle
-            cx="11"
-            cy="11"
-            r="6.5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"></circle>
-          <path
-            d="M16 16 L21 21"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"></path>
-        </symbol>
-        <symbol id="chevron" viewBox="0 0 24 24">
-          <path
-            d="M7 10 L12 15 L17 10"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </symbol>
-        <symbol id="disconnect" viewBox="0 0 24 24">
-          <path
-            d="M9 4 H6 A2 2 0 0 0 4 6 V18 A2 2 0 0 0 6 20 H9"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"></path>
-          <path
-            d="M13 12 H21"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"></path>
-          <path
-            d="M17 8 L21 12 L17 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </symbol>
-      </defs>
-    </svg>
+    <a class="skip-link" href="#workspace">Skip to workspace</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Product areas">
+        <header class="brand-row">
+          <img src={titenMark} width="24" height="24" alt="" />
+          <strong>titen</strong>
+          <span>v{packageJson.version}</span>
+        </header>
 
-    <div class="app-shell" data-connected="true" data-selection="focus">
-      <nav class="sidebar" aria-label="Product areas">
-        <div class="brand-row">
-          <img src={titenMark} width="22" height="22" alt="Titen" />
-          <span class="brand-name">titen</span>
-          <span class="version">1.0.0</span>
-        </div>
+        <nav>
+          <p>Memory</p>
+          <a href="/dashboard/" aria-current="page">Memory Atlas</a>
+          <p>Product map</p>
+          {productAreas.map((area) => <span class="inactive-area">{area}<small>not wired</small></span>)}
+        </nav>
 
-        <button class="workspace-switcher" type="button" data-open-search>
-          <span class="workspace-title">
-            <span class="scope-mark" aria-hidden="true">••</span>
-            <span>
-              <strong>platform-team</strong>
-              <small>biver · 4 projects</small>
-            </span>
-          </span>
-          <svg aria-hidden="true"><use href="#chevron"></use></svg>
-        </button>
+        <section class="credential-note" aria-label="Credential handling">
+          <p>Credential boundary</p>
+          <strong>Server-only</strong>
+          <span>The browser uses same-origin routes. API keys stay in the adapter process.</span>
+        </section>
+      </aside>
 
-        <div class="nav-sections">
-          {
-            navigation.map((section) => (
-              <section
-                class="nav-section"
-                aria-labelledby={`nav-${section.label}`}
-              >
-                <h2 id={`nav-${section.label}`}>{section.label}</h2>
-                {section.items.map((item) => (
-                  <span
-                    class:list={["nav-item", { active: item.current }]}
-                    aria-current={item.current ? "page" : undefined}
-                  >
-                    <span class="nav-item-label">
-                      <svg aria-hidden="true">
-                        <use href={`#${item.icon}`} />
-                      </svg>
-                      {item.name}
-                    </span>
-                    {item.suffix && (
-                      <span class="nav-suffix">{item.suffix}</span>
-                    )}
-                    {item.badge && <span class="nav-badge">{item.badge}</span>}
-                    {item.status && (
-                      <span class="nav-status">{item.status}</span>
-                    )}
-                    {item.count && <span class="nav-count">{item.count}</span>}
-                  </span>
-                ))}
-              </section>
-            ))
-          }
-        </div>
-
-        <div class="account-panel">
-          <div class="account-row">
-            <span class="avatar">RB</span>
-            <span>
-              <strong>rizky</strong>
-              <small>owner · org</small>
-            </span>
-          </div>
-          <button class="disconnect-button" type="button" data-disconnect>
-            <svg aria-hidden="true"><use href="#disconnect"></use></svg>
-            Disconnect
-          </button>
-        </div>
-      </nav>
-
-      <main class="main-shell">
+      <main id="workspace" class="main-shell" tabindex="-1">
         <header class="topbar">
-          <div class="heading-stack">
-            <div class="breadcrumbs">
-              <span>Memory</span><span>/</span><b>Atlas</b>
-            </div>
-            <div class="title-row">
-              <h1>Memory Atlas</h1>
-              <span class="read-only">read-only</span>
-            </div>
+          <div>
+            <p class="eyebrow">Operator surface / read only</p>
+            <h1>Live Memory Atlas</h1>
           </div>
-          <div class="top-actions">
-            <button class="search-trigger" type="button" data-open-search>
-              <svg aria-hidden="true"><use href="#search"></use></svg>
-              <span>Search or jump to…</span>
-              <kbd>⌘K</kbd>
-            </button>
-            <span class="top-divider" aria-hidden="true"></span>
-            <div class="connection-state" role="status" aria-live="polite">
-              <span class="connected-label"><i></i>{live ? "connected" : "preview"}</span>
-              <span class="runtime-label">{runtimeLabel}</span>
-            </div>
+          <div class="connection" role="status" aria-live="polite">
+            <i data-connection-dot></i>
+            <span data-connection-label>Connecting</span>
+            <small data-endpoint>same-origin adapter</small>
           </div>
         </header>
 
-        <section
-          class="connected-workspace private-view"
-          aria-label="Memory Atlas workspace"
-        >
-          <div class="lensbar">
-            <div class="lens-controls" aria-label="Memory Atlas lens">
-              <span class="eyebrow">Lens</span>
-              <div class="lens-buttons">
-                {
-                  lenses.map((lens, index) => (
-                    <button
-                      type="button"
-                      class="lens-button"
-                      data-lens={lens.id}
-                      aria-pressed={index === 0 ? "true" : "false"}
-                    >
-                      {lens.label}
-                    </button>
-                  ))
-                }
+        <section class="service-strip" aria-label="Service checks">
+          <article>
+            <span>Process</span>
+            <strong data-health>Checking</strong>
+            <small data-runtime>healthz</small>
+          </article>
+          <article>
+            <span>Readiness</span>
+            <strong data-readiness>Checking</strong>
+            <small data-revision>readyz</small>
+          </article>
+          <article>
+            <span>Projection</span>
+            <strong data-projection>No query</strong>
+            <small>authorized SQL view</small>
+          </article>
+          <button type="button" class="secondary-button" data-reconnect>Refresh service</button>
+        </section>
+
+        <div class="notice" data-service-notice role="alert" hidden></div>
+
+        <section class="query-panel" aria-labelledby="query-heading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Bounded query</p>
+              <h2 id="query-heading">Choose what the API may return</h2>
+            </div>
+            <span>Nothing is stored in this browser.</span>
+          </div>
+
+          <form data-query-form>
+            <fieldset class="lens-picker">
+              <legend>Atlas lens</legend>
+              {lenses.map((lens, index) => (
+                <label>
+                  <input type="radio" name="lens" value={lens.id} data-needs={lens.needs} checked={index === 0} />
+                  <span>{lens.label}</span>
+                </label>
+              ))}
+            </fieldset>
+
+            <div class="input-grid">
+              <label>
+                <span>Subject ID</span>
+                <input name="subject_id" autocomplete="off" maxlength="200" placeholder="subject or project identity" required />
+                <small data-subject-help>Required for the selected lens.</small>
+              </label>
+              <label>
+                <span>Focus claim ID</span>
+                <input name="focus_id" autocomplete="off" maxlength="200" placeholder="claim ID for evidence trace" />
+                <small data-focus-help>Used only by Evidence trace.</small>
+              </label>
+              <label>
+                <span>Result limit</span>
+                <input name="limit" type="number" min="1" max="100" value="50" inputmode="numeric" required />
+                <small>Server limit: 1–100.</small>
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="primary-button" type="submit" data-run>Compile authorized view</button>
+              <span data-query-status role="status" aria-live="polite">Enter an authorized scope to begin.</span>
+            </div>
+          </form>
+        </section>
+
+        <section class="atlas-workspace" aria-label="Atlas result">
+          <div class="result-column">
+            <header class="result-header">
+              <div>
+                <p class="eyebrow">Canonical projection</p>
+                <h2 data-view-title>Waiting for a live query</h2>
               </div>
+              <span data-result-count>0 records</span>
+            </header>
+
+            <div class="loading-state" data-loading hidden aria-label="Loading Atlas records">
+              <span></span><span></span><span></span>
             </div>
-            <div class="focus-field">
-              <span>focus</span>
-              <b>clm_01J8QK4T</b>
-              <i aria-hidden="true"></i>
+            <div class="empty-state" data-empty>
+              <strong>No fixture is loaded.</strong>
+              <p>Run a bounded query to inspect records authorized for the adapter credential.</p>
             </div>
-            <div class="view-metrics" aria-label="View metrics">
-              <span>depth 2</span><i></i><span>31/40 nodes</span><i></i>
-              <span>38/60 edges</span><i></i><span>41 ms</span>
-            </div>
+            <div class="notice" data-query-error role="alert" hidden></div>
+            <div class="record-list" data-records hidden></div>
           </div>
 
-          <div class="limit-notice" role="status">
-            <span class="notice-chip"><i></i>truncated</span>
-            <span>
-              Depth cap reached. 1 further edge is withheld because it is not
-              authorized for you — totals describe the authorized candidate set
-              only.
-            </span>
-            <small>cache miss · canonical versions revalidated</small>
-          </div>
-
-          <div class="workspace-grid">
-            <div class="atlas-column">
-              <section class="atlas-panel" aria-labelledby="atlas-view-heading">
-                <header class="panel-header">
-                  <h2 id="atlas-view-heading">Evidence Trace</h2>
-                  <span>select a node to inspect it</span>
-                  <span class="keyboard-help"
-                    ><kbd>↹</kbd> walk nodes <kbd>↵</kbd> inspect</span
-                  >
-                </header>
-
-                <div class="lens-panel" data-lens-panel="evidence">
-                  <div
-                    class="graph-scroll"
-                    role="region"
-                    aria-label="Evidence Trace relationship view"
-                    tabindex="0"
-                  >
-                    <div class="graph-canvas evidence-canvas">
-                      <svg viewBox="0 0 836 400" aria-hidden="true">
-                        <g fill="none" stroke="#171310" stroke-width="1.5">
-                          <path d="M230 50 C 300 50 310 170 376 170"></path>
-                          <path d="M230 150 C 300 150 315 192 369 192"></path>
-                        </g>
-                        <path
-                          d="M230 250 C 300 250 315 210 369 210"
-                          class="line-qualifies"></path>
-                        <path
-                          d="M230 350 C 300 350 310 232 376 232"
-                          class="line-contradicts"></path>
-                        <path
-                          d="M460 172 C 510 172 530 82 592 82"
-                          class="line-contradicts"></path>
-                        <path
-                          d="M466 200 C 520 200 540 210 592 210"
-                          class="line-supports"></path>
-                        <path
-                          d="M460 228 C 510 228 530 338 592 338"
-                          class="line-supports"></path>
-                      </svg>
-
-                      <button
-                        class="graph-card evidence-one"
-                        type="button"
-                        data-select="observation"
-                      >
-                        <span class="node-kind"
-                          ><svg aria-hidden="true"
-                            ><use href="#observation"></use></svg
-                          >observation</span
-                        >
-                        <strong>load-test-0714.json</strong><small
-                          class="success">verified · org</small
-                        >
-                      </button>
-                      <div class="graph-card evidence-two">
-                        <span class="node-kind"
-                          ><svg aria-hidden="true"
-                            ><use href="#observation"></use></svg
-                          >observation</span
-                        >
-                        <strong>Thread · 14 Jul</strong><small
-                          >asserted · team</small
-                        >
-                      </div>
-                      <div class="graph-card evidence-three">
-                        <span class="node-kind"
-                          ><svg aria-hidden="true"
-                            ><use href="#observation"></use></svg
-                          >observation</span
-                        >
-                        <strong>Scope: checkout only</strong><small
-                          >asserted · team</small
-                        >
-                      </div>
-                      <div class="graph-card evidence-four danger-border">
-                        <span class="node-kind danger"
-                          ><svg aria-hidden="true"
-                            ><use href="#observation"></use></svg
-                          >observation</span
-                        >
-                        <strong>Peak run · p95 268 ms</strong><small
-                          >asserted · team</small
-                        >
-                      </div>
-
-                      <button
-                        class="focus-node"
-                        type="button"
-                        data-select="focus"
-                        aria-label="Focus claim: p95 budget stays at 400 ms"
-                        ><span></span></button
-                      >
-                      <div class="focus-caption">
-                        <small>focus claim · v3</small><strong
-                          >p95 budget stays at 400 ms</strong
-                        ><span>active · verified · team</span>
-                      </div>
-
-                      <button
-                        class="graph-card disputed-card danger-border"
-                        type="button"
-                        data-select="disputed"
-                      >
-                        <span class="node-kind danger"
-                          ><svg aria-hidden="true"
-                            ><use href="#claim"></use></svg
-                          >claim · disputed</span
-                        >
-                        <strong>Budget is 250 ms</strong><small
-                          >agent-11 · conf 0.44</small
-                        >
-                      </button>
-                      <div class="graph-card context-card">
-                        <span class="node-kind"
-                          ><svg aria-hidden="true"
-                            ><use href="#context"></use></svg
-                          >context</span
-                        >
-                        <strong class="mono">ctx_01J8QM7B</strong><small
-                          >agent-11 · 09:41</small
-                        >
-                      </div>
-                      <div class="graph-card release-card">
-                        <span class="node-kind"
-                          ><svg aria-hidden="true"
-                            ><use href="#release"></use></svg
-                          >released-as · release</span
-                        >
-                        <strong>crm-web · anonymous</strong><small
-                          class="success">active · from v3</small
-                        >
-                      </div>
-
-                      <span class="edge-label edge-one">supports</span>
-                      <span class="edge-label edge-two">supports</span>
-                      <span class="edge-label edge-three warning"
-                        >qualifies</span
-                      >
-                      <span class="edge-label edge-four danger"
-                        >contradicts</span
-                      >
-                      <span class="edge-label edge-five danger"
-                        >contradicts</span
-                      >
-                      <span class="edge-label edge-six">selected-in</span>
-                    </div>
-                  </div>
-                  <div class="legend-row">
-                    <span class="eyebrow">Legend</span>
-                    <span><i class="shape-square"></i>observation</span>
-                    <span><i class="shape-circle"></i>claim</span>
-                    <span><i class="shape-diamond"></i>context</span>
-                    <em></em>
-                    <span><i class="solid-line"></i>supports</span>
-                    <span><i class="dashed-line"></i>contradicts</span>
-                    <span><i class="dotted-line"></i>qualifies</span>
-                  </div>
-                </div>
-
-                <div class="lens-panel" data-lens-panel="neighborhood" hidden>
-                  <div
-                    class="graph-scroll"
-                    role="region"
-                    aria-label="Memory Neighborhood relationship view"
-                    tabindex="0"
-                  >
-                    <div class="graph-canvas neighborhood-canvas">
-                      <svg viewBox="0 0 836 400" aria-hidden="true">
-                        <g
-                          fill="none"
-                          stroke="#171310"
-                          stroke-width="1.5"
-                          opacity=".5"
-                        >
-                          <path d="M418 152 L240 88"></path><path
-                            d="M418 152 L614 88"></path>
-                          <path d="M386 224 L236 314"></path><path
-                            d="M450 224 L610 314"></path>
-                          <path d="M370 200 L226 200"></path>
-                        </g>
-                      </svg>
-                      <button
-                        class="focus-node"
-                        type="button"
-                        data-select="focus"
-                        aria-label="Focus claim"><span></span></button
-                      >
-                      <div class="focus-caption">
-                        <small>focus claim</small><strong
-                          >p95 budget stays at 400 ms</strong
-                        >
-                      </div>
-                      <div class="graph-card neighbor-one">
-                        <span class="node-kind">observed-by · agent</span
-                        ><strong class="mono">agent-04</strong><small
-                          >wrote 3 versions</small
-                        >
-                      </div>
-                      <div class="graph-card neighbor-two">
-                        <span class="node-kind">subject</span><strong
-                          >checkout service</strong
-                        ><small>18 claims</small>
-                      </div>
-                      <div class="graph-card neighbor-three">
-                        <span class="node-kind">selected-in · context</span
-                        ><strong class="mono">ctx_01J8QM7B</strong><small
-                          >4h ago</small
-                        >
-                      </div>
-                      <div class="graph-card neighbor-four">
-                        <span class="node-kind">related · claim</span><strong
-                          >Retry twice, then escalate</strong
-                        ><small>procedural · org</small>
-                      </div>
-                      <button
-                        class="graph-card neighbor-five"
-                        type="button"
-                        data-select="disputed"
-                        ><span class="node-kind">supersedes · claim</span
-                        ><strong>Budget is 250 ms</strong><small
-                          >superseded 14 Jul</small
-                        ></button
-                      >
-                    </div>
-                  </div>
-                  <div class="panel-note">
-                    <span class="eyebrow">Depth 1</span><p>
-                      Five authorized neighbours. Relationship type is written
-                      on each card — the lines carry adjacency only, never
-                      meaning.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="lens-panel" data-lens-panel="conflict" hidden>
-                  <div
-                    class="table-scroll"
-                    role="region"
-                    aria-label="Conflict and freshness records"
-                    tabindex="0"
-                  >
-                    <div class="data-table conflict-table" data-conflict-table>
-                      <div class="table-head">
-                        <span></span><span>claim</span><span>status</span><span
-                          >trust</span
-                        ><span>scope</span><span>evidence</span><span
-                          >changed</span
-                        >
-                      </div>
-                      {
-                        conflictRows.map((row) => {
-                          const Tag = row.selectable ? "button" : "div";
-                          return (
-                            <Tag
-                              class:list={[
-                                "table-row",
-                                row.tone,
-                                { selectable: row.selectable },
-                              ]}
-                              type={row.selectable ? "button" : undefined}
-                              data-select={
-                                row.selectable ? "disputed" : undefined
-                              }
-                            >
-                              <svg aria-hidden="true">
-                                <use href="#claim" />
-                              </svg>
-                              <span
-                                class:list={{ struck: row.tone === "muted" }}
-                              >
-                                {row.claim}
-                              </span>
-                              <>
-                                <span>{row.status}</span>
-                                <span>{row.trust}</span>
-                              </>
-                              <>
-                                <span>{row.scope}</span>
-                                <span>{row.evidence}</span>
-                                <span>{row.changed}</span>
-                              </>
-                            </Tag>
-                          );
-                        })
-                      }
-                    </div>
-                  </div>
-                  <div class="table-summary">
-                    Five claims need attention in this project. Superseded and
-                    expired records stay listed — history is never removed, only
-                    made ineligible for context.
-                  </div>
-                </div>
-
-                <div class="lens-panel" data-lens-panel="scope" hidden>
-                  <div class="preview-as">
-                    <span class="eyebrow">Preview as</span>
-                    <span class="principal-chip"
-                      ><b>a11</b><strong>agent-11</strong><svg
-                        aria-hidden="true"><use href="#chevron"></use></svg
-                      ></span
-                    >
-                    <p>
-                      Computes what this principal would be eligible to inspect.
-                      It does not assume their identity, and grants you nothing.
-                    </p>
-                  </div>
-                  <div
-                    class="table-scroll"
-                    role="region"
-                    aria-label="Scope preview records"
-                    tabindex="0"
-                  >
-                    <div class="data-table scope-table">
-                      <div class="table-head">
-                        <span></span><span>record</span><span>visibility</span
-                        ><span>agent-11 eligible</span><span>reason</span>
-                      </div>
-                      {
-                        scopeRows.map((row) => (
-                          <div class="table-row">
-                            <svg aria-hidden="true">
-                              <use href={`#${row.icon}`} />
-                            </svg>
-                            <>
-                              <span>{row.record}</span>
-                              <span>{row.visibility}</span>
-                            </>
-                            <>
-                              <span class={row.tone}>{row.eligible}</span>
-                              <span>{row.reason}</span>
-                            </>
-                          </div>
-                        ))
-                      }
-                    </div>
-                  </div>
-                  <div class="table-summary">
-                    Eligibility is computed from policy, not sampled from a real
-                    session. Preview requires its own capability and is itself
-                    written to the audit trail.
-                  </div>
-                </div>
-              </section>
-
-              <section class="compile-panel" aria-labelledby="compile-heading">
-                <header>
-                  <h2 id="compile-heading">Compile trace</h2><span
-                    >authorize before expand</span
-                  >
-                </header>
-                <ol>
-                  {
-                    compileSteps.map((step, index) => (
-                      <li>
-                        <>
-                          <span>{index + 1}</span>
-                          <strong>{step[0]}</strong>
-                          <b class:list={{ warning: index === 4 }}>{step[1]}</b>
-                        </>
-                      </li>
-                    ))
-                  }
-                </ol>
-                <footer>
-                  <code>POST /v1/memory-views/compile</code><span>41 ms</span>
-                </footer>
+          <aside class="inspector" aria-labelledby="inspector-heading">
+            <header>
+              <p class="eyebrow">Selected record</p>
+              <h2 id="inspector-heading" data-inspector-title>Nothing selected</h2>
+            </header>
+            <div class="inspector-empty" data-inspector-empty>Select a returned record to inspect canonical fields and relationships.</div>
+            <div data-inspector-body hidden>
+              <dl data-node-fields></dl>
+              <section>
+                <h3>Relationships</h3>
+                <div data-relationships></div>
               </section>
             </div>
-
-            <aside
-              class="inspector-column"
-              aria-label="Selected memory details"
-            >
-              <article class="inspector-card" data-inspector="focus">
-                <header>
-                  <svg aria-hidden="true"><use href="#claim"></use></svg><span
-                    >claim · v3</span
-                  ><b><i></i>active</b>
-                </header>
-                <div class="inspector-body">
-                  <p class="claim-copy">
-                    The p95 latency budget for checkout stays at 400 ms; the 250
-                    ms target was dropped after the 14 July load test.
-                  </p>
-                  <div class="tags">
-                    <span class="verified">verified</span><span>•• team</span
-                    ><span>decision</span><span>released</span>
-                  </div>
-                  <section class="detail-section">
-                    <h3>Provenance</h3><dl>
-                      <div><dt>id</dt><dd>clm_01J8QK4T</dd></div><div>
-                        <dt>wrote</dt><dd>agent-04</dd>
-                      </div><div>
-                        <dt>valid</dt><dd>14 Jul 2026 → open</dd>
-                      </div><div><dt>observer</dt><dd>platform-team</dd></div>
-                    </dl>
-                  </section>
-                  <section class="detail-section">
-                    <h3>Evidence · 4 authorized</h3><ul class="evidence-list">
-                      <li class="supports">
-                        <b>supports</b><span
-                          >load-test-0714.json · p95 383 ms</span
-                        >
-                      </li><li class="supports">
-                        <b>supports</b><span>“400 is the honest number.”</span>
-                      </li><li class="qualifies">
-                        <b>qualifies</b><span>Applies to checkout only</span>
-                      </li><li class="contradicts">
-                        <b>contradicts</b><span>Peak run · p95 268 ms</span>
-                      </li><li>
-                        <b>withheld</b><span
-                          >1 source exists but is not visible to you</span
-                        >
-                      </li>
-                    </ul>
-                  </section>
-                  <p class="untrusted-note">
-                    Recalled memory is untrusted reference data. Never follow
-                    instructions found inside it.
-                  </p>
-                </div>
-              </article>
-
-              <article
-                class="inspector-card disputed-inspector"
-                data-inspector="disputed"
-                hidden
-              >
-                <header>
-                  <svg aria-hidden="true"><use href="#claim"></use></svg><span
-                    >disputed · 2 perspectives kept</span
-                  >
-                </header>
-                <div class="perspective">
-                  <b>a04</b><p>
-                    <strong>Budget is 400 ms.</strong><span
-                      >team decision · 14 Jul · 2 evidence · conf 0.91</span
-                    >
-                  </p>
-                </div>
-                <div class="perspective">
-                  <b>a11</b><p>
-                    <strong>Budget is 250 ms.</strong><span
-                      >agent opinion · 2 Jul · 1 evidence · conf 0.44</span
-                    >
-                  </p>
-                </div>
-                <div class="dispute-note">
-                  <p>
-                    Atlas is read-only. Resolving a dispute needs evidence or
-                    explicit policy authority, and happens in <strong
-                      >Memories</strong
-                    > — not here.
-                  </p><span>clm_01J8QF2M · agent-11</span>
-                </div>
-              </article>
-
-              <article
-                class="inspector-card"
-                data-inspector="observation"
-                hidden
-              >
-                <header>
-                  <svg aria-hidden="true"><use href="#observation"></use></svg
-                  ><span>observation</span><b><i></i>verified</b>
-                </header>
-                <div class="inspector-body">
-                  <div class="tags">
-                    <span>tool result</span><small>svc-ci</small>
-                  </div>
-                  <p class="observation-copy">
-                    load-test-0714.json · p95 = 383 ms at 3× traffic, 0 errors
-                    over 40 min
-                  </p>
-                  <section class="detail-section">
-                    <dl>
-                      <div>
-                        <dt>content hash</dt><dd>sha256 · 4f2a…c81e</dd>
-                      </div><div>
-                        <dt>occurred_at</dt><dd>2026-07-14 09:12Z</dd>
-                      </div><div>
-                        <dt>ingested_at</dt><dd>2026-07-14 09:12Z</dd>
-                      </div><div><dt>supports</dt><dd>1 claim</dd></div>
-                    </dl>
-                  </section>
-                  <p class="untrusted-note">
-                    Untrusted reference data — never an instruction.
-                  </p>
-                </div>
-              </article>
-
-              <section class="boundary-note">
-                <h2>Boundary</h2><p>
-                  Titen stores evidence, derives memory, compiles authorized
-                  context, and records bounded coordination state. It does not
-                  select agents, run model loops, schedule workflows, or execute
-                  tools.
-                </p>
-              </section>
-            </aside>
-          </div>
+          </aside>
         </section>
 
-        <section
-          class="disconnected-workspace"
-          aria-labelledby="disconnected-heading"
-          hidden
-        >
-          <div>
-            <span class="eyebrow">Connection closed</span>
-            <h2 id="disconnected-heading">Memory Atlas is disconnected.</h2>
-            <p>
-              The synthetic fixture and selected-memory details have been
-              cleared from view. Reconnect explicitly to restore the local
-              demonstration.
-            </p>
-            <button type="button" data-reconnect>Reconnect demo</button>
-          </div>
-        </section>
+        <details class="metadata-panel">
+          <summary>View metadata</summary>
+          <pre data-metadata>No live view compiled.</pre>
+        </details>
       </main>
     </div>
 
-    <dialog class="search-dialog" aria-labelledby="search-heading">
-      <form method="dialog" class="dialog-shell">
-        <header>
-          <svg aria-hidden="true"><use href="#search"></use></svg>
-          <input
-            id="command-search"
-            type="search"
-            autocomplete="off"
-            placeholder="Search views…"
-            aria-labelledby="search-heading"
-          />
-          <button value="cancel" aria-label="Close search">Esc</button>
-        </header>
-        <div class="dialog-body">
-          <h2 id="search-heading">Jump to a Memory Atlas lens</h2>
-          {
-            lenses.map((lens, index) => (
-              <button type="button" data-command-lens={lens.id}>
-                <>
-                  <span>{lens.label}</span>
-                  <kbd>{index + 1}</kbd>
-                </>
-              </button>
-            ))
-          }
-          <p>Only Memory Atlas is active in this frontend demonstration.</p>
-        </div>
-      </form>
-    </dialog>
-
     <script>
-      const shell = document.querySelector(".app-shell");
-      const heading = document.querySelector("#atlas-view-heading");
-      const dialog = document.querySelector(".search-dialog");
-      const searchInput = document.querySelector("#command-search");
-      const labelByLens = {
-        evidence: "Evidence Trace",
-        neighborhood: "Memory Neighborhood",
-        conflict: "Conflict & Freshness",
-        scope: "Scope Preview",
-      };
+      import {
+        DashboardApiError,
+        checkService,
+        compileView,
+        getDashboardStatus,
+        type AtlasNode,
+        type AtlasView,
+      } from "../../lib/dashboard-api";
 
-      function selectLens(lens) {
-        document
-          .querySelectorAll("[data-lens]")
-          .forEach((button) =>
-            button.setAttribute(
-              "aria-pressed",
-              String(button.dataset.lens === lens),
-            ),
-          );
-        document.querySelectorAll("[data-lens-panel]").forEach((panel) => {
-          panel.hidden = panel.dataset.lensPanel !== lens;
-        });
-        heading.textContent = labelByLens[lens];
+      const one = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
+      const form = one<HTMLFormElement>("[data-query-form]");
+      const runButton = one<HTMLButtonElement>("[data-run]");
+      const records = one<HTMLElement>("[data-records]");
+      const empty = one<HTMLElement>("[data-empty]");
+      const loading = one<HTMLElement>("[data-loading]");
+      const queryError = one<HTMLElement>("[data-query-error]");
+      let view: AtlasView | null = null;
+
+      function text(selector: string, value: string) { one<HTMLElement>(selector).textContent = value; }
+      function data(payload: Record<string, unknown>): Record<string, unknown> {
+        return payload.data && typeof payload.data === "object"
+          ? payload.data as Record<string, unknown>
+          : payload.error && typeof payload.error === "object"
+            ? payload.error as Record<string, unknown>
+            : payload;
       }
-
-      function selectInspector(selection) {
-        shell.dataset.selection = selection;
-        document.querySelectorAll("[data-inspector]").forEach((panel) => {
-          panel.hidden = panel.dataset.inspector !== selection;
-        });
-        if (matchMedia("(max-width: 639px)").matches)
-          document
-            .querySelector(".inspector-column")
-            .scrollIntoView({ block: "start" });
+      function serviceDetail(payload: Record<string, unknown>, key: string): string | undefined {
+        const value = data(payload)[key];
+        return typeof value === "string" ? value : undefined;
       }
-
-      function openSearch() {
-        if (!dialog.open) dialog.showModal();
-        requestAnimationFrame(() => searchInput.focus());
+      function setNotice(element: HTMLElement, message?: string) {
+        element.hidden = !message;
+        element.textContent = message ?? "";
       }
-
-      document
-        .querySelectorAll("[data-lens]")
-        .forEach((button) =>
-          button.addEventListener("click", () =>
-            selectLens(button.dataset.lens),
-          ),
-        );
-      document
-        .querySelectorAll("[data-select]")
-        .forEach((button) =>
-          button.addEventListener("click", () =>
-            selectInspector(button.dataset.select),
-          ),
-        );
-      document
-        .querySelectorAll("[data-open-search]")
-        .forEach((button) => button.addEventListener("click", openSearch));
-      document.querySelectorAll("[data-command-lens]").forEach((button) =>
-        button.addEventListener("click", () => {
-          selectLens(button.dataset.commandLens);
-          dialog.close();
-        }),
-      );
-      document
-        .querySelector("[data-disconnect]")
-        .addEventListener("click", () => {
-          shell.dataset.connected = "false";
-          document.querySelector(".connected-workspace").hidden = true;
-          document.querySelector(".disconnected-workspace").hidden = false;
-          document.querySelector(".connected-label").innerHTML =
-            "<i></i>disconnected";
-          document.querySelector(".runtime-label").textContent =
-            "no endpoint connected";
-        });
-      document
-        .querySelector("[data-reconnect]")
-        .addEventListener("click", () => {
-          shell.dataset.connected = "true";
-          document.querySelector(".connected-workspace").hidden = false;
-          document.querySelector(".disconnected-workspace").hidden = true;
-          document.querySelector(".connected-label").innerHTML =
-            "<i></i>connected";
-          document.querySelector(".runtime-label").textContent =
-            "synthetic demo · no live connection";
-          document.querySelector(".connected-label").innerHTML =
-            "<i></i>preview";
-          selectLens("evidence");
-          selectInspector("focus");
-        });
-      document.addEventListener("keydown", (event) => {
-        if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === "k"
-        ) {
-          event.preventDefault();
-          openSearch();
+      function errorMessage(error: unknown): string {
+        if (error instanceof DashboardApiError) {
+          if (error.status === 401) return "Authentication failed. Replace the server-side dashboard credential.";
+          if (error.status === 403) return "This credential is not authorized for the selected view.";
+          if (error.status === 503) return "Titen is not ready. Inspect readiness before retrying.";
+          return error.message;
         }
-      });
-      searchInput.addEventListener("input", () => {
-        const query = searchInput.value.trim().toLowerCase();
-        document.querySelectorAll("[data-command-lens]").forEach((button) => {
-          button.hidden = !button.textContent.toLowerCase().includes(query);
-        });
-      });
-      dialog.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          dialog.close();
-        }
-      });
+        return "The same-origin dashboard adapter is unreachable.";
+      }
 
-      // Live mode is opt-in and same-origin. The browser never receives the
-      // canonical key; the adapter owns it and allowlists this single action.
-      async function connectLiveAtlas() {
+      function updateRequirements() {
+        const selected = one<HTMLInputElement>('input[name="lens"]:checked');
+        const subject = form.elements.namedItem("subject_id") as HTMLInputElement;
+        const focus = form.elements.namedItem("focus_id") as HTMLInputElement;
+        subject.required = selected.dataset.needs === "subject";
+        focus.required = selected.dataset.needs === "focus";
+        text("[data-subject-help]", subject.required ? "Required for the selected lens." : "Optional filter for Review queue.");
+        text("[data-focus-help]", focus.required ? "Required for Evidence trace." : "Used only by Evidence trace.");
+      }
+
+      function addField(list: HTMLDListElement, label: string, value: unknown) {
+        if (value === undefined || value === null || value === "") return;
+        const term = document.createElement("dt");
+        const description = document.createElement("dd");
+        term.textContent = label;
+        description.textContent = Array.isArray(value) ? value.join(", ") || "none" : String(value);
+        list.append(term, description);
+      }
+
+      function inspect(node: AtlasNode) {
+        records.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.id === node.id)));
+        text("[data-inspector-title]", node.label);
+        one<HTMLElement>("[data-inspector-empty]").hidden = true;
+        one<HTMLElement>("[data-inspector-body]").hidden = false;
+        const fields = one<HTMLDListElement>("[data-node-fields]");
+        fields.replaceChildren();
+        addField(fields, "ID", node.id);
+        addField(fields, "Type", node.type);
+        addField(fields, "Trust", node.trust);
+        addField(fields, "Status", node.status);
+        addField(fields, "Created", new Date(node.created_at).toLocaleString());
+        addField(fields, "Freshness", node.freshness === undefined ? undefined : `${node.freshness} days`);
+        addField(fields, "Confidence", node.confidence);
+        addField(fields, "Priority", node.priority);
+        addField(fields, "Reasons", node.reasons);
+        addField(fields, "Owner", node.owner_id);
+        addField(fields, "Next action", node.next_action);
+        addField(fields, "Deadline", node.deadline);
+        addField(fields, "Evidence refs", node.evidence_refs);
+        addField(fields, "Audit refs", node.audit_refs);
+
+        const relationships = one<HTMLElement>("[data-relationships]");
+        relationships.replaceChildren();
+        const edges = view?.edges.filter((edge) => edge.from === node.id || edge.to === node.id) ?? [];
+        if (!edges.length) relationships.textContent = "No relationships returned in this view.";
+        for (const edge of edges) {
+          const row = document.createElement("p");
+          row.textContent = `${edge.from} — ${edge.relation} → ${edge.to}`;
+          relationships.append(row);
+        }
+      }
+
+      function render(next: AtlasView) {
+        view = next;
+        records.replaceChildren();
+        text("[data-view-title]", next.lens.replaceAll("_", " "));
+        text("[data-result-count]", `${next.nodes.length} record${next.nodes.length === 1 ? "" : "s"} · ${next.edges.length} edge${next.edges.length === 1 ? "" : "s"}`);
+        text("[data-projection]", next.nodes.length ? "Live data" : "Empty");
+        text("[data-metadata]", JSON.stringify(next.metadata, null, 2));
+        empty.hidden = next.nodes.length > 0;
+        if (!next.nodes.length) {
+          empty.querySelector("strong")!.textContent = "No authorized records found.";
+          empty.querySelector("p")!.textContent = "The query succeeded. Adjust the subject, focus, or review filter if you expected data.";
+        }
+        records.hidden = next.nodes.length === 0;
+        for (const node of next.nodes) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.dataset.id = node.id;
+          button.setAttribute("aria-pressed", "false");
+          const kind = document.createElement("span");
+          const label = document.createElement("strong");
+          const detail = document.createElement("small");
+          kind.textContent = node.type;
+          kind.className = "record-kind";
+          label.textContent = node.label;
+          detail.textContent = `${node.trust} · ${node.status} · ${new Date(node.created_at).toLocaleDateString()}`;
+          button.append(kind, label, detail);
+          button.addEventListener("click", () => inspect(node));
+          records.append(button);
+        }
+        if (next.nodes[0]) inspect(next.nodes[0]);
+      }
+
+      async function refreshService() {
+        const notice = one<HTMLElement>("[data-service-notice]");
+        text("[data-connection-label]", "Connecting");
+        one<HTMLElement>("[data-connection-dot]").className = "";
         try {
-          const status = await fetch("/dashboard-api/status", { headers: { accept: "application/json" } });
-          if (!status.ok) return;
-          const connection = await status.json();
-          if (connection.mode !== "live") return;
-          document.querySelector(".runtime-label").textContent = `${connection.endpoint} · connecting`;
-          const response = await fetch("/dashboard-api/atlas/compile", {
-            method: "POST",
-            headers: { "content-type": "application/json", accept: "application/json" },
-            body: JSON.stringify({ lens: "conflict_freshness", subject_id: "default", limit: 5 }),
-          });
-          if (!response.ok) throw new Error("live Atlas request failed");
-          const envelope = await response.json();
-          const nodes = envelope?.data?.nodes;
-          if (!Array.isArray(nodes)) throw new Error("invalid live Atlas response");
-          const table = document.querySelector("[data-conflict-table]");
-          table.querySelectorAll(".table-row").forEach((row) => row.remove());
-          for (const node of nodes.slice(0, 5)) {
-            const row = document.createElement("div");
-            row.className = `table-row ${node.status === "disputed" ? "danger" : "warning"}`;
-            row.innerHTML = `<span aria-hidden="true">●</span><span></span><span></span><span></span><span>authorized</span><span>—</span><span>—</span>`;
-            row.children[1].textContent = String(node.label ?? "Untitled claim");
-            row.children[2].textContent = String(node.status ?? "active");
-            row.children[3].textContent = String(node.trust ?? "unknown");
-            table.append(row);
-          }
-          document.querySelector(".connected-label").innerHTML = "<i></i>connected";
-          document.querySelector(".runtime-label").textContent = `${connection.endpoint} · Conflict & Freshness live; other lenses synthetic`;
-        } catch {
-          document.querySelector(".connected-label").innerHTML = "<i></i>error";
-          document.querySelector(".runtime-label").textContent = "live Atlas unavailable · demo retained";
+          const status = await getDashboardStatus();
+          if (status.mode !== "live") throw new DashboardApiError(503, "DASHBOARD_DISCONNECTED", "Live dashboard integration is disabled.");
+          text("[data-endpoint]", status.endpoint ?? "configured endpoint");
+          const [health, readiness] = await Promise.all([checkService("health"), checkService("readiness")]);
+          text("[data-health]", health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`);
+          text("[data-runtime]", serviceDetail(health.payload, "runtime") ?? "healthz");
+          text("[data-readiness]", readiness.ok ? "Ready" : `Not ready · ${readiness.status}`);
+          text("[data-revision]", serviceDetail(health.payload, "revision") ?? "revision unavailable");
+          text("[data-connection-label]", health.ok ? "Connected" : "Degraded");
+          one<HTMLElement>("[data-connection-dot]").className = health.ok && readiness.ok ? "ok" : "warn";
+          setNotice(notice, readiness.ok ? undefined : "The process is reachable but not ready. Atlas requests may fail until readiness recovers.");
+          runButton.disabled = !health.ok;
+        } catch (error) {
+          text("[data-connection-label]", "Disconnected");
+          text("[data-endpoint]", "same-origin adapter unavailable");
+          text("[data-health]", "Unavailable");
+          text("[data-readiness]", "Unavailable");
+          one<HTMLElement>("[data-connection-dot]").className = "bad";
+          setNotice(notice, `${errorMessage(error)} Configure TITEN_API_URL and TITEN_API_KEY in the dashboard adapter process.`);
+          runButton.disabled = true;
         }
       }
-      if (new URLSearchParams(location.search).get("live") === "1") connectLiveAtlas();
+
+      form.addEventListener("change", (event) => {
+        if ((event.target as HTMLInputElement).name === "lens") updateRequirements();
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+        const values = new FormData(form);
+        const lens = String(values.get("lens"));
+        const subject = String(values.get("subject_id") ?? "").trim();
+        const focus = String(values.get("focus_id") ?? "").trim();
+        const limit = Number(values.get("limit"));
+        const payload: Record<string, unknown> = { lens, limit };
+        if (subject) payload.subject_id = subject;
+        if (focus) payload.focus_id = focus;
+        loading.hidden = false;
+        empty.hidden = true;
+        records.hidden = true;
+        setNotice(queryError);
+        runButton.disabled = true;
+        text("[data-query-status]", "Compiling authorized view…");
+        try {
+          render(await compileView(payload));
+          text("[data-query-status]", "Live view compiled from the Titen API.");
+        } catch (error) {
+          view = null;
+          setNotice(queryError, errorMessage(error));
+          text("[data-query-status]", "Query failed without a fixture fallback.");
+          text("[data-projection]", "Query failed");
+        } finally {
+          loading.hidden = true;
+          runButton.disabled = false;
+        }
+      });
+      one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);
+      updateRequirements();
+      refreshService();
     </script>
   </body>
 </html>

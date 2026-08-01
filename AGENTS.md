@@ -29,9 +29,10 @@ dual-runtime contract suite passes on both runtimes. Automatic model-assisted
 derivation/reflection is implemented as an optional durable enrichment pipeline
 and remains disabled unless its complete extraction configuration is present.
 It is not production-activated until the locked evaluation and real runtime
-smokes are complete. The Astro dashboard preview continues to use a synthetic
-fixture independently of the memory API. Do not present opt-in enrichment or
-the synthetic dashboard as production activation evidence.
+smokes are complete. The Astro dashboard uses the loopback same-origin adapter
+for live health, readiness, and authorized Memory Atlas data and has no
+synthetic fallback. Do not present opt-in enrichment or an undeployed dashboard
+as production activation evidence.
 
 ## Required work lifecycle
 

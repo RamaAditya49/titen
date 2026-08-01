@@ -52,7 +52,7 @@ is the source of truth for shipped and planned capabilities.
 | --- | --- | --- |
 | Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
 | Containerized Bun service with optional embeddings | Historical 0.3.0 canary evidence | The recorded loopback container does not verify this release, systemd/Caddy, or Cloudflare. |
-| Memory Atlas dashboard | Interactive prototype | The checked-in preview uses a frozen synthetic fixture. It is not evidence of live API integration. |
+| Memory Atlas dashboard | Implemented and verified locally | Health, readiness, and four authorized Atlas lenses pass through the same-origin adapter against temporary Bun/SQLite. This is not evidence of an external deployment. |
 | Live Vectorize, Workers AI, and Cloudflare production | Planned | Local configuration and emulation are not production evidence. |
 | Enterprise governance and recallable-memory federation | Planned | Signed event exchange exists, but remote events do not become canonical memory automatically. |
 
@@ -223,11 +223,11 @@ the [Cloudflare deployment guide](https://github.com/RamaAditya49/titen/blob/mai
 
 ## Dashboard
 
-The checked-in Astro client at `/dashboard/` is an interactive Memory Atlas
-preview. Its default data is synthetic and stays separate from the memory
-service. The
+The checked-in Astro client at `/dashboard/` is a live, read-only Memory Atlas
+client. It uses a loopback same-origin adapter, keeps the API key server-side,
+and shows no fixture fallback when disconnected or denied. The
 [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
-documents the fixture, optional loopback adapter, tests, and hosting boundary.
+documents configuration, tests, and the hosting boundary.
 
 ## Documentation
 

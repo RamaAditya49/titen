@@ -13,8 +13,7 @@ instead of using phase checkmarks.
   emulated runtimes.
 - **Verified live** — a documented check passed against provisioned external
   infrastructure.
-- **Interactive prototype** — usable UI behavior backed by synthetic data, not
-  a live service.
+- **Interactive prototype** — usable UI behavior without a live service.
 - **Planned** — intended behavior without completed implementation evidence.
 - **Out of scope** — deliberately excluded from the current product boundary.
 
@@ -30,7 +29,7 @@ locally verified but has no live deployment evidence.
 | Identities, visibility, leases, handoffs, MCP, events, Atlas compiler | Implemented; Verified locally | [collaboration architecture](./architecture/collaboration.md), [API reference](./reference/api.md), [contract tests](../tests/contract/) | Local/emulated runtime evidence only. |
 | Enterprise policy and governed releases | Planned | [FRD governance requirements](./FRD.md), [ADR-0002](./decisions/0002-channel-release-not-public-memory.md) | Withdrawn from the current route inventory until authorization and lifecycle gates are complete. |
 | Enterprise audit | Implemented; Verified locally | [FRD governance requirements](./FRD.md), [contract tests](../tests/contract/) | No claim of a provisioned enterprise deployment. |
-| Memory Atlas dashboard | Interactive prototype | [dashboard guide](./dashboard.md), [browser tests](../tests/) | Checked-in UI uses a synthetic fixture; it is not evidence of live API integration. |
+| Memory Atlas dashboard | Implemented; Verified locally | [dashboard guide](./dashboard.md), [browser tests](../tests/), [live adapter smoke](../scripts/verify-dashboard-live.ts) | Live health/readiness and four authorized Atlas lenses pass through the same-origin adapter against temporary Bun/SQLite; this is not a provisioned external deployment claim. |
 | Containerized Bun service with `embeddinggemma` | Historical live evidence: 0.3.0 canary | [evaluation record](./testing/EVALS.md), [cycle 1](./testing/2026-07-31-mem0-replacement-cycle1.md), [cycle 2](./testing/2026-07-31-mem0-replacement-cycle2.md), [end-to-end script](../scripts/verify-live.ts) | The evaluated npm 0.3.0 canary ran loopback-only on Wulan with explicit `sqlite-vec`; this is not evidence for a later package, systemd, or Cloudflare. |
 | Model-assisted derivation and reflection | Implemented; Verified locally; activation gated | [ADR-0004](./decisions/0004-model-assisted-memory-enrichment.md), [paired work spec](./specs/done/2026-07-31-model-assisted-enrichment-0136.md), [dual-runtime contracts](../tests/contract/enrichment.ts), [model gate](./testing/2026-07-31-enrichment-model-gate-luna-full.md) | Durable jobs, provider, and validator are shipped opt-in. No tested candidate passed the frozen activation gate; revision attestation and three-target runtime smoke remain absent. |
 | Replace Wulan Mem0 with Titen | Historical 0.3.0 evaluation: NO-GO | [cycle 1](./testing/2026-07-31-mem0-replacement-cycle1.md), [cycle 2](./testing/2026-07-31-mem0-replacement-cycle2.md), [cycle 3](./testing/2026-07-31-mem0-replacement-cycle3.md), [cycle 4](./testing/2026-07-31-mem0-replacement-cycle4.md) | The evaluated 0.3.0 canary did not pass ranking, abstention, native LLM, production migration, real Cloudflare/local, exact resource, and soak gates. This does not describe later source or package state. |
@@ -64,8 +63,8 @@ decision.
 ### v0.2 — collaboration
 
 Adds identities and memberships, scoped visibility, leases, handoffs,
-observer-specific conflicts, MCP, durable metadata events, and Memory Atlas
-view compilation. The dashboard remains a separate synthetic-data prototype.
+observer-specific conflicts, MCP, durable metadata events, Memory Atlas view
+compilation, and an optional live same-origin dashboard client.
 
 ### v0.3 — governance (planned)
 

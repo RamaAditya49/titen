@@ -380,6 +380,28 @@ address, disables redirects, and bounds each attempt to 10 seconds. Cloudflare
 webhook registration/delivery remains deliberately unavailable: Worker `fetch`
 does not expose a verifiable address-pinning primitive.
 
+## Optional live dashboard
+
+Build the static Astro client and run its adapter beside the loopback API. The
+key needs only `views:compile` and never enters browser assets or responses:
+
+```bash
+pnpm build
+TITEN_DASHBOARD_LIVE=true \
+TITEN_API_URL=http://127.0.0.1:8787 \
+TITEN_API_KEY='...' \
+TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
+pnpm dashboard:adapter
+```
+
+The adapter remains bound to `127.0.0.1:4322`. An authenticated tailnet may
+publish that single origin with Tailscale Serve while the Titen API stays
+loopback-only. Configure Serve to proxy the HTTPS tailnet hostname to
+`http://127.0.0.1:4322`; the exact hostname must match
+`TITEN_DASHBOARD_ORIGIN`. Do not expose port 8787 or reuse an administrative
+wildcard key. Stop the adapter and remove the Serve mapping to roll back without
+touching canonical data.
+
 ## Service hardening
 
 The production unit should use:

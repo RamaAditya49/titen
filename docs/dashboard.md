@@ -1,82 +1,73 @@
-# Dashboard
+# Live Memory Atlas dashboard
 
-Titen includes a static Astro implementation of the approved Memory Atlas
-dashboard at `/dashboard/`. It is a product-quality frontend preview, not the
-memory service: every displayed record, count, connection label, and trace is a
-frozen synthetic fixture.
+Titen includes an optional Astro dashboard at `/dashboard/`. It is a read-only
+same-origin client of the authenticated Titen API; it contains no fixture
+records and is not required for REST or MCP operation.
 
-## Run locally
+## Run disconnected
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:4321/dashboard/`.
+Open `http://localhost:4321/dashboard/`. Static Astro development has no
+credential-bearing adapter, so the page truthfully shows a disconnected state.
 
-The production and browser gate is:
+## Run live
 
-```bash
-pnpm test
-pnpm check:workflow
-```
-
-`pnpm test` builds static output into `dist/`, enforces the 80 KiB gzip CSS/JS
-budget, starts `astro preview`, and runs the Chromium interaction, network,
-storage, responsive, and screenshot checks. GitHub Actions remain disabled;
-these are local maintainer gates.
-
-## Implemented frontend behavior
-
-- exact desktop composition from the approved 1600 x 1080 final mockup;
-- Evidence Trace, Neighborhood, Conflict & Freshness, and Scope Preview lenses;
-- focus claim, disputed claim, and observation inspectors;
-- tap-to-inspect phone flow that brings the selected detail card into view;
-- native search dialog from the header or <kbd>Ctrl/Command</kbd>+<kbd>K</kbd>;
-- disconnect/reconnect that removes the private fixture from view and persists
-  nothing;
-- responsive page composition with a vertical evidence trail and labelled table
-  cards on phones, plus bounded graph/table scrolling on wider screens;
-- reduced-motion, forced-colors, visible-focus, and semantic landmark support;
-- locally built fonts, logo, SVG graphs, and icons with no third-party runtime
-  request.
-
-Atlas is the only active route. Memories, Context, Work, Audit & Events, System,
-Access, Approvals, and Releases are non-interactive labels that preserve the
-approved information map; they are not available product pages.
-
-## Screenshot workflow
-
-The README images are real captures from `astro preview`:
+Build once, then start the existing loopback adapter with a least-privilege key:
 
 ```bash
 pnpm build
-pnpm screenshots
+TITEN_DASHBOARD_LIVE=true \
+TITEN_API_URL=http://127.0.0.1:8787 \
+TITEN_API_KEY='replace-with-a-key-that-has-views:compile' \
+TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
+pnpm dashboard:adapter
 ```
 
-Outputs:
+Open `http://127.0.0.1:4322/dashboard/`. The browser calls only same-origin
+`/dashboard-api/*` routes. The adapter keeps the upstream URL and API key in its
+process environment, forwards `/healthz`, `/readyz`, and the four current
+read-only Atlas lenses, and never returns the key. Nothing is written to Web
+Storage.
 
-- `docs/assets/screenshots/dashboard-atlas-evidence.png`;
-- `docs/assets/screenshots/dashboard-conflict-freshness.png`;
-- `docs/assets/screenshots/dashboard-mobile.png`.
+Supported lenses:
 
-Inspect every refreshed image before committing it. A test pass proves the
-capture completed; it does not replace visual review.
+- Neighborhood and Conflict & freshness require a subject ID;
+- Evidence trace requires a focus claim ID;
+- Review queue accepts an optional subject filter.
 
-## Static hosting
+Empty, loading, disconnected, not-ready, unauthorized, forbidden, and upstream
+failure are distinct states. A failed request never falls back to synthetic
+records. Atlas remains the only active dashboard route; the product-map labels
+are non-interactive orientation until their backend and UI gates complete.
 
-The dashboard has no Astro server adapter. Serve the same `dist/` directory on
-Cloudflare static assets/Pages or a VPS static file server and preserve trailing
-slash routing for `/dashboard/`. Do not expose the preview as a live memory
-service or attach production credentials to it.
+## Verification
 
-The future authorized API integration needs a new EARS work item. It must add
-memory-only credential handling, generic denial, bounded response decoding,
-canonical hydration behavior, Cloudflare/VPS contract parity, and deployment
-smoke evidence before any fixture label is replaced by live data.
+```bash
+pnpm verify:dashboard-live
+pnpm test:adapter
+pnpm build
+pnpm test:browser tests/dashboard.spec.ts
+pnpm check:workflow
+```
 
-## Rollback
+The real smoke provisions a temporary Bun/SQLite service and proves health,
+readiness, evidence trace, neighborhood, conflict/freshness, review queue, and
+cross-subject exclusion through the adapter. Browser tests cover no-secret,
+no-storage, disconnected, loading, empty, denial, mobile, and keyboard paths.
 
-Remove or revert the optional static dashboard artifact. The current frontend
-imports no Titen database, API, provider adapter, or memory kernel, so rollback
-cannot mutate canonical data or headless REST/MCP behavior.
+Refresh documentation captures explicitly with `pnpm screenshots`; ordinary
+test runs do not rewrite tracked images.
+
+## Deployment and rollback
+
+The included adapter binds only to loopback and rejects foreign Host and Origin
+values. `TITEN_DASHBOARD_ORIGIN` allowlists exactly one HTTPS reverse-proxy
+origin while keeping the listener and upstream API private. Put authentication
+and TLS at a separately audited ingress before making it remotely reachable;
+do not treat the adapter as a public session service. Rollback is stopping the
+optional adapter or removing the dashboard static assets. Neither action
+changes canonical data or headless readiness.

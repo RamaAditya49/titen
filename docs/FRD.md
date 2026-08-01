@@ -868,8 +868,8 @@ Acceptance (EARS):
 
 ### UI-001 — Progressive dashboard information architecture
 
-**Release:** v0.3.1 implements the static reference shell; live areas follow
-their backing feature release and a separate completed UI work item
+**Release:** Memory Atlas is live through the same-origin adapter; later areas
+follow their backing feature release and a separate completed UI work item
 
 The canonical area map is defined in [DESIGN](./DESIGN.md). It groups operator
 jobs without claiming that every planned area is implemented:
@@ -883,9 +883,8 @@ jobs without claiming that every planned area is implemented:
 Required behavior:
 
 - keep the dashboard optional and consume only authenticated REST contracts;
-- render Memory Atlas as the only active route in the final reference shell,
-  using synthetic fixture data until the separately specified authorized view
-  compiler integration ships;
+- render Memory Atlas as the only active route in the reference shell, using
+  only same-origin health, readiness, and authorized view compiler responses;
 - allow the approved shell to show the canonical area map as non-interactive
   orientation without implying those labels have routes or backend behavior;
 - add a later area only after its backend behavior is implemented, the current
@@ -1162,9 +1161,10 @@ Pass conditions:
 10. Reconstruct the flow from metadata-only audit events.
 11. Compile Evidence Trace, Memory Neighborhood, and Conflict & Freshness views
     for visible records, then probe each with a foreign/private record ID.
-12. Open the v0.3.1 static dashboard and confirm Atlas is the only active product
-    area; other approved shell labels are plain, non-interactive orientation with
-    no route, locked, disabled, promotional, or shipped-capability treatment.
+12. Open the live dashboard, compile an authorized Atlas view, and confirm
+    Atlas is the only active product area; other approved shell labels are
+    plain, non-interactive orientation with no route or shipped-capability
+    treatment.
 
 Pass conditions:
 
