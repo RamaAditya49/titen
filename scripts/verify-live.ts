@@ -122,11 +122,14 @@ for (const statement of facts) {
 }
 ok(`${claimIds.length} claims materialized under subject ${SUBJECT}`);
 
-// Indexing must happen on its own. Nothing here calls /v1/index/drain: the
-// service runs a maintenance pass on an interval, and a caller should never need
-// to know that embedding is asynchronous.
+// Drain explicitly so this release gate measures Workers AI and Vectorize
+// without depending on a provider's Cron delivery/replication timing. Cron is a
+// separate operational smoke over the same maintenance function.
 if (vectorEnabled) {
-  const deadline = Date.now() + 120_000;
+  const drained = await api("POST", "/v1/index/drain?limit=50");
+  assert.equal(drained.remaining, 0, "the bounded operator drain must clear pending index work");
+  ok(`operator drain indexed ${drained.indexed} claim(s) with ${drained.model}`);
+  const deadline = Date.now() + 60_000;
   let waited = 0;
   let ready = false;
   while (Date.now() < deadline) {
@@ -146,7 +149,7 @@ if (vectorEnabled) {
     waited += 1;
   }
   assert.ok(ready, "the service must index new claims without being asked");
-  ok(`automatic indexing made memory searchable after ~${waited}s, no manual drain`);
+  ok(`Vectorize made the drained memory searchable after ~${waited}s`);
 }
 
 const context = await api("POST", "/v1/context/compile", {

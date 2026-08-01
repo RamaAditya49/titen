@@ -55,7 +55,7 @@ is the source of truth for shipped and planned capabilities.
 | Memory kernel, REST, MCP, SDK, and collaboration | Implemented and verified locally | The same contract runs on Bun/SQLite and local workerd/D1. This does not prove a live Cloudflare deployment. |
 | Containerized Bun service | Verified live on `rama-tuf` at 0.5.3 | The exact rootless OCI image runs behind loopback-only Quadlets with schema 20, verified backup/restore, restart recovery, and rollback artifacts. Optional embeddings remain disabled there. |
 | Operator dashboard | Verified live on `rama-tuf` at 0.5.3 | Default `owner`, forced first-login password change, Add User, and all six areas pass against the exact image in a restored-data canary; production login, scope denial, and restart invalidation pass through the loopback adapter. Tailscale or Cloudflare ingress is operator-configured. |
-| Live Vectorize, Workers AI, and Cloudflare production | Planned | Local configuration and emulation are not production evidence. |
+| Live Vectorize, Workers AI, and Cloudflare production | Verified live in the isolated `titen-test-*` stack | Rama Digital runs Worker/D1, BGE-M3/Vectorize, scoped metadata filters, Cron repair, schema 20, semantic retrieval, denial, persistence, and dashboard-adapter smokes. This is test-production evidence, not a customer traffic cutover or model-enrichment activation. |
 | Enterprise governance and recallable-memory federation | Implemented; verified locally and in the 0.5.3 restored-data canary | The shared Bun/SQLite and workerd/D1 contract covers governed roles, policies, approvals, releases, retention, legal holds, identity mappings, and opt-in signed canonical import. Production access remains capability-gated. |
 
 ## Install and run
@@ -207,7 +207,7 @@ One Web-Standards TypeScript core serves both runtimes:
 | HTTP | `Bun.serve` | Worker `fetch` |
 | Canonical SQL | `bun:sqlite` | D1 |
 | Lexical retrieval | SQLite FTS5 | D1 FTS5 |
-| Optional vectors | `sqlite-vec` | Vectorize (planned live) |
+| Optional vectors | `sqlite-vec` | Vectorize (verified live in `titen-test-*`) |
 | Automatic model enrichment | Implemented, opt-in compatible HTTP | Implemented, opt-in compatible HTTP |
 | Background work | Startup and bounded timer | Scheduled handler; trigger provisioning varies |
 

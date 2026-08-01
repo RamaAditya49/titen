@@ -17,6 +17,37 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-08-01
+
+### Added
+
+- A checked-in `titen-test-*` Wrangler profile provisions the isolated live
+  Worker, D1, Vectorize, Workers AI, and Cron contract without storing an
+  account API token in the Worker.
+
+### Changed
+
+- Cloudflare schema readiness verifies the complete migration contract in one
+  D1 read instead of issuing one remote read per required object and column.
+- New dashboard passwords use six serial PBKDF2-HMAC-SHA-256 stages of 100,000
+  iterations each, preserving the 600,000-operation work factor within the
+  Workers Web Crypto per-call limit. Bun retains legacy verifier compatibility.
+- The live semantic verifier uses an explicit bounded index drain; Cron remains
+  a separately observed production reconciler instead of a timing dependency.
+
+### Fixed
+
+- The dashboard login username example is now the canonical bootstrap account
+  `owner`, not a maintainer-specific placeholder.
+- The Cloudflare runbook provisions the three Vectorize metadata indexes needed
+  for scope-before-search filtering before the first vector upsert.
+
+### Security
+
+- Live unauthenticated and cross-organization probes fail with non-disclosing
+  `401`/`404`, while native D1, Vectorize, and Workers AI bindings require no
+  account credential inside the deployed Worker.
+
 ## [0.5.3] — 2026-08-01
 
 ### Added
@@ -512,7 +543,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.4
 [0.5.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.3
 [0.5.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.2
 [0.5.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.1

@@ -1,8 +1,10 @@
 # Cloudflare deployment
 
-Status: **implemented and verified locally** through workerd/D1. A provisioned
-live Worker/D1 deployment and live Vectorize/Workers AI bindings are not current
-repository evidence.
+Status: **implemented, verified locally, and verified live** in the retained
+prefix-isolated Rama Digital `titen-test-*` stack. The live proof covers Worker,
+D1, Vectorize, Workers AI BGE-M3 embeddings, Cron repair, authorization,
+persistence, rollback, and dashboard-adapter behavior. It is not a customer
+traffic cutover or activation of model-assisted derivation/reflection.
 
 Cloudflare Tunnel is ingress for a self-hosted Bun/VPS origin, not a way to
 deploy this Worker runtime. See the [secure ingress guide](./secure-ingress.md)
@@ -65,6 +67,17 @@ pnpm deploy:worker
 curl https://titen.<your-subdomain>.workers.dev/healthz
 ```
 
+When Vectorize is enabled, create its authorization metadata indexes before the
+first upsert. Existing vectors must be requeued after adding an index because
+metadata-index creation is asynchronous:
+
+```bash
+wrangler vectorize create-metadata-index <index> --propertyName org_id --type string
+wrangler vectorize create-metadata-index <index> --propertyName project_id --type string
+wrangler vectorize create-metadata-index <index> --propertyName subject_id --type string
+wrangler vectorize list-metadata-index <index>
+```
+
 Schema migrations are forward-only. Before changing production schema, record
 the current [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
 bookmark with `wrangler d1 time-travel info titen` and retain the previous
@@ -81,6 +94,31 @@ deployment or restore, gate traffic on `/readyz`, not `/healthz`.
 - The shared contract suite passes through workerd/Miniflare with real D1.
 - Data survives isolate disposal and fresh cold start.
 - No Vectorize, Workers AI, Cron, KV, R2, Queue, DO, or `nodejs_compat` required.
+
+## Reference live stack
+
+The account-specific [`wrangler.titen-test.jsonc`](../../wrangler.titen-test.jsonc)
+keeps the generic OSS config reusable and contains no credential:
+
+| Resource | Retained live value |
+| --- | --- |
+| Account | Rama Digital |
+| Worker | `titen-test-api` |
+| D1 | `titen-test-db` in APAC |
+| Vectorize | `titen-test-claims-v1`, 1024 dimensions, cosine |
+| Workers AI | native `AI` binding, `@cf/baai/bge-m3` |
+| Cron | every minute, bounded maintenance |
+| URL | `https://titen-test-api.konektor.workers.dev` |
+
+The 2026-08-01 live gate observed a 600.17 KiB / 124.29 KiB gzip Worker,
+schema 20, one-read schema verification, enabled semantic readiness, 1024-value
+BGE-M3 output, scoped metadata filtering, and a keyword-free target recalled
+about two seconds after an explicit drain. A real Cron invocation indexed
+pending work; unauthenticated and foreign-organization probes returned `401`
+and non-disclosing `404`. Forced password replacement, six dashboard areas,
+Add User, logout, D1 persistence, and Worker rollback/redeploy also belong to
+the release gate; the exact terminal revision is recorded in the paired done
+spec.
 
 ## Bindings
 
@@ -113,9 +151,9 @@ whether the Worker applies pending migrations on cold start.
 ## Optional capability truth
 
 The Worker contains vector and extraction adapters plus a `scheduled()`
-maintenance handler, but checked-in `wrangler.jsonc` configures only D1. It has
-no AI, Vectorize, extraction secret, or Cron binding, so those capabilities are
-not active by default or live-verified.
+maintenance handler. The generic `wrangler.jsonc` configures only D1; the
+separate `wrangler.titen-test.jsonc` activates native AI, Vectorize, and Cron for
+the retained live reference stack. Extraction remains disabled.
 
 - **Vectorize** — rebuildable semantic index for vector retrieval.
 - **Workers AI** — embedding adapter support.
@@ -131,8 +169,10 @@ in intentional FTS-only mode. Semantic opt-in requires both native bindings and
 a valid local contract. Configure `TITEN_EMBED_MODEL`, `TITEN_EMBED_DIMS`,
 `TITEN_EMBED_REVISION`, `TITEN_EMBED_PROFILE`, and
 `TITEN_EMBED_MIN_COSINE`; the bound Vectorize index must use the same dimensions
-and cosine metric. Revision must identify immutable provider weights. The floor
-must come from a locked evaluation of that exact model/profile; Titen bundles no
+and cosine metric. Revision should identify immutable provider weights when the
+provider exposes them. The reference stack records Cloudflare's observed catalog
+identity and date, not an independent weight attestation. The floor must come
+from a locked evaluation of that exact model/profile; Titen bundles no
 universal threshold. A partial binding/variable set, invalid dimension/policy,
 or binding object without the required methods returns `configured_error` and
 fails `/readyz`.
@@ -195,6 +235,34 @@ activation is still blocked until a real max-bound D1 smoke proves the declared
   the Worker.
 - Use a distinct, revocable key per agent/service integration.
 - Never place API keys in Vectorize metadata or logs.
+- Workers Web Crypto supports PBKDF2 but rejects one call above 100,000
+  iterations. Titen's versioned verifier therefore runs six serial salted
+  100,000-iteration stages; no crypto package or `nodejs_compat` flag is added.
+
+## August 2026 platform check
+
+Re-verified on 2026-08-01 from Cloudflare's official documentation:
+
+- Wrangler JSONC remains the deployment source of truth, and native bindings
+  avoid account tokens inside Workers: [configuration](https://developers.cloudflare.com/workers/wrangler/configuration/),
+  [bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/).
+- BGE-M3 is available as `@cf/baai/bge-m3`; Workers AI includes 10,000 free
+  neurons per day, then usage is billed by neurons:
+  [model](https://developers.cloudflare.com/workers-ai/models/bge-m3/),
+  [pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+- Vectorize supports at most 1,536 dimensions and asynchronous mutations; its
+  Free allocation includes 30 million queried dimensions and 5 million stored
+  dimensions per month: [limits](https://developers.cloudflare.com/vectorize/platform/limits/),
+  [pricing](https://developers.cloudflare.com/vectorize/platform/pricing/),
+  [client API](https://developers.cloudflare.com/vectorize/reference/client-api/).
+- D1 Time Travel is always on, with seven days of Free-plan and thirty days of
+  Paid-plan retention: [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
+- Worker rollback changes code, not D1 migrations or bindings; schema
+  compatibility must be proved before rollback:
+  [rollbacks](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/).
+- Workers Web Crypto documents native PBKDF2 support; the live runtime probe
+  additionally established the current 100,000-iteration per-call ceiling:
+  [Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/).
 
 ## Rate limiting, telemetry, and rollback
 
@@ -233,5 +301,5 @@ according to the deployment runbook, redeploy the compatible Worker, then smoke
 - Run these gates manually from a controlled local checkout. GitHub Actions is
   intentionally not enabled so the repository incurs no hosted automation cost.
 
-Current Cloudflare limits and pricing remain research evidence in the root
-[blueprint](../../blueprint.md) and must be refreshed before production.
+Refresh the linked limits and pricing before a different account, plan, or
+customer cutover; the values above are a dated operational snapshot.
