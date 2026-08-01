@@ -1,6 +1,6 @@
 import { afterAll, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
@@ -348,6 +348,7 @@ test("migrate dry-run is read-only and schema output is deterministic", () => {
   assert.deepEqual(fresh.files, []);
 
   assert.equal(run("dry-run-current", ["bootstrap", "--db", "current.db"]).exitCode, 0);
+  chmodSync(join(root, "dry-run-current", "current.db"), 0o400);
   const before = statSync(join(root, "dry-run-current", "current.db"));
   const current = run("dry-run-current", ["migrate", "--db", "current.db", "--dry-run"]);
   const after = statSync(join(root, "dry-run-current", "current.db"));
@@ -355,6 +356,7 @@ test("migrate dry-run is read-only and schema output is deterministic", () => {
   assert.match(current.output, /-- 0 migration\(s\) pending; database unchanged/);
   assert.equal(after.size, before.size);
   assert.equal(after.mtimeMs, before.mtimeMs);
+  assert.equal(after.mode & 0o777, 0o400);
 
   const first = run("schema-deterministic", ["schema"]);
   const second = run("schema-deterministic", ["schema"]);

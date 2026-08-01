@@ -24,7 +24,7 @@ export function openDatabase(
   let database: Database | undefined;
   try {
     database = new Database(path, open);
-    protectDatabaseFiles(path);
+    if (!readonly) protectDatabaseFiles(path);
     if (!readonly) {
       database.run("PRAGMA journal_mode = WAL");
       // A successful response means its canonical transaction survived process,
