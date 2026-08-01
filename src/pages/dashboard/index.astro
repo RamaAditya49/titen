@@ -36,7 +36,7 @@ const lenses = [
   </head>
   <body>
     <a class="skip-link" href="#workspace">Skip to workspace</a>
-    <div class="app-shell">
+    <div class="app-shell" data-shell="loading">
       <aside class="sidebar" aria-label="Product areas">
         <header class="brand-row">
           <img src={titenMark} width="24" height="24" alt="" />
@@ -75,17 +75,26 @@ const lenses = [
         </header>
 
         <section class="login-panel" data-login-panel hidden aria-labelledby="login-heading">
-          <div>
-            <p class="eyebrow">Private operator access</p>
-            <h2 id="login-heading">Sign in with your Titen API key</h2>
-            <p>The key is exchanged once for an HttpOnly session and is never written to browser storage.</p>
+          <div class="login-intro">
+            <div class="login-brand" aria-label={`Titen version ${packageJson.version}`}>
+              <img src={titenMark} width="32" height="32" alt="" />
+              <strong>titen</strong>
+              <span>v{packageJson.version}</span>
+            </div>
+            <div>
+              <p class="eyebrow">Private operator access</p>
+              <h1 id="login-heading">Sign in</h1>
+              <p>Use an API key issued by your Titen organization.</p>
+            </div>
+            <p class="login-intro-note">Your permissions decide which memory, work, audit, governance, and federation tools become available.</p>
           </div>
           <form data-login-form>
             <label>
-              <span>API key</span>
+              <span>Titen API key</span>
               <input name="api_key" type="password" autocomplete="off" spellcheck="false" maxlength="512" required placeholder="titen_sk_…" />
             </label>
-            <button class="primary-button" type="submit">Sign in</button>
+            <button class="primary-button" type="submit">Continue</button>
+            <p class="login-boundary"><strong>Kept off this device.</strong> The adapter exchanges this key for an HttpOnly session and never writes it to browser storage.</p>
             <span data-login-status role="status" aria-live="polite"></span>
           </form>
         </section>
@@ -508,6 +517,7 @@ const lenses = [
         history.replaceState(null, "", `#${id}`);
       }
       function showPrivateSurface() {
+        one<HTMLElement>(".app-shell").dataset.shell = "private";
         one<HTMLElement>("[data-login-panel]").hidden = true;
         one<HTMLElement>("[data-service-strip]").hidden = false;
         one<HTMLElement>("[data-product-nav]").hidden = false;
@@ -533,6 +543,7 @@ const lenses = [
       function signedOut(message?: string) {
         principal = null;
         clearPrivateState();
+        one<HTMLElement>(".app-shell").dataset.shell = "login";
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = true;
         for (const button of all<HTMLButtonElement>("[data-area]")) button.hidden = true;
         one<HTMLElement>("[data-product-nav]").hidden = true;

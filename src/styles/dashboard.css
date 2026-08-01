@@ -42,6 +42,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .skip-link:focus { transform: translateY(0); }
 
 .app-shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100dvh; }
+.app-shell[data-shell="loading"],
+.app-shell[data-shell="login"] { grid-template-columns: minmax(0, 1fr); }
+.app-shell[data-shell="loading"] .sidebar,
+.app-shell[data-shell="login"] .sidebar { display: none; }
+.app-shell[data-shell="login"] .main-shell {
+  display: grid;
+  align-content: center;
+  width: 100%;
+  max-width: 1080px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: clamp(18px, 5vw, 64px);
+}
+.app-shell[data-shell="login"] .topbar { display: none; }
 .sidebar {
   position: sticky;
   top: 0;
@@ -170,15 +184,30 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .notice { margin: 16px clamp(16px, 3vw, 44px) 0; padding: 12px 14px; color: var(--danger); background: #f8e8df; border-left: 3px solid var(--danger); font-size: 12px; line-height: 1.5; }
 .login-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, .75fr);
-  gap: 36px;
-  margin: 24px clamp(16px, 3vw, 44px) 0;
-  padding: clamp(24px, 4vw, 48px);
+  grid-template-columns: minmax(280px, .9fr) minmax(320px, 1.1fr);
+  min-height: 560px;
+  margin: 0;
   background: var(--paper);
   border: 1px solid var(--rule);
 }
-.login-panel > div > p:last-child, .user-admin p { max-width: 58ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.login-panel form { display: grid; gap: 12px; align-content: center; }
+.login-intro {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 48px;
+  padding: clamp(30px, 5vw, 56px);
+  color: var(--paper);
+  background: var(--ink);
+}
+.login-brand { display: flex; align-items: center; gap: 11px; }
+.login-brand img { border-radius: 4px; }
+.login-brand strong { font-family: "Bricolage Grotesque Variable", sans-serif; font-size: 18px; font-weight: 600; }
+.login-brand span { margin-left: auto; color: #c5b9aa; font: 10px "JetBrains Mono Variable", monospace; }
+.login-intro .eyebrow { color: #c5b9aa; }
+.login-intro h1 { max-width: 8ch; margin-top: 12px; color: var(--paper); font-size: clamp(42px, 6vw, 68px); line-height: .95; }
+.login-intro > div > p:last-child { max-width: 34ch; margin: 20px 0 0; color: #d9cfc1; font-size: 14px; line-height: 1.6; }
+.login-intro-note { max-width: 42ch; margin: 0; color: #a99d90; font: 10px/1.6 "JetBrains Mono Variable", monospace; }
+.login-panel form { display: grid; gap: 16px; align-content: center; width: min(100%, 390px); margin: auto; padding: clamp(30px, 6vw, 64px); }
 .login-panel label, .inline-form label, .user-admin label { display: grid; gap: 6px; }
 .login-panel label span, .inline-form label span, .user-admin label span { font-size: 11px; font-weight: 600; }
 .login-panel input, .inline-form input, .user-admin input, .user-admin select {
@@ -191,7 +220,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   border-radius: 2px;
   font: 11px "JetBrains Mono Variable", monospace;
 }
-.login-panel form > span, .user-admin form > span { min-height: 1.4em; color: var(--muted); font-size: 11px; }
+.login-panel form > .primary-button { width: 100%; }
+.login-boundary { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.login-boundary strong { color: var(--ink-soft); font-weight: 620; }
+.login-panel form > span, .user-admin form > span { min-height: 1.4em; color: var(--danger); font-size: 11px; }
+.user-admin p { max-width: 58ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .query-panel {
   margin: 18px clamp(16px, 3vw, 44px) 0;
   padding: 22px;
@@ -344,7 +377,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .service-strip { grid-template-columns: 1fr; margin-top: 14px; }
   .service-strip article { border-right: 0; border-bottom: 1px solid var(--rule-soft); }
   .query-panel { padding: 18px 14px; }
-  .login-panel { grid-template-columns: 1fr; gap: 18px; padding: 22px 18px; }
+  .app-shell[data-shell="login"] .main-shell { align-content: start; padding: 0; }
+  .login-panel { grid-template-columns: 1fr; min-height: 100dvh; border: 0; }
+  .login-intro { min-height: 270px; gap: 32px; padding: 28px 22px; }
+  .login-intro h1 { font-size: 46px; }
+  .login-intro-note { display: none; }
+  .login-panel form { width: 100%; padding: 34px 22px 48px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .input-grid { grid-template-columns: 1fr; }
   .input-grid label:last-child { grid-column: auto; max-width: none; }

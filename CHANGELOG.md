@@ -17,6 +17,14 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-08-01
+
+### Fixed
+
+- The per-principal sign-in state now uses a focused responsive login surface;
+  the private product sidebar and operator topbar appear only after a valid
+  session instead of framing the unauthenticated form.
+
 ## [0.5.2] — 2026-08-01
 
 ### Added
@@ -483,7 +491,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.3
 [0.5.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.2
 [0.5.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.1
 [0.5.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.0

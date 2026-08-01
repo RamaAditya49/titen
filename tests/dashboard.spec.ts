@@ -136,8 +136,15 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
 
   await page.goto("/dashboard/");
   await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "login");
+  await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator(".topbar")).toBeHidden();
+  await expect(page.getByLabel("Titen API key")).toBeVisible();
   await page.locator('[data-login-form] input[name="api_key"]').fill("titen_sk_browser_login");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
+  await expect(page.locator(".sidebar")).toBeVisible();
+  await expect(page.locator(".topbar")).toBeVisible();
   await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(6);
   await expect(page.locator("[data-principal]")).toHaveText("user_admin");
 
@@ -178,6 +185,7 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await expect(page.locator("[data-principal]")).toHaveText("user_admin");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeHidden();
   await expect(page.getByText("titen_sk_one_time_browser")).toHaveCount(0);
 });
 
