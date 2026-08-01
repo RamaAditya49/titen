@@ -1,14 +1,13 @@
 ---
 work_id: host-compatibility-adapters
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-02
 updated: 2026-08-02
-review_after: 2026-08-16
 owner: ramaaditya
-spec: docs/specs/active/2026-08-02-host-compatibility-adapters.md
+spec: docs/specs/done/2026-08-02-host-compatibility-adapters.md
 ---
 
 # Protocol-first MCP host compatibility plan
@@ -33,8 +32,8 @@ spec: docs/specs/active/2026-08-02-host-compatibility-adapters.md
   stale MCP, schema, and Cloudflare capability text.
 - [x] Run the complete manual gate, package inspection, dependency audit, and
   exact-tarball MCP smoke; inspect the final diff for stale claims or secrets.
-- [ ] Move this pair to `done/` with terminal evidence and no unchecked work.
-- [ ] Merge the 0.5.7 follow-up, publish the stable npm and GitHub releases,
+- [x] Move this pair to `done/` with terminal evidence and no unchecked work.
+- [x] Merge the 0.5.7 follow-up, publish the stable npm and GitHub releases,
   update stable discovery, smoke the registry artifact, and remove the merged
   remote topic branch.
 
@@ -62,3 +61,56 @@ spec: docs/specs/active/2026-08-02-host-compatibility-adapters.md
 - Use no GitHub Actions; all repository and release gates run locally.
 - Publish only after the packed tarball and its hashes match the reviewed source.
 - Preserve the previous npm version and release tag as rollback authorities.
+
+## Terminal evidence
+
+## Verification
+
+- PR [#215](https://github.com/RamaAditya49/titen/pull/215) merged the
+  protocol-native instructions and stateless stdio bridge as `0.5.6`; PR
+  [#216](https://github.com/RamaAditya49/titen/pull/216) merged the verified
+  host guide, test-port root fixes, and `0.5.7` release commit
+  `f226df0f04b7480b8ebf99df34f6378e5a5dfa88`.
+- `pnpm test:all` passed: 110 workerd/D1, 135 Bun/vector/SDK, and 200
+  integration tests; the live dashboard verifier passed all six product areas,
+  Playwright passed 6 tests with 2 screenshot-only tests skipped, and the
+  workflow self-test plus Ponytail ledger passed with zero markers.
+- `bash scripts/verify-pack.sh` passed all nine installed-tarball checks;
+  `pnpm audit --prod` reported no known vulnerabilities, `git diff --check`
+  passed, and the reviewed prose/secret scan found no credential literal.
+- The packed `0.5.7` CLI exposed nine tools through a real local service;
+  Codex configuration and live Claude Code and Hermes stdio connections passed.
+- titen-web cross-checked 84 routes, 9 MCP tools, and 28 navigation entries,
+  then built 42 static pages against the exact release checkout.
+
+## Stable release and live surfaces
+
+- npm `latest` is `titen-memory@0.5.7`; its SHA-1 is
+  `e3a0c7aa3dc7c48948754e3fcecb25ef2b51e51b`, a clean registry install ran CLI
+  `0.5.7`, and annotated tag `v0.5.7` peels to the release commit above.
+- The non-draft GitHub Release is
+  [v0.5.7](https://github.com/RamaAditya49/titen/releases/tag/v0.5.7).
+- titen-web PR [#13](https://github.com/RamaAditya49/titen-web/pull/13)
+  merged as `bc110fc0e0ad1d410b593a89e61aa6c1ebc7f83e`; Cloudflare static deployment
+  `e3c8e34e-2c06-4b8d-bd67-9065974bb30f` serves CLI `0.5.7`, the release page,
+  and the HTML/Markdown agent guide from both `titen.dev` hostnames.
+- The retained Cloudflare stack was backed by D1 bookmark
+  `00000004-000000e0-000050ba-4832da9f1149daff41dbe2a0f133eda9` and deployed
+  as Worker version `0335b2bb-5490-49ee-a35c-c3cb3caaf17a`; readiness reports
+  the exact release revision, verified schema 21, Vectorize, Workers AI, and
+  background repair, while unauthenticated MCP returns `401`.
+- `rama-tuf` runs rootless image `localhost/titen:0.5.7-f226df0` for the API and
+  dashboard. A verified production snapshot with SHA-256
+  `8fcd6f682dfc92f2b8d2e8b4bbc35825fe5490a9ca220f9440b6359c8b2b30c1`
+  passed a restored-data canary, authenticated nine-tool MCP smoke, dashboard
+  smoke, active cutover, and restart recovery. Both listeners remain bound to
+  loopback and remote probes are denied; the 0.5.5 image, units, and snapshot
+  remain available for rollback.
+
+## Closure
+
+- Immediately before this terminal move, GitHub returned zero open Titen
+  issues, zero open pull requests, and only `origin/main`; this closure uses one
+  disposable documentation branch that is deleted on merge.
+- The user's dirty primary checkout was not reset, cleaned, committed, or used
+  as release authority.
