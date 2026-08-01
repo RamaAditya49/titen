@@ -56,7 +56,8 @@ test("Cloudflare health returns before touching a stalled D1 binding", async () 
 });
 
 test("a failed migration version rolls back fully and succeeds on retry", async () => {
-  const statements = MIGRATIONS.at(-1)!.statements;
+  const migration = MIGRATIONS.find(({ version }) => version === 16)!;
+  const statements = migration.statements;
   for (let failureAfter = 0; failureAfter < statements.length; failureAfter += 1) {
     const database = openDatabase(join(temporary(), "titen.db"));
     const db = createSqliteDb(database);
@@ -65,7 +66,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
       ...db,
       async batch(batch: Stmt[]) {
         const marker = batch.at(-1);
-        if (inject && marker?.params?.[0] === SCHEMA_VERSION) {
+        if (inject && marker?.params?.[0] === migration.version) {
           inject = false;
           await db.batch([
             {
@@ -103,7 +104,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
 
     await assert.rejects(() => migrate(injected));
     const version = await db.all<{ version: number }>("SELECT MAX(version) AS version FROM titen_migrations");
-    assert.equal(Number(version[0]!.version), MIGRATIONS.at(-2)!.version);
+    assert.equal(Number(version[0]!.version), migration.version - 1);
     const integrity = await db.all<{ name: string; sql: string }>(
       `SELECT name, sql FROM sqlite_master
         WHERE name IN ('checkpoints_scope', 'event_order', 'semantic_index_metadata', 'enrichment_jobs')
