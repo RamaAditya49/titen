@@ -465,6 +465,34 @@ export const CASES: Case[] = [
       expectOk(res, 201);
       assert.equal(res.body.data.claims[0].status, "disputed");
 
+      const secondDispute = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          claims: [{
+            kind: "procedural",
+            statement: "Rollback smoke always precedes a release announcement.",
+            sources: [
+              { observation_id: supporting.body.data.observation_id, relation: "supports" },
+              { observation_id: contradicting.body.data.observation_id, relation: "contradicts" },
+            ],
+          }],
+        },
+      });
+      expectOk(secondDispute, 201);
+      const clean = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          claims: [{
+            kind: "procedural",
+            statement: "Rollback smoke always precedes a release announcement.",
+            sources: [{ observation_id: supporting.body.data.observation_id, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(clean, 201);
+
       const compiled = await fx.call("POST", "/v1/context/compile", {
         key: agent.key,
         body: {
@@ -474,11 +502,27 @@ export const CASES: Case[] = [
         },
       });
       expectOk(compiled);
-      assert.equal(compiled.body.data.conflicts.length, 1);
-      assert.equal(
-        compiled.body.data.conflicts[0].claim_id,
+      const disputedIds = [
         res.body.data.claims[0].claim_id,
+        secondDispute.body.data.claims[0].claim_id,
+      ];
+      assert.deepEqual(
+        compiled.body.data.conflicts.map((conflict: any) => conflict.claim_id).sort(),
+        [...disputedIds].sort(),
       );
+      const items = new Map(compiled.body.data.items.map((item: any, index: number) => [
+        item.claim_id, { ...item, index },
+      ]));
+      const cleanItem = items.get(clean.body.data.claims[0].claim_id) as any;
+      assert.equal(cleanItem.status, "active");
+      assert.equal(cleanItem.score_components.conflict, 1);
+      for (const claimId of disputedIds) {
+        const item = items.get(claimId) as any;
+        assert.equal(item.status, "disputed");
+        assert.equal(item.score_components.conflict, 0);
+        assert.ok(cleanItem.index < item.index);
+        assert.ok(cleanItem.score > item.score);
+      }
 
       const evidence = await fx.call(
         "GET",
