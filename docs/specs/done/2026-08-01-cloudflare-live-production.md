@@ -1,12 +1,11 @@
 ---
 work_id: cloudflare-live-production
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
 ---
 # Prefix-isolated Cloudflare live production
@@ -110,8 +109,48 @@ deployment.
 
 ## Done conditions
 
-Every acceptance criterion has current reproducible evidence; the retained
-Cloudflare resource names, deployed revision, Worker URL, D1 bookmark, semantic
-fingerprint, test counts, rollback result, package/tag, and titen.dev manifest
-agree; credentials remain outside durable evidence; and this pair is moved to
-`done` with no unchecked plan item.
+Every acceptance criterion has current reproducible evidence. Credentials remain
+outside durable evidence, and the paired plan has no unchecked item.
+
+## Acceptance evidence
+
+- **AC-CFL-001:** the dashboard source and Playwright contract use canonical
+  username `owner`; the live browser smoke showed no private sidebar before
+  login and all six authorized areas after login.
+- **AC-CFL-002:** `wrangler.titen-test.jsonc` binds Worker `titen-test-api`, D1
+  `titen-test-db`, Vectorize `titen-test-claims-v1`, Workers AI, and the one-minute
+  Cron in Rama Digital. The file contains no credential or account token.
+- **AC-CFL-003:** the cache-busted terminal smoke returned revision
+  `2fddeede64aa770744e413da9594b9349a767af1`, runtime `cloudflare-d1`, schema 20,
+  and enabled Vectorize/model readiness from
+  `https://titen-test-api.konektor.workers.dev`.
+- **AC-CFL-004:** the release verifier wrote two canonical claims, drained two
+  BGE-M3 embeddings into the 1024-dimension cosine index, and retrieved the
+  keyword-free intended claim first after 11 seconds of bounded Vectorize
+  convergence. Evidence, feedback, supersession, export, events, and audit also
+  passed.
+- **AC-CFL-005:** cache-busted unauthenticated principal and foreign-organization
+  project probes returned non-disclosing `401` and `404` with no foreign data.
+- **AC-CFL-006:** the exact candidate and the prior Worker both read the same D1
+  claim evidence across deploy, rollback, and redeploy transitions.
+- **AC-CFL-007:** the live dashboard adapter completed forced owner password
+  replacement, fresh login, six-area discovery, bounded-role Add User, reader
+  first login, denial, logout, and session revocation against the Worker API.
+- **AC-CFL-008:** release version `2d891aeb-c69f-4015-bbb7-37d784ce9465` rolled
+  back to compatible version `8d373a6e-63e0-4639-af44-fe12780e0ea5`, which was
+  ready on schema 20 and read candidate evidence. Redeploy version
+  `38db0dac-c135-415b-8223-e16f41362261` restored the exact release SHA and
+  semantic readiness. D1 was not restored.
+- **AC-CFL-009:** npm `titen-memory@0.5.4` has registry shasum
+  `30e0b6b0da9cdfebcdcd86f0ddd75b2f36bea653`; annotated tag and non-draft
+  GitHub Release `v0.5.4` point to the exact candidate. `titen-web` commit
+  `4784153e2fc6b9f65c6bd298cdf98aa0760a3e90` deployed as Worker version
+  `8b8bff72-b6fd-469a-b3f0-f5a3e441403e`; both titen.dev hostnames returned
+  stable 0.5.4 manifest, homepage, release, and installer responses with 200.
+- **AC-CFL-010:** Bun/workerd tests passed the six-stage verifier and legacy Bun
+  fixture; the live owner forced-change and subsequent login passed without
+  exposing a password. The direct Worker probe established the 100,000-iteration
+  per-call ceiling using native Web Crypto.
+
+The retained D1 Time Travel bookmark after terminal smoke is
+`00000003-000002f0-000050ba-e36da22adc12cbba35ffee634a4194a7`.

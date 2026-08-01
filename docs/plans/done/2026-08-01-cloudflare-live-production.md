@@ -1,43 +1,42 @@
 ---
 work_id: cloudflare-live-production
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-01
 updated: 2026-08-01
-review_after: 2026-08-15
 owner: CADIS
-spec: docs/specs/active/2026-08-01-cloudflare-live-production.md
+spec: docs/specs/done/2026-08-01-cloudflare-live-production.md
 ---
 # Plan — prefix-isolated Cloudflare live production
 
-Spec: [cloudflare-live-production](../../specs/active/2026-08-01-cloudflare-live-production.md)
+Spec: [cloudflare-live-production](../../specs/done/2026-08-01-cloudflare-live-production.md)
 
 - [x] Audit clean `origin/main`, locate the maintainer placeholder, map the
       existing native Cloudflare boundary, and verify the authenticated account.
 - [x] Refresh August 2026 D1, Vectorize, Workers AI, Wrangler, pricing, limits,
       eventual consistency, Time Travel, and rollback facts from official docs.
-- [ ] Replace the username placeholder/test fixture and add one isolated
+- [x] Replace the username placeholder/test fixture and add one isolated
       account-specific Wrangler config without changing the generic OSS config.
-- [ ] Add the smallest manual deploy/verify documentation and status updates;
+- [x] Add the smallest manual deploy/verify documentation and status updates;
       do not add a dependency, Queue, provider abstraction, or GitHub Action.
-- [ ] Replace the unsupported single 600,000-iteration Worker password call
+- [x] Replace the unsupported single 600,000-iteration Worker password call
       with six serial native 100,000-iteration stages and retain the legacy Bun
       verifier contract.
-- [ ] Run focused browser/config checks, the full local Cloudflare/Bun contracts,
+- [x] Run focused browser/config checks, the full local Cloudflare/Bun contracts,
       integration/browser suites, workflow checks, package install, and audit.
-- [ ] Provision `titen-test-db` and `titen-test-claims-v1`, record a D1 Time
+- [x] Provision `titen-test-db` and `titen-test-claims-v1`, record a D1 Time
       Travel bookmark, apply schema, and bootstrap credentials through mode-0600
       temporary files without printing secrets.
-- [ ] Commit the exact candidate, stamp its revision, deploy `titen-test-api`,
+- [x] Commit the exact candidate, stamp its revision, deploy `titen-test-api`,
       and verify health, readiness, bundle size, and binding truth.
-- [ ] Run live canonical write/read, Workers AI/Vectorize semantic retrieval,
+- [x] Run live canonical write/read, Workers AI/Vectorize semantic retrieval,
       eventual-consistency retry, unauthenticated and cross-scope denials,
       cold-request persistence, Cron maintenance, and dashboard-adapter smokes.
-- [ ] Deploy a schema-compatible successor, prove Worker rollback and retained
+- [x] Deploy a schema-compatible successor, prove Worker rollback and retained
       D1 data, then redeploy and re-smoke the exact release candidate.
-- [ ] Move this pair to `done`, merge to `main`, publish npm/GitHub, update and
+- [x] Move this pair to `done`, merge to `main`, publish npm/GitHub, update and
       deploy titen.dev stable discovery, remove only the absorbed release branch,
       and verify final remote/package/runtime state.
 
@@ -69,14 +68,20 @@ Spec: [cloudflare-live-production](../../specs/active/2026-08-01-cloudflare-live
 
 ## Verification
 
-- Local: focused placeholder/config checks; Bun/SQLite and workerd/D1 contracts;
-  integration, dashboard browser, type/build, workflow, package-install, and
-  production dependency audit.
-- Cloudflare: resource/binding inspection; D1 schema/bookmark; health/readiness;
-  authorized write/read; semantic drain/query; denial; Cron; cold request;
-  rollback/redeploy; dashboard adapter against the live Worker.
-- Distribution: packed tarball contents, clean install/import/CLI, npm `latest`,
-  annotated Git tag, GitHub release, stable manifest, and public Worker smoke.
+- Local: 108 D1 contract tests, 132 Bun/vector/SDK tests, 192 integration tests,
+  six browser tests with two intentional screenshot skips, live dashboard
+  verifier, workflow checker/self-test, 22-entry Ponytail ledger, production
+  dependency audit, exact Worker dry build, and nine-step clean package install
+  all passed. The Worker bundle was 600.17 KiB / 124.29 KiB gzip.
+- Cloudflare: schema 20, D1/Vectorize/AI bindings, three scope metadata indexes,
+  one-minute Cron, authorized semantic write/read, 11-second convergence,
+  persistence, `401`/`404` denial, dashboard adapter, rollback, and exact-SHA
+  redeploy passed. Final Worker version is
+  `38db0dac-c135-415b-8223-e16f41362261`.
+- Distribution: npm `latest`, registry tarball shasum, annotated `v0.5.4`,
+  non-draft GitHub Release, titen-web deterministic release sync, 83/83 HTTP
+  routes, 9/9 MCP tools, 1200x630 release OG image, build, deploy, and dual-host
+  public smokes passed.
 
 ## Rollback
 
