@@ -669,6 +669,12 @@ capability `configured_error`, and supplies one fixed
 `checks.semantic_index` diagnostic. The response does not expose the
 fingerprint, endpoint, database path, or provider error.
 
+An active/disputed claim with pending upsert or reconciliation work reports
+`index_projection_pending` and keeps readiness at `503` until the rebuildable
+projection converges. A graceful Bun shutdown releases only the active
+maintenance pass's owned semantic leases; a fresh process can reclaim them
+without waiting for the normal lease expiry.
+
 The cosine floor is an operator-supplied calibration policy, not a public API
 field or universal Titen default. Sub-threshold vector IDs never reach canonical
 hydration; authorized lexical candidates and successful empty packs retain their

@@ -32,9 +32,9 @@ is local and uses tracked Git content; it does not require hosted automation.
 | `src/core/tokens.ts:4` | Estimate one token per four characters | Accuracy is limited for non-Latin scripts and code | The configured provider exposes an exact model-tokenizer contract; retain this fallback |
 | `src/core/validate.ts:43` | Cap lexical candidates at 200 | Matches beyond the fixed pool are unreachable | Recall evaluation shows a quality miss requiring a per-request limit |
 | `src/core/vectors.ts:8` | Use one shared vector boundary and persisted fingerprint | No provider factory or readiness network probe | **No source trigger.** |
-| `src/core/vectors.ts:838` | Detect canonical-only restore through an empty-index check without a second metadata protocol | Partial external index loss still requires the documented drain/query smoke | **No source trigger.** |
+| `src/core/vectors.ts:863` | Detect canonical-only restore through an empty-index check without a second metadata protocol | Partial external index loss still requires the documented drain/query smoke | **No source trigger.** |
 | `src/core/webhooks.ts:460` | Queue one bounded event page per pass | A large tenant backlog may need several passes | Measured backlog exceeds the maintenance freshness window; add per-organization cursors |
-| `src/runtime/bun/server.ts:131` | Use one process, one database handle, and synchronous `bun:sqlite` on the main thread | Throughput is limited by one event-loop core | An equivalent-quality, durability-preserving small-team workload misses its accepted latency or throughput objective; profile before workers or read replicas (#123) |
+| `src/runtime/bun/server.ts:132` | Use one process, one database handle, and synchronous `bun:sqlite` on the main thread | Throughput is limited by one event-loop core | An equivalent-quality, durability-preserving small-team workload misses its accepted latency or throughput objective; profile before workers or read replicas (#123) |
 
 ## Benchmarks
 

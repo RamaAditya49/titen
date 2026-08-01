@@ -3,6 +3,7 @@ import { migrate, schemaState } from "../../core/migrations";
 import { runMaintenance } from "../../core/maintenance";
 import {
   prepareSemanticReadiness,
+  releaseSemanticIndexLease,
   type VectorCapability,
 } from "../../core/vectors";
 import { createSqliteDb, openDatabase } from "./sqlite";
@@ -142,6 +143,8 @@ export async function serve(options: ServeOptions) {
     server = Bun.serve({
       port: options.port,
       hostname: options.hostname,
+      // Extraction may wait up to 45s; keep bounded response headroom above it.
+      idleTimeout: 60,
       async fetch(request: Request) {
         const started = Date.now();
         const response = await app(request);
@@ -170,46 +173,64 @@ export async function serve(options: ServeOptions) {
    * searches nothing, and that was the behavior before this existed. Disable with
    * an interval of 0 when an external scheduler owns the work instead.
    */
-  let ticking = false;
-  const tick = async () => {
+  let activeTick: Promise<void> | undefined;
+  let activeSemanticLeases: Set<string> | undefined;
+  const tick = () => {
     // Skip rather than queue: a slow model must not stack overlapping passes.
-    if (ticking || stopped) return;
-    ticking = true;
-    try {
-      const result = await runMaintenance({
-        db,
-        vectors,
-        extraction,
-        webhookSecurity: options.webhookSecurity,
-        secretCipher: options.secretCipher,
-        expectedIntervalMs: intervalMs,
-      });
-      if (!options.quiet && (
-        result.enriched > 0 || result.indexed > 0 || result.delivered > 0 || result.errors.length
-      ))
-        console.log(
-          `maintenance enriched=${result.enriched} indexed=${result.indexed} delivered=${result.delivered}${
-            result.errors.length ? ` errors=${result.errors.join(",")}` : ""
-          }`,
-        );
-    } catch {
-      // runMaintenance already contains its own failures; this is a backstop so a
-      // timer callback can never take the process down.
-    } finally {
-      ticking = false;
-    }
+    if (activeTick || stopped) return;
+    const leases = new Set<string>();
+    activeSemanticLeases = leases;
+    activeTick = (async () => {
+      try {
+        const result = await runMaintenance({
+          db,
+          vectors,
+          extraction,
+          webhookSecurity: options.webhookSecurity,
+          secretCipher: options.secretCipher,
+          expectedIntervalMs: intervalMs,
+          onSemanticLease: (token) => leases.add(token),
+        });
+        if (!options.quiet && (
+          result.enriched > 0 || result.indexed > 0 || result.delivered > 0 || result.errors.length
+        ))
+          console.log(
+            `maintenance enriched=${result.enriched} indexed=${result.indexed} delivered=${result.delivered}${
+              result.errors.length ? ` errors=${result.errors.join(",")}` : ""
+            }`,
+          );
+      } catch {
+        // runMaintenance already contains its own failures; this is a backstop so a
+        // timer callback can never take the process down.
+      } finally {
+        activeTick = undefined;
+        if (activeSemanticLeases === leases) activeSemanticLeases = undefined;
+      }
+    })();
   };
   const timer = backgroundRepair ? setInterval(tick, intervalMs) : undefined;
   // Never hold the process open on account of maintenance.
   timer?.unref?.();
-  if (backgroundRepair) void tick();
+  if (backgroundRepair) tick();
 
   const stop = async () => {
     if (stopped) return;
     stopped = true;
     if (timer) clearInterval(timer);
     await server.stop(true);
-    database.close();
+    const pass = activeTick;
+    try {
+      for (const token of activeSemanticLeases ?? [])
+        await releaseSemanticIndexLease(db, token);
+      if (pass) await Promise.race([
+        pass,
+        new Promise<void>((resolve) => setTimeout(resolve, 100)),
+      ]);
+    } catch {
+      // Shutdown must still close SQLite; a restart reports unreclaimed work stale.
+    } finally {
+      database.close();
+    }
   };
 
   /**

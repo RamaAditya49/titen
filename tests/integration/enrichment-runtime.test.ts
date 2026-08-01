@@ -208,3 +208,115 @@ test("an incomplete HTTP completion leaves no durable semantic output", async ()
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("the Bun drain route outlives the default ten-second idle timeout", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "titen-enrichment-slow-"));
+  const dbPath = join(directory, "titen.db");
+  const running = await serve({
+    dbPath,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    maintenanceIntervalMs: 0,
+    extraction: {
+      modelId: "slow-fixture",
+      modelFingerprint: "b".repeat(64),
+      async generate() {
+        await Bun.sleep(10_100);
+        return { action: "abstain", claims: null };
+      },
+    },
+    extractionState: "enabled",
+    secretCipher: TEST_SECRET_CIPHER,
+  });
+  const database = openDatabase(dbPath);
+  const db = createSqliteDb(database);
+  try {
+    const actor = await provisionWith(db, { scopes: ["*"] });
+    const headers = {
+      authorization: `Bearer ${actor.key}`,
+      "content-type": "application/json",
+    };
+    assert.equal((await fetch(`${running.url}/v1/observations`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        subject_id: "subject_slow",
+        kind: "user_statement",
+        content: "Synthetic slow provider evidence.",
+        source: { type: "test" },
+      }),
+    })).status, 201);
+    const started = performance.now();
+    const drain = await fetch(`${running.url}/v1/enrichment/drain?limit=1`, {
+      method: "POST",
+      headers,
+    });
+    assert.equal(drain.status, 200);
+    assert.ok(performance.now() - started >= 10_000);
+    assert.equal((await drain.json() as any).data.completed, 1);
+    assert.equal((await fetch(`${running.url}/readyz`)).status, 200);
+  } finally {
+    database.close();
+    await running.stop();
+    rmSync(directory, { recursive: true, force: true });
+  }
+}, 15_000);
+
+test("the Bun drain returns a retryable result at the extraction timeout", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "titen-enrichment-timeout-"));
+  const dbPath = join(directory, "titen.db");
+  const running = await serve({
+    dbPath,
+    port: 0,
+    hostname: "127.0.0.1",
+    quiet: true,
+    maintenanceIntervalMs: 0,
+    extraction: createHttpExtraction({
+      baseUrl: "https://models.example.test/v1",
+      model: "timeout",
+      modelFingerprint: "d".repeat(64),
+      timeoutMs: 1_000,
+      fetch: (async (_input, init) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+      })) as typeof fetch,
+    }),
+    extractionState: "enabled",
+    secretCipher: TEST_SECRET_CIPHER,
+  });
+  const database = openDatabase(dbPath);
+  const db = createSqliteDb(database);
+  try {
+    const actor = await provisionWith(db, { scopes: ["*"] });
+    const headers = {
+      authorization: `Bearer ${actor.key}`,
+      "content-type": "application/json",
+    };
+    assert.equal((await fetch(`${running.url}/v1/observations`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        subject_id: "subject_timeout",
+        kind: "user_statement",
+        content: "Synthetic timeout evidence.",
+        source: { type: "test" },
+      }),
+    })).status, 201);
+    const drain = await fetch(`${running.url}/v1/enrichment/drain?limit=1`, {
+      method: "POST",
+      headers,
+    });
+    assert.equal(drain.status, 200);
+    const result = (await drain.json() as any).data;
+    assert.equal(result.retried, 1);
+    assert.equal(result.failed, 0);
+    assert.deepEqual(await db.all(
+      `SELECT state, error_class FROM enrichment_jobs`,
+    ), [{ state: "pending", error_class: "provider_unavailable" }]);
+    assert.equal((await fetch(`${running.url}/readyz`)).status, 200);
+  } finally {
+    database.close();
+    await running.stop();
+    rmSync(directory, { recursive: true, force: true });
+  }
+}, 5_000);

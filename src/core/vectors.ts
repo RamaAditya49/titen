@@ -488,6 +488,16 @@ export async function releaseSemanticIndexWork(
     }]);
 }
 
+/** Release every pending row still owned by one interrupted maintenance pass. */
+export async function releaseSemanticIndexLease(db: Db, leaseToken: string): Promise<void> {
+  await db.batch([{
+    sql: `UPDATE index_outbox
+             SET lease_token = NULL, lease_expires_at = NULL
+           WHERE state = 'pending' AND lease_token = ?`,
+    params: [leaseToken],
+  }]);
+}
+
 /** Activate owned write-ahead repair and replace any repair lost to takeover. */
 export async function preserveSemanticIndexReconciliation(
   db: Db,
@@ -708,8 +718,17 @@ export async function observedSemanticReadiness(
     await db.all<{
       embedder_failure_at: string | null;
       vector_store_failure_at: string | null;
+      projection_pending: number;
     }>(
-      `SELECT embedder_failure_at, vector_store_failure_at
+      `SELECT embedder_failure_at, vector_store_failure_at,
+              EXISTS(
+                SELECT 1 FROM index_outbox o
+                JOIN claims c ON c.org_id = o.org_id AND c.id = o.record_id
+                WHERE o.record_type = 'claim'
+                  AND o.operation IN ('upsert', 'reconcile')
+                  AND o.state = 'pending'
+                  AND c.status IN ('active', 'disputed')
+              ) AS projection_pending
          FROM semantic_index_metadata WHERE id = 'claims'`,
     )
   )[0];
@@ -733,6 +752,12 @@ export async function observedSemanticReadiness(
       embedding: "enabled",
       vector: "configured_error",
       diagnostic: "vector_dependency_unavailable",
+    };
+  if (Number(state.projection_pending) > 0)
+    return {
+      embedding: "enabled",
+      vector: "configured_error",
+      diagnostic: "index_projection_pending",
     };
   return readiness;
 }

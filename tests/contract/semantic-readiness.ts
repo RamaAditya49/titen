@@ -97,6 +97,16 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
     createApp({ db, runtime, revision: "semantic-readiness", vectors }),
     "http://titen.test",
   );
+  const pendingProjection = await persistent.call("GET", "/readyz");
+  assert.equal(pendingProjection.status, 503);
+  assert.equal(
+    pendingProjection.body.meta.checks.semantic_index,
+    "index_projection_pending",
+  );
+  await db.batch([{
+    sql: `UPDATE index_outbox SET state = 'done'
+           WHERE id = 'idx_semantic_backfill'`,
+  }]);
   const healthy = await persistent.call("GET", "/readyz");
   assert.equal(healthy.status, 200);
   assert.equal(healthy.body.data.capabilities.version, 1);
@@ -117,7 +127,28 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
   assert.equal(lostMetadata.status, 503);
   assert.equal(lostMetadata.body.meta.checks.semantic_index, "index_metadata_unavailable");
   assert.equal(vectors.embedCalls(), 0, "metadata loss readiness stays local");
-  assert.equal((await readyWith(db, runtime, vectors)).status, 200);
+  const missingFingerprint = await readyWith(db, runtime, vectors);
+  assert.equal(missingFingerprint.status, 503);
+  assert.equal(
+    missingFingerprint.body.meta.checks.semantic_index,
+    "index_fingerprint_missing",
+  );
+  await db.batch([{
+    sql: `INSERT INTO semantic_index_metadata
+            (id, provider, model, revision, dimensions, metric,
+             preprocessing, index_schema, created_at)
+          VALUES ('claims', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    params: [
+      vectors.fingerprint.provider,
+      vectors.fingerprint.model,
+      vectors.fingerprint.revision,
+      vectors.fingerprint.dimensions,
+      vectors.fingerprint.metric,
+      vectors.fingerprint.preprocessing,
+      vectors.fingerprint.index_schema,
+      "2026-07-31T00:00:00.000Z",
+    ],
+  }]);
 
   for (const dependency of ["embedder", "vector_store"] as const) {
     await db.batch([
@@ -184,6 +215,10 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
                     '2026-07-31T00:00:00.000Z')`,
     },
   ]);
+  await db.batch([{
+    sql: `UPDATE index_outbox SET state = 'pending'
+           WHERE id = 'idx_semantic_backfill'`,
+  }]);
   const failedLease = await claimSemanticIndexWork(
     db,
     ["idx_semantic_backfill"],
@@ -335,7 +370,12 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
                     '2026-07-31T00:00:00.000Z')`,
     },
   ]);
-  assert.equal((await readyWith(db, runtime, vectors)).status, 200);
+  const queuedProjection = await readyWith(db, runtime, vectors);
+  assert.equal(queuedProjection.status, 503);
+  assert.equal(
+    queuedProjection.body.meta.checks.semantic_index,
+    "index_projection_pending",
+  );
 
   await db.batch([
     {
@@ -378,15 +418,15 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
     },
   ]);
   const recovered = await readyWith(db, runtime, changed);
-  assert.equal(recovered.status, 200);
-  assert.equal(recovered.body.data.capabilities.vector, "enabled");
+  assert.equal(recovered.status, 503);
+  assert.equal(recovered.body.meta.checks.semantic_index, "index_projection_pending");
+  assert.equal(recovered.body.meta.capabilities.vector, "configured_error");
   assert.equal(changed.embedCalls(), 0);
 
   await db.batch([
     { sql: `DELETE FROM semantic_index_metadata` },
     {
-      sql: `DELETE FROM index_outbox
-             WHERE id IN ('idx_semantic_backfill', 'idx_semantic_interim')`,
+      sql: `DELETE FROM index_outbox WHERE org_id = 'org_semantic_backfill'`,
     },
     {
       sql: `DELETE FROM claims

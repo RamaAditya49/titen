@@ -156,7 +156,9 @@ strict schemas; Titen then sends the exact schema with the bounded input and
 still applies the same local validator. A partial or invalid tuple or response
 mode reports `configured_error`; an absent tuple remains `disabled`. A positive maintenance interval drains one
 shared bounded queue in the background, while `POST /v1/enrichment/drain`
-provides an authorized manual path. Do not expose credentials through readiness.
+provides an authorized manual path. The Bun server's 60-second idle bound stays
+above the supported 45-second extraction timeout, leaving bounded response
+headroom. Do not expose credentials through readiness.
 
 Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
 is the exact external origin (scheme, host, and optional port), with no trailing
@@ -392,7 +394,9 @@ The production unit should use:
 - Restart on failure with bounded backoff.
 - Graceful HTTP and SQLite shutdown.
 - Bounded shutdown flush for canonical/outbox state; remote model/vector or
-  webhook completion is not required before process exit.
+  webhook completion is not required before process exit. An interrupted
+  in-process semantic pass releases only its owned rebuildable leases before
+  SQLite closes, so the next process can reconcile immediately.
 
 ## Capacity, rate limiting, and telemetry
 
