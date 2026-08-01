@@ -12,9 +12,13 @@ const view = {
 };
 
 async function mockService(page: Page) {
-  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", endpoint: "titen.internal" } }));
+  let connected = true;
+  await page.route("**/dashboard-api/status", (route) => connected
+    ? route.fulfill({ json: { mode: "live", endpoint: "titen.internal" } })
+    : route.fulfill({ status: 503, json: { error: { code: "DASHBOARD_DISCONNECTED", message: "disconnected" } } }));
   await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun", revision: "stable-42" } } }));
   await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+  return { disconnect: () => { connected = false; } };
 }
 
 test("starts disconnected without fixtures, secrets, storage, or external requests", async ({ page }) => {
@@ -35,7 +39,7 @@ test("starts disconnected without fixtures, secrets, storage, or external reques
 });
 
 test("renders live service checks and authorized Atlas records", async ({ page }) => {
-  await mockService(page);
+  const service = await mockService(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
     expect(route.request().headers().authorization).toBeUndefined();
     expect(route.request().postDataJSON()).toEqual({ lens: "neighborhood", limit: 50, subject_id: "platform-team" });
@@ -51,29 +55,42 @@ test("renders live service checks and authorized Atlas records", async ({ page }
   await expect(page.locator("[data-relationships]")).toContainText("supports");
   await expect(page.locator("[data-metadata]")).toContainText("platform-team");
   await expect(page.getByText("Live view compiled from the Titen API.")).toBeVisible();
+  service.disconnect();
+  await page.getByRole("button", { name: "Refresh service" }).click();
+  await expect(page.getByText("Disconnected", { exact: true })).toBeVisible();
+  await expect(page.getByText("Production retry budget is 400 ms")).toHaveCount(0);
+  await expect(page.locator("[data-inspector-title]")).toHaveText("Nothing selected");
+  await expect(page.locator("[data-metadata]")).toHaveText("No live view compiled.");
+  await expect(page.locator("[data-records] button")).toHaveCount(0);
 });
 
-test("keeps loading, empty, denial, and recovery states distinct", async ({ page }) => {
+test("clears a successful projection before and after denial", async ({ page }) => {
   await mockService(page);
-  let mode: "empty" | "denied" | "unauthenticated" = "empty";
+  let mode: "success" | "denied" | "unauthenticated" = "success";
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     if (mode === "denied") return route.fulfill({ status: 403, json: { error: { code: "UPSTREAM_403", message: "denied" } } });
     if (mode === "unauthenticated") return route.fulfill({ status: 401, json: { error: { code: "UPSTREAM_401", message: "unauthenticated" } } });
-    return route.fulfill({ json: { data: { ...view, nodes: [], edges: [], metadata: { subject_id: "empty" } } } });
+    return route.fulfill({ json: { data: view } });
   });
   await page.goto("/dashboard/");
-  await page.getByLabel("Subject ID").fill("empty");
+  await page.getByLabel("Subject ID").fill("platform-team");
   await page.getByRole("button", { name: "Compile authorized view" }).click();
-  await expect(page.locator("[data-loading]")).toBeVisible();
-  await expect(page.getByText("No authorized records found.")).toBeVisible();
-  await expect(page.locator("[data-projection]")).toHaveText("Empty");
+  await expect(page.getByText("Production retry budget is 400 ms").first()).toBeVisible();
+  await expect(page.locator("[data-metadata]")).toContainText("platform-team");
 
   mode = "denied";
   await page.getByRole("button", { name: "Compile authorized view" }).click();
+  await expect(page.locator("[data-loading]")).toBeVisible();
+  await expect(page.getByText("Production retry budget is 400 ms")).toHaveCount(0);
   await expect(page.locator("[data-query-error]")).toContainText("not authorized");
   await expect(page.getByText("Query failed without a fixture fallback.")).toBeVisible();
   await expect(page.getByText("Production retry budget is 400 ms")).toHaveCount(0);
+  await expect(page.locator("[data-inspector-title]")).toHaveText("Nothing selected");
+  await expect(page.locator("[data-inspector-body]")).toBeHidden();
+  await expect(page.locator("[data-metadata]")).toHaveText("No live view compiled.");
+  await expect(page.locator("[data-records] button")).toHaveCount(0);
+  await expect(page.locator("[data-projection]")).toHaveText("Query failed");
 
   mode = "unauthenticated";
   await page.getByRole("button", { name: "Compile authorized view" }).click();
@@ -96,6 +113,7 @@ test("validates lens-specific input and remains keyboard/mobile usable", async (
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, body: document.body.scrollWidth }));
   expect(width.body).toBeLessThanOrEqual(width.viewport);
   await expect(page.locator(".inactive-area")).toHaveCount(6);
+  await expect(page.locator(".inactive-area small")).toHaveText(Array(6).fill("not wired"));
   await expect(page.locator(".inactive-area a")).toHaveCount(0);
 });
 
@@ -131,6 +149,4 @@ test("compiles governance lenses with their exact focus contracts", async ({ pag
     { lens: "scope_preview", limit: 50, focus_id: "principal_ops" },
     { lens: "knowledge_release", limit: 50 },
   ]);
-  await expect(page.locator(".inactive-area").filter({ hasText: "Governance" })).toContainText("2 live lenses");
-  await expect(page.locator(".inactive-area").filter({ hasText: "Federation" })).toContainText("canonical recall");
 });

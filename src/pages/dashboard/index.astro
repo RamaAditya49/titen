@@ -6,14 +6,7 @@ import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
 import packageJson from "../../../package.json";
 
-const productAreas = [
-  { name: "Memories", status: "4 live lenses" },
-  { name: "Context", status: "headless API" },
-  { name: "Work", status: "headless API" },
-  { name: "Audit", status: "Atlas refs" },
-  { name: "Governance", status: "2 live lenses" },
-  { name: "Federation", status: "canonical recall" },
-];
+const productAreas = ["Memories", "Context", "Work", "Audit", "Governance", "Federation"];
 const lenses = [
   { id: "neighborhood", label: "Neighborhood", needs: "subject" },
   { id: "evidence_trace", label: "Evidence trace", needs: "focus" },
@@ -48,7 +41,7 @@ const lenses = [
           <p>Memory</p>
           <a href="/dashboard/" aria-current="page">Memory Atlas</a>
           <p>Product map</p>
-          {productAreas.map((area) => <span class="inactive-area">{area.name}<small>{area.status}</small></span>)}
+          {productAreas.map((area) => <span class="inactive-area">{area}<small>not wired</small></span>)}
         </nav>
 
         <section class="credential-note" aria-label="Credential handling">
@@ -199,6 +192,7 @@ const lenses = [
       const loading = one<HTMLElement>("[data-loading]");
       const queryError = one<HTMLElement>("[data-query-error]");
       let view: AtlasView | null = null;
+      let projectionGeneration = 0;
 
       function text(selector: string, value: string) { one<HTMLElement>(selector).textContent = value; }
       function data(payload: Record<string, unknown>): Record<string, unknown> {
@@ -224,6 +218,28 @@ const lenses = [
           return error.message;
         }
         return "The same-origin dashboard adapter is unreachable.";
+      }
+
+      function clearProjection() {
+        projectionGeneration += 1;
+        view = null;
+        records.replaceChildren();
+        records.hidden = true;
+        loading.hidden = true;
+        empty.hidden = false;
+        empty.querySelector("strong")!.textContent = "No fixture is loaded.";
+        empty.querySelector("p")!.textContent = "Run a bounded query to inspect records authorized for the adapter credential.";
+        text("[data-view-title]", "Waiting for a live query");
+        text("[data-result-count]", "0 records");
+        text("[data-projection]", "No query");
+        text("[data-metadata]", "No live view compiled.");
+        text("[data-query-status]", "Enter an authorized scope to begin.");
+        setNotice(queryError);
+        text("[data-inspector-title]", "Nothing selected");
+        one<HTMLElement>("[data-inspector-empty]").hidden = false;
+        one<HTMLElement>("[data-inspector-body]").hidden = true;
+        one<HTMLDListElement>("[data-node-fields]").replaceChildren();
+        one<HTMLElement>("[data-relationships]").replaceChildren();
       }
 
       function updateRequirements() {
@@ -328,6 +344,7 @@ const lenses = [
 
       async function refreshService() {
         const notice = one<HTMLElement>("[data-service-notice]");
+        clearProjection();
         text("[data-connection-label]", "Connecting");
         one<HTMLElement>("[data-connection-dot]").className = "";
         try {
@@ -368,23 +385,30 @@ const lenses = [
         const payload: Record<string, unknown> = { lens, limit };
         if (subject) payload.subject_id = subject;
         if (focus) payload.focus_id = focus;
+        clearProjection();
+        const generation = projectionGeneration;
         loading.hidden = false;
         empty.hidden = true;
-        records.hidden = true;
         setNotice(queryError);
         runButton.disabled = true;
         text("[data-query-status]", "Compiling authorized view…");
         try {
-          render(await compileView(payload));
+          const next = await compileView(payload);
+          if (generation !== projectionGeneration) return;
+          render(next);
           text("[data-query-status]", "Live view compiled from the Titen API.");
         } catch (error) {
-          view = null;
+          if (generation !== projectionGeneration) return;
+          clearProjection();
           setNotice(queryError, errorMessage(error));
           text("[data-query-status]", "Query failed without a fixture fallback.");
           text("[data-projection]", "Query failed");
-        } finally {
-          loading.hidden = true;
           runButton.disabled = false;
+        } finally {
+          if (generation === projectionGeneration) {
+            loading.hidden = true;
+            runButton.disabled = false;
+          }
         }
       });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);
