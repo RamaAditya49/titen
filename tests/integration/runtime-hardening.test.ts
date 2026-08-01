@@ -56,7 +56,7 @@ test("Cloudflare health returns before touching a stalled D1 binding", async () 
 });
 
 test("a failed migration version rolls back fully and succeeds on retry", async () => {
-  const migration = MIGRATIONS.find(({ version }) => version === 16)!;
+  const migration = MIGRATIONS.at(-1)!;
   const statements = migration.statements;
   for (let failureAfter = 0; failureAfter < statements.length; failureAfter += 1) {
     const database = openDatabase(join(temporary(), "titen.db"));
@@ -122,7 +122,7 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
         .map(({ name }) => name)
         .sort(),
       ["embedder_failure_at", "vector_store_failure_at"],
-      `the completed migration 15 must survive failed migration 16 statement ${failureAfter + 1}`,
+      `the completed migration 15 must survive failed migration ${migration.version} statement ${failureAfter + 1}`,
     );
     assert.equal(
       (await db.all<{ name: string }>("PRAGMA table_info(claims)"))
@@ -132,9 +132,17 @@ test("a failed migration version rolls back fully and succeeds on retry", async 
     );
     assert.deepEqual(
       (await db.all<{ name: string }>("PRAGMA table_info(index_outbox)"))
-        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at"),
+        .filter(({ name }) => name === "lease_token" || name === "lease_expires_at")
+        .map(({ name }) => name)
+        .sort(),
+      ["lease_expires_at", "lease_token"],
+      `completed migration 16 must retain its lease columns after statement ${failureAfter + 1}`,
+    );
+    assert.deepEqual(
+      (await db.all<{ name: string }>("PRAGMA table_info(api_keys)"))
+        .filter(({ name }) => ["not_before", "expires_at", "last_used_at"].includes(name)),
       [],
-      `migration 16 must roll back its lease columns after statement ${failureAfter + 1}`,
+      `migration ${migration.version} must roll back its lifecycle columns after statement ${failureAfter + 1}`,
     );
     assert.deepEqual(await db.all(
       `SELECT embedder_failure_at, vector_store_failure_at
