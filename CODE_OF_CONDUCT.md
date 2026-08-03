@@ -59,8 +59,8 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the maintainers responsible for enforcement by contacting
-[@RamaAditya49](https://github.com/RamaAditya49) privately, or by using
+reported to the maintainers responsible for enforcement at
+[conduct@titen.dev](mailto:conduct@titen.dev), or through
 [GitHub's report abuse form](https://github.com/contact/report-abuse) when the
 report concerns a maintainer or you prefer a channel outside this project.
 
