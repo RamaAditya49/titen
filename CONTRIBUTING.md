@@ -2,6 +2,9 @@
 
 Thank you for helping build Titen.
 
+Participation in this project is governed by the
+[Code of Conduct](./CODE_OF_CONDUCT.md).
+
 ## Before coding
 
 - Read the [PRD](./docs/PRD.md) and relevant architecture document.
