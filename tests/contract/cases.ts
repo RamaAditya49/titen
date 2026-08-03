@@ -685,7 +685,6 @@ export const CASES: Case[] = [
           subject_id: subject,
           task: "final pack metric marker",
           max_tokens: 4_000,
-          at: "2026-08-02T00:00:00.000Z",
         },
       });
       expectOk(compiled);
@@ -712,7 +711,6 @@ export const CASES: Case[] = [
           subject_id: subject,
           task: "final pack metric marker",
           max_tokens: 500,
-          at: "2026-08-02T00:00:00.000Z",
         },
       });
       expectOk(pressured);

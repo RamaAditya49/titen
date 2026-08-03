@@ -17,6 +17,13 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The full-fit context contract no longer pins an absolute as-of date, so it
+  stops passing or failing on the calendar. Shipped code is unchanged: the
+  fixture asked for context as of a date that had moved into the past, and
+  `valid_from <= at` correctly excluded the claims it had just written.
+
 ## [0.5.7] — 2026-08-02
 
 ### Documentation
