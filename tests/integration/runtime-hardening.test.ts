@@ -12,6 +12,7 @@ import { observedSemanticReadiness } from "../../src/core/vectors";
 import cloudflareWorker from "../../src/runtime/cloudflare/worker";
 import { verifyPassword } from "../../src/core/accounts";
 import {
+  assertLegacyTeamRowsRefuseMigration,
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
 } from "../contract/integrity-migration";
@@ -311,6 +312,13 @@ test("migration retires unowned federation peers and releases their endpoint", a
             (id, org_id, principal_id, name, endpoint, shared_secret_hash, direction, status, created_at)
           VALUES ('fpeer_replacement', 'org_legacy', 'agent_owner', 'Replacement', 'https://peer.example.test', 'hash', 'pull', 'active', '2026-07-30T00:00:01.000Z')`,
   }]);
+  database.close();
+});
+
+test("a pre-workspace SQLite database refuses to migrate its team rows into silence", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await assertLegacyTeamRowsRefuseMigration(db);
   database.close();
 });
 

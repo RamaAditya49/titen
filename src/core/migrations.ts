@@ -1392,6 +1392,20 @@ export async function pendingMigrations(db: Db): Promise<typeof MIGRATIONS> {
 /** Apply pending migrations as one cross-runtime atomic batch per version. */
 export async function migrate(db: Db): Promise<number> {
   let current = await appliedVersion(db);
+  // Migration 10 leaves pre-0.2.0 `team` rows with a NULL workspace_id, which
+  // recordAccessSql fail-closes, and nothing backfills the column. Refuse
+  // rather than report success on a store whose records would vanish.
+  if (current > 0 && current < 10) {
+    const rows = await db.all<{ legacy: number }>(
+      `SELECT (SELECT COUNT(*) FROM claims WHERE visibility = 'team')
+            + (SELECT COUNT(*) FROM observations WHERE visibility = 'team') AS legacy`,
+    );
+    const legacy = Number(rows[0]?.legacy ?? 0);
+    if (legacy > 0)
+      throw new Error(
+        `Refusing to migrate: ${legacy} team-visibility rows predate workspace scoping and would become unreadable. 0.2.0 is the supported data floor; bind a workspace to these rows on the current binary first.`,
+      );
+  }
   for (const migration of MIGRATIONS) {
     if (migration.version <= current) continue;
     try {

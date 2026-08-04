@@ -258,9 +258,31 @@ turn embedding similarity into a memory-management decision.
 The [disjoint S-validation-v2 run](./2026-07-31-embedding-s-validation-v2-full.md)
 repeated 91.67% Recall@5 and zero no-result false positives without tuning the
 profile or `0.737307171` floor on the new 10,000-statement/600-query fixture.
-The English-query to Javanese-in-Indonesian-statement direction stayed at 0/40,
-and the provider revision remained unattested. This is deployment-specific
-evidence, not a universal default or replacement pass.
+The English-query to Javanese-in-Indonesian-statement direction stayed at 0/40
+because `cross_language` is not one task: `groupLanguage` rotates the statement
+language one position past the query language, so the stratum tests Indonesian
+to English, English to Javanese-in-Indonesian, and Javanese-in-Indonesian to
+Indonesian at three different difficulties. Joining the run's raw trials to the
+fixture's per-statement language shows that English queries never leave English:
+2,000 of 2,000 top-10 hits across all 200 English queries are English
+statements, while Indonesian and Javanese-in-Indonesian queries retrieve across
+all three languages. `cross_language:en` is the only stratum whose gold is
+non-English for an English query, so it is the only stratum at zero. That 0/40
+is a property of the provider's English embedding cluster over 333 same-template
+English `backup_region` statements, not a fixture defect: the gold exists,
+carries the query's entity, and is the correct record kind. The provider
+revision also remained unattested. This is deployment-specific evidence, not a
+universal default or replacement pass.
+
+The `cross_language` label therefore averages three unequal ordered pairs:
+Javanese-in-Indonesian to Indonesian is near lexical identity, Indonesian to
+English is a well-supported bridge, and English to Javanese-in-Indonesian is
+neither. Reporting one mean over them is misleading, but splitting the stratum
+by ordered language pair is deliberately not taken on its own. The generator
+pins `fixture_sha256`, the split checksum, the locked holdout, and the pre-hoc
+`0.737307171` floor to each other, so relabelling a stratum invalidates every
+published run. Split it only when a future fixture revision invalidates those
+hashes anyway.
 
 ## Recorded Mem0 replacement cycle
 
@@ -685,6 +707,24 @@ Every quality run includes:
 P0 establishes the first numeric retrieval baseline. Later releases may not
 silently lower it. Any numeric release threshold must be recorded in an ADR
 after the fixture corpus and variance are measured.
+
+### FTS-only quality is not flat across corpus size
+
+Measured in [scale and concurrency](./2026-08-04-scale-and-concurrency.md), one
+fixed 100-query set answerable at every decade, FTS-only, concurrency 1. Each
+cell is run 1 / run 2, the two independent RAM-backed repeats:
+
+| Active claims | recall@1 | MRR@10 |
+| ---: | ---: | ---: |
+| 1,000 (XS) | 1.00 / 1.00 | 1.000 / 1.000 |
+| 10,000 (S) | 0.81 / 0.80 | 0.897 / 0.892 |
+| 100,000 (M) | 0.49 / 0.48 | 0.609 / 0.597 |
+
+The corpus is synthetic and the absolute values are a property of its
+generator, so they are not Titen's recall; the shape is the result. Any
+FTS-only quality figure must be quoted with the corpus size it was measured
+at. Tier L (1,000,000) has never been run. Arresting this slope is strategic
+debt item 3 in `PONYTAIL-DEBT.md`.
 
 LoCoMo and LongMemEval are external comparability suites, not substitutes for
 Titen's isolation, evidence, conflict, and collaboration fixtures.

@@ -10,6 +10,11 @@
 Keep Titen on loopback. Reach it through an SSH tunnel, a private network, or a
 TLS reverse proxy; opening a public firewall port is a separate operator choice.
 
+Size for one core per process: at and above 10,000 claims a single concurrent
+client already saturates one Titen process, so past that corpus size add
+processes sharded by subject rather than clients
+([measurements](../docs/testing/2026-08-04-scale-and-concurrency.md)).
+
 ## Install
 
 ```bash

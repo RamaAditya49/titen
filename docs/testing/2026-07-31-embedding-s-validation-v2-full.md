@@ -33,6 +33,16 @@ for English queries. Exact, paraphrase, and hard-negative Recall@5 were 100%.
 Cross-language Recall@5 was 66.67%; the English-query to
 Javanese-in-Indonesian-statement direction remained 0/40.
 
+That direction is one of three the stratum contains: `groupLanguage` rotates the
+statement language one position past the query language, so `cross_language`
+tests Indonesian to English, English to Javanese-in-Indonesian, and
+Javanese-in-Indonesian to Indonesian, and only the English case has non-English
+gold. Joining the raw trials to the fixture's per-statement language shows that
+2,000 of 2,000 top-10 hits across all 200 English queries are English
+statements, so the 0/40 measures the provider's English embedding cluster over
+333 same-template English `backup_region` statements rather than a missing or
+malformed gold.
+
 The overall Recall@5 and no-result result exactly repeat the first full profile
 run (91.67% and zero false positives) on a disjoint fixture. This supports the
 profile and floor for this measured deployment. It does not justify a bundled

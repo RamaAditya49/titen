@@ -296,3 +296,27 @@ npm view titen-memory version
 The npmjs.com page renders `README.md`; its repository-only documentation and
 image references use stable absolute GitHub URLs because those files are not in
 the package allowlist.
+
+## Supply-chain assurance
+
+The tarball carries **no provenance attestation**, and that is a decision, not
+an oversight. `npm publish --provenance` mints a sigstore attestation from the
+OIDC token of a supported CI, so it is obtainable only from GitHub Actions or
+GitLab CI. This repository runs no GitHub Actions by standing maintainer rule
+(see [`CONTRIBUTING.md`](../../CONTRIBUTING.md#repository-stage)) and publishes
+by hand to keep the npm credential off a repository secret. Restoring provenance
+means reversing that decision, which the top of this file already states
+requires a new maintainer decision and an explicit cost budget.
+
+What a consumer can verify today is the registry's own integrity metadata:
+
+```bash
+npm audit signatures
+npm view titen-memory@<version> dist.integrity dist.shasum dist.fileCount dist.unpackedSize
+npm pack titen-memory@<version> && sha256sum titen-memory-<version>.tgz
+```
+
+Those checks prove the tarball on disk is byte-for-byte what npm served and that
+the registry signed it. They prove nothing about origin: no commit, tree, or
+build is bound to the artifact. A consumer who needs that binding must build
+from a tagged checkout and compare against `npm pack` themselves.

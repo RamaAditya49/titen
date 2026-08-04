@@ -53,6 +53,7 @@ const vectorScope = () => ({ org_id: orgId, subject_id: subjectId, project_id: "
 const rankInput = (id: string, confidence: number, vector_boost?: number): RankInput => ({
   id,
   kind: "procedural",
+  statement: `claim ${id}`,
   trust: "verified",
   confidence,
   status: "active",
@@ -537,11 +538,28 @@ test("a score tie between the lexical best and the semantic best breaks on cosin
 
   // A genuine dead heat — equal score and equal evidence — must stay total and
   // repeatable, which is the property the cosine term must not have broken.
+  // Ids are freshly minted uuids in production, so the order has to come from
+  // content: here the lower id carries the higher statement, and the statement
+  // decides. With an id-only fallback this returns ["aaa", "zzz"].
   const twins = rankCandidates(
-    [{ ...rankInput("zzz", 1), bm25: -4 }, { ...rankInput("aaa", 1), bm25: -4 }],
+    [
+      { ...rankInput("zzz", 1), statement: "Alpha rollback rehearsal.", bm25: -4 },
+      { ...rankInput("aaa", 1), statement: "Zulu rollback rehearsal.", bm25: -4 },
+    ],
     now,
   );
-  assert.deepEqual(twins.map((entry) => entry.candidate.id), ["aaa", "zzz"]);
+  assert.deepEqual(twins.map((entry) => entry.candidate.id), ["zzz", "aaa"]);
+
+  // Byte-identical statements still fall through to the id, so the order stays
+  // total when content cannot separate two candidates.
+  const identical = rankCandidates(
+    [
+      { ...rankInput("zzz", 1), statement: "Same rollback rehearsal.", bm25: -4 },
+      { ...rankInput("aaa", 1), statement: "Same rollback rehearsal.", bm25: -4 },
+    ],
+    now,
+  );
+  assert.deepEqual(identical.map((entry) => entry.candidate.id), ["aaa", "zzz"]);
 
   // Lexical-only ranking carries no cosine at all, so the new term is inert
   // there: a stronger bm25 still wins on score, never on the tie-break.
