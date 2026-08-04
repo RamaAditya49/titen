@@ -72,6 +72,52 @@ export async function assertPopulatedV14SemanticOutageMigration(db: Db): Promise
   });
 }
 
+/**
+ * Migration 10 scopes `team` visibility to a workspace and nothing backfills the
+ * column, so a pre-0.2.0 store would migrate "successfully" into one where every
+ * team row is fail-closed and unreachable. Upgrading must refuse instead.
+ */
+export async function assertLegacyTeamRowsRefuseMigration(db: Db): Promise<void> {
+  await db.exec(
+    `CREATE TABLE titen_migrations (
+       version INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL
+     )`,
+  );
+  for (const migration of MIGRATIONS.filter(({ version }) => version <= 9)) {
+    await db.batch([
+      ...migration.statements.map((sql) => ({ sql })),
+      {
+        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+        params: [migration.version, "2026-07-31T00:00:00.000Z"],
+      },
+    ]);
+  }
+  await db.batch([
+    { sql: `INSERT INTO organizations (id, name, created_at) VALUES ('org_legacy_team', 'Legacy', '2026-07-31T00:00:00.000Z')` },
+    {
+      sql: `INSERT INTO claims
+              (id, org_id, subject_id, actor_id, kind, statement, confidence,
+               trust, visibility, status, valid_from, created_at)
+            VALUES ('claim_legacy_team', 'org_legacy_team', 'subject_legacy',
+                    'agent_legacy', 'procedural', 'Legacy team marker.', 0.9,
+                    'verified', 'team', 'active', '2026-07-31T00:00:00.000Z',
+                    '2026-07-31T00:00:00.000Z')`,
+    },
+  ]);
+
+  await assert.rejects(
+    () => migrate(db),
+    /predate workspace scoping/,
+    "a store whose team rows would become unreadable must not report success",
+  );
+  // Refusal is a precondition, not a partial upgrade: the store is untouched.
+  assert.deepEqual(
+    await db.all(`SELECT MAX(version) AS version FROM titen_migrations`),
+    [{ version: 9 }],
+  );
+}
+
 /** Runs the same populated-v11 integrity upgrade against either SQL adapter. */
 export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void> {
   await db.exec(

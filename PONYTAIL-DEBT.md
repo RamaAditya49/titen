@@ -1,15 +1,25 @@
 # Ponytail debt ledger
 
-Re-audited on 2026-08-02. This ledger is generated from tracked `ponytail:`
-comment markers and is intentionally empty.
+Re-audited on 2026-08-04. This ledger is generated from tracked `ponytail:`
+comment markers.
 
 Run `pnpm check:ponytail` after moving, adding, or removing a marker. The check
 is local and requires no hosted automation.
 
 ## Summary
 
-- Markers: 0.
+- Markers: 1.
 - Markers without a source trigger: 0.
+
+## Tracked markers
+
+- `src/runtime/bun/server.ts:262` — in-process mode still binds a listening
+  socket. `serve()` now returns the handler it serves so an embedded consumer
+  can call the kernel directly (#230), but the port is opened and then never
+  connected to. Removing it means splitting the app, maintenance timer, and
+  shutdown wiring out of `serve()` into their own factory — a ~75-line move for
+  a listener nobody uses. Upgrade when an embedded consumer objects to the bound
+  port; until then the unused socket is cheaper than the refactor.
 
 ## Closure evidence
 
@@ -43,8 +53,9 @@ verification of every reported failure) and a same-date survey of Mem0, Honcho,
 Zep/Graphiti, Letta, Cognee and Supermemory.
 
 Issues #220-#256 track defects. This section tracks what closing every one of
-them would still leave undone. None of these are `ponytail:` markers; the
-generated ledger above stays at zero and `pnpm check:ponytail` is unaffected.
+them would still leave undone. None of these are `ponytail:` markers; they are
+independent of the generated ledger above and `pnpm check:ponytail` is
+unaffected by them.
 
 Measured baseline this section argues from. Externally authored corpus
 (Mr.TyDi Indonesian, 25 queries, 100 documents), five independent repeats per
@@ -190,9 +201,12 @@ queue does. Compile throughput plateaus at 1,705 / 718 / 90 rps across the
 decades. Recall is **not** flat: recall@1 1.00 / 0.81 / 0.49 on an identical
 query set, though the corpus is synthetic so only the shape transfers. Cold start
 stays at ~53 ms and resident memory grows 2.9% across a hundredfold corpus.
-Tracked as #259 and #260. Remaining debt is no longer measurement — it is
-deciding whether to shard, to parallelise, or to publish the ceiling and let
-operators size against it.
+Tracked as #259 and #260. The ceiling is now published as an operator sizing
+rule in [VPS
+deployment](./docs/deployment/vps.md#capacity-rate-limiting-and-telemetry) and
+in `deploy/README.md`, so remaining debt is no longer measurement or disclosure
+— it is deciding whether to shard across processes or to parallelise within
+one.
 
 ### 8. Operational lifecycle is unexercised
 

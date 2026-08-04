@@ -556,8 +556,19 @@ The Bun runtime intentionally serves one process with one synchronous SQLite
 handle. Its useful throughput is therefore bounded by one event loop/core;
 adding client concurrency does not add database workers. Keep this shape until
 an equivalent-quality, durability-preserving workload misses the accepted
-small-team latency or throughput objective. Measure that workload before adding
-a worker pool, read replicas, or sharding.
+small-team latency or throughput objective.
+
+That ceiling is measured rather than asserted, and it is a product fact to size
+against: to 10^5 claims and 64 concurrent clients the service holds 0.98 to
+1.11 cores of 16 at every level, and compile throughput plateaus at about 1,700
+requests per second at 1,000 claims, about 700 at 10,000, and about 89 at
+100,000. At and above 10,000 claims a single concurrent client already
+saturates the process, so past that corpus size add capacity by running more
+processes sharded by subject, not by adding clients to one. On NVMe rather than
+tmpfs the binding resource moves from CPU to `fsync` and ingest falls to 309 to
+355 claims per second across the same decades. Measure the real workload
+against those numbers before adding a worker pool, read replicas, or sharding:
+[scale and concurrency](../testing/2026-08-04-scale-and-concurrency.md).
 
 Rate-limit at the authenticated ingress, not inside the Titen process. For
 example, Nginx provides the native [`limit_req`
@@ -608,6 +619,10 @@ code.
   pending forward-only SQL without creating or changing the database. Take the
   snapshot, apply the migration, restart, and require `/readyz` rather than
   `/healthz` to report success.
+- 0.2.0 is the oldest release whose data survives an upgrade usable. `migrate`
+  now refuses to run against a store holding pre-0.2.0 team-visibility rows
+  rather than reporting success and leaving every claim unreadable, so bind a
+  0.1.x store's team rows to a workspace on the old binary first.
 - Rollback is snapshot restore, not a down migration. Stop the service, preserve
   the failed database for diagnosis, restore the verified pre-upgrade snapshot
   into a new mode-`0600` file, start the previous binary against that file, and

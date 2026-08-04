@@ -614,6 +614,13 @@ async function exportPage(
     observations: "observation",
     claims: "claim",
   };
+  // The importer rejects these at assertWorkspaceReferences (below). Refuse to
+  // write a backup artifact that cannot be restored.
+  const unbindable = rows.find((row) => row.visibility === "team" && row.workspace_id == null);
+  if (unbindable)
+    throw validationError(
+      `Record ${String(unbindable.id)} predates workspace scoping; "workspace_id" is required for team visibility.`,
+    );
   const candidates: ExportLine[] = rows.map((row) => {
     const {
       __cursor,

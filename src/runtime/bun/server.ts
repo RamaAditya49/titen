@@ -254,6 +254,17 @@ export async function serve(options: ServeOptions) {
   return {
     server,
     database,
+    /**
+     * The same handler the socket serves, exposed so an embedded consumer can
+     * call it directly instead of paying a loopback round trip. See
+     * docs/architecture/agent-integration.md.
+     *
+     * ponytail: this still binds a listening socket. Extracting the app,
+     * maintenance timer, and shutdown wiring above into their own factory would
+     * remove it — a ~75-line move for a port nobody connects to, so it waits
+     * until an embedded consumer objects to the bound port.
+     */
+    app,
     url: `http://${options.hostname}:${server.port}`,
     stop: async () => {
       process.off("SIGTERM", shutdown);

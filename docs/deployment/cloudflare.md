@@ -308,6 +308,12 @@ Use those surfaces for request errors, CPU time, invocation volume, and tailing;
 no logger framework or Prometheus endpoint is required. Keep memory content,
 credentials, request bodies, and raw embeddings out of logs.
 
+The one-core throughput ceiling published in [VPS
+deployment](./vps.md#capacity-rate-limiting-and-telemetry) is a property of the
+single-process `bun:sqlite` runtime and does not apply here, because Workers
+concurrency is the platform's per-request isolate model rather than one event
+loop.
+
 Before a release, retain the previous Worker version and a verified pre-upgrade
 D1 backup/export. Roll back to that Worker version only when its code is known
 to accept the current schema. A Worker rollback does not reverse a forward D1

@@ -2249,6 +2249,28 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "export refuses a pre-workspace team row instead of writing an unrestorable backup",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const seeded = await seedClaim(fx, owner.key);
+      assert.equal((await fx.call("GET", "/v1/export?type=claims&all=true", { key: owner.key })).status, 200);
+
+      // Exactly what migration 10 leaves behind on a 0.1.x store: team
+      // visibility with no workspace to bind it to. The importer rejects the
+      // line, so emitting it would produce a backup that cannot be restored.
+      await fx.query(
+        `UPDATE claims SET visibility = 'team', workspace_id = NULL WHERE id = ?`,
+        [seeded.claimId],
+      );
+      const refused = await fx.call("GET", "/v1/export?type=claims&all=true", { key: owner.key });
+      expectError(refused, 400, "VALIDATION_ERROR");
+      assert.ok(
+        String(refused.body.error.message).includes(seeded.claimId),
+        "refusal must name the record an operator has to repair",
+      );
+    },
+  },
+  {
     name: "import preflights references and accepts child-before-parent atomically",
     async run(fx) {
       const target = await fx.provision({ scopes: ["*"] });

@@ -1,12 +1,11 @@
 # Container image
 
 Status: **image verified, publication unverified.** The image in this repository
-was built and run on 2026-08-04 (evidence at the bottom). The publishing
-workflow has never run, because it only runs on a version tag and no tag has
-been pushed since it was added. Until the first `vN.N.N` tag,
-`ghcr.io/ramaaditya49/titen` serves nothing and `podman pull` will fail — build
-locally instead, as [VPS deployment](./vps.md#container-install-verified)
-describes.
+was built and run on 2026-08-04 (evidence at the bottom). Nothing has been
+pushed to the registry, because publishing is a manual step a maintainer has
+not yet run. Until that push, `ghcr.io/ramaaditya49/titen` serves nothing and
+`podman pull` will fail — build locally instead, as [VPS
+deployment](./vps.md#container-install-verified) describes.
 
 The container is optional. Titen runs directly under Bun with no container
 runtime at all; this exists so a deployment can be reproduced without
@@ -161,5 +160,5 @@ commit's `Dockerfile`:
 | Persistence | an organization bootstrapped before `podman restart` was still present after it |
 | Quadlet | `deploy/titen.container` started under rootless `systemctl --user`, reached `ready: true`, wrote the database into the host directory as the invoking user |
 
-Not measured: the GitHub Actions workflow (no tag pushed yet), any arm64 build,
-a real `ghcr.io` pull, and any run longer than a few minutes.
+Not measured: the manual `docker push` to `ghcr.io`, any arm64 build, a real
+`ghcr.io` pull, and any run longer than a few minutes.

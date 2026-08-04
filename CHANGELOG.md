@@ -24,6 +24,61 @@ Every release heading below is dated in **UTC**, matching the npm registry
 The published npm package is [`titen-memory`](https://www.npmjs.com/package/titen-memory).
 The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
+## [Unreleased]
+
+### Fixed
+
+- Retrieval ranking is now reproducible in the FTS-only lane. Exactly-tied
+  scores previously fell through to `claim_id`, a fresh uuid per ingest, so the
+  same corpus ranked differently on every run. Ties now break on the claim
+  statement — content-derived, and compared by code unit so Bun and Workers
+  agree — before falling back to the id. This makes rank reproducible, not
+  better: it picks an arbitrary-but-stable winner among genuine ties. What
+  causes the ties is untouched and stays open as #227. Closes #226.
+- Upgrading a pre-0.2.0 store now refuses instead of succeeding into silence.
+  Migration 10 scopes `team` visibility to a workspace and nothing backfills the
+  column, so a 0.1.x store migrated cleanly and then answered 404 on every
+  claim. `migrate` now counts legacy team rows first and fails closed, naming
+  the count and the 0.2.0 data floor. Rebinding is deliberately not attempted: a
+  legacy row's real workspace is unknowable, and inventing one would invent an
+  authorization boundary. Closes #257.
+- The logical export refuses a pre-workspace `team` row rather than writing a
+  backup its own importer rejects. `export_import` is advertised as enabled, so
+  an artifact that cannot be restored is worse than an error. Closes #258.
+
+### Added
+
+- In-process mode for Bun hosts. `serve()` returns the handler it serves, and a
+  `titen-memory/bun` subpath exports it, so a benchmark or embedding host can
+  drive `TitenClient` through an injected `fetch` with no loopback hop. The
+  transport is removed; auth, scopes, and response envelopes are unchanged
+  because it is the same handler. An ephemeral socket is still bound and unused,
+  tracked in `PONYTAIL-DEBT.md`. Closes #230.
+
+### Documentation
+
+- The single-core throughput ceiling is published as an operator sizing rule in
+  [VPS deployment](./docs/deployment/vps.md) and `deploy/README.md`: at and
+  above 10,000 claims one client saturates one process, so shard by subject
+  across processes rather than adding clients. Cloudflare records that this is a
+  `bun:sqlite` property that does not transfer to per-request isolates. Closes
+  #259.
+- `docs/testing/EVALS.md` carries the FTS-only degradation curve, so no
+  FTS-only quality figure is quoted without the corpus size it was measured at.
+  Closes #260.
+- The `cross_language:en` zero is explained rather than left open: the stratum
+  rotates document language past query language, so it is three language pairs,
+  and English queries never retrieve a non-English document (2,000 of 2,000
+  top-10 hits). A provider embedding property, not a fixture defect. The fixture
+  is unchanged because its hashes pin the locked holdout and pre-hoc threshold.
+  Closes #245.
+- `docs/engineering/release.md` states why the tarball carries no provenance
+  attestation — it requires a supported CI's OIDC token and this repository
+  publishes by hand on purpose — and gives consumers the registry checks that do
+  work, with what they do not prove. Closes #242.
+- One product sentence across the GitHub description, README, and
+  `package.json`. Closes #225.
+
 ## [0.6.0] — 2026-08-04
 
 ### Evidence

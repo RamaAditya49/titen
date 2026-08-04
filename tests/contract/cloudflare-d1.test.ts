@@ -12,6 +12,7 @@ import { CASES, assertBatchAtomicity } from "./cases";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
 import {
+  assertLegacyTeamRowsRefuseMigration,
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
 } from "./integrity-migration";
@@ -484,6 +485,25 @@ d1Test("a populated schema-v10 D1 database rebuilds scoped Porter FTS", async ()
     await migrationRuntime.ready;
     const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
     await assertPopulatedV10RetrievalMigration(migrationDb);
+  } finally {
+    await dispose(migrationRuntime);
+    rmSync(migrationPersist, { recursive: true, force: true });
+  }
+});
+
+d1Test("a pre-workspace D1 database refuses to migrate its team rows into silence", async () => {
+  const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-legacy-team-migration-"));
+  const migrationRuntime = runtime({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-legacy-team-migration" },
+    d1Persist: migrationPersist,
+  });
+  try {
+    await migrationRuntime.ready;
+    const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
+    await assertLegacyTeamRowsRefuseMigration(migrationDb);
   } finally {
     await dispose(migrationRuntime);
     rmSync(migrationPersist, { recursive: true, force: true });

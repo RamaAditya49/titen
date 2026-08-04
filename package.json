@@ -1,7 +1,7 @@
 {
   "name": "titen-memory",
   "version": "0.6.0",
-  "description": "Collaborative memory fabric for AI agents — evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
+  "description": "The Level 6 collaborative memory fabric for AI agents — evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.17.0",
@@ -34,6 +34,9 @@
       "types": "./dist/npm/sdk.d.ts",
       "bun": "./dist/npm/sdk.js",
       "default": "./dist/npm/sdk.js"
+    },
+    "./bun": {
+      "bun": "./src/runtime/bun/server.ts"
     },
     "./package.json": "./package.json"
   },

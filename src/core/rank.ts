@@ -16,6 +16,7 @@ export const RECENCY_HALF_LIFE_DAYS = 90;
 export interface RankInput {
   id: string;
   kind: string;
+  statement: string;
   trust: Trust;
   confidence: number;
   status: string;
@@ -145,8 +146,8 @@ export interface Ranked<T extends RankInput> {
 }
 
 /**
- * Ties break on semantic evidence, then on id so two identical states rank
- * identically.
+ * Ties break on semantic evidence, then on statement, then on id so two
+ * identical states rank identically.
  *
  * Both relevance arms are min-max normalized inside the candidate set, so each
  * arm's own best scores exactly 1. When those are different claims — the usual
@@ -157,8 +158,17 @@ export interface Ranked<T extends RankInput> {
  *
  * Cosines are compared only against each other, so this introduces no constant
  * and no cross-scale comparison; it cannot move a candidate that was not already
- * tied, and it cannot change a returned score. Lexical-only ranking is
- * unaffected — every candidate carries `vector_boost` undefined.
+ * tied, and it cannot change a returned score. Lexical-only ranking carries no
+ * cosine at all, which is why the statement key exists: it is content-derived,
+ * so the same claims rank the same way across ingests that mint fresh uuids.
+ * The comparison is by code unit rather than `localeCompare`, because statements
+ * are arbitrary text and default collation is not guaranteed to agree between
+ * Bun and the Workers runtime; ids are safe under `localeCompare` only because
+ * they are `[a-f0-9_]`.
+ *
+ * The ceiling is honest: this makes rank reproducible, not better. It picks an
+ * arbitrary-but-stable winner among genuinely tied items. What causes the ties —
+ * min-max normalization pinning each arm's best to 1.0 — is untouched here.
  */
 export function rankCandidates<T extends RankInput>(candidates: T[], now: Date): Ranked<T>[] {
   const relevance = normalizeRelevance(candidates);
@@ -177,6 +187,11 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
       (left, right) =>
         right.score - left.score ||
         (right.candidate.vector_boost ?? 0) - (left.candidate.vector_boost ?? 0) ||
+        (left.candidate.statement < right.candidate.statement
+          ? -1
+          : left.candidate.statement > right.candidate.statement
+            ? 1
+            : 0) ||
         left.candidate.id.localeCompare(right.candidate.id),
     );
 }

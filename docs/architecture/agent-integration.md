@@ -305,6 +305,40 @@ feedback. Checkpoint/lease/handoff calls activate when collaboration is needed.
 The reference CLI should read JSON from stdin and print JSON to stdout so any
 host hook can use it without an SDK dependency.
 
+### In-process Bun mode
+
+A benchmark, an evaluation harness, or an embedding host that already runs on
+Bun does not have to pay a loopback round trip. `serve()` returns the same
+handler the socket serves, and `TitenClient` accepts a `fetch` implementation,
+so the client can call the kernel directly:
+
+```ts
+import { serve } from "titen-memory/bun";
+import { TitenClient } from "titen-memory";
+
+const { app, stop } = await serve({
+  dbPath: "./titen.db",
+  port: 0,
+  hostname: "127.0.0.1",
+  quiet: true,
+});
+const titen = new TitenClient({
+  url: "http://embedded.invalid",
+  key,
+  fetch: (input, init) => app(new Request(input, init)),
+});
+```
+
+The URL is never dialled; it only supplies the origin the client builds paths
+against. Authentication, scopes, and every response envelope are identical
+because it is the same handler — this mode removes the transport, not the
+contract. `port: 0` still binds an ephemeral listener that nothing connects to,
+and `stop()` closes it together with the database.
+
+The subpath is exported under the `bun` condition only. On Node it fails with
+`ERR_PACKAGE_PATH_NOT_EXPORTED`, which is honest: this runtime needs
+`bun:sqlite`. Node hosts use `titen serve` plus the HTTP client.
+
 ## Provisioning flow
 
 An operator performs this once per agent identity:
