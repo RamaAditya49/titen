@@ -1,6 +1,12 @@
 packages:
   - "."
 
+# miniflare pins undici at exactly 7.28.0, so no upstream bump clears
+# GHSA-4cwx-7wf7-3272 and its four siblings. 7.29.0 is the advised patch and the
+# last 7.x. Drop this once miniflare ships a dependency past it.
+overrides:
+  undici: "7.29.0"
+
 allowBuilds:
   esbuild: true
   workerd: true
