@@ -45,6 +45,54 @@ The zero-marker release is public as
 Exact Cloudflare, `rama-tuf`, registry, and rollback identifiers live in the
 [terminal delivery evidence](./docs/specs/done/2026-08-01-ponytail-zero.md#delivery-evidence).
 
+## The measured position, LongMemEval-S, 2026-08-04
+
+Supersedes the Mr.TyDi section below as the primary evidence, because it is a
+larger externally authored corpus (MIT, 500 instances, 246,930 turns) and it is
+the corpus an independent audit already published controls for. Session
+retrieval, ground truth `answer_session_ids`, our own scorer, failures kept in
+the denominator. Full protocol was pre-registered before the first run.
+
+| Lane, n=500 | recall@1 | MRR@10 | LLM calls | embed calls | ingest |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| **Titen FTS-only** | **0.880** | **0.915** | 0 | 0 | 816 s |
+| verbatim-RAG control, router embeddings | 0.854 | 0.907 | 0 | 877 | 2,378 s |
+| MemPalace 3.6.0, MiniLM | 0.804 | 0.872 | 0 | 0 | 486 s |
+| verbatim-RAG control, fastembed | 0.772 | 0.843 | 0 | 0 | 1,989 s |
+| MCP reference server (substring) | 0.050 | 0.151 | 0 | 0 | 13 s |
+
+Read the sign tests, not the ordering. Against the dense control on the same 500
+instances: **44 wins, 31 losses, 425 ties, p = 0.165**. Titen is *not* measurably
+better than roughly a hundred lines of cosine-over-sessions. The wins that do
+reach significance are against lanes carrying a weaker embedder, so they are
+partly a context-length artifact (#268) rather than clean retrieval wins.
+
+Three things this changes.
+
+1. **The cost axis is the defensible claim, not the accuracy axis.** Mem0 OSS
+   2.0.15, in-process, embedder pinned to the same model, on the 60-instance
+   subsample: recall@1 **0.833** from **2,981 LLM calls** and **288,021 s** of
+   ingest — about 80 hours. Titen scored higher with zero LLM calls, and the
+   paired test says the difference is not significant either way (2 wins, 5
+   losses, 53 ties, p = 0.45). Extraction-based memory bought no measurable
+   retrieval advantage over embedding the raw sessions, at roughly 350x the
+   ingest time. That independently reproduces MemDelta (arXiv:2606.29914) on a
+   different subsample, and it is the strongest honest statement we can make.
+2. **The FTS-only lane is the product, not the fallback.** It is our best
+   measured configuration on this corpus and it needs no provider at all. The
+   deployment story should lead with the zero-dependency operating point rather
+   than treating it as degraded.
+3. **The reranker case is real but bounded, and not automatic.** recall@10 is
+   0.982 against recall@1 0.880, so ten points are retrieved and mis-ranked —
+   that is the entire addressable gain. MemPalace ships a reranked mode and it
+   scored *worse* than its own plain vector mode in both embedding
+   configurations (0.733 vs 0.867, and 0.800 vs 0.850). Measure the ceiling
+   before building the stage (#269).
+
+Standing limitation: the strongest Titen configuration, FTS+vector, has no
+500-instance run (#266), and recall@10 is saturated on this corpus so only k=1
+and MRR discriminate (#267).
+
 ## Strategic debt beyond the issue tracker
 
 Recorded 2026-08-04 from a release-bound benchmark of the published
