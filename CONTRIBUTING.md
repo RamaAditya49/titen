@@ -66,20 +66,15 @@ retain its run/case/workerd diagnostic and classify it separately from product
 assertions. This emulator gate is not a substitute for an explicitly authorized
 real Cloudflare D1 smoke.
 
-`.github/workflows/ci.yml` runs the same gates on every push to `main` and on
-every pull request. It consumes no secrets, so a fork pull request runs exactly
-what a branch runs, and Actions minutes are free on a public repository.
+It stays a local manual gate. **This repository runs no GitHub Actions at all**,
+by standing decision of the maintainer: there is no CI workflow, no release
+workflow, and no container-publish workflow, and none should be added. The gates
+above are the gate. Publishing stays manual from a maintainer's machine — see
+[`docs/engineering/release.md`](./docs/engineering/release.md) — and the
+container image is built and pushed the same way.
 
-**It has never completed a run.** Actions are enabled and the workflow is active,
-but every job is refused before its first step with *"The job was not started
-because your account is locked due to a billing issue"*. Until that account lock
-clears, the local gates below are the only real gate, and no green badge should
-be claimed anywhere. Tracked in
-[#220](https://github.com/RamaAditya49/titen/issues/220).
-Publishing stays manual from a maintainer's machine and is never performed by a
-workflow — see [`docs/engineering/release.md`](./docs/engineering/release.md).
-A green CI run is not a substitute for an explicitly authorized real Cloudflare
-D1 smoke either; the hosted job runs the same local emulator gate.
+A contributor is therefore expected to run the commands above before opening a
+pull request, because nothing hosted will run them afterwards.
 
 ### Restricted or read-only home directories
 

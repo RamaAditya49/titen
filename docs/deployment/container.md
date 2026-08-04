@@ -14,12 +14,18 @@ provisioning a host.
 
 ## What gets published
 
-[`.github/workflows/container.yml`](../../.github/workflows/container.yml)
-builds the `Dockerfile` and pushes to `ghcr.io/ramaaditya49/titen` on a version
-tag only — never on a branch push, never on a pull request. It publishes a
-container and nothing else; npm releases stay manual from a maintainer's machine
-(see [release](../engineering/release.md)). Its only credential is the built-in
-`GITHUB_TOKEN` with `packages: write` on this repository's own package.
+Nothing is published automatically. This repository runs **no GitHub Actions**,
+so the image is built and pushed by hand from a maintainer's machine, the same
+way npm releases are (see [release](../engineering/release.md)):
+
+```bash
+docker build -t ghcr.io/ramaaditya49/titen:0.6.0 -t ghcr.io/ramaaditya49/titen:latest .
+docker push ghcr.io/ramaaditya49/titen:0.6.0
+docker push ghcr.io/ramaaditya49/titen:latest
+```
+
+Until that push happens the tags below describe the intended scheme, not
+something a `docker pull` will find.
 
 | Tag | Meaning |
 | --- | --- |
