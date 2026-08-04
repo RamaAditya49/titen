@@ -12,6 +12,11 @@ const titen = new TitenClient({
 });
 ```
 
+`titen-memory` is ESM-only and has no CommonJS entry, so the consuming project
+needs `"type": "module"` in its `package.json` (`npm pkg set type=module`) or a
+`.mjs`/`.mts` file. `npm init -y` writes `"type": "commonjs"`, which fails with
+`SyntaxError: Cannot use import statement outside a module`.
+
 The constructor rejects a missing key, a non-HTTP(S) URL, or a non-function
 `fetch` before any network call. Requests time out after 20 seconds by default;
 pass `signal` in request options to compose caller cancellation with that bound.

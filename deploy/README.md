@@ -60,6 +60,13 @@ sudo -u titen /opt/titen/deploy/backup.sh
 
 ## Rootless Podman/Quadlet
 
+The unit pulls `ghcr.io/ramaaditya49/titen:latest`, published on every version
+tag. **The first image publishes with the next version tag; until that tag is
+pushed the pull fails**, so build locally and point the unit at
+`localhost/titen:latest` instead. Pin the version tag in production. Image
+details, the volume that must persist, and the environment variables that matter
+are in [`docs/deployment/container.md`](../docs/deployment/container.md).
+
 ```bash
 mkdir -p ~/.config/containers/systemd ~/.config/titen ~/.local/share/titen
 chmod 700 ~/.config/titen ~/.local/share/titen

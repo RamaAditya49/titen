@@ -114,6 +114,9 @@ export function scoreCandidate(
   //
   // Both retrieval signals are normalized within the same authorized candidate
   // set before max(), avoiding provider-specific absolute similarity scales.
+  // The cost is that each arm's own best scores exactly 1, so when the lexical
+  // best and the semantic best are different claims they tie here on relevance
+  // and often on the whole weighted score; `rankCandidates` breaks that.
   // Upgrade path: learn the blend weight from context feedback.
   const effectiveRelevance = Math.max(relevance, vectorRelevance ?? 0);
 
@@ -141,7 +144,22 @@ export interface Ranked<T extends RankInput> {
   components: ScoreComponents;
 }
 
-/** Ties break on id so two identical states rank identically. */
+/**
+ * Ties break on semantic evidence, then on id so two identical states rank
+ * identically.
+ *
+ * Both relevance arms are min-max normalized inside the candidate set, so each
+ * arm's own best scores exactly 1. When those are different claims — the usual
+ * case on a hybrid query — they tie on the whole weighted score and the old
+ * id-only fallback decided the answer with a freshly minted uuid. On the release
+ * fixture that was a literal coin flip: `id_temporal_endpoint` and
+ * `jv_in_id_preference` both tied at 0.816667 and flipped between repeats.
+ *
+ * Cosines are compared only against each other, so this introduces no constant
+ * and no cross-scale comparison; it cannot move a candidate that was not already
+ * tied, and it cannot change a returned score. Lexical-only ranking is
+ * unaffected — every candidate carries `vector_boost` undefined.
+ */
 export function rankCandidates<T extends RankInput>(candidates: T[], now: Date): Ranked<T>[] {
   const relevance = normalizeRelevance(candidates);
   const vectorRelevance = normalizeVectorSimilarity(candidates);
@@ -155,10 +173,11 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
         now,
       ),
     }))
-    .sort((left, right) =>
-      right.score === left.score
-        ? left.candidate.id.localeCompare(right.candidate.id)
-        : right.score - left.score,
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        (right.candidate.vector_boost ?? 0) - (left.candidate.vector_boost ?? 0) ||
+        left.candidate.id.localeCompare(right.candidate.id),
     );
 }
 

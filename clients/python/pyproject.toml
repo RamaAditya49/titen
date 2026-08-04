@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "titen-memory"
+description = "Minimal zero-dependency Python client for the Titen memory service"
+readme = "README.md"
+license = "Apache-2.0"
+# 3.10 is the floor because socket.timeout only became an alias of the builtin
+# TimeoutError there, which is what the client catches to bound a read timeout.
+requires-python = ">=3.10"
+authors = [{ name = "Titen maintainers" }]
+keywords = ["agent-memory", "memory", "rag", "context", "titen"]
+dependencies = []
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://titen.dev"
+Source = "https://github.com/RamaAditya49/titen/tree/main/clients/python"
+Issues = "https://github.com/RamaAditya49/titen/issues"
+
+[tool.setuptools]
+py-modules = ["titen"]
+
+[tool.setuptools.dynamic]
+version = { attr = "titen.__version__" }

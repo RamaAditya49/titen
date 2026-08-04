@@ -176,19 +176,36 @@ in intentional FTS-only mode. Semantic opt-in requires both native bindings and
 a valid local contract. Configure `TITEN_EMBED_MODEL`, `TITEN_EMBED_DIMS`,
 `TITEN_EMBED_REVISION`, `TITEN_EMBED_PROFILE`, and
 `TITEN_EMBED_MIN_COSINE`; the bound Vectorize index must use the same dimensions
-and cosine metric. Revision should identify immutable provider weights when the
-provider exposes them. The reference stack records Cloudflare's observed catalog
-identity and date, not an independent weight attestation. The floor must come
-from a locked evaluation of that exact model/profile; Titen bundles no
-universal threshold. A partial binding/variable set, invalid dimension/policy,
+and cosine metric. A partial binding/variable set, invalid dimension/policy,
 or binding object without the required methods returns `configured_error` and
 fails `/readyz`.
+
+Only two of those have a Worker-side default: `TITEN_EMBED_MODEL` falls back to
+`@cf/baai/bge-base-en-v1.5` and `TITEN_EMBED_DIMS` to `768`. **Revision,
+profile, and floor have no default on this runtime either**, and the same
+absence rules as the
+[VPS embedding reference](./vps.md#embedding-configuration) apply — including
+the model-forced profile rule and the empty-string rejection that makes an unset
+`TITEN_EMBED_MIN_COSINE` fail closed. Revision should identify immutable
+provider weights when the provider exposes them. The reference stack records
+Cloudflare's observed catalog identity and date, not an independent weight
+attestation. The floor must come from a locked evaluation of that exact
+model/profile; Titen bundles no universal threshold.
+
+The live evidence for this path comes from `titen-test-*`, an isolated stack on
+the maintainer's own Cloudflare account. It is test production and not a
+general-availability claim; a new account needs its own ready, drain, and query
+smoke.
 
 Migration 13 persists provider `workers-ai`, model, revision, dimensions,
 cosine metric, the named role/normalization profile plus calibrated floor, and
 index schema `claims-scope-v1` in D1. `embeddinggemma-retrieval-v1` applies
 EmbeddingGemma's asymmetric prompts; `raw-unit-v1` remains explicit for raw-text
-models. Readiness compares those local facts without calling Workers AI or
+models; `raw-unit-v1-model-mismatch-acknowledged` is the deliberate opt-out that
+sends raw text on a model whose id claims the prompt convention, documented in
+[the VPS guide](./vps.md#embedding-configuration). All three are distinct in the
+fingerprint, so switching between them forces a rebuild rather than mixing
+conventions in one index. Readiness compares those local facts without calling Workers AI or
 Vectorize. Migration 14 retains only safe embedder/vector-store failure
 timestamps in semantic metadata, so `/readyz` fails without a provider probe
 until a later complete embed/upsert proves recovery. A real drain/query smoke

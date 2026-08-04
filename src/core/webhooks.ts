@@ -249,7 +249,7 @@ async function queueEvent(
   const hooks = await db.all<{ id: string; events: string; principal_id: string }>(
     `SELECT id, events, principal_id FROM webhooks
        WHERE org_id = ? AND status = 'active' AND principal_id IS NOT NULL
-         AND created_at <= ? AND (? IS NULL OR principal_id = ?)`,
+         AND created_at < ? AND (? IS NULL OR principal_id = ?)`,
     [orgId, event.created_at, principalId ?? null, principalId ?? null],
   );
   const statements: Stmt[] = [];
@@ -448,7 +448,7 @@ export async function processWebhooks(options: {
            AND w.principal_id IS NOT NULL
            AND (? IS NULL OR w.principal_id = ?)
            AND ${eventAccessSql("e", "w.principal_id")}
-           AND w.created_at <= e.created_at
+           AND w.created_at < e.created_at
            AND ((',' || w.events || ',') LIKE '%,*,%' OR (',' || w.events || ',') LIKE '%,' || e.kind || ',%')
            AND NOT EXISTS (
              SELECT 1 FROM webhook_deliveries d

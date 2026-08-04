@@ -47,6 +47,21 @@ export interface EmbeddingProvider {
 export const EMBEDDING_PROFILES = [
   "raw-unit-v1",
   "embeddinggemma-retrieval-v1",
+  /**
+   * Raw input on a model whose id claims a prefix convention (#250).
+   *
+   * `embeddingProfileMatchesModel` refuses `raw-unit-v1` for an EmbeddingGemma
+   * model on purpose: mixing prefixed and unprefixed vectors in one index
+   * corrupts retrieval silently, and an operator who mistypes a profile should
+   * not discover it as a slow quality decay. But there was no way to say "yes,
+   * I mean it" — which also made a fair head-to-head against a system that
+   * embeds raw text impossible. This profile is that opt-out, and the length of
+   * what has to be typed is the safety mechanism: nobody reaches it by
+   * accident. It goes into the index fingerprint like any other profile, so
+   * switching to or from it fails readiness with `index_fingerprint_mismatch`
+   * until the index is rebuilt.
+   */
+  "raw-unit-v1-model-mismatch-acknowledged",
 ] as const;
 export type EmbeddingProfile = (typeof EMBEDDING_PROFILES)[number];
 export type EmbeddingRole = "document" | "query";
@@ -92,7 +107,7 @@ export function embeddingInput(
   role: EmbeddingRole,
   content: string,
 ): string {
-  if (profile === "raw-unit-v1") return content;
+  if (profile !== "embeddinggemma-retrieval-v1") return content;
   return role === "document"
     ? `title: none | text: ${content}`
     : `task: search result | query: ${content}`;
@@ -102,6 +117,7 @@ export function embeddingProfileMatchesModel(
   profile: EmbeddingProfile,
   model: string,
 ): boolean {
+  if (profile === "raw-unit-v1-model-mismatch-acknowledged") return true;
   const embeddingGemma = model
     .toLowerCase()
     .replaceAll(/[^a-z0-9]/g, "")

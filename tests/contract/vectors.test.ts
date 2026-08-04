@@ -386,12 +386,18 @@ test("a semantic hit lifts a lexically weak claim up the ranking", async () => {
   assert.equal(hybrid.body.meta.degraded.vector, "used");
   const hybridOrder = hybrid.body.data.items.map((item: any) => item.claim_id) as string[];
 
-  // Position must improve. It may reach a tie with the top lexical hit, which
-  // within-set normalization already scores at 1, and ties break on id — so the
-  // guarantee under test is movement, not an outright win.
+  // Position must improve, and it now improves all the way. Within-set
+  // normalization scores the top lexical hit and the top semantic hit at
+  // relevance 1 alike, so the two tie on the weighted score; the cosine
+  // tie-break decides that tie on evidence instead of on a freshly minted uuid.
   assert.ok(
     hybridOrder.indexOf(weakest) < lexicalOrder.indexOf(weakest),
     `a semantic match must rank higher: was ${lexicalOrder.indexOf(weakest)}, now ${hybridOrder.indexOf(weakest)}`,
+  );
+  assert.equal(
+    hybridOrder[0],
+    weakest,
+    "a tie with the top lexical hit must be decided by the cosine, not by the uuid",
   );
   const boosted = hybrid.body.data.items.find((item: any) => item.claim_id === weakest);
   assert.equal(boosted.score_components.relevance, 1, "similarity feeds relevance");
@@ -503,6 +509,48 @@ test("narrow-band vector similarity is normalized before ranking", () => {
 
   const absent = normalizeVectorSimilarity([rankInput("none", 1, 0)]);
   assert.equal(absent.has("none"), false);
+});
+
+test("a score tie between the lexical best and the semantic best breaks on cosine", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+  // Each arm is min-max normalized inside the set, so each arm's own best scores
+  // relevance exactly 1 and the two claims tie on the whole weighted score. This
+  // is the ordinary hybrid case, not a corner: on the release fixture it decided
+  // rank 1 of `id_temporal_endpoint` and `jv_in_id_preference` with a uuid, and
+  // the measured recall@1 flipped between repeats because of it.
+  const lexicalBest = { ...rankInput("aaa", 1), bm25: -9.082 };
+  const semanticBest = { ...rankInput("zzz", 1, 0.7207) };
+  const ranked = rankCandidates([lexicalBest, semanticBest], now);
+  assert.equal(ranked[0]!.score, ranked[1]!.score, "the fixture must actually tie on score");
+  assert.equal(ranked[0]!.components.relevance, ranked[1]!.components.relevance);
+  // Fails on the id-only fallback, which returns "aaa".
+  assert.equal(ranked[0]!.candidate.id, "zzz", "semantic evidence outranks a lower uuid");
+
+  // Two cosines are compared only against each other, so no constant and no
+  // cross-scale comparison enters: the larger raw cosine wins a tied score even
+  // when within-set normalization has already flattened both to relevance 1.
+  const near = { ...rankInput("aaa", 1, 0.7026), bm25: -4 };
+  const nearer = { ...rankInput("zzz", 1, 0.7207), bm25: -4 };
+  const bothSemantic = rankCandidates([near, nearer], now);
+  assert.equal(bothSemantic[0]!.score, bothSemantic[1]!.score);
+  assert.equal(bothSemantic[0]!.candidate.id, "zzz");
+
+  // A genuine dead heat — equal score and equal evidence — must stay total and
+  // repeatable, which is the property the cosine term must not have broken.
+  const twins = rankCandidates(
+    [{ ...rankInput("zzz", 1), bm25: -4 }, { ...rankInput("aaa", 1), bm25: -4 }],
+    now,
+  );
+  assert.deepEqual(twins.map((entry) => entry.candidate.id), ["aaa", "zzz"]);
+
+  // Lexical-only ranking carries no cosine at all, so the new term is inert
+  // there: a stronger bm25 still wins on score, never on the tie-break.
+  const lexicalOnly = rankCandidates(
+    [{ ...rankInput("zzz", 1), bm25: -1.73 }, { ...rankInput("aaa", 1), bm25: -8.08 }],
+    now,
+  );
+  assert.equal(lexicalOnly[0]!.candidate.id, "aaa");
+  assert.ok(lexicalOnly[0]!.score > lexicalOnly[1]!.score);
 });
 
 test("confidence is an explicit weighted and auditable ranking factor", () => {

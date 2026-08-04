@@ -52,6 +52,25 @@ Level 6 is Titen's product model, not an external certification. The distinction
 is observable in the API: memory and collaboration share one authorization,
 evidence, and audit boundary.
 
+## You author the claims
+
+**Titen's default memory model is caller-authored claims.** `consolidate()`
+takes statements you wrote, each explicitly linked to a source observation you
+already recorded. Titen does not read a transcript and decide on its own what is
+worth remembering.
+
+That is deliberate. Every claim has an author, a source, and a scope, which is
+what makes provenance, permission, conflict, and audit answerable at all. It is
+also a real cost, and it is the honest comparison point: systems that derive
+memory from raw dialogue do work Titen hands back to you.
+
+Model-assisted derivation and reflection are implemented and ship in the
+package, but they are activation-gated and **no candidate model has passed the
+gate** — the best result on record is 65.56% against a 90% contract threshold.
+Treat them as unfinished work with a public gate, not as a feature you can
+simply switch on. The [roadmap](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
+carries the current evidence.
+
 ## The questions Titen answers
 
 | Question | Titen's answer |
@@ -69,14 +88,40 @@ instruction, and it does not run agent loops.
 
 ## Project status
 
-Titen is pre-1.0. The core service is usable, but public contracts may still
-change between minor releases. The current release includes the memory kernel,
-REST API, MCP server, TypeScript SDK, collaboration tools, enterprise
-governance, signed federation, and the operator dashboard.
+**Titen is pre-1.0.** Per [SemVer clause 4](https://semver.org/spec/v2.0.0.html#spec-item-4),
+the public API is not yet stable. Below `1.0.0` the **minor** slot is the only
+breaking-change signal consumers get: `0.5.7` to `0.6.0` may break you, and
+`^0.5.0` does not match `0.6.0`. Pin an exact version and read the
+[changelog](https://github.com/RamaAditya49/titen/blob/main/CHANGELOG.md) before
+upgrading.
+
+Where the word *stable* appears around Titen — the npm `latest` dist-tag,
+`"channel": "stable"` in [`titen.dev/version.json`](https://titen.dev/version.json),
+and `titen version --check` — it names the **release channel**: a deliberate
+release rather than a prerelease on `next`. It never describes API stability,
+and it is not a maturity badge. See
+[versioning and channels](https://github.com/RamaAditya49/titen/blob/main/docs/engineering/release.md#versioning-and-channels).
+
+The current release includes the memory kernel, REST API, MCP server,
+TypeScript SDK, collaboration tools, enterprise governance, signed federation,
+and the operator dashboard.
 
 You can run Titen on Bun with SQLite or on Cloudflare Workers with D1. Semantic
 retrieval is optional: use `sqlite-vec` on Bun, or Vectorize and Workers AI on
-Cloudflare. Titen runs in your own infrastructure.
+Cloudflare — verified live only on the maintainer's isolated `titen-test-*`
+stack, which is test production and not general availability
+([scope note](#architecture)). Titen runs in your own infrastructure.
+
+**Clients.** Titen ships a TypeScript/JavaScript SDK, the `titen` CLI, and a
+minimal Python client in
+[`clients/python/`](https://github.com/RamaAditya49/titen/tree/main/clients/python).
+The Python client is one standard-library-only file covering
+`observe → consolidate → compile → evidence`, with a generic `request` for every
+other route. **It is not published to PyPI**: install it from a checkout with
+`pip install ./clients/python`, or vendor `titen.py`. There is no client for any
+other language — those callers use the authenticated REST API directly, and
+every route, scope, and error shape is in the
+[API reference](https://github.com/RamaAditya49/titen/blob/main/docs/reference/api.md).
 
 See the [maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
 for detailed runtime evidence and remaining gates, or the
@@ -232,9 +277,47 @@ Titen does not poll during server or MCP startup.
 
 ## Optional semantic retrieval
 
-The default install is FTS-only. A Bun vector deployment must explicitly add
-`sqlite-vec@0.1.9`; configured semantic retrieval fails readiness if the native
-extension or stored index fingerprint is incompatible.
+The default install is FTS-only and stays ready with no embedding configuration
+at all. Semantic retrieval is **all-or-nothing**: set one `TITEN_EMBED_*`
+variable and you have opted in, so every variable below must then be valid or
+the service fails closed — `/readyz` returns `503` with
+`checks.semantic_index: "embedding_configuration_invalid"` and no vector query
+runs. A Bun vector deployment must also add `sqlite-vec@0.1.9`.
+
+| Variable | Required | Shipped default | Absent or invalid |
+| --- | --- | --- | --- |
+| `TITEN_EMBED_BASE_URL` | yes | none | `configured_error`; must be `http:`/`https:` with no credentials, query, or fragment |
+| `TITEN_EMBED_MODEL` | yes | none on Bun; `@cf/baai/bge-base-en-v1.5` on Workers | `configured_error` |
+| `TITEN_EMBED_DIMS` | yes | none on Bun; `768` on Workers | `configured_error`; integer 1–65,536, must equal the index dimension |
+| `TITEN_EMBED_REVISION` | yes | **none** | `configured_error` |
+| `TITEN_EMBED_PROFILE` | yes | **none** | `configured_error`; exactly one value is accepted per model family |
+| `TITEN_EMBED_MIN_COSINE` | yes | **none** | `configured_error`; every operator calibrates this alone |
+| `TITEN_EMBED_API_KEY` | only if the provider needs a bearer token | none | supplying it *without* the rest still opts in, and then fails closed |
+
+Three of these have no default anywhere and no value can be guessed safely:
+
+- **`TITEN_EMBED_REVISION`** is an opaque immutable identifier for the exact
+  weights behind the endpoint, ≤200 characters. It is not validated for shape —
+  it is recorded in the stored index fingerprint, so changing it invalidates the
+  index and forces a rebuild. That is the point: it is how you promise Titen the
+  vectors already in the store came from the same weights as the next query. A
+  provider that cannot name an immutable revision should stay FTS-only.
+- **`TITEN_EMBED_PROFILE`** selects the query/document input transform, and the
+  accepted value is *forced by the model id*. Any model id containing
+  `embeddinggemma` (case- and punctuation-insensitive) accepts **only**
+  `embeddinggemma-retrieval-v1`; every other model accepts **only**
+  `raw-unit-v1`. There is no way to run an EmbeddingGemma model on raw
+  untransformed input, and no way to apply the EmbeddingGemma prompts to another
+  model. A mismatch is `configured_error`, not a warning.
+- **`TITEN_EMBED_MIN_COSINE`** has **no shipped default**. An unset variable
+  reads as the empty string, which is rejected, so semantic retrieval fails
+  closed rather than silently accepting weak matches. Titen ships no universal
+  or pre-inspected threshold: derive it from a locked evaluation of that exact
+  provider, model, revision, and profile. `0` is a valid, deliberate value
+  meaning "accept every candidate the index returns and let ranking decide".
+
+Worked EmbeddingGemma example — an OpenAI-compatible endpoint serving
+`embeddinggemma` at 768 dimensions:
 
 ```bash
 bun add titen-memory sqlite-vec@0.1.9
@@ -242,16 +325,21 @@ bun add titen-memory sqlite-vec@0.1.9
 TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1 \
 TITEN_EMBED_MODEL=embeddinggemma \
 TITEN_EMBED_DIMS=768 \
-TITEN_EMBED_REVISION=local-pinned \
+TITEN_EMBED_REVISION=embeddinggemma-q4-2026-07-31 \
 TITEN_EMBED_PROFILE=embeddinggemma-retrieval-v1 \
-TITEN_EMBED_MIN_COSINE="$CALIBRATED_COSINE_FLOOR" \
+TITEN_EMBED_MIN_COSINE=0.32 \
 bunx titen-memory serve
 ```
 
-Set `CALIBRATED_COSINE_FLOOR` from a locked evaluation of that exact provider,
-model revision, and profile. Titen ships no universal threshold. The packaged
-vector path is verified on glibc Linux x64 with Bun 1.3.13; other platforms need
-their own ready, drain, and query smoke.
+`embeddinggemma-retrieval-v1` is the only profile that model id will accept.
+`embeddinggemma-q4-2026-07-31` is a placeholder: substitute the immutable
+revision your provider reports, and treat any change to it as an index rebuild.
+`0.32` is a placeholder too — replace it with your own calibrated floor and
+record how you measured it. Verify with `curl --fail http://127.0.0.1:8787/readyz`;
+a healthy vector deployment reports `capabilities.vector: "enabled"`.
+
+The packaged vector path is verified on glibc Linux x64 with Bun 1.3.13; other
+platforms need their own ready, drain, and query smoke.
 
 For backups, key rotation, containers, and durable service setup, use the
 [Bun/VPS deployment guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md).
@@ -260,16 +348,25 @@ For backups, key rotation, containers, and durable service setup, use the
 
 The SDK uses `fetch` and runs on Node 22+, Bun, Deno, and edge runtimes.
 
+`titen-memory` is **ESM-only** — it has no CommonJS entry — so the consuming
+project must be ESM too. `npm init -y` writes `"type": "commonjs"`, which is why
+the second line below is not optional: without it Node fails with
+`SyntaxError: Cannot use import statement outside a module` before it reaches
+any Titen code.
+
 ```bash
 npm install titen-memory
+npm pkg set type=module
 ```
 
-```ts
+Save this as `titen-example.js` and run `node titen-example.js`:
+
+```js
 import { TitenClient } from "titen-memory";
 
 const titen = new TitenClient({
   url: process.env.TITEN_URL ?? "http://127.0.0.1:8787",
-  key: process.env.TITEN_API_KEY!,
+  key: process.env.TITEN_API_KEY,
 });
 
 const subject = "release-runbook";
@@ -300,8 +397,23 @@ const context = await titen.compile({
 console.log(context.items);
 ```
 
+The script needs a running service and a key: start one with
+`titen bootstrap --org "My Org"` and `titen serve`, then export
+`TITEN_API_KEY`. In TypeScript the same file works unchanged as
+`titen-example.ts` on Node 22.18+ or Bun; write `process.env.TITEN_API_KEY!`
+there to satisfy strict null checks. Skipping `npm pkg set type=module` and
+naming the file `.mjs`/`.mts` also works — those extensions are ESM regardless
+of `package.json`.
+
 `max_tokens` accepts 128 through 32,000. Every returned memory item includes
 `untrusted: true`; the client still owns prompt boundaries and action policy.
+
+Python callers use
+[`clients/python/`](https://github.com/RamaAditya49/titen/tree/main/clients/python),
+which is not on PyPI and installs from a checkout. Any other language calls the
+REST API in the
+[API reference](https://github.com/RamaAditya49/titen/blob/main/docs/reference/api.md)
+directly.
 
 Typed methods cover common agent operations. `request()` and `requestRaw()`
 cover the remaining authenticated JSON and streaming routes. Mutations accept
@@ -320,15 +432,26 @@ One Web-Standards TypeScript core serves both runtimes:
 | HTTP | `Bun.serve` | Worker `fetch` |
 | Canonical SQL | `bun:sqlite` | D1 |
 | Lexical retrieval | SQLite FTS5 | D1 FTS5 |
-| Optional vectors | `sqlite-vec` | Vectorize (verified live in `titen-test-*`) |
+| Optional vectors | `sqlite-vec` | Vectorize (see the scope note below) |
 | Automatic model enrichment | Implemented, opt-in compatible HTTP | Implemented, opt-in compatible HTTP |
 | Background work | Startup and bounded timer | Scheduled handler; trigger provisioning varies |
 
+**Vectorize scope.** Vectorize and Workers AI are implemented and verified live
+on `titen-test-*`, an isolated stack on the maintainer's own Cloudflare account,
+with scoped BGE-M3 retrieval, bounded repair, Cron, persistence, and rollback.
+That is test production and **not a general-availability claim**: no customer
+deployment runs it, and your account needs its own ready, drain, and query
+smoke before you rely on it. Without an AI/Vectorize binding a Worker stays
+ready and retrieval is lexical D1 FTS5. The
+[maturity matrix](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
+holds the exact evidence.
+
 Automatic model-assisted claim derivation and reflection are implemented as an
 opt-in capability with durable jobs, bounded validation, and separate
-readiness. They are not production-activated until the locked evaluation and
-real-runtime smokes are recorded; callers may continue submitting evidence-
-linked claims explicitly.
+readiness. They are not production-activated: no candidate model has passed the
+frozen activation gate, and the locked evaluation and real-runtime smokes are
+not recorded. Callers author evidence-linked claims explicitly, as described in
+[You author the claims](#you-author-the-claims).
 
 The base service does not require Docker, Redis, Postgres, a graph database, or
 a vector database. Authorization runs before retrieval, and every candidate is

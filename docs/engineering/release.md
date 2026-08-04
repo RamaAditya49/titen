@@ -176,6 +176,25 @@ Keep each released changelog section easy to scan:
 5. prefix every incompatible change with **`Breaking:`** and describe the
    required migration in the same item.
 
+**Date every heading in UTC.** The heading date must equal the npm registry
+publish date for that exact version, not the maintainer's local calendar day.
+A late-evening publish in UTC+7 lands on the previous UTC day, and recording the
+local date makes the changelog useless as a cross-reference against registry
+metadata. The registry is the authority:
+
+```bash
+version=$(node -p 'require("./package.json").version')
+curl -s https://registry.npmjs.org/titen-memory \
+  | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>
+      console.log(JSON.parse(s).time[process.argv[1]].slice(0,10)))' "$version"
+grep -n "^## \[$version\]" CHANGELOG.md
+```
+
+The two must print the same date. Because the heading is written before the
+publish in step 2, re-check it immediately after `npm publish` and correct it in
+the same session if the clock crossed midnight UTC. Historical headings for
+0.5.7, 0.5.6, 0.5.5, and 0.2.0 were corrected this way on 2026-08-04.
+
 The generator adds the exact install command and links to the install guide,
 the matching titen.dev page, and the versioned npm package. These presentation
 lines are derived from the version; the release content still comes only from
@@ -211,6 +230,20 @@ Merge and deploy the reviewed `titen-web` change manually, then smoke
 checks pass. If published notes need a correction, update `CHANGELOG.md`,
 replace the GitHub Release body with regenerated output, then sync and deploy
 the website again.
+
+The homepage carries the widest reach and the fewest caveats, so two claims are
+checked by hand on every deploy:
+
+- **Stability.** `"channel": "stable"` in `version.json` is a release-channel
+  discriminator — `fetchStableRelease()` in `src/runtime/bun/release.ts` rejects
+  a manifest without it — and it says nothing about the API. Rendering the bare
+  word *stable* beside the version reads as a product-stability claim and
+  contradicts both `README.md` and `CHANGELOG.md`. The badge must name the
+  channel and disclose pre-1.0, for example `v0.5.7 · stable channel · pre-1.0`.
+- **Vectorize.** Cloudflare Vectorize and Workers AI are verified live only on
+  the maintainer's isolated `titen-test-*` stack. Every surface says test
+  production, not general availability. Table cells and prose in the same
+  section must not disagree.
 
 This handoff does not use GitHub Actions, a webhook, a scheduled job, or a
 runtime GitHub API request. Roll back a bad website deployment to its previous

@@ -15,3 +15,8 @@ plugins/claude/titen-memory/reports/
 
 # Project-local developer tools
 .tools/
+
+# Default CLI store when titen is run from the repository root.
+titen.db
+titen.db-*
+titen.db.vec

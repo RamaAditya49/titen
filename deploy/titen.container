@@ -3,11 +3,22 @@ Description=Titen rootless memory service
 After=network-online.target
 
 [Container]
-Image=localhost/titen:latest
+# Published on every version tag by .github/workflows/container.yml.
+# Pin the exact tag you intend to run in production - :latest moves under a
+# restart. To run a locally built image instead, use localhost/titen:latest and
+# build with: podman build --format docker -t localhost/titen:latest .
+Image=ghcr.io/ramaaditya49/titen:latest
 ContainerName=titen
 PublishPort=127.0.0.1:8787:8787
 Volume=%h/.local/share/titen:/var/lib/titen:Z
 EnvironmentFile=%h/.config/titen/titen.env
+# Required, not cosmetic. The image runs as its own uid 1000, which without this
+# maps to a subuid that does not own the host directory above, and the service
+# dies on startup with "unable to open database file". keep-id maps the invoking
+# user onto uid 1000 inside, so the mounted directory stays plainly owned by the
+# operator on the host, whatever the operator's own uid is. Only needed for a
+# host-path mount; a named volume inherits the image's ownership instead.
+UserNS=keep-id:uid=1000,gid=1000
 Exec=serve --db /var/lib/titen/titen.db --host 0.0.0.0 --port 8787
 ReadOnly=true
 NoNewPrivileges=true

@@ -350,6 +350,7 @@ Compile a task-specific context pack.
   "task": "prepare a safe deployment",
   "max_tokens": 1200,
   "max_candidates": 300,
+  "top_k": 5,
   "at": "2026-08-01T09:00:00.000Z",
   "include_checkpoints": true
 }
@@ -357,7 +358,19 @@ Compile a task-specific context pack.
 
 `max_tokens` accepts 128 through 32,000. `max_candidates` optionally accepts 1
 through 1,000 and defaults to 200; Vectorize requests remain capped at its
-native 100-match boundary. `at` optionally supplies an ISO-8601 point-in-time
+native 100-match boundary. `top_k` optionally accepts 1 through 1,000 and is
+absent by default, leaving `max_tokens` as the only bound on pack size. The two
+limits are different things: `max_candidates` bounds what retrieval considers,
+`top_k` bounds what comes back. `top_k` is applied to the ranked list before the
+token budget, so a bounded pack costs fewer tokens rather than being trimmed
+after the caller has paid for a full one. `budget.omitted_items` counts every
+ranked candidate that was dropped, by the count bound as well as by the budget,
+so a truncated answer is never reported as a complete one;
+`budget.budget_exhausted` stays specific to the token budget, and omissions with
+`budget_exhausted: false` are the count bound. It is a ceiling, not an exact
+count: duplicate statements are still deduplicated, and fewer eligible claims
+still return fewer items. `meta.candidates` continues to report everything
+retrieval considered. `at` optionally supplies an ISO-8601 point-in-time
 eligibility anchor and defaults to the server's current instant. The response
 scope reports the normalized `as_of` instant. The response includes selected claims,
 evidence IDs, trust, temporal validity, conflicts, score components, token usage,
@@ -395,10 +408,41 @@ explicit weighted factor, not a hidden multiplier. The conflict component is
 evidence lowers relative rank by `0.05` while remaining visible in the item
 status and `conflicts`.
 
+Because both signals are rescaled inside the candidate set, `score` is
+comparable **within one response only**. It is not a cross-query confidence and
+a threshold set on one query does not transfer to the next: on a uniformly
+ingested corpus rank 1 returns the same number on every query. Issue 227 tracks
+that limitation and is open.
+
+Equal scores are ordered by the stronger vector similarity, then by `claim_id`.
+Within-set normalization scores each signal's own best at exactly `1`, so when
+the best lexical match and the best semantic match are different claims they tie
+on the whole score; the similarity term decides that tie on retrieval evidence
+rather than on identity. Two cosines are only ever compared with each other, so
+no constant and no cross-scale comparison enters the ordering, and a lexical-only
+deployment is unaffected. `claim_id` remains the last term, so a genuine dead
+heat still ranks identically on every run.
+
 Lexical planning removes Unicode format characters, preserves combining marks,
 normalizes to NFC, and drops a bounded English/Indonesian function-word set;
 an all-function-word task falls back to its original terms. Porter stemming
-handles common word forms. The FTS MATCH includes encoded organization and
+handles common word forms.
+
+A temporal polarity marker is expanded inside the MATCH to the other markers
+naming the same window boundary **in the same language**: `mulai`, `sejak`,
+`sesudah`, `setelah` name the start of an Indonesian window and `after`, `since`
+an English one; `hingga`, `sampai`, `sebelum` name the end of an Indonesian
+window and `before`, `prior`, `until` an English one. A query saying "sejak Juli
+2026" therefore reaches a claim that says "Mulai Juli 2026" and outranks the
+otherwise identical "Sebelum Juli 2026". Groups never span languages: one OR
+branch that did would pull an unrelated English document into an Indonesian
+query on a shared function word alone. Markers that are also function words
+(`dari`, `from`) stay in the stoplist and are not expanded. The expansion is a
+recall device inside the MATCH only: `meta.query_terms_used` and
+`meta.dropped_query_terms` still count the caller's own terms, claim eligibility
+still comes from `valid_from`/`valid_to`, and there is no temporal ranking term.
+
+The FTS MATCH includes encoded organization and
 subject scope before BM25, then canonical SQL repeats every authorization and
 lifecycle check. `meta.degraded.lexical` is `no_terms` when normalization leaves
 no searchable term and `used` otherwise. The existing `remove_diacritics 2`

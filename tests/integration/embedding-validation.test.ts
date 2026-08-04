@@ -155,6 +155,50 @@ test("embedding policies are canonical, role-aware, and model-specific", () => {
   assert.equal(parseEmbeddingPolicy("raw-unit-v1;min_cosine=0.10"), undefined);
 });
 
+test("the model-forced profile has one deliberate opt-out and no accidental one", () => {
+  // The guard #250 must preserve: a bare raw profile on an EmbeddingGemma model
+  // is still refused, and no near-miss spelling of the opt-out is accepted.
+  assert.equal(embeddingProfileMatchesModel("raw-unit-v1", "tuf/embeddinggemma"), false);
+  for (const near of [
+    "raw-unit-v1-model-mismatch",
+    "raw-unit-v2-model-mismatch-acknowledged",
+    "RAW-UNIT-V1-MODEL-MISMATCH-ACKNOWLEDGED",
+  ])
+    assert.equal(
+      parseEmbeddingPolicy(`${near};min_cosine=0.5`),
+      undefined,
+      `${near} must not be accepted as the opt-out`,
+    );
+
+  // Typed in full, it is accepted, embeds raw text on both roles, and is the
+  // only profile that overrides the model convention.
+  assert.equal(
+    embeddingProfileMatchesModel(
+      "raw-unit-v1-model-mismatch-acknowledged",
+      "tuf/embeddinggemma",
+    ),
+    true,
+  );
+  for (const role of ["query", "document"] as const)
+    assert.equal(
+      embeddingInput("raw-unit-v1-model-mismatch-acknowledged", role, "release gate"),
+      "release gate",
+    );
+
+  // It survives the fingerprint round trip as a distinct profile, which is what
+  // makes a convention switch a rebuild instead of a silent index mix.
+  const acknowledged = embeddingPolicyFingerprint(
+    "raw-unit-v1-model-mismatch-acknowledged",
+    0.5,
+  );
+  assert.equal(acknowledged, "raw-unit-v1-model-mismatch-acknowledged;min_cosine=0.5");
+  assert.notEqual(acknowledged, embeddingPolicyFingerprint("raw-unit-v1", 0.5));
+  assert.deepEqual(parseEmbeddingPolicy(acknowledged), {
+    profile: "raw-unit-v1-model-mismatch-acknowledged",
+    minimumCosine: 0.5,
+  });
+});
+
 test("both runtime adapters receive identical role prompts and return unit vectors", async () => {
   const seen: string[][] = [];
   const server = Bun.serve({

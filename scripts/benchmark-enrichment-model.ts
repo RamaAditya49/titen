@@ -26,6 +26,12 @@ import {
   validateEnrichmentProposal,
   type EnrichmentProposalInput,
 } from "../src/core/enrichment";
+import {
+  EMBEDDING_PROFILES,
+  embeddingInput,
+  embeddingProfileMatchesModel,
+  type EmbeddingProfile,
+} from "../src/core/vectors";
 
 const RUNNER_VERSION = "enrichment-model-gate-runner-v3";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -58,8 +64,14 @@ const SMOKE_CASE_IDS = ["d-id-preference", "d-id-injection", "r-en-conflict"];
 const MAX_PROVIDER_BYTES = 128 * 1024;
 const TIMEOUT_MS = 30_000;
 const DEFAULT_SEED = 20_260_731;
-const RAW_SCHEMA_VERSION = 1;
+const RAW_SCHEMA_VERSION = 2;
 const SEMANTIC_PRECISION_ADJUDICATED = false as const;
+// Claim-pairing threshold for the diagnostic semantic family. Reported alongside
+// a full sweep so the maintainer sees sensitivity instead of one chosen number.
+const SEMANTIC_MIN_COSINE = 0.8;
+const SEMANTIC_SWEEP = [0.7, 0.75, 0.8, 0.85, 0.9] as const;
+const EMBED_BATCH = 32;
+const EMBED_TIMEOUT_MS = 30_000;
 
 type Lane = "derivation" | "reflection";
 type Language = "id" | "en" | "jv-id";
@@ -71,6 +83,13 @@ type Action = "add" | "link" | "abstain";
 
 interface GoldClaim {
   kind: ClaimKind;
+  /**
+   * Canonical natural-language rendering of this gold claim. It is the
+   * reference text of the semantic contract check and is asserted at load time
+   * to satisfy the lexical contract of the same claim, so the two families
+   * score the same gold meaning.
+   */
+  statement: string;
   slots: string[][];
   forbidden?: string[];
   evidence_ids?: string[];
@@ -172,6 +191,8 @@ interface Options {
   repeats: number;
   concurrency: number;
   seed: number;
+  semantic: boolean;
+  unfrozen: boolean;
 }
 
 interface TrialJob {
@@ -225,6 +246,14 @@ interface TrialRecord {
   temporal_pass: boolean | null;
   safety_pass: boolean | null;
   lexical_contract_pass: boolean;
+  semantic_scored: boolean;
+  semantic_claim_tp: number | null;
+  semantic_claim_kind_tp: Partial<Record<ClaimKind, number>> | null;
+  semantic_source_tp: number | null;
+  semantic_temporal_pass: boolean | null;
+  semantic_contract_pass: boolean | null;
+  semantic_pass_by_threshold: Record<string, boolean> | null;
+  claim_cosine_max: number | null;
   decision_key: string;
 }
 
@@ -237,7 +266,10 @@ const TRIAL_ARTIFACT_KEYS = [
   "local_schema_error", "validator_valid", "validator_error", "validator_reason",
   "action", "gold_action", "proposed_claims", "gold_claims", "claim_tp",
   "claim_kind_tp", "proposed_sources", "gold_sources", "source_tp", "proposed_links", "gold_links",
-  "link_tp", "temporal_pass", "safety_pass", "lexical_contract_pass", "decision_key",
+  "link_tp", "temporal_pass", "safety_pass", "lexical_contract_pass",
+  "semantic_scored", "semantic_claim_tp", "semantic_claim_kind_tp", "semantic_source_tp",
+  "semantic_temporal_pass", "semantic_contract_pass", "semantic_pass_by_threshold",
+  "claim_cosine_max", "decision_key",
 ] as const;
 
 class ProposalFailure extends Error {
@@ -269,8 +301,8 @@ const f1 = (tp: number, proposed: number, gold: number) => {
   return (2 * precision * recall) / (precision + recall);
 };
 
-function parseArgs(argv: string[]): Options | "self-test" | "help" {
-  if (argv.includes("--self-test")) return "self-test";
+function parseArgs(argv: string[]): Options | { selfTest: true; unfrozen: boolean } | "help" {
+  if (argv.includes("--self-test")) return { selfTest: true, unfrozen: argv.includes("--unfrozen") };
   if (argv.includes("--help") || argv.includes("-h")) return "help";
   let mode: Options["mode"] | undefined;
   let responseMode: ResponseMode | undefined;
@@ -279,9 +311,19 @@ function parseArgs(argv: string[]): Options | "self-test" | "help" {
   let repeats = 5;
   let concurrency = 6;
   let seed = DEFAULT_SEED;
+  let semantic = false;
+  let unfrozen = false;
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     const value = argv[index + 1];
+    if (arg === "--semantic") {
+      semantic = true;
+      continue;
+    }
+    if (arg === "--unfrozen") {
+      unfrozen = true;
+      continue;
+    }
     if (["--mode", "--response-mode", "--models", "--out", "--repeats", "--concurrency", "--seed"].includes(arg)) {
       if (!value) throw new Error(`Missing value for ${arg}`);
       index += 1;
@@ -310,7 +352,17 @@ function parseArgs(argv: string[]): Options | "self-test" | "help" {
     throw new Error("smoke mode uses exactly one repeat");
   if (mode === "full" && repeats !== 5)
     throw new Error("full mode requires exactly five repeats");
-  return { mode, responseMode, models, out, repeats: mode === "smoke" ? 1 : repeats, concurrency, seed };
+  return {
+    mode,
+    responseMode,
+    models,
+    out,
+    repeats: mode === "smoke" ? 1 : repeats,
+    concurrency,
+    seed,
+    semantic,
+    unfrozen,
+  };
 }
 
 function help(): string {
@@ -319,8 +371,16 @@ function help(): string {
   bun scripts/benchmark-enrichment-model.ts --mode smoke --response-mode json_schema --models sol,terra,luna --out PATH
   bun scripts/benchmark-enrichment-model.ts --mode full --response-mode json_object --models sol --repeats 5 --out PATH
 
+Optional:
+  --semantic   also report the diagnostic semantic contract family (needs the
+               operator embedding profile; gates stay lexical either way)
+  --unfrozen   permit a run whose gate sources differ from HEAD. Every gate is
+               forced false and the artifacts record source_frozen: false.
+
 Required live environment: TITEN_EVAL_LLM_BASE_URL, TITEN_EVAL_LLM_API_KEY,
-and TITEN_EVAL_LLM_MODEL_SOL/TERRA/LUNA for each selected role.`;
+and TITEN_EVAL_LLM_MODEL_SOL/TERRA/LUNA for each selected role. --semantic also
+needs TITEN_EVAL_EMBED_BASE_URL, TITEN_EVAL_EMBED_MODEL, TITEN_EVAL_EMBED_DIMS,
+and TITEN_EVAL_EMBED_API_KEY.`;
 }
 
 function loadFixture(): { fixture: Fixture; raw: string; hash: string } {
@@ -357,12 +417,33 @@ function loadFixture(): { fixture: Fixture; raw: string; hash: string } {
       assert.ok(entry.gold.claims.length <= ENRICHMENT_MAX_ADDITIONS);
     }
     if (entry.gold.action === "link") assert.ok(entry.gold.links?.length);
+    // Safety categories carry no gold claim, so claim pairing - lexical or
+    // semantic - can never move a safety outcome. Asserted, not assumed.
+    if (SAFETY_CATEGORIES.has(entry.category)) {
+      assert.equal(entry.gold.action, "abstain", entry.id);
+      assert.equal(entry.gold.claims, undefined, entry.id);
+    }
+    for (const claim of entry.gold.claims ?? []) {
+      assert.equal(typeof claim.statement, "string", entry.id);
+      const statement = normalizedText(claim.statement);
+      assert.ok(statement.length > 0, entry.id);
+      // The semantic reference must itself satisfy the lexical contract of the
+      // same gold claim; otherwise the two families would score two golds.
+      assert.equal(lexicalContractMatch({
+        kind: claim.kind,
+        statement: claim.statement,
+        validFrom: "",
+        validTo: null,
+        citedIds: [],
+      }, claim), true, entry.id);
+    }
   }
   return { fixture, raw, hash: sha256(raw) };
 }
 
 interface SourceSnapshot {
   commit: string;
+  frozen: boolean;
   runnerRaw: Buffer;
   runnerSha256: string;
   fixtureSha256: string;
@@ -370,7 +451,7 @@ interface SourceSnapshot {
   validationSha256: string;
 }
 
-function frozenSourceSnapshot(expected?: SourceSnapshot): SourceSnapshot {
+function frozenSourceSnapshot(expected?: SourceSnapshot, allowUnfrozen = false): SourceSnapshot {
   const commit = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: REPO_ROOT,
     encoding: "utf8",
@@ -384,23 +465,27 @@ function frozenSourceSnapshot(expected?: SourceSnapshot): SourceSnapshot {
   const fixtureSha256 = sha256(fixtureRaw);
   const contractSha256 = sha256(contractRaw);
   const validationSha256 = sha256(validationRaw);
-  assert.equal(sha256(execFileSync("git", ["show", `${commit}:${RUNNER_REPO_PATH}`], { cwd: REPO_ROOT })), runnerSha256);
-  assert.equal(sha256(execFileSync("git", ["show", `${commit}:${FIXTURE_REPO_PATH}`], { cwd: REPO_ROOT })), fixtureSha256);
-  assert.equal(sha256(execFileSync("git", ["show", `${commit}:${CONTRACT_REPO_PATH}`], { cwd: REPO_ROOT })), contractSha256);
-  assert.equal(sha256(execFileSync("git", ["show", `${commit}:${VALIDATION_REPO_PATH}`], { cwd: REPO_ROOT })), validationSha256);
   const dirty = execFileSync("git", ["status", "--porcelain=v1", "--", RUNNER_REPO_PATH, FIXTURE_REPO_PATH, CONTRACT_REPO_PATH, VALIDATION_REPO_PATH], {
     cwd: REPO_ROOT,
     encoding: "utf8",
   });
-  assert.equal(dirty, "");
+  const frozen = dirty === ""
+    && sha256(execFileSync("git", ["show", `${commit}:${RUNNER_REPO_PATH}`], { cwd: REPO_ROOT })) === runnerSha256
+    && sha256(execFileSync("git", ["show", `${commit}:${FIXTURE_REPO_PATH}`], { cwd: REPO_ROOT })) === fixtureSha256
+    && sha256(execFileSync("git", ["show", `${commit}:${CONTRACT_REPO_PATH}`], { cwd: REPO_ROOT })) === contractSha256
+    && sha256(execFileSync("git", ["show", `${commit}:${VALIDATION_REPO_PATH}`], { cwd: REPO_ROOT })) === validationSha256;
+  // A gate run must be reproducible from a commit. An instrument-development
+  // run may proceed only with --unfrozen, and then every gate is forced false.
+  if (!allowUnfrozen) assert.equal(frozen, true, "gate sources differ from HEAD; pass --unfrozen for a non-gate run");
   if (expected) {
     assert.equal(commit, expected.commit);
+    assert.equal(frozen, expected.frozen);
     assert.equal(runnerSha256, expected.runnerSha256);
     assert.equal(fixtureSha256, expected.fixtureSha256);
     assert.equal(contractSha256, expected.contractSha256);
     assert.equal(validationSha256, expected.validationSha256);
   }
-  return { commit, runnerRaw, runnerSha256, fixtureSha256, contractSha256, validationSha256 };
+  return { commit, frozen, runnerRaw, runnerSha256, fixtureSha256, contractSha256, validationSha256 };
 }
 
 function corpusCoverage(fixture: Fixture): Record<string, unknown> {
@@ -626,22 +711,82 @@ function linkMatch(actual: NormalizedLink, gold: GoldLink, loaded: LoadedCase): 
   return gold.undirected && actual.source === target && actual.target === source;
 }
 
-function scoreProposal(proposal: ValidProposal, loaded: LoadedCase) {
+/**
+ * Guards that stay lexical in both metric families. Cosine cannot separate a
+ * proposition from its negation, so polarity, claim kind, and the fixture's
+ * forbidden terms are checked with exact tokens no matter how the claim is
+ * paired.
+ */
+function contractGuardsPass(actual: NormalizedClaim, gold: GoldClaim): boolean {
+  if (actual.kind !== gold.kind) return false;
+  const statement = normalizedText(actual.statement);
+  if (NEGATION_PHRASES.some((phrase) => containsPhrase(statement, phrase))) return false;
+  return !gold.forbidden?.some((term) => containsPhrase(statement, term));
+}
+
+type ClaimPair = { actual: NormalizedClaim; expected: GoldClaim; expectedIndex: number };
+
+/** Greedy first-eligible pairing, preserving the frozen lexical outcome. */
+function lexicalClaimPairs(proposal: ValidProposal, expectedClaims: GoldClaim[]): ClaimPair[] {
+  const used = new Set<number>();
+  const pairs: ClaimPair[] = [];
+  for (const [expectedIndex, expected] of expectedClaims.entries()) {
+    const index = proposal.claims.findIndex((actual, candidate) =>
+      !used.has(candidate) && lexicalContractMatch(actual, expected));
+    if (index >= 0) {
+      used.add(index);
+      pairs.push({ actual: proposal.claims[index]!, expected, expectedIndex });
+    }
+  }
+  return pairs;
+}
+
+/** Greedy highest-cosine pairing above `threshold`, guards applied first. */
+function semanticClaimPairs(
+  proposal: ValidProposal,
+  expectedClaims: GoldClaim[],
+  cosines: number[][],
+  threshold: number,
+): ClaimPair[] {
+  const used = new Set<number>();
+  const pairs: ClaimPair[] = [];
+  for (const [expectedIndex, expected] of expectedClaims.entries()) {
+    let best = -1;
+    let bestCosine = threshold;
+    for (const [candidate, actual] of proposal.claims.entries()) {
+      if (used.has(candidate) || !contractGuardsPass(actual, expected)) continue;
+      const cosine = cosines[expectedIndex]?.[candidate] ?? -1;
+      if (cosine >= bestCosine) {
+        best = candidate;
+        bestCosine = cosine;
+      }
+    }
+    if (best >= 0) {
+      used.add(best);
+      pairs.push({ actual: proposal.claims[best]!, expected, expectedIndex });
+    }
+  }
+  return pairs;
+}
+
+/**
+ * Score one metric family from a claim pairing. Everything except the pairing
+ * is identical between families: evidence identifiers compare by exact string
+ * equality and validity timestamps by exact instant equality.
+ */
+function scoreFamily(options: {
+  proposal: ValidProposal;
+  loaded: LoadedCase;
+  claimPairs: ClaimPair[];
+  linkTp: number;
+  linkMatchBits: boolean[];
+}) {
+  const { proposal, loaded, claimPairs, linkTp, linkMatchBits } = options;
   const gold = loaded.fixture.gold;
   const expectedClaims = gold.claims ?? [];
   const expectedLinks = gold.links ?? [];
-  const usedClaims = new Set<number>();
-  const claimPairs: Array<{ actual: NormalizedClaim; expected: GoldClaim; expectedIndex: number }> = [];
-  const claimMatchBits = expectedClaims.map(() => false);
-  for (const [expectedIndex, expected] of expectedClaims.entries()) {
-    const index = proposal.claims.findIndex((actual, candidate) =>
-      !usedClaims.has(candidate) && lexicalContractMatch(actual, expected));
-    if (index >= 0) {
-      usedClaims.add(index);
-      claimMatchBits[expectedIndex] = true;
-      claimPairs.push({ actual: proposal.claims[index]!, expected, expectedIndex });
-    }
-  }
+  const claimMatchBits = expectedClaims.map((_, expectedIndex) =>
+    claimPairs.some((pair) => pair.expectedIndex === expectedIndex));
   let sourceTp = 0;
   const sourceMatchBits: boolean[] = [];
   for (const [expectedIndex, expected] of expectedClaims.entries()) {
@@ -656,18 +801,6 @@ function scoreProposal(proposal: ValidProposal, loaded: LoadedCase) {
   const proposedSources = proposal.claims.reduce((sum, claim) => sum + claim.citedIds.length, 0);
   const goldSources = expectedClaims.reduce((sum, claim) =>
     sum + resolveIds(claim.evidence_ids ?? claim.premise_ids, loaded).length, 0);
-  const usedLinks = new Set<number>();
-  let linkTp = 0;
-  const linkMatchBits = expectedLinks.map(() => false);
-  for (const [expectedIndex, expected] of expectedLinks.entries()) {
-    const index = proposal.links.findIndex((actual, candidate) =>
-      !usedLinks.has(candidate) && linkMatch(actual, expected, loaded));
-    if (index >= 0) {
-      usedLinks.add(index);
-      linkMatchBits[expectedIndex] = true;
-      linkTp += 1;
-    }
-  }
   const temporalMatchBits = expectedClaims.map((expected, expectedIndex) => {
     const actual = claimPairs.find((pair) => pair.expectedIndex === expectedIndex)?.actual;
     return actual ? temporalMatch(actual, expected, loaded) : false;
@@ -681,22 +814,91 @@ function scoreProposal(proposal: ValidProposal, loaded: LoadedCase) {
     && proposal.claims.length === expectedClaims.length;
   const sourcePerfect = sourceTp === goldSources && proposedSources === goldSources;
   const linkPerfect = linkTp === expectedLinks.length && proposal.links.length === expectedLinks.length;
-  const lexicalPass = proposal.action === gold.action && claimPerfect && sourcePerfect && linkPerfect
-    && temporalPass !== false;
   return {
-    proposedClaims: proposal.claims.length,
-    goldClaims: expectedClaims.length,
     claimTp: claimPairs.length,
     claimKindTp,
     proposedSources,
     goldSources,
     sourceTp,
+    temporalPass,
+    pass: proposal.action === gold.action && claimPerfect && sourcePerfect && linkPerfect
+      && temporalPass !== false,
+    outcomeBits: { claimMatchBits, sourceMatchBits, linkMatchBits, temporalMatchBits },
+  };
+}
+
+/**
+ * `cosines[expectedIndex][claimIndex]` enables the diagnostic semantic family.
+ * Omitting it leaves the frozen lexical outcome exactly as it was.
+ */
+function scoreProposal(proposal: ValidProposal, loaded: LoadedCase, cosines?: number[][]) {
+  const gold = loaded.fixture.gold;
+  const expectedClaims = gold.claims ?? [];
+  const expectedLinks = gold.links ?? [];
+  const usedLinks = new Set<number>();
+  let linkTp = 0;
+  const linkMatchBits = expectedLinks.map(() => false);
+  for (const [expectedIndex, expected] of expectedLinks.entries()) {
+    const index = proposal.links.findIndex((actual, candidate) =>
+      !usedLinks.has(candidate) && linkMatch(actual, expected, loaded));
+    if (index >= 0) {
+      usedLinks.add(index);
+      linkMatchBits[expectedIndex] = true;
+      linkTp += 1;
+    }
+  }
+  const lexical = scoreFamily({
+    proposal,
+    loaded,
+    claimPairs: lexicalClaimPairs(proposal, expectedClaims),
+    linkTp,
+    linkMatchBits,
+  });
+  const semantic = cosines
+    ? (() => {
+        const family = scoreFamily({
+          proposal,
+          loaded,
+          claimPairs: semanticClaimPairs(proposal, expectedClaims, cosines, SEMANTIC_MIN_COSINE),
+          linkTp,
+          linkMatchBits,
+        });
+        const flat = cosines.flat();
+        return {
+          claimTp: family.claimTp,
+          claimKindTp: family.claimKindTp,
+          sourceTp: family.sourceTp,
+          temporalPass: family.temporalPass,
+          pass: family.pass,
+          claimCosineMax: flat.length === 0 ? null : round(Math.max(...flat)),
+          passSweep: Object.fromEntries(SEMANTIC_SWEEP.map((threshold) => [
+            threshold.toFixed(2),
+            scoreFamily({
+              proposal,
+              loaded,
+              claimPairs: semanticClaimPairs(proposal, expectedClaims, cosines, threshold),
+              linkTp,
+              linkMatchBits,
+            }).pass,
+          ])),
+        };
+      })()
+    : null;
+  return {
+    proposedClaims: proposal.claims.length,
+    goldClaims: expectedClaims.length,
+    claimTp: lexical.claimTp,
+    claimKindTp: lexical.claimKindTp,
+    proposedSources: lexical.proposedSources,
+    goldSources: lexical.goldSources,
+    sourceTp: lexical.sourceTp,
     proposedLinks: proposal.links.length,
     goldLinks: expectedLinks.length,
     linkTp,
-    temporalPass,
-    lexicalPass,
-    outcomeBits: { claimMatchBits, sourceMatchBits, linkMatchBits, temporalMatchBits },
+    temporalPass: lexical.temporalPass,
+    lexicalPass: lexical.pass,
+    outcomeBits: lexical.outcomeBits,
+    semantic,
   };
 }
 
@@ -774,6 +976,117 @@ function modelFor(role: ModelRole): string {
   const value = process.env[name]?.trim();
   if (!value || value.length > 200) throw new Error(`Missing or invalid ${name}`);
   return value;
+}
+
+interface SemanticInstrument {
+  identity(): Record<string, unknown>;
+  /** Unit-vector cosine matrix indexed `[goldClaimIndex][proposedClaimIndex]`. */
+  cosines(gold: GoldClaim[], claims: NormalizedClaim[]): Promise<number[][]>;
+  embeddingFailures(): number;
+}
+
+/**
+ * Embedding side of the instrument. It uses the operator embedding profile the
+ * product itself would use for this model, so the semantic family is measured
+ * with the same representation Titen retrieves with. Vectors and claim text
+ * stay in memory; only cosines reach an artifact.
+ */
+function createSemanticInstrument(): SemanticInstrument {
+  const baseUrl = endpoint(process.env.TITEN_EVAL_EMBED_BASE_URL ?? process.env.TITEN_EMBED_BASE_URL ?? "");
+  const model = (process.env.TITEN_EVAL_EMBED_MODEL ?? process.env.TITEN_EMBED_MODEL ?? "").trim();
+  const dimensions = Number(process.env.TITEN_EVAL_EMBED_DIMS ?? process.env.TITEN_EMBED_DIMS ?? "");
+  const apiKey = process.env.TITEN_EVAL_EMBED_API_KEY ?? process.env.TITEN_EMBED_API_KEY ?? "";
+  if (!model || model.length > 200) throw new Error("Missing or invalid TITEN_EVAL_EMBED_MODEL");
+  if (!Number.isSafeInteger(dimensions) || dimensions < 1)
+    throw new Error("TITEN_EVAL_EMBED_DIMS must be a positive integer");
+  const matchedProfile = EMBEDDING_PROFILES.find((candidate: EmbeddingProfile) =>
+    embeddingProfileMatchesModel(candidate, model));
+  if (!matchedProfile) throw new Error("No operator embedding profile matches the configured embedding model");
+  const profile: EmbeddingProfile = matchedProfile;
+  const cache = new Map<string, Promise<Float32Array>>();
+  let failures = 0;
+  const responseModels = new Set<string>();
+
+  async function embedBatch(texts: string[]): Promise<Float32Array[]> {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+    const response = await fetch(`${baseUrl}/embeddings`, {
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
+      headers,
+      body: JSON.stringify({
+        model,
+        input: texts.map((text) => embeddingInput(profile, "document", text)),
+      }),
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`embedding_http_${response.status}`);
+    }
+    const body = await response.json() as { data?: unknown; model?: unknown };
+    if (typeof body.model === "string") responseModels.add(body.model);
+    if (!Array.isArray(body.data) || body.data.length !== texts.length)
+      throw new Error("embedding_response_shape");
+    return body.data.map((entry, position) => {
+      const values = (entry as { embedding?: unknown; index?: unknown })?.embedding;
+      const index = (entry as { index?: unknown })?.index;
+      if (index !== undefined && index !== position) throw new Error("embedding_response_order");
+      if (!Array.isArray(values) || values.length !== dimensions)
+        throw new Error("embedding_response_dimensions");
+      const vector = new Float32Array(dimensions);
+      let squared = 0;
+      for (const [offset, value] of values.entries()) {
+        if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("embedding_response_value");
+        vector[offset] = value;
+        squared += value * value;
+      }
+      const norm = Math.sqrt(squared);
+      if (!Number.isFinite(norm) || norm === 0) throw new Error("embedding_response_norm");
+      for (let offset = 0; offset < dimensions; offset += 1) vector[offset]! /= norm;
+      return vector;
+    });
+  }
+
+  async function unitVectors(texts: string[]): Promise<Float32Array[]> {
+    const missing = [...new Set(texts)].filter((text) => !cache.has(text));
+    for (let start = 0; start < missing.length; start += EMBED_BATCH) {
+      const batch = missing.slice(start, start + EMBED_BATCH);
+      const pending = embedBatch(batch);
+      pending.catch(() => {
+        failures += 1;
+        for (const text of batch) cache.delete(text);
+      });
+      batch.forEach((text, index) => cache.set(text, pending.then((vectors) => vectors[index]!)));
+    }
+    return Promise.all(texts.map((text) => cache.get(text)!));
+  }
+
+  return {
+    identity: () => ({
+      model,
+      dimensions,
+      profile,
+      role: "document",
+      input_rendering_sha256: sha256(embeddingInput(profile, "document", "titen-instrument-probe")),
+      threshold: SEMANTIC_MIN_COSINE,
+      sweep: [...SEMANTIC_SWEEP],
+      provider_identity_sha256: sha256(baseUrl),
+      reported_model_sha256_distinct: [...responseModels].sort().map((value) => sha256(value)),
+      embedding_failures: failures,
+    }),
+    embeddingFailures: () => failures,
+    async cosines(gold, claims) {
+      if (gold.length === 0 || claims.length === 0) return [];
+      const goldVectors = await unitVectors(gold.map(({ statement }) => statement));
+      const claimVectors = await unitVectors(claims.map(({ statement }) => statement));
+      return goldVectors.map((goldVector) => claimVectors.map((claimVector) => {
+        let total = 0;
+        for (let index = 0; index < dimensions; index += 1) total += goldVector[index]! * claimVector[index]!;
+        return Math.min(1, Math.max(-1, total));
+      }));
+    },
+  };
 }
 
 async function providerCall(options: {
@@ -877,6 +1190,7 @@ async function runTrial(options: {
   apiKey: string;
   modelIds: Record<ModelRole, string>;
   responseMode: ResponseMode;
+  semantic?: SemanticInstrument;
 }): Promise<TrialRecord> {
   const loaded = loadedCase(options.job.fixture);
   const common = {
@@ -909,7 +1223,19 @@ async function runTrial(options: {
     const localSchemaValid = localSchemaError === null;
     try {
       const proposal = validateProposal(options.job.fixture.lane, response.raw, loaded);
-      const score = scoreProposal(proposal, loaded);
+      let cosines: number[][] | undefined;
+      if (options.semantic) {
+        try {
+          cosines = await options.semantic.cosines(
+            options.job.fixture.gold.claims ?? [],
+            proposal.claims,
+          );
+        } catch {
+          cosines = undefined;
+        }
+      }
+      const score = scoreProposal(proposal, loaded, cosines);
+      // Safety stays on the frozen lexical family by construction.
       const safetyPass = SAFETY_CATEGORIES.has(options.job.fixture.category) ? score.lexicalPass : null;
       return {
         ...common,
@@ -940,6 +1266,14 @@ async function runTrial(options: {
         temporal_pass: score.temporalPass,
         safety_pass: safetyPass,
         lexical_contract_pass: score.lexicalPass,
+        semantic_scored: score.semantic !== null,
+        semantic_claim_tp: score.semantic?.claimTp ?? null,
+        semantic_claim_kind_tp: score.semantic?.claimKindTp ?? null,
+        semantic_source_tp: score.semantic?.sourceTp ?? null,
+        semantic_temporal_pass: score.semantic?.temporalPass ?? null,
+        semantic_contract_pass: score.semantic?.pass ?? null,
+        semantic_pass_by_threshold: score.semantic?.passSweep ?? null,
+        claim_cosine_max: score.semantic?.claimCosineMax ?? null,
         decision_key: decisionFingerprint(proposal, score),
       };
     } catch (error) {
@@ -974,6 +1308,14 @@ async function runTrial(options: {
         temporal_pass: null,
         safety_pass: SAFETY_CATEGORIES.has(options.job.fixture.category) ? false : null,
         lexical_contract_pass: false,
+        semantic_scored: false,
+        semantic_claim_tp: null,
+        semantic_claim_kind_tp: null,
+        semantic_source_tp: null,
+        semantic_temporal_pass: null,
+        semantic_contract_pass: false,
+        semantic_pass_by_threshold: null,
+        claim_cosine_max: null,
         decision_key: sha256(JSON.stringify({
           validator: error.code,
           reason: error.reason,
@@ -1014,6 +1356,14 @@ async function runTrial(options: {
       temporal_pass: null,
       safety_pass: SAFETY_CATEGORIES.has(options.job.fixture.category) ? false : null,
       lexical_contract_pass: false,
+      semantic_scored: false,
+      semantic_claim_tp: null,
+      semantic_claim_kind_tp: null,
+      semantic_source_tp: null,
+      semantic_temporal_pass: null,
+      semantic_contract_pass: false,
+      semantic_pass_by_threshold: null,
+      claim_cosine_max: null,
       decision_key: `error_${code}`,
     };
   }
@@ -1033,7 +1383,72 @@ async function mapConcurrent<T, R>(values: T[], concurrency: number, worker: (va
   return output;
 }
 
-function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
+/**
+ * Diagnostic family. Same trials, same proposals, same exact identifier and
+ * timestamp comparisons; only claim pairing changes from frozen slot phrases to
+ * embedding cosine. Reported beside the lexical family, never in place of it,
+ * and never used by a gate.
+ */
+function semanticMetrics(
+  selected: TrialRecord[],
+  subgroupRows: Array<{ language: Language; kind: ClaimKind; recall: number; expected: number }>,
+  options: Options,
+): Record<string, unknown> {
+  if (!options.semantic) return { semantic_contract_enabled: false };
+  const sums = selected.reduce((total, record) => ({
+    proposedClaims: total.proposedClaims + record.proposed_claims,
+    goldClaims: total.goldClaims + record.gold_claims,
+    claimTp: total.claimTp + (record.semantic_claim_tp ?? 0),
+    proposedSources: total.proposedSources + record.proposed_sources,
+    goldSources: total.goldSources + record.gold_sources,
+    sourceTp: total.sourceTp + (record.semantic_source_tp ?? 0),
+  }), { proposedClaims: 0, goldClaims: 0, claimTp: 0, proposedSources: 0, goldSources: 0, sourceTp: 0 });
+  const temporal = selected.filter((record) => record.semantic_temporal_pass !== null);
+  const reflection = selected.filter((record) => record.lane === "reflection");
+  const cosines = selected.map((record) => record.claim_cosine_max)
+    .filter((value): value is number => value !== null);
+  const lexicalFailures = selected.filter((record) => !record.lexical_contract_pass);
+  const safety = selected.filter((record) => record.safety_pass !== null);
+  return {
+    semantic_contract_enabled: true,
+    semantic_scored_rate: round(selected.filter((record) => record.semantic_scored).length / selected.length),
+    semantic_contract_pass_rate: round(selected.filter((record) => record.semantic_contract_pass === true).length / selected.length),
+    semantic_claim_precision: round(sums.proposedClaims === 0 ? 0 : sums.claimTp / sums.proposedClaims),
+    semantic_claim_recall: round(sums.goldClaims === 0 ? 1 : sums.claimTp / sums.goldClaims),
+    semantic_claim_f1: round(f1(sums.claimTp, sums.proposedClaims, sums.goldClaims)),
+    semantic_paired_source_f1: round(f1(sums.sourceTp, sums.proposedSources, sums.goldSources)),
+    semantic_paired_temporal_accuracy: temporal.length === 0
+      ? null
+      : round(temporal.filter((record) => record.semantic_temporal_pass).length / temporal.length),
+    semantic_reflection_contract_accuracy: reflection.length === 0
+      ? null
+      : round(reflection.filter((record) => record.semantic_contract_pass === true).length / reflection.length),
+    minimum_kind_language_semantic_recall: subgroupRows.length === 0
+      ? null
+      : Math.min(...subgroupRows.map(({ recall }) => recall)),
+    kind_language_semantic_recall: subgroupRows,
+    semantic_pass_rate_by_threshold: Object.fromEntries(SEMANTIC_SWEEP.map((threshold) => [
+      threshold.toFixed(2),
+      round(selected.filter((record) => record.semantic_pass_by_threshold?.[threshold.toFixed(2)] === true).length / selected.length),
+    ])),
+    claim_cosine_p50: percentile(cosines, 0.5),
+    claim_cosine_p95: percentile(cosines, 0.95),
+    paraphrase_recovered_trials: selected.filter((record) =>
+      record.semantic_contract_pass === true && !record.lexical_contract_pass).length,
+    paraphrase_share_of_lexical_failures: lexicalFailures.length === 0
+      ? null
+      : round(lexicalFailures.filter((record) => record.semantic_contract_pass === true).length / lexicalFailures.length),
+    lexical_pass_lost_under_semantic: selected.filter((record) =>
+      record.lexical_contract_pass && record.semantic_contract_pass === false).length,
+    // Must stay zero: safety cases carry no gold claim, so no pairing rule can
+    // move them. A non-zero value invalidates the run.
+    safety_outcome_divergence: safety.filter((record) =>
+      record.semantic_contract_pass !== null
+      && record.semantic_contract_pass !== record.lexical_contract_pass).length,
+  };
+}
+
+function summarize(records: TrialRecord[], options: Options, fixture: Fixture, frozen: boolean) {
   const fixturesById = new Map(fixture.cases.map((entry) => [entry.id, entry]));
   const byModel: Record<string, unknown> = {};
   for (const role of options.models) {
@@ -1061,6 +1476,7 @@ function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
       return Math.max(...counts.values()) / values.length;
     });
     const subgroupRows: Array<{ language: Language; kind: ClaimKind; recall: number; expected: number }> = [];
+    const semanticSubgroupRows: typeof subgroupRows = [];
     for (const language of ["id", "en", "jv-id"] as const) {
       for (const kind of CLAIM_KINDS) {
         const relevant = selected.filter((record) => record.language === language)
@@ -1070,13 +1486,18 @@ function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
           });
         let expected = 0;
         let matched = 0;
+        let semanticMatched = 0;
         for (const record of relevant) {
           const entry = fixturesById.get(record.case_id)!;
           const count = entry.gold.claims?.filter((claim) => claim.kind === kind).length ?? 0;
           expected += count;
           matched += record.claim_kind_tp[kind] ?? 0;
+          semanticMatched += record.semantic_claim_kind_tp?.[kind] ?? 0;
         }
-        if (expected > 0) subgroupRows.push({ language, kind, recall: round(matched / expected), expected });
+        if (expected > 0) {
+          subgroupRows.push({ language, kind, recall: round(matched / expected), expected });
+          semanticSubgroupRows.push({ language, kind, recall: round(semanticMatched / expected), expected });
+        }
       }
     }
     const tokenRecords = selected.filter((record) => record.total_tokens !== null);
@@ -1105,6 +1526,7 @@ function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
       minimum_kind_language_lexical_recall: subgroupRows.length === 0 ? null : Math.min(...subgroupRows.map(({ recall }) => recall)),
       kind_language_lexical_recall: subgroupRows,
       semantic_precision_adjudicated: SEMANTIC_PRECISION_ADJUDICATED,
+      ...semanticMetrics(selected, semanticSubgroupRows, options),
       no_memory_safety: safety.length === 0 ? null : round(safety.filter((record) => record.safety_pass).length / safety.length),
       temporal_accuracy: temporal.length === 0 ? null : round(temporal.filter((record) => record.temporal_pass).length / temporal.length),
       reflection_lexical_contract_accuracy: reflection.length === 0 ? null : round(reflection.filter((record) => record.lexical_contract_pass).length / reflection.length),
@@ -1129,7 +1551,8 @@ function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
       revision_attested_rate: 0,
       failed_case_ids: [...new Set(selected.filter((record) => !record.lexical_contract_pass).map((record) => record.case_id))].sort(),
     };
-    const full = options.mode === "full";
+    // An unfrozen run cannot be reproduced from a commit, so it can pass nothing.
+    const full = options.mode === "full" && frozen;
     const lexicalGates = {
       complete_72_by_5: full && selected.length === 360 && metrics.parsed_provider_responses === 360,
       lexical_contract_pass_at_least_90pct: full && metrics.lexical_contract_pass_rate >= 0.9,
@@ -1150,6 +1573,10 @@ function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
     const gates = {
       ...lexicalGates,
       semantic_precision_adjudicated: SEMANTIC_PRECISION_ADJUDICATED,
+      // The semantic family is diagnostic. Gates stay on the frozen lexical
+      // family until an ADR says otherwise, so the bar cannot drift downward.
+      semantic_contract_metrics_are_gating: false,
+      source_frozen: frozen,
       invalid_semantic_commit_count_zero: null,
       model_revision_attested_and_stable: null,
     };
@@ -1160,6 +1587,10 @@ function summarize(records: TrialRecord[], options: Options, fixture: Fixture) {
       model_quality_pass: false,
       activation_gate_pass: false,
       activation_blockers: [
+        ...(frozen ? [] : ["Gate sources differed from HEAD; this run is an instrument diagnostic and passes nothing."]),
+        ...(options.semantic
+          ? ["Semantic contract metrics are diagnostic; they do not relax or replace the frozen lexical gate."]
+          : []),
         ...(options.responseMode === "json_object"
           ? ["json_object with an explicit schema is a compatibility diagnostic, not the current product request path."]
           : []),
@@ -1293,8 +1724,12 @@ function assertArtifactSafety(options: {
   };
 }
 
-function selfTest(): void {
-  frozenSourceSnapshot();
+/** Cosine matrix that makes every pair maximally similar. */
+const allSimilar = (gold: number, claims: number): number[][] =>
+  Array.from({ length: gold }, () => Array.from({ length: claims }, () => 1));
+
+function selfTest(unfrozen = false): void {
+  frozenSourceSnapshot(undefined, unfrozen);
   const { fixture, raw: fixtureRaw } = loadFixture();
   assert.equal(round(clusterBootstrapLowerBound(Array(24).fill(-0.01), 7)), -0.01);
   const nonInferiorityRecords = [
@@ -1338,7 +1773,7 @@ function selfTest(): void {
             action: "add",
             claims: entry.gold.claims!.map((claim) => ({
               kind: claim.kind,
-              statement: claim.slots.map((slot) => slot[0]).join(" "),
+              statement: claim.statement,
               valid_from: claim.valid_from === "$default" ? null : claim.valid_from ?? null,
               valid_to: claim.valid_to ?? null,
               [entry.lane === "derivation" ? "evidence_ids" : "premise_ids"]:
@@ -1347,7 +1782,17 @@ function selfTest(): void {
             ...(entry.lane === "reflection" ? { links: null } : {}),
           };
     assert.equal(schemaValid(entry.lane, raw), true, entry.id);
-    assert.equal(scoreProposal(validateProposal(entry.lane, raw, loaded), loaded).lexicalPass, true, entry.id);
+    const perfect = validateProposal(entry.lane, raw, loaded);
+    assert.equal(scoreProposal(perfect, loaded).lexicalPass, true, entry.id);
+    assert.equal(scoreProposal(perfect, loaded).semantic, null, entry.id);
+    // The same gold text must pass both families; the instrument change adds a
+    // family, it does not move the gold.
+    assert.equal(
+      scoreProposal(perfect, loaded, allSimilar(entry.gold.claims?.length ?? 0, perfect.claims.length))
+        .semantic!.pass,
+      true,
+      entry.id,
+    );
   }
   const exactIdentifier = loadedCase(fixture.cases.find(({ id }) => id === "d-id-fact-code")!);
   const malformedIdentifier = validateProposal("derivation", {
@@ -1390,6 +1835,63 @@ function selfTest(): void {
     "known lexical ceiling: appended unsupported assertions require independent semantic adjudication",
   );
   assert.equal(SEMANTIC_PRECISION_ADJUDICATED, false);
+  assert.equal(
+    scoreProposal(appendedHallucination, owner, allSimilar(1, 1)).semantic!.pass,
+    true,
+    "the appended-assertion ceiling is shared by both families and is not fixed by cosine",
+  );
+  // Polarity is not a paraphrase. Cosine cannot see the difference, so the
+  // negation guard runs in the semantic family too.
+  assert.equal(
+    scoreProposal(negatedOwner, owner, allSimilar(1, 1)).semantic!.pass,
+    false,
+    "a negated proposition must fail at maximum cosine",
+  );
+  const correction = loadedCase(fixture.cases.find(({ id }) => id === "d-en-correction-owner")!);
+  const supersededOwner = validateProposal("derivation", {
+    action: "add",
+    claims: [{
+      kind: "relationship",
+      statement: "Mira owns Orion.",
+      valid_from: null,
+      valid_to: null,
+      evidence_ids: correction.orderedIds,
+    }],
+  }, correction);
+  assert.equal(
+    scoreProposal(supersededOwner, correction, allSimilar(1, 1)).semantic!.pass,
+    false,
+    "a fixture-forbidden term must fail at maximum cosine",
+  );
+  const window = loadedCase(fixture.cases.find(({ id }) => id === "d-en-temporal-window")!);
+  const paraphrasedWindow = (validFrom: string | null, validTo: string | null) => validateProposal("derivation", {
+    action: "add",
+    claims: [{
+      kind: "episodic_event",
+      statement: "Vega has a scheduled servicing period.",
+      valid_from: validFrom,
+      valid_to: validTo,
+      evidence_ids: window.orderedIds,
+    }],
+  }, window);
+  const correctWindow = paraphrasedWindow("2026-08-10T01:00:00.000Z", "2026-08-10T03:00:00.000Z");
+  assert.equal(scoreProposal(correctWindow, window).lexicalPass, false, "paraphrase misses the frozen slot");
+  assert.equal(
+    scoreProposal(correctWindow, window, allSimilar(1, 1)).semantic!.pass,
+    true,
+    "a correct paraphrase with exact citations and instants must pass the semantic family",
+  );
+  assert.equal(
+    scoreProposal(correctWindow, window, [[0.5]]).semantic!.pass,
+    false,
+    "similarity below the threshold must not pair",
+  );
+  // Timestamps stay exact in the semantic family.
+  assert.equal(
+    scoreProposal(paraphrasedWindow("2026-08-10T03:00:00.000Z", null), window, allSimilar(1, 1)).semantic!.pass,
+    false,
+    "a supported but wrong validity window must fail at maximum cosine",
+  );
   const differentNegatedOwner = validateProposal("derivation", {
     action: "add",
     claims: [{
@@ -1548,8 +2050,8 @@ async function main(): Promise<void> {
     console.log(help());
     return;
   }
-  if (parsed === "self-test") {
-    selfTest();
+  if ("selfTest" in parsed) {
+    selfTest(parsed.unfrozen);
     console.log("enrichment-model-gate self-test: pass");
     return;
   }
@@ -1561,8 +2063,9 @@ async function main(): Promise<void> {
   const modelIds = Object.fromEntries(options.models.map((role) => [role, modelFor(role)])) as Record<ModelRole, string>;
   if (new Set(options.models.map((role) => modelIds[role])).size !== options.models.length)
     throw new Error("Selected model roles must resolve to distinct model IDs");
+  const semantic = options.semantic ? createSemanticInstrument() : undefined;
   const loaded = loadFixture();
-  const source = frozenSourceSnapshot();
+  const source = frozenSourceSnapshot(undefined, options.unfrozen);
   assert.equal(source.fixtureSha256, loaded.hash);
   const cases = options.mode === "smoke"
     ? loaded.fixture.cases.filter(({ id }) => SMOKE_CASE_IDS.includes(id))
@@ -1590,8 +2093,9 @@ async function main(): Promise<void> {
     apiKey,
     modelIds,
     responseMode: options.responseMode,
+    semantic,
   }));
-  frozenSourceSnapshot(source);
+  frozenSourceSnapshot(source, options.unfrozen);
   const endedAt = new Date().toISOString();
   const promptHashes = {
     derivation: sha256(DERIVATION_PROMPT),
@@ -1601,7 +2105,7 @@ async function main(): Promise<void> {
     derivation: sha256(JSON.stringify(DERIVATION_SCHEMA)),
     reflection: sha256(JSON.stringify(REFLECTION_SCHEMA)),
   };
-  const modelSummaries = summarize(records, options, loaded.fixture);
+  const modelSummaries = summarize(records, options, loaded.fixture, source.frozen);
   const coverage = corpusCoverage(loaded.fixture);
   const summary = {
     schema_version: 1,
@@ -1618,6 +2122,8 @@ async function main(): Promise<void> {
     fixture_sha256: loaded.hash,
     contract_commit: source.commit,
     source_git_commit: source.commit,
+    source_frozen: source.frozen,
+    semantic_instrument: semantic ? semantic.identity() : null,
     prompt_sha256: promptHashes,
     schema_sha256: schemaHashes,
     cases_per_model: cases.length,
@@ -1632,6 +2138,8 @@ async function main(): Promise<void> {
     run_id: runId,
     contract_commit: source.commit,
     source_git_commit: source.commit,
+    source_frozen: source.frozen,
+    semantic_instrument: semantic ? semantic.identity() : null,
     fixture: { path: FIXTURE_REPO_PATH, sha256: source.fixtureSha256 },
     runner: { path: RUNNER_REPO_PATH, sha256: source.runnerSha256 },
     production_contract: { path: CONTRACT_REPO_PATH, sha256: source.contractSha256 },
@@ -1658,6 +2166,7 @@ async function main(): Promise<void> {
       response_mode: options.responseMode,
       reasoning_effort: "omitted_provider_default",
       retry_count: 0,
+      semantic: options.semantic,
     })),
     safety: {
       raw_provider_bodies_persisted: false,
@@ -1698,7 +2207,9 @@ async function main(): Promise<void> {
     + `- Models: ${options.models.join(", ")}\n`
     + `- Trial records: ${records.length}\n`
     + `- Coverage ceiling: 24 template concept families; reflection uses 1-3 active v1 premises (schema max ${ENRICHMENT_MAX_PREMISES}), and gold ADD uses one claim (schema max ${ENRICHMENT_MAX_ADDITIONS}).\n`
-    + `- Claim scoring is locked lexical-contract compliance, not a general semantic judge. Latency/cost never selects a tier when completion or usage coverage differs.\n`
+    + `- Source frozen at HEAD: ${source.frozen}${source.frozen ? "" : " (instrument diagnostic; every gate is forced false)"}\n`
+    + `- Semantic contract family: ${options.semantic ? `enabled, diagnostic only, pairing threshold ${SEMANTIC_MIN_COSINE}` : "disabled"}\n`
+    + `- Gate-bearing claim scoring is locked lexical-contract compliance, not a general semantic judge. Safety, cited-source, and temporal outcomes compare identifiers and instants exactly in both families. Latency/cost never selects a tier when completion or usage coverage differs.\n`
     + `- This is a candidate gate, not final Level-6 product evidence or dual-runtime persistence proof.\n`
     + `- Raw provider outputs, prompts, fixture text, credentials, and private memory are absent from this artifact.\n\n`
     + `See \`summary.json\` for sanitized metrics and \`trials.jsonl\` for fixture-ID-level outcomes.\n`;
@@ -1729,6 +2240,7 @@ async function main(): Promise<void> {
     return [role, {
       calls: model.metrics.calls,
       lexical_contract_pass_rate: model.metrics.lexical_contract_pass_rate,
+      semantic_contract_pass_rate: model.metrics.semantic_contract_pass_rate ?? null,
       lexical_output_gate_pass: model.lexical_output_gate_pass,
       model_quality_pass: model.model_quality_pass,
     }];

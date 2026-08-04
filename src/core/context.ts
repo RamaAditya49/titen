@@ -78,6 +78,12 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   const maxCandidates = body.max_candidates === undefined
     ? LIMITS.candidates
     : requireInteger(body, "max_candidates", 1, LIMITS.maxCandidates);
+  // `max_candidates` bounds what retrieval considers; `top_k` bounds what comes
+  // back. Without it a caller comparing two systems had to truncate the pack
+  // client-side after paying for every item's tokens (#229).
+  const topK = body.top_k === undefined
+    ? undefined
+    : requireInteger(body, "top_k", 1, LIMITS.maxCandidates);
   const includeCheckpoints = optionalBoolean(body, "include_checkpoints");
   const requestedProjectId = optionalString(body, "project_id", LIMITS.identifier);
   const crossProject = optionalBoolean(body, "cross_project");
@@ -148,7 +154,14 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }
   }
 
-  const ranked = rankCandidates(candidates, new Date(at));
+  // Applied after ranking and before the budget, so the token budget is spent
+  // on the items the caller asked for. What the bound discarded is still counted
+  // into `budget.omitted_items`: a caller who cannot tell a complete answer from
+  // a truncated one has no reason to trust either. `slice(0, undefined)` is the
+  // whole no-op path.
+  const allRanked = rankCandidates(candidates, new Date(at));
+  const ranked = allRanked.slice(0, topK);
+  const omittedByTopK = allRanked.length - ranked.length;
   const evidence = await loadAuthorizedEvidenceIds(
     ctx.app.db,
     principal,
@@ -254,8 +267,10 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         max_tokens: maxTokens,
         used_tokens: usedTokens,
         selected_items: items.length,
-        omitted_items: packed.omittedCount,
+        omitted_items: packed.omittedCount + omittedByTopK,
         deduplicated_items: packed.deduplicatedCount,
+        // Token budget only. `omitted_items` above it and `budget_exhausted`
+        // false together mean the count bound truncated, not the budget.
         budget_exhausted: packed.budgetExhausted,
       },
       items,
