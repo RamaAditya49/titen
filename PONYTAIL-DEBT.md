@@ -240,10 +240,10 @@ or scope the claim to what is smoke-tested.
 **Partly closed 0.6.0.** The image exists and was built and run before anything
 was claimed: 217 MB, non-root, `/readyz` healthy on a fresh volume with all 21
 migrations applied, `sqlite-vec` loading inside the image, 34.8 MiB idle resident
-memory. `.github/workflows/container.yml` publishes it to ghcr on a version tag
-only, never on a branch or a pull request, and never to npm. The publishing path
-itself is **unverified** until the first tag pushes, and the local proof used
-podman rather than docker. Bun-required, the vector path's platform scope, and
+memory. The image is **not published**: this repository runs no GitHub Actions, so it is
+pushed to ghcr by hand from a maintainer's machine like every other release
+artifact, and that push has not happened yet. The local proof used podman rather
+than docker. Bun-required, the vector path's platform scope, and
 npm provenance (#242) all remain open.
 
 ### 10. Deepen the moats instead of chasing recall

@@ -15,7 +15,7 @@ owner: ramaaditya
 
 Completed. The `Dockerfile` is pinned by digest, ships only the two source
 directories the service runs from, and probes readiness rather than liveness.
-`.github/workflows/container.yml` publishes it to `ghcr.io/ramaaditya49/titen`
+The image is pushed to `ghcr.io/ramaaditya49/titen` by hand
 on a version tag only, using the built-in `GITHUB_TOKEN` and no other
 credential. `docs/deployment/container.md` documents the pull, the volume, and
 the environment. `deploy/titen.container` now names a real image and, separately,
