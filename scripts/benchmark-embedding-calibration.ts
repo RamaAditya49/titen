@@ -497,6 +497,17 @@ function filtered(trial: RawTrial, threshold: number) {
   return trial.ranked_top_10.filter((hit) => hit.cosine >= threshold);
 }
 
+const f1Score = (precision: number | null, recall: number | null) =>
+  precision === null || recall === null || precision + recall === 0
+    ? null
+    : round((2 * precision * recall) / (precision + recall));
+
+/**
+ * Precision is micro-averaged over every trial, no-result queries included: the
+ * denominator counts the results the threshold actually returned, so returning
+ * junk to lift recall shows up here. Each answerable query has exactly one
+ * relevant statement, so the numerator is the recall@k count.
+ */
 function quality(trials: RawTrial[], threshold: number) {
   const positive = trials.filter((trial) => trial.relevant_statement_id !== null);
   const empty = trials.filter((trial) => trial.relevant_statement_id === null);
@@ -505,8 +516,13 @@ function quality(trials: RawTrial[], threshold: number) {
   let coverage = 0;
   let reciprocalRank = 0;
   let ndcg = 0;
-  for (const trial of positive) {
+  let returned1 = 0;
+  let returned5 = 0;
+  for (const trial of trials) {
     const hits = filtered(trial, threshold);
+    returned1 += Math.min(1, hits.length);
+    returned5 += Math.min(5, hits.length);
+    if (trial.relevant_statement_id === null) continue;
     if (hits.length > 0) coverage += 1;
     const rank = hits.findIndex((hit) => hit.statement_id === trial.relevant_statement_id);
     if (rank === 0) recall1 += 1;
@@ -517,12 +533,20 @@ function quality(trials: RawTrial[], threshold: number) {
     }
   }
   const falsePositives = empty.filter((trial) => filtered(trial, threshold).length > 0).length;
+  const recallAt1 = proportion(recall1, positive.length);
+  const recallAt5 = proportion(recall5, positive.length);
+  const precisionAt1 = returned1 === 0 ? null : round(recall1 / returned1);
+  const precisionAt5 = returned5 === 0 ? null : round(recall5 / returned5);
   return {
     samples: trials.length,
     answerable_samples: positive.length,
     no_result_samples: empty.length,
-    recall_at_1: proportion(recall1, positive.length),
-    recall_at_5: proportion(recall5, positive.length),
+    recall_at_1: recallAt1,
+    recall_at_5: recallAt5,
+    precision_at_1: precisionAt1,
+    precision_at_5: precisionAt5,
+    f1_at_1: f1Score(precisionAt1, recallAt1?.rate ?? null),
+    f1_at_5: f1Score(precisionAt5, recallAt5?.rate ?? null),
     mrr_at_10: positive.length === 0 ? null : round(reciprocalRank / positive.length),
     ndcg_at_10: positive.length === 0 ? null : round(ndcg / positive.length),
     answerable_coverage: proportion(coverage, positive.length),
@@ -648,6 +672,8 @@ function writeArtifacts(
     "",
     `- Recall@1: ${pct(holdout.recall_at_1)}`,
     `- Recall@5: ${pct(holdout.recall_at_5)}`,
+    `- Precision@1: ${holdout.precision_at_1 ?? "n/a"} (F1 ${holdout.f1_at_1 ?? "n/a"})`,
+    `- Precision@5: ${holdout.precision_at_5 ?? "n/a"} (F1 ${holdout.f1_at_5 ?? "n/a"})`,
     `- MRR@10: ${holdout.mrr_at_10 ?? "n/a"}`,
     `- nDCG@10: ${holdout.ndcg_at_10 ?? "n/a"}`,
     `- no-result false positives: ${pct(holdout.no_result_false_positive)}`,
@@ -897,6 +923,8 @@ async function run(options: Options) {
     writeArtifacts(options.out, trials, manifest, summary, [config.apiKey, config.baseUrl, fixture.statements[0]!.text, fixture.queries[0]!.text]);
     console.log(`ok ${benchmarkVersion} scale=${options.scale} statements=${fixture.statements.length} queries=${fixture.queries.length}`);
     console.log(`holdout_recall_at_5=${summary.quality.holdout.overall.recall_at_5.rate}`);
+    console.log(`holdout_precision_at_5=${summary.quality.holdout.overall.precision_at_5}`);
+    console.log(`holdout_f1_at_5=${summary.quality.holdout.overall.f1_at_5}`);
     console.log(`holdout_no_result_false_positive=${summary.quality.holdout.overall.no_result_false_positive.rate}`);
     console.log(`artifacts=${options.out}`);
   } finally {
@@ -983,6 +1011,23 @@ function selfTest() {
   assert.ok(threshold.cosine_threshold > 0.4);
   assert.equal(threshold.calibration_recall_at_5?.rate, 1);
   assert.equal(quality(calibration, threshold.cosine_threshold).no_result_false_positive?.rate, 0);
+  // A perfect-recall run that also returns a decoy and answers a no-result query
+  // must report precision below recall, and F1 between the two.
+  const answerable = fake("answerable", "gold", 0.9);
+  answerable.ranked_top_10 = [
+    { statement_id: "gold", cosine: 0.9 },
+    { statement_id: "decoy", cosine: 0.8 },
+  ];
+  const noisy = quality([answerable, fake("no_result", null, 0.85)], 0.5);
+  assert.equal(noisy.recall_at_1?.rate, 1);
+  assert.equal(noisy.recall_at_5?.rate, 1);
+  assert.equal(noisy.precision_at_1, 0.5);
+  assert.equal(noisy.precision_at_5, round(1 / 3));
+  assert.equal(noisy.f1_at_1, round(2 / 3));
+  assert.equal(noisy.f1_at_5, 0.5);
+  const emptyQuality = quality([], 0.5);
+  assert.equal(emptyQuality.precision_at_1, null);
+  assert.equal(emptyQuality.f1_at_5, null);
   assert.equal(cosineFromStoreScore(1), 1);
   assert.equal(cosineFromStoreScore(0.25), 0.25);
   assert.deepEqual(splitFixture(full.queries).checksum, split.checksum);

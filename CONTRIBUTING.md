@@ -64,8 +64,22 @@ reserves one loopback lane across worktrees and fails immediately with the
 current owner identity if another D1 gate is active. Do not retry a red run:
 retain its run/case/workerd diagnostic and classify it separately from product
 assertions. This emulator gate is not a substitute for an explicitly authorized
-real Cloudflare D1 smoke. It stays a local manual gate: GitHub Actions are
-intentionally disabled so the repository has no hosted-automation cost.
+real Cloudflare D1 smoke.
+
+`.github/workflows/ci.yml` runs the same gates on every push to `main` and on
+every pull request. It consumes no secrets, so a fork pull request runs exactly
+what a branch runs, and Actions minutes are free on a public repository.
+
+**It has never completed a run.** Actions are enabled and the workflow is active,
+but every job is refused before its first step with *"The job was not started
+because your account is locked due to a billing issue"*. Until that account lock
+clears, the local gates below are the only real gate, and no green badge should
+be claimed anywhere. Tracked in
+[#220](https://github.com/RamaAditya49/titen/issues/220).
+Publishing stays manual from a maintainer's machine and is never performed by a
+workflow — see [`docs/engineering/release.md`](./docs/engineering/release.md).
+A green CI run is not a substitute for an explicitly authorized real Cloudflare
+D1 smoke either; the hosted job runs the same local emulator gate.
 
 ### Restricted or read-only home directories
 

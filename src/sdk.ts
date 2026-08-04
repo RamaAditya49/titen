@@ -96,6 +96,11 @@ export interface CompileOptions {
   at?: string;
   /** Authorized candidate ceiling: 1 through 1,000; defaults to 200. */
   max_candidates?: number;
+  /**
+   * Hard ceiling on returned items: 1 through 1,000. Applied after ranking and
+   * before the token budget. Absent, only `max_tokens` bounds the pack.
+   */
+  top_k?: number;
   project_id?: string;
   /** Explicit all-project request; requires the separate context:compile:all capability. */
   cross_project?: boolean;

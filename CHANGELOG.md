@@ -12,19 +12,137 @@ migration. Released versions live on npm under `latest`; prereleases
 (`0.2.0-rc.1`) under `next`. `main` may be ahead of both; see
 [versioning and channels](./docs/engineering/release.md#versioning-and-channels).
 
+The word **stable** around Titen — the npm `latest` dist-tag and
+`"channel": "stable"` in [`titen.dev/version.json`](https://titen.dev/version.json)
+— names the release *channel*, meaning a deliberate release rather than a
+prerelease. It never describes API stability; the paragraph above does.
+
+Every release heading below is dated in **UTC**, matching the npm registry
+`time` field for that version. A heading date and
+`https://registry.npmjs.org/titen-memory` must agree.
+
 The published npm package is [`titen-memory`](https://www.npmjs.com/package/titen-memory).
 The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
-## [Unreleased]
+## [0.6.0] — 2026-08-04
+
+### Evidence
+
+- First published head-to-head against a comparator on an **externally authored**
+  corpus: [neutral head-to-head](./docs/testing/2026-08-04-neutral-head-to-head.md),
+  Mr.TyDi Indonesian, 25 queries over 100 documents, 10 repeats, against
+  self-hosted `mem0ai` 2.0.13. The result is **parity, not superiority**. Point
+  estimates favour Titen on every metric, but both systems are deterministic on
+  this harness, so disjoint across-repeat ranges prove nothing; paired sign tests
+  over the same 25 queries give p >= 0.500 on every metric, and the whole margin
+  is two queries (20 of 25 rank-1 hits against 18). Titen loses one query to both
+  Mem0 configurations. What the run does establish: ~1.9x lower query latency
+  with vector search and ~400x without it, ~9.6x faster ingest, and deterministic
+  ranking **when vector search is enabled**. The FTS-only lane still produces a
+  different ordering on every repeat, exactly as 0.5.7 did.
+- Correction to the record: the five-repeat figures published earlier the same
+  day for 0.5.7 — recall@1 0.680, MRR@10 0.807, query p50 170 ms — were the
+  **top** of their ranges, not medians. Re-scoring the same artifact per repeat
+  gives a 0.62 median for recall@1. Do not requote them.
+- [Scale and concurrency](./docs/testing/2026-08-04-scale-and-concurrency.md):
+  the service uses one core at every concurrency level, so a single client
+  saturates it at and above 10,000 claims, and retrieval quality falls with
+  corpus size on a synthetic corpus (recall@1 1.00 / 0.81 / 0.49 at 10^3 / 10^4 /
+  10^5). Cold start stays at ~53 ms and resident memory grows 2.9% across a
+  hundredfold corpus. Tracked as #259 and #260.
+- [Operational lifecycle](./docs/testing/2026-08-04-operational-lifecycle.md):
+  nine published releases rehearsed through in-place upgrade with zero canonical
+  rows lost or mutated, plus a real backup, destroy and restore drill and a JSONL
+  export/import round trip. The **data-usable upgrade floor is 0.2.0**: a 0.1.x
+  store migrates without error and then answers 404 on every claim (#257), and
+  its export is rejected by the importer (#258).
+
+### Added
+
+- `POST /v1/context/compile` accepts an optional `top_k`, a hard ceiling of 1
+  through 1,000 on returned items, exposed by the TypeScript SDK, the Python
+  client, and the `titen_compile` MCP tool. It bounds the answer where
+  `max_candidates` bounds what retrieval considers, and is applied to the ranked
+  list before the token budget, so a bounded pack costs fewer tokens instead of
+  being truncated client-side. Omitting it changes nothing. Closes #229.
+- `TITEN_EMBED_PROFILE=raw-unit-v1-model-mismatch-acknowledged` sends raw
+  embedding input on a model whose id claims a prompt convention. The forced
+  rule that rejects `raw-unit-v1` for an EmbeddingGemma model is unchanged and
+  still fails closed; this is the one deliberate way past it, for a model served
+  without the prompts and for a fair head-to-head against a system that embeds
+  raw text. It is a distinct profile in the index fingerprint, so switching to
+  or from it answers `503` with `index_fingerprint_mismatch` until the index is
+  rebuilt rather than mixing prefixed and raw vectors. The retrieval harness
+  accepts `TITEN_EVAL_EMBED_PROFILE` to use it. Closes #250.
+
+### Documentation
+
+- The README states up front that Titen's default memory model is
+  caller-authored claims: `consolidate()` takes explicit statements with explicit
+  source links, and model-assisted derivation remains activation-gated with no
+  candidate model past the gate.
+- The README states the client surface exactly: a TypeScript SDK, the `titen`
+  CLI, and the standard-library-only Python client in `clients/python/` that is
+  installed from a checkout and is not published to PyPI. Callers in any other
+  language are pointed at the REST reference.
+- Project status leads with pre-1.0 and defines *stable* as the release channel
+  (npm `latest`, `"channel": "stable"` in `version.json`), never as API
+  stability. The changelog header and the release guide carry the same wording.
+- The SDK quickstart now works by copy-paste from `npm init -y`. `titen-memory`
+  is ESM-only, so the quickstart adds `npm pkg set type=module` and names the
+  file `titen-example.js`; previously the documented steps ended in
+  `SyntaxError: Cannot use import statement outside a module`.
+- `TITEN_EMBED_REVISION`, `TITEN_EMBED_PROFILE`, and `TITEN_EMBED_MIN_COSINE`
+  are documented in the README and the VPS guide with their absence behavior,
+  the model-forced profile rule, and a worked EmbeddingGemma example.
+  `TITEN_EMBED_MIN_COSINE` has no shipped default and semantic retrieval fails
+  closed without it.
+- Vectorize status is stated identically everywhere: verified live only on the
+  maintainer's isolated `titen-test-*` stack, which is test production and not
+  general availability.
 
 ### Fixed
 
+- Hybrid ranking no longer decides a tied top result with a random identifier.
+  Because lexical and vector relevance are each min-max normalized inside the
+  candidate set, each signal's own best scores exactly `1`; when those are
+  different claims the two tie on the whole weighted score, and the tie-break
+  was `claim_id` over UUIDs minted at ingest. Equal scores now break on the
+  stronger vector similarity first, then on `claim_id`. Two cosines are only
+  ever compared with each other, so no constant and no cross-scale comparison
+  enters the ordering, no returned score changes, and lexical-only ranking is
+  untouched. On the release retrieval harness, 10 repeats, the vector lane's
+  recall@1 median rises from 0.7143 to 0.8571, MRR@10 from 0.8333 to 0.9048 and
+  nDCG@3 from 0.8758 to 0.9286, and every range collapses to zero width. The
+  ceiling is unchanged: this is a higher median with the variance eliminated,
+  not a higher best case. Part of #226; #226 and #227 both remain open.
+- Temporal polarity reaches lexical retrieval. "Mulai Juli 2026" and "Sebelum
+  Juli 2026" previously scored identically for any query that did not repeat one
+  of those words verbatim, because a surviving marker matched only a claim using
+  the identical word. A marker now expands inside the MATCH to the other markers
+  naming the same window boundary **in the same language**, so "sejak Juli 2026"
+  reaches "Mulai Juli 2026". Groups never span languages, and markers that are
+  also function words (`dari`, `from`) stay in the stoplist and are not
+  expanded. `query_terms_used` still counts only the caller's terms, and no
+  ranking term was added. On the release retrieval harness, 10 repeats, the
+  FTS-only lane's recall@1 median rises from 0.5714 to 0.7143 and nDCG@3 from
+  0.7517 to 0.8044, both with the variance eliminated and the maximum unchanged.
+  MRR@10 rises from a median of 0.7381 to 0.8061 but keeps a residual range of
+  [0.8061, 0.8095] across four independent 10-repeat runs, so its variance is
+  reduced rather than removed. Closes #228.
+- `budget.omitted_items` counts the ranked candidates a `top_k` bound discarded,
+  not only those the token budget dropped. A count-bounded pack previously
+  reported zero omissions with `budget_exhausted: false`, so a caller could not
+  tell a truncated answer from a complete one.
+- Release headings for 0.5.7, 0.5.6, 0.5.5, and 0.2.0 now carry their UTC
+  publish dates and agree with the npm registry `time` field; they had recorded
+  the maintainer's local (UTC+7) date.
 - The full-fit context contract no longer pins an absolute as-of date, so it
   stops passing or failing on the calendar. Shipped code is unchanged: the
   fixture asked for context as of a date that had moved into the past, and
   `valid_from <= at` correctly excluded the claims it had just written.
 
-## [0.5.7] — 2026-08-02
+## [0.5.7] — 2026-08-01
 
 ### Documentation
 
@@ -40,7 +158,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Dashboard integration and browser gates no longer share hard-coded port
   ranges with unrelated development servers.
 
-## [0.5.6] — 2026-08-02
+## [0.5.6] — 2026-08-01
 
 ### Added
 
@@ -60,7 +178,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   inherited environment, rejects credential-bearing or ambiguous URLs, emits no
   notification reply, and sanitizes upstream failures without exposing the key.
 
-## [0.5.5] — 2026-08-02
+## [0.5.5] — 2026-08-01
 
 ### Upgrade notes
 
@@ -444,7 +562,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Contributor setup now documents a temporary writable `HOME` and
   `XDG_CONFIG_HOME` for pnpm/Wrangler checks in restricted containers.
 
-## [0.2.0] — 2026-07-30
+## [0.2.0] — 2026-07-31
 
 ### Added
 

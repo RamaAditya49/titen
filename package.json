@@ -1,7 +1,7 @@
 {
   "name": "titen-memory",
-  "version": "0.5.7",
-  "description": "Collaborative memory fabric for AI agents \u2014 evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
+  "version": "0.6.0",
+  "description": "Collaborative memory fabric for AI agents — evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.17.0",
@@ -79,7 +79,8 @@
     "test:integration": "bun test tests/integration",
     "example:golden-path": "bun examples/small-team-golden-path.ts",
     "dashboard:adapter": "bun scripts/dashboard-adapter.ts",
-    "test:adapter": "bun test tests/integration/dashboard-adapter.test.ts"
+    "test:adapter": "bun test tests/integration/dashboard-adapter.test.ts",
+    "benchmark:retrieval": "bun scripts/benchmark-retrieval-h2h.ts"
   },
   "devDependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

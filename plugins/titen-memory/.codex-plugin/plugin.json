@@ -1,6 +1,6 @@
 {
   "name": "titen-memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Use Titen's evidence-grounded collaborative memory through its existing authenticated MCP server.",
   "author": {
     "name": "Titen contributors",

@@ -1,0 +1,92 @@
+{
+  "fixture_version": "titen-057-h2h-v2",
+  "provenance": "titen-own",
+  "derived_from": "scripts/benchmark-mem0-replacement.ts (FIXTURE_VERSION titen-mem0-cycle1-v1, archived in this repository)",
+  "note": "core_facts and cases are copied VERBATIM from the archived runner, INCLUDING relevant/language/category. scripts/benchmark-retrieval-h2h.ts --self-test re-checks every statement, query, language, category and relevant array against that archived source, so this file cannot drift from the ground truth it claims. distractor_facts are authored by the harness author, are ingested identically by every system under test, and never appear in any case.relevant list.",
+  "authorship_warning": "30 of the 38 corpus facts (all distractor_facts) were authored by the harness author after reading Titen's ranker. This is a disclosed bias vector, not a neutral corpus. A neutral lane needs an externally authored fixture; see the header of scripts/benchmark-retrieval-h2h.ts for how to build and run one (Mr. TyDi Indonesian, CC-BY-SA-3.0), which this repository deliberately does not vendor.",
+  "v2_changes": "Added 8 distractors, one per case, each sharing the gold's rarest content term so no case is a lexical walkover. Corpus 30 -> 38.",
+  "scored_content": "fixture_version, top_k, core_facts, distractor_facts, cases and ground_truth_variants are the only fields that can move a published number. scripts/benchmark-retrieval-h2h.ts asserts a pinned sha256 over exactly those fields; prose fields above may be edited freely.",
+  "top_k": 10,
+  "core_facts": [
+    { "id": "fact_incident_code", "statement": "Kode insiden pembayaran adalah PAY-7842.", "kind": "semantic_fact" },
+    { "id": "fact_rollback_rehearsal", "statement": "Tim harus melatih pembatalan rilis sebelum pelanggan menerima perubahan.", "kind": "procedural" },
+    { "id": "fact_atlas_retention", "statement": "The Atlas export retention period is 21 days.", "kind": "semantic_fact" },
+    { "id": "fact_mira_timezone", "statement": "Mira prefers all calendar times in UTC.", "kind": "preference" },
+    { "id": "fact_raka_meeting", "statement": "Raka luwih seneng rapat esuk jam sanga.", "kind": "preference" },
+    { "id": "fact_active_endpoint", "statement": "Mulai Juli 2026, endpoint aktif adalah api-v3.internal.", "kind": "decision" },
+    { "id": "fact_orion_requirement", "statement": "Prosedur rilis Orion memerlukan smoke rollback sebelum aktivasi.", "kind": "procedural" },
+    { "id": "fact_orion_decoy", "statement": "Dokumen smoke rollback Orion diarsipkan setelah rapat.", "kind": "semantic_fact" }
+  ],
+  "distractor_facts": [
+    { "id": "dis_support_ticket", "statement": "Kode tiket dukungan pelanggan adalah SUP-7842.", "kind": "semantic_fact" },
+    { "id": "dis_invoice_schedule", "statement": "Faktur pembayaran vendor dikirim setiap tanggal sepuluh.", "kind": "semantic_fact" },
+    { "id": "dis_bluegreen_doc", "statement": "Panduan deployment biru-hijau ditulis oleh tim platform.", "kind": "semantic_fact" },
+    { "id": "dis_rehearse_pitch", "statement": "Tim harus melatih presentasi produk sebelum konferensi tahunan.", "kind": "procedural" },
+    { "id": "dis_smoke_nightly", "statement": "Smoke test otomatis berjalan setiap malam pukul dua.", "kind": "procedural" },
+    { "id": "dis_nimbus_retention", "statement": "The Nimbus log retention period is 7 days.", "kind": "semantic_fact" },
+    { "id": "dis_backup_retention", "statement": "Database backups are kept for 90 days in cold storage.", "kind": "semantic_fact" },
+    { "id": "dis_atlas_owner", "statement": "The Atlas export pipeline is owned by the data platform team.", "kind": "semantic_fact" },
+    { "id": "dis_dani_timezone", "statement": "Dani prefers all calendar times in Asia/Jakarta.", "kind": "preference" },
+    { "id": "dis_mira_dateformat", "statement": "Mira prefers ISO-8601 date formatting in exports.", "kind": "preference" },
+    { "id": "dis_deploy_freeze", "statement": "The deployment freeze starts every Friday at 17:00 local time.", "kind": "decision" },
+    { "id": "dis_oncall_rotation", "statement": "The on-call rotation hands over every Monday morning.", "kind": "procedural" },
+    { "id": "dis_raka_coffee", "statement": "Raka luwih seneng ngombe kopi ireng saben esuk.", "kind": "preference" },
+    { "id": "dis_sinta_meeting", "statement": "Sinta memilih rapat sore jam empat.", "kind": "preference" },
+    { "id": "dis_yogya_office", "statement": "Kantor cabang Yogya bukak jam wolu esuk.", "kind": "semantic_fact" },
+    { "id": "dis_endpoint_previous", "statement": "Sebelum Juli 2026, endpoint aktif adalah api-v2.internal.", "kind": "decision" },
+    { "id": "dis_endpoint_staging", "statement": "Endpoint staging adalah api-staging.internal dan tidak dipakai produksi.", "kind": "decision" },
+    { "id": "dis_orion_schedule", "statement": "Rilis Orion dijadwalkan pada kuartal ketiga 2026.", "kind": "semantic_fact" },
+    { "id": "dis_orion_owner", "statement": "Pemilik rilis Orion adalah tim infrastruktur.", "kind": "semantic_fact" },
+    { "id": "dis_nadia_travel", "statement": "Nadia menyimpan dokumen perjalanan di lemari arsip kantor.", "kind": "semantic_fact" },
+    { "id": "dis_nadia_employee", "statement": "Nomor karyawan Nadia adalah EMP-3391.", "kind": "semantic_fact" },
+    { "id": "dis_vendor_contract", "statement": "Kontrak vendor pembayaran berakhir pada Desember 2026.", "kind": "decision" },
+    { "id": "dis_security_incident", "statement": "Kode insiden keamanan adalah SEC-1102.", "kind": "semantic_fact" },
+    { "id": "dis_order_cancellation", "statement": "Pembatalan pesanan pelanggan diproses dalam tiga hari kerja.", "kind": "procedural" },
+    { "id": "dis_atlas_import_retry", "statement": "The Atlas import job retries for 21 days before alerting.", "kind": "semantic_fact" },
+    { "id": "dis_export_utc", "statement": "The nightly export job writes all timestamps in UTC.", "kind": "semantic_fact" },
+    { "id": "dis_standup_nine", "statement": "Standup harian tim mulai jam sanga esuk.", "kind": "procedural" },
+    { "id": "dis_apiv3_docs", "statement": "Dokumentasi api-v3.internal ditulis ulang pada Agustus 2026.", "kind": "semantic_fact" },
+    { "id": "dis_orion_activation_license", "statement": "Aktivasi lisensi Orion dilakukan oleh tim keuangan.", "kind": "decision" },
+    { "id": "dis_passport_renewal", "statement": "Paspor tim harus diperbarui sebelum perjalanan dinas.", "kind": "procedural" }
+  ],
+  "v2_distractor_targets": {
+    "id_exact_identifier": "dis_security_incident shares 'insiden' + 'Kode' (was a lexical walkover: no distractor carried 'insiden')",
+    "id_semantic_rollback": "dis_order_cancellation shares 'Pembatalan' + 'pelanggan'",
+    "en_exact_retention": "dis_atlas_import_retry shares 'Atlas' + '21 days'",
+    "en_semantic_timezone": "dis_export_utc shares 'UTC'",
+    "jv_in_id_preference": "dis_standup_nine shares 'jam sanga esuk'",
+    "id_temporal_endpoint": "dis_apiv3_docs shares 'api-v3.internal'",
+    "id_hard_negative_orion": "dis_orion_activation_license shares 'Aktivasi' + 'Orion'",
+    "id_no_result_passport": "dis_passport_renewal shares 'Paspor'"
+  },
+  "cases": [
+    { "id": "id_exact_identifier", "language": "id", "category": "exact", "query": "Apa kode insiden pembayaran?", "relevant": ["fact_incident_code"] },
+    { "id": "id_semantic_rollback", "language": "id", "category": "paraphrase", "query": "Bagaimana prosedur aman untuk membalik deployment sebelum pengguna terdampak?", "relevant": ["fact_rollback_rehearsal"] },
+    { "id": "en_exact_retention", "language": "en", "category": "exact", "query": "How many days is the Atlas export retention period?", "relevant": ["fact_atlas_retention"] },
+    { "id": "en_semantic_timezone", "language": "en", "category": "paraphrase", "query": "Which timezone should we use when scheduling for Mira?", "relevant": ["fact_mira_timezone"] },
+    { "id": "jv_in_id_preference", "language": "jv-id", "category": "paraphrase", "query": "Raka memilih rapat pagi jam berapa?", "relevant": ["fact_raka_meeting"] },
+    { "id": "id_temporal_endpoint", "language": "id", "category": "temporal", "query": "Endpoint mana yang aktif sejak Juli 2026?", "relevant": ["fact_active_endpoint"] },
+    { "id": "id_hard_negative_orion", "language": "id", "category": "hard_negative", "query": "Apa syarat sebelum aktivasi rilis Orion?", "relevant": ["fact_orion_requirement"] },
+    { "id": "id_no_result_passport", "language": "id", "category": "no_result", "query": "Berapa nomor paspor Nadia?", "relevant": [] }
+  ],
+  "ground_truth_variants": {
+    "strict": {
+      "description": "the archived runner's ground truth, unmodified. `cases[].relevant` IS this variant.",
+      "overrides": {}
+    },
+    "lenient": {
+      "description": "independent re-judge of every case. id_semantic_rollback is under-annotated: fact_orion_requirement is a rollback procedure executed before activation and answers 'safe procedure to reverse a deployment before users are affected'. Every other case was independently confirmed. Publish both variants or neither.",
+      "overrides": {
+        "id_semantic_rollback": ["fact_rollback_rehearsal", "fact_orion_requirement"]
+      }
+    }
+  },
+  "discriminating_queries": {
+    "count": 7,
+    "note": "id_no_result_passport is a tie by construction. At the primary threshold 0.0 a system that always returns something scores 0, so the case only moves under --threshold, and a score threshold is not comparable across systems whose score scales differ."
+  },
+  "smoke": {
+    "fact_ids": ["fact_incident_code", "fact_atlas_retention", "fact_mira_timezone"],
+    "case_ids": ["id_exact_identifier", "en_exact_retention", "en_semantic_timezone"]
+  }
+}

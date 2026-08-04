@@ -1,6 +1,6 @@
 import { afterAll, test } from "bun:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
@@ -133,6 +133,42 @@ test("version check validates and reports the stable CLI and plugin release", as
   assert.equal(stableVersionStatus("0.5.0", "0.5.0"), "current");
   assert.equal(stableVersionStatus("0.6.0", "0.5.0"), "ahead");
   assert.equal(stableVersionStatus("0.6.0-rc.1", "0.5.0"), "prerelease");
+});
+
+test("the bin names Bun and its install page when Bun is missing from PATH", () => {
+  // npm and pnpm link `node_modules/.bin/titen` straight at this file, so the
+  // kernel reads its shebang. Reproduce that exact entry rather than `bun cli.ts`.
+  const linked = join(root, "bun-missing-bin");
+  mkdirSync(linked, { recursive: true });
+  const bin = join(linked, "titen");
+  symlinkSync(cli, bin);
+  const emptyPath = join(root, "bun-missing-path");
+  mkdirSync(emptyPath, { recursive: true });
+
+  const missing = Bun.spawnSync({
+    cmd: [bin, "--version"],
+    env: { PATH: emptyPath, HOME: process.env.HOME ?? "" },
+  });
+  const output = `${missing.stdout.toString()}${missing.stderr.toString()}`;
+  assert.equal(missing.exitCode, 1, output);
+  assert.match(output, /^titen: error: bun was not found on PATH\.$/m);
+  assert.match(output, /Bun 1\.2 or newer.*https:\/\/bun\.sh/);
+  assert.doesNotMatch(output, /No such file or directory/);
+
+  // The same entry must still reach the CLI when Bun is the only runtime on PATH.
+  const bunOnlyPath = join(root, "bun-only-path");
+  mkdirSync(bunOnlyPath, { recursive: true });
+  symlinkSync(process.execPath, join(bunOnlyPath, "bun"));
+  const present = Bun.spawnSync({
+    cmd: [bin, "--version"],
+    env: { PATH: bunOnlyPath, HOME: process.env.HOME ?? "" },
+  });
+  assert.equal(
+    present.exitCode,
+    0,
+    `${present.stdout.toString()}${present.stderr.toString()}`,
+  );
+  assert.equal(present.stdout.toString(), `${version}\n`);
 });
 
 test("malformed flags fail before side effects for every command", () => {

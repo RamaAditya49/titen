@@ -26,6 +26,33 @@ const STOPWORDS = new Set(`
   kapan ke kita mana oleh pada saya sebagai siapa sudah tentang tidak untuk yang
 `.trim().split(/\s+/u));
 
+/**
+ * Temporal polarity markers, grouped by window boundary AND language (#228).
+ *
+ * A query saying "sejak Juli 2026" could not reach a claim saying "Mulai Juli
+ * 2026": the two tie to the last digit on bm25 against "Sebelum Juli 2026", and
+ * the winner was decided by whichever uuid the ingest happened to mint. The MATCH
+ * is a disjunction, so a synonym is one more OR branch and IDF still discounts
+ * the common members.
+ *
+ * Groups never mix languages. One OR branch that spans them injects an unrelated
+ * English document into an Indonesian query on nothing but a shared function word
+ * ("sebelum" reaching "before" reached "...21 days before alerting").
+ *
+ * Members that are already STOPWORDS ("dari", "from") are deliberately absent:
+ * exempting them would expand every ordinary "dari" in Indonesian prose into
+ * four extra branches for no measured recall.
+ */
+const TEMPORAL_POLARITY: string[][] = [
+  ["mulai", "sejak", "sesudah", "setelah"],
+  ["after", "since"],
+  ["hingga", "sampai", "sebelum"],
+  ["before", "prior", "until"],
+];
+const TEMPORAL_MARKERS = new Map<string, string[]>(
+  TEMPORAL_POLARITY.flatMap((group) => group.map((term) => [term, group] as [string, string[]])),
+);
+
 function termSignal(term: string): number {
   return (/[0-9]/u.test(term) ? 2 : 0) + (/[_'-]/u.test(term) ? 1 : 0);
 }
@@ -52,10 +79,11 @@ export function planFtsQuery(task: string, maxTerms = LIMITS.queryTerms): FtsQue
         ...ordered.slice(0, headCount),
         ...(tailCount > 0 ? ordered.slice(-tailCount) : []),
       ];
+  // Counts stay the caller's own terms: expansion is an internal recall device.
   return {
-    match: selected
-    .map((term) => `"${term.replaceAll('"', '""')}"`)
-    .join(" OR "),
+    match: [...new Set(selected.flatMap((term) => TEMPORAL_MARKERS.get(term) ?? [term]))]
+      .map((term) => `"${term.replaceAll('"', '""')}"`)
+      .join(" OR "),
     termsUsed: selected.length,
     termsDropped: terms.length - selected.length,
   };

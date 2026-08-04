@@ -5,6 +5,7 @@ import { runMaintenance } from "../../src/core/maintenance";
 import {
   claimSemanticIndexWork,
   completeSemanticIndexWork,
+  embeddingPolicyFingerprint,
   recordSemanticDependencyFailure,
   SEMANTIC_INDEX_LEASE_MS,
 } from "../../src/core/vectors";
@@ -121,6 +122,36 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
        FROM semantic_index_metadata WHERE id = 'claims'`,
   );
   assert.deepEqual(persisted, [{ ...vectors.fingerprint }]);
+
+  // #250. The model-convention guard stays: a bare raw profile on an
+  // EmbeddingGemma model is a configuration error, not a slow quality decay.
+  const refusedProfile = fakeVectors();
+  refusedProfile.embedder.model = "tuf/embeddinggemma";
+  refusedProfile.fingerprint.model = "tuf/embeddinggemma";
+  const refused = await readyWith(db, runtime, refusedProfile);
+  assert.equal(refused.status, 503);
+  assert.equal(
+    refused.body.meta.checks.semantic_index,
+    "embedding_configuration_invalid",
+  );
+
+  // The deliberate opt-out clears that check and lands on a rebuild instead,
+  // because the profile is part of the persisted fingerprint. Every other
+  // fingerprint field is byte-identical to what is stored, so the profile is
+  // the only thing that can be demanding the rebuild.
+  const acknowledged = fakeVectors();
+  acknowledged.fingerprint.preprocessing = embeddingPolicyFingerprint(
+    "raw-unit-v1-model-mismatch-acknowledged",
+    0.1,
+  );
+  const rebuild = await readyWith(db, runtime, acknowledged);
+  assert.equal(rebuild.status, 503);
+  assert.equal(
+    rebuild.body.meta.checks.semantic_index,
+    "index_fingerprint_mismatch",
+    "switching preprocessing convention must force a rebuild, never mix silently",
+  );
+  assert.equal(acknowledged.embedCalls(), 0, "the opt-out must not add provider I/O");
 
   await db.batch([{ sql: `DELETE FROM semantic_index_metadata WHERE id = 'claims'` }]);
   const lostMetadata = await persistent.call("GET", "/readyz");

@@ -1,0 +1,71 @@
+name: Container image
+
+# Publishes the memory-service container image to ghcr.io, on a version tag and
+# nothing else. Never on a branch push and never on a pull request: a pull
+# request from a fork must not be able to run a job holding packages: write.
+#
+# This workflow publishes a container. It does not publish to npm. Releases to
+# npm stay manual from a maintainer's machine and are never run by an Action:
+# see docs/engineering/release.md. The only credential used here is the built-in
+# GITHUB_TOKEN, which is scoped to this repository's own package.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Lowercase and literal: ghcr rejects the uppercase owner in
+      # github.repository, and this repository has exactly one image.
+      IMAGE: ghcr.io/ramaaditya49/titen
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tag must match the version it claims to ship
+        run: test "v$(node -p 'require("./package.json").version')" = "$TAG"
+
+      - name: Build
+        run: docker build -t "$IMAGE:$TAG" .
+
+      - name: Prove the image runs before publishing it
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -p 127.0.0.1:8787:8787 "$IMAGE:$TAG"
+          for _ in $(seq 60); do
+            curl -sf -o /dev/null http://127.0.0.1:8787/readyz && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8787/readyz | grep -q '"ready":true'
+          # Non-root, and the glibc-linked sqlite-vec prebuilt actually loads.
+          # A musl or wrong-arch base still serves traffic and silently loses
+          # vector retrieval, so readiness alone would not catch it.
+          test "$(docker exec smoke id -u)" = 1000
+          docker exec smoke bun -e 'const {Database}=require("bun:sqlite");const v=require("sqlite-vec");const d=new Database(":memory:");d.loadExtension(v.getLoadablePath().replace(/\.(so|dylib|dll)$/,""));if(!d.query("select vec_version() as v").get().v)process.exit(1)'
+
+      - name: Container logs
+        if: failure()
+        run: docker logs smoke || true
+
+      - name: Publish
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:$TAG"
+          # Same rule the npm release follows: a prerelease never becomes the
+          # default anyone pulls. v1.2.3 moves latest; v1.2.3-rc.1 does not.
+          case "$TAG" in
+            *-*) echo "prerelease $TAG: leaving :latest where it is" ;;
+            *) docker tag "$IMAGE:$TAG" "$IMAGE:latest" && docker push "$IMAGE:latest" ;;
+          esac

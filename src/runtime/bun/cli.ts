@@ -1,4 +1,11 @@
-#!/usr/bin/env bun
+#!/bin/sh
+":" //; command -v bun >/dev/null 2>&1 || { echo "titen: error: bun was not found on PATH." >&2; echo "titen: the titen CLI runs on Bun 1.2 or newer. Install it from https://bun.sh, then run titen again." >&2; exit 1; }; exec bun "$0" "$@"
+// Do not "simplify" the two lines above back to `#!/usr/bin/env bun`. npm and
+// pnpm link this file into `node_modules/.bin`, so the kernel reads the shebang
+// before any Titen code exists, and a Bun-less machine got env(1)'s own exit-127
+// message naming neither Titen nor Bun. Line 2 is a string expression plus a
+// comment to TypeScript and the whole check to `sh`, which never reaches line 3
+// because it has already exec'd Bun or exited. One entry, one guard.
 import { createApiKey, keyLifecycleStatus, organizationStatement, SCOPES } from "../../core/auth";
 import { newOperatorAccount } from "../../core/accounts";
 import { auditStatement } from "../../core/audit";

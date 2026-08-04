@@ -70,10 +70,12 @@ server tools: `titen_project_resolve`, `titen_compile`, `titen_remember`,
 
 ## Check and update
 
-Run `titen version --check` to compare the installed CLI with the stable CLI
-release and see the independently versioned stable plugin release. This is an
-explicit request to `https://titen.dev/version.json`; neither the CLI nor MCP
-checks in the background.
+Run `titen version --check` to compare the installed CLI with the current
+stable-channel CLI release and see the independently versioned stable-channel
+plugin release. "Stable" is the release channel — a deliberate release rather
+than a prerelease on `next` — and says nothing about API stability; Titen is
+pre-1.0. This is an explicit request to `https://titen.dev/version.json`;
+neither the CLI nor MCP checks in the background.
 
 Plugin updates remain owned by the host that installed them:
 

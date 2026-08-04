@@ -13,13 +13,21 @@ DB_PATH="${1:-/var/lib/titen/titen.db}"
 BACKUP_DIR="${2:-/var/lib/titen/backups}"
 RETENTION_DAYS="${TITEN_BACKUP_RETENTION_DAYS:-30}"
 TITEN_ROOT="${TITEN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-BACKUP_FILE="${BACKUP_DIR}/titen_$(date +%Y%m%d_%H%M%S).db"
 
 [ -f "${DB_PATH}" ] || { echo "ERROR: database not found: ${DB_PATH}" >&2; exit 1; }
 command -v bun >/dev/null 2>&1 || { echo "ERROR: bun not found on PATH" >&2; exit 1; }
 
 mkdir -p "${BACKUP_DIR}"
 chmod 700 "${BACKUP_DIR}"
+
+# Absolute paths, always. A relative backup directory makes sha256sum record a
+# relative name, and the checksum then fails from any other working directory.
+# No shipped invocation hits this: backup.service passes no arguments and the
+# defaults are absolute. It bites an operator who runs the script by hand with a
+# relative directory, which is exactly when a restore is least convenient.
+DB_PATH="$(cd "$(dirname "${DB_PATH}")" && pwd)/$(basename "${DB_PATH}")"
+BACKUP_DIR="$(cd "${BACKUP_DIR}" && pwd)"
+BACKUP_FILE="${BACKUP_DIR}/titen_$(date +%Y%m%d_%H%M%S).db"
 
 # A backup that cannot verify itself is removed rather than left looking usable.
 if ! bun "${TITEN_ROOT}/src/runtime/bun/cli.ts" backup --db "${DB_PATH}" --out "${BACKUP_FILE}"; then

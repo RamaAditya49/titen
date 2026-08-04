@@ -774,6 +774,206 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "top_k hard-caps the returned pack and leaves the default unbounded",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = `topk_${fx.runtime}`;
+      for (const suffix of ["alfa", "bravo", "charlie"])
+        await seedClaim(fx, agent.key, {
+          observation: {
+            subject_id: subject,
+            content: `Zenith orbit checklist evidence ${suffix}.`,
+          },
+          claim: { statement: `Zenith orbit checklist covers stage ${suffix}.` },
+        });
+      const compile = (extra: Record<string, unknown>) =>
+        fx.call("POST", "/v1/context/compile", {
+          key: agent.key,
+          body: {
+            subject_id: subject,
+            task: "zenith orbit checklist",
+            max_tokens: 4_000,
+            ...extra,
+          },
+        });
+
+      const unbounded = await compile({});
+      expectOk(unbounded);
+      assert.equal(unbounded.body.data.items.length, 3, "absent top_k must not bound the pack");
+      assert.equal(unbounded.body.data.budget.omitted_items, 0);
+
+      const bounded = await compile({ top_k: 2 });
+      expectOk(bounded);
+      assert.equal(bounded.body.data.items.length, 2);
+      assert.equal(bounded.body.data.budget.selected_items, 2);
+      assert.deepEqual(
+        bounded.body.data.items.map((item: any) => item.claim_id),
+        unbounded.body.data.items.slice(0, 2).map((item: any) => item.claim_id),
+        "top_k must keep the ranked prefix",
+      );
+      // Applied before the budget, so a bounded pack costs fewer tokens rather
+      // than being trimmed after the caller has already paid for the full one.
+      assert.ok(
+        bounded.body.data.budget.used_tokens < unbounded.body.data.budget.used_tokens,
+        "top_k must reduce the token bill, not just the array length",
+      );
+      // It bounds the answer, not what retrieval was allowed to consider.
+      assert.equal(bounded.body.meta.candidates, unbounded.body.meta.candidates);
+      // A truncated pack must say so. Reporting zero omissions here let a caller
+      // read a bounded answer as a complete one, which is the only thing the
+      // budget block exists to prevent.
+      assert.equal(
+        bounded.body.data.budget.omitted_items,
+        1,
+        "a count-bounded pack must report the ranked candidates it dropped",
+      );
+      assert.equal(
+        bounded.body.data.budget.budget_exhausted,
+        false,
+        "the token budget did not bind, so only omitted_items may report the truncation",
+      );
+
+      for (const value of [0, 1_001, 1.5, "2", null])
+        expectError(await compile({ top_k: value }), 400, "VALIDATION_ERROR");
+    },
+  },
+  {
+    name: "temporal polarity separates two claims that differ only in its marker",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = `polarity_${fx.runtime}`;
+      // Same length, same tokens, one differing marker: the only thing FTS can
+      // use to tell them apart is the polarity word itself.
+      const start = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Kuiper endpoint rotation, current." },
+        claim: {
+          kind: "decision",
+          statement: "Mulai Juli 2026 endpoint kuiper aktif adalah alfa.",
+        },
+      });
+      const end = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Kuiper endpoint rotation, historical." },
+        claim: {
+          kind: "decision",
+          statement: "Sebelum Juli 2026 endpoint kuiper aktif adalah beta.",
+        },
+      });
+      // An English claim sharing nothing with the Indonesian queries except the
+      // English member of the same polarity group. Expanding across languages
+      // inside one OR branch injected exactly this at rank 2.
+      const foreign = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Unrelated English retry policy." },
+        claim: {
+          kind: "procedural",
+          statement: "The import job retries for 21 days before alerting.",
+        },
+      });
+      const items = async (task: string) => {
+        const res = await fx.call("POST", "/v1/context/compile", {
+          key: agent.key,
+          body: { subject_id: subject, task, max_tokens: 4_000 },
+        });
+        expectOk(res);
+        assert.ok(
+          res.body.data.items.every((item: any) => item.claim_id !== foreign.claimId),
+          `an Indonesian query must not reach an English claim through a shared polarity marker: ${task}`,
+        );
+        assert.equal(res.body.data.items.length, 2);
+        return res.body.data.items;
+      };
+
+      // "sejak" and "hingga" appear in neither claim. Both were seeded on the
+      // same day, so recency cannot decide this either, and the end-of-window
+      // claim is the newer of the two — which is what the old plan returned for
+      // BOTH queries, because the two tied exactly on bm25.
+      const fromJuly = await items("endpoint kuiper aktif sejak Juli 2026");
+      assert.equal(
+        fromJuly[0].claim_id,
+        start.claimId,
+        "a start-of-window query must reach the start-of-window claim",
+      );
+      assert.ok(
+        fromJuly[0].score > fromJuly[1].score,
+        "polarity must move the score, not only the order",
+      );
+
+      const untilJuly = await items("endpoint kuiper aktif hingga Juli 2026");
+      assert.equal(
+        untilJuly[0].claim_id,
+        end.claimId,
+        "an end-of-window query must reach the end-of-window claim",
+      );
+      assert.ok(untilJuly[0].score > untilJuly[1].score);
+    },
+  },
+  {
+    // The English polarity groups ship on the same OR-expansion mechanism that
+    // leaked across languages once, so they carry their own coverage rather
+    // than inheriting confidence from the Indonesian case above.
+    name: "temporal polarity separates English claims and does not cross into Indonesian",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = `polarity_en_${fx.runtime}`;
+      const start = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Kuiper endpoint rotation, current." },
+        claim: {
+          kind: "decision",
+          statement: "After July 2026 the active kuiper endpoint is alfa.",
+        },
+      });
+      const end = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Kuiper endpoint rotation, historical." },
+        claim: {
+          kind: "decision",
+          statement: "Before July 2026 the active kuiper endpoint is beta.",
+        },
+      });
+      // Reverse of the Indonesian guard: an Indonesian claim reachable only
+      // through the Indonesian member of the same polarity group.
+      const foreign = await seedClaim(fx, agent.key, {
+        observation: { subject_id: subject, content: "Unrelated Indonesian retry policy." },
+        claim: {
+          kind: "procedural",
+          statement: "Pekerjaan impor mencoba ulang 21 hari sebelum memberi peringatan.",
+        },
+      });
+      const items = async (task: string) => {
+        const res = await fx.call("POST", "/v1/context/compile", {
+          key: agent.key,
+          body: { subject_id: subject, task, max_tokens: 4_000 },
+        });
+        expectOk(res);
+        assert.ok(
+          res.body.data.items.every((item: any) => item.claim_id !== foreign.claimId),
+          `an English query must not reach an Indonesian claim through a shared polarity marker: ${task}`,
+        );
+        assert.equal(res.body.data.items.length, 2);
+        return res.body.data.items;
+      };
+
+      // "since" and "until" appear in neither claim; each reaches its claim
+      // only through its own single-language group.
+      const sinceJuly = await items("active kuiper endpoint since July 2026");
+      assert.equal(
+        sinceJuly[0].claim_id,
+        start.claimId,
+        "an English start-of-window query must reach the start-of-window claim",
+      );
+      assert.ok(
+        sinceJuly[0].score > sinceJuly[1].score,
+        "polarity must move the score, not only the order",
+      );
+
+      const untilJuly = await items("active kuiper endpoint until July 2026");
+      assert.equal(
+        untilJuly[0].claim_id,
+        end.claimId,
+        "an English end-of-window query must reach the end-of-window claim",
+      );
+      assert.ok(untilJuly[0].score > untilJuly[1].score);
+    },
+  },
+  {
     name: "a tiny budget drops whole items instead of truncating them",
     async run(fx) {
       const agent = await fx.provision();
@@ -4119,6 +4319,44 @@ export const CASES: Case[] = [
       );
     },
   },
+  {
+    name: "a webhook never receives an event recorded in its own registration millisecond",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      await seedClaim(fx, owner.key, {
+        observation: { content: "Evidence recorded before the webhook existed." },
+        claim: { statement: "Pre-registration evidence stays out of the queue." },
+      });
+      const [latest] = await fx.query<{ created_at: string }>(
+        `SELECT created_at FROM events WHERE org_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
+        [owner.orgId],
+      );
+      const hook = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          url: "https://hooks.example.com/same-millisecond",
+          secret: "same-millisecond-hook-secret",
+          events: ["*"],
+        },
+      });
+      expectOk(hook, 201);
+      const hookId = hook.body.data.webhook_id;
+      // ISO-8601 timestamps are millisecond-precision, so a fast host can register
+      // a webhook inside the millisecond an earlier event already occupies.
+      await fx.query(`UPDATE webhooks SET created_at = ? WHERE id = ?`, [latest!.created_at, hookId]);
+
+      expectOk(await fx.call("POST", "/v1/webhooks/deliver", { key: owner.key, body: {} }));
+      const deliveries = await fx.call("GET", `/v1/webhooks/${hookId}/deliveries?limit=200`, {
+        key: owner.key,
+      });
+      expectOk(deliveries);
+      assert.deepEqual(
+        deliveries.body.data.deliveries.map((delivery: any) => delivery.event_id),
+        [],
+        "a webhook must never receive an event that predates its own registration",
+      );
+    },
+  },
   // --- v1: Federation ---
   {
     name: "a federation peer registers with a hashed secret and filters its scope",
@@ -4484,14 +4722,30 @@ export const CASES: Case[] = [
         observation: { visibility: "private", content: "Victim-local pointer target." },
         claim: { visibility: "private", statement: "Victim-local pointer target is private." },
       });
-      expectOk(await fx.call("POST", "/v1/webhooks", {
+      const victimHook = await fx.call("POST", "/v1/webhooks", {
         key: victim.key,
         body: {
           url: "https://hooks.example.com/federation-victim",
           secret: "federation-victim-hook-secret",
           events: ["*"],
         },
-      }), 201);
+      });
+      expectOk(victimHook, 201);
+      // Positive control: the owner must actually receive the wrappers, so the
+      // victim-side assertion below cannot pass by nothing being queued at all.
+      const ownerHook = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          url: "https://hooks.example.com/federation-receiver",
+          secret: "federation-receiver-hook-secret",
+          events: ["*"],
+        },
+      });
+      expectOk(ownerHook, 201);
+      await fx.query(`UPDATE webhooks SET created_at = ? WHERE id = ?`, [
+        "2020-01-01T00:00:00.000Z",
+        ownerHook.body.data.webhook_id,
+      ]);
 
       const secret = "signed-remote-wrapper-secret";
       const peer = await fx.call("POST", "/v1/federation/peers", {
@@ -4549,12 +4803,31 @@ export const CASES: Case[] = [
         victimFeed.body.data.events.every((event: any) => !remoteIds.has(event.id)),
         "remote actor and canonical pointers must not grant local victim visibility",
       );
-      const victimDrain = await fx.call("POST", "/v1/webhooks/deliver", {
-        key: victim.key,
-        body: {},
-      });
-      expectOk(victimDrain);
-      assert.equal(victimDrain.body.data.events_drained, 0, "the victim webhook must not queue remote wrappers");
+      const queuedWrappers = async (hook: Res, key: string) => {
+        expectOk(await fx.call("POST", "/v1/webhooks/deliver", { key, body: {} }));
+        const listed = await fx.call(
+          "GET",
+          `/v1/webhooks/${hook.body.data.webhook_id}/deliveries?limit=200`,
+          { key },
+        );
+        expectOk(listed);
+        return listed.body.data.deliveries
+          .map((delivery: any) => delivery.event_id as string)
+          .filter((id: string) => remoteIds.has(id))
+          .sort();
+      };
+      // The queue total also counts each subscriber's own legitimate events, so assert
+      // on the wrapper ids themselves — that is the property these messages claim.
+      assert.deepEqual(
+        await queuedWrappers(victimHook, victim.key),
+        [],
+        "the victim webhook must not queue remote wrappers",
+      );
+      assert.deepEqual(
+        await queuedWrappers(ownerHook, owner.key),
+        [...remoteIds].sort(),
+        "the owner webhook must queue every remote wrapper",
+      );
 
       const ownerFeed = await fx.call("GET", "/v1/events?limit=200", { key: owner.key });
       expectOk(ownerFeed);

@@ -20,7 +20,8 @@ curl http://127.0.0.1:8787/healthz
 The published `titen` executable runs directly on Bun because it uses
 `bun:sqlite`; npm and pnpm installation paths still require Bun on `PATH`. The
 SDK (`import { TitenClient } from "titen-memory"`) is plain `fetch` and runs on
-Node 22+, Bun, Deno, and workers alike.
+Node 22+, Bun, Deno, and workers alike. It is ESM-only, so a Node consumer needs
+`"type": "module"` or an `.mjs` entry file.
 
 ## Quick start from a clone
 
@@ -134,6 +135,8 @@ TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
 ```
 
+### Embedding configuration
+
 Embedding variables are optional. Observations and lexical context work without
 them. Put `TITEN_EMBED_API_KEY` only in the mode-`0600` service environment; it
 is required only when the configured embedder requires bearer authentication.
@@ -143,11 +146,112 @@ supplying an API key without it, returns `configured_error` and makes `/readyz`
 fail. A provider without an immutable revision remains FTS-only; Titen does not
 pretend an `unspecified` model is safe to calibrate.
 
-`raw-unit-v1` sends raw query/document text and fits models that explicitly use
-that contract. `embeddinggemma-retrieval-v1` applies EmbeddingGemma's asymmetric
-query/document prompts. Titen unit-normalizes both profiles. Select
-`TITEN_EMBED_MIN_COSINE` from a locked exact-model evaluation; no universal or
-pre-inspected threshold is bundled.
+The opt-in trigger is any one variable. `tryCreateVectors()` treats the whole
+group as *requested* as soon as a single `TITEN_EMBED_*` value is defined, so
+there is no partial mode: either none of them are set and the service is ready
+FTS-only, or all six are set and valid.
+
+| Variable | Shipped default | Accepted values | Behavior when absent or invalid |
+| --- | --- | --- | --- |
+| `TITEN_EMBED_BASE_URL` | none | `http:`/`https:` origin, at most 2,048 characters, no username, password, query, or fragment | `configured_error` |
+| `TITEN_EMBED_MODEL` | none on Bun; `@cf/baai/bge-base-en-v1.5` on Workers | provider model id, 1–200 characters | `configured_error` |
+| `TITEN_EMBED_DIMS` | none on Bun; `768` on Workers | integer 1–65,536, equal to the index dimension | `configured_error` |
+| `TITEN_EMBED_REVISION` | **none** | opaque immutable revision, 1–200 characters | `configured_error` |
+| `TITEN_EMBED_PROFILE` | **none** | `raw-unit-v1` or `embeddinggemma-retrieval-v1`, forced by the model id; `raw-unit-v1-model-mismatch-acknowledged` overrides that deliberately | `configured_error` |
+| `TITEN_EMBED_MIN_COSINE` | **none** | finite number in `[-1, 1]` | `configured_error` |
+| `TITEN_EMBED_API_KEY` | none | provider bearer token | no error by itself, but defining it opts the group in |
+
+`configured_error` is fail-closed, not degraded: `/readyz` answers `503` with
+`checks.semantic_index: "embedding_configuration_invalid"` and
+`capabilities.vector: "configured_error"`, and no vector query runs. With no
+`TITEN_EMBED_*` variable set at all, the same probe answers `200` with
+`checks.semantic_index: "disabled"` and `capabilities.fts: "enabled"`.
+
+**`TITEN_EMBED_REVISION`** is an operator-supplied immutable identifier for the
+exact weights behind the endpoint. Titen does not validate its shape — it is
+stored in the semantic index fingerprint, so a changed revision invalidates the
+stored index and forces a rebuild. Use whatever your provider reports as
+immutable: a digest, a quantization tag with a date, a pinned release. Do not
+use a moving alias such as `latest`; it would let two different weight sets
+share one fingerprint.
+
+**`TITEN_EMBED_PROFILE`** selects the query/document input transform, and the
+accepted value is decided by the model id, not by preference.
+`embeddingProfileMatchesModel()` lowercases the model id, strips every
+non-alphanumeric character, and looks for `embeddinggemma`:
+
+- a match accepts **only** `embeddinggemma-retrieval-v1`, which applies
+  EmbeddingGemma's asymmetric `title: none | text: …` and
+  `task: search result | query: …` prompts;
+- anything else accepts **only** `raw-unit-v1`, which sends the raw text.
+
+So `tuf/embeddinggemma`, `embeddinggemma:300m`, and `EmbeddingGemma-Q4` all
+reject `raw-unit-v1` with `configured_error`. This materially changes retrieval
+quality for that model family, which is why the constraint is forced rather than
+advisory. Titen unit-normalizes every profile.
+
+There is exactly one way out, and it is deliberate:
+
+```text
+TITEN_EMBED_PROFILE=raw-unit-v1-model-mismatch-acknowledged
+```
+
+That profile sends raw text on any model, including an EmbeddingGemma one. It
+exists for the two cases where the forced rule is wrong — a model whose id says
+`embeddinggemma` but which was served or fine-tuned without the prompts, and a
+head-to-head against a system that embeds raw text, which is not a fair
+comparison unless Titen embeds raw text too. Nothing shortens it and nothing
+infers it: the length of what has to be typed is the safety mechanism. It is a
+distinct profile in the index fingerprint, so switching to or from it answers
+`503` with `checks.semantic_index: "index_fingerprint_mismatch"` until the index
+is drained and rebuilt — prefixed and raw vectors are never mixed in one index.
+There is still no way to apply the EmbeddingGemma prompts to another model.
+
+It is an opt-out, not a free choice. Measured on the release retrieval harness
+against `tuf/embeddinggemma` at 768 dimensions, five repeats, raw input scores
+recall@1 0.7143, MRR@10 0.8571 and nDCG@3 0.8946 where the prompted profile
+scores 0.8571, 0.9048 and 0.9286 on the same corpus. Use it when the forced rule
+is factually wrong about your endpoint, not to skip a configuration step.
+
+**`TITEN_EMBED_MIN_COSINE`** has **no shipped default on either runtime**. The
+unset variable reads as the empty string, which is rejected before any number
+parsing, so the deployment fails closed instead of silently accepting weak
+matches. Titen bundles no universal or pre-inspected threshold: select it from a
+locked evaluation of that exact provider, model, revision, and profile, and
+record how you measured it next to the deployment. `0` is a valid deliberate
+value meaning "accept every candidate the index returns and let ranking decide";
+it is a choice, not a default.
+
+Because the profile and the floor both enter the fingerprint through
+`embeddingPolicyFingerprint()`, changing either one invalidates the stored index
+exactly as a revision change does. Plan a drain and rebuild before you retune a
+threshold in place.
+
+#### Worked EmbeddingGemma example
+
+An OpenAI-compatible endpoint serving `embeddinggemma` at 768 dimensions:
+
+```text
+TITEN_EMBED_BASE_URL=http://127.0.0.1:11434/v1
+TITEN_EMBED_MODEL=embeddinggemma
+TITEN_EMBED_DIMS=768
+TITEN_EMBED_REVISION=embeddinggemma-q4-2026-07-31
+TITEN_EMBED_PROFILE=embeddinggemma-retrieval-v1
+TITEN_EMBED_MIN_COSINE=0.32
+TITEN_EMBED_API_KEY=only-if-the-provider-requires-one
+```
+
+`embeddinggemma-retrieval-v1` is the only profile that model id accepts.
+Substitute your provider's immutable revision for the placeholder above, and
+replace `0.32` with your own calibrated floor. Then verify:
+
+```bash
+curl -s http://127.0.0.1:8787/readyz | grep -o '"vector":"[a-z_]*"'
+# "vector":"enabled"
+```
+
+If it reports `configured_error`, read `checks.semantic_index`: it names the
+diagnostic without exposing any credential.
 
 Extraction uses the separate `TITEN_EXTRACT_BASE_URL`, `TITEN_EXTRACT_MODEL`,
 and immutable 64-hex `TITEN_EXTRACT_MODEL_FINGERPRINT` tuple. The API key and

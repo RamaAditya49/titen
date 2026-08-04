@@ -1,0 +1,5 @@
+# Build output from `pip wheel .` / `python3 -m build`.
+build/
+dist/
+*.egg-info/
+__pycache__/
