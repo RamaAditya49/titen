@@ -28,6 +28,20 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ### Fixed
 
+- Webhooks no longer silently drop events written in their own registration
+  millisecond. Eligibility compared `w.created_at < e.created_at`, a strict
+  comparison on a millisecond wall-clock string, so on a fast host the
+  registration and the next write shared a millisecond and those events were
+  never queued, never delivered, and never retried. Delivery now pages on the
+  `event_order.seq` watermark that `/v1/events` and federation already use:
+  migration 22 adds `webhooks.created_seq`, backfilled to the current head so an
+  upgrade delivers only future events rather than replaying history. Both
+  eligibility sites are converted — `processWebhooks` and the background
+  `deliverPending` selector — because the second one would otherwise leave an
+  organization unwoken until another event arrived. Measured on a 16-core host:
+  the contract file went from 8 of 12 runs failing to 12 of 12 passing.
+  Closes #265.
+
 - Retrieval ranking is now reproducible in the FTS-only lane. Exactly-tied
   scores previously fell through to `claim_id`, a fresh uuid per ingest, so the
   same corpus ranked differently on every run. Ties now break on the claim
@@ -46,6 +60,17 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   backup its own importer rejects. `export_import` is advertised as enabled, so
   an artifact that cannot be restored is worse than an error. Closes #258.
 
+### Measured, not built
+
+- The reranking stage recorded as strategic debt was measured before being
+  written, and the measurement says do not write it. The oracle ceiling over
+  Titen's own top-10 is +10.2 points (recall@1 0.880 to 0.982), but every cheap
+  reranking signal tested captured at most 0.6 of those points at p=0.61, and
+  two were significantly *worse* than no reranking at all. MemPalace, which
+  ships one, scored lower with it than without it in both embedding
+  configurations. The gain is real and lexical signals cannot reach it.
+  Closes #269.
+
 ### Added
 
 - In-process mode for Bun hosts. `serve()` returns the handler it serves, and a
@@ -56,6 +81,15 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   tracked in `PONYTAIL-DEBT.md`. Closes #230.
 
 ### Documentation
+
+- Measured the memory-agent field on an externally authored corpus
+  (LongMemEval-S, MIT) and recorded where Titen actually stands:
+  [landscape note](./docs/research/2026-08-04-memory-agent-landscape.md).
+  `docs/testing/EVALS.md` now marks recall@5/@10 as saturated on that corpus so
+  only recall@1 and MRR@10 are quoted as discriminating, and `blueprint.md` no
+  longer plans a LoCoMo run — LoCoMo is CC BY-NC 4.0 and a launch is commercial
+  use, which an SPDX check misses because GitHub reports it as `NOASSERTION`.
+  Closes #267, #270, #271.
 
 - The single-core throughput ceiling is published as an operator sizing rule in
   [VPS deployment](./docs/deployment/vps.md) and `deploy/README.md`: at and

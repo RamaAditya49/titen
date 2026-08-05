@@ -182,6 +182,11 @@ and unsafe IPv6 addresses, re-resolves before every attempt, pins TLS to one
 approved address, and never follows redirects. Cloudflare returns `503` for
 webhook registration/delivery because Worker `fetch` cannot prove this pinning.
 
+Registration records the current event sequence as the webhook's watermark, and
+delivery is owed for every event committed after it. Eligibility never depends
+on comparing wall-clock timestamps, so events written in the same millisecond as
+the registration are delivered rather than dropped.
+
 Canonical writes enqueue durable delivery rows before outbound I/O. Claims are
 atomic leases that recover after expiry. `X-Titen-Delivery` is stable across
 retries; `X-Titen-Attempt` changes per network attempt. Delivery is
