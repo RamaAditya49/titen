@@ -4342,15 +4342,16 @@ export const CASES: Case[] = [
     },
   },
   {
-    name: "a webhook never receives an event recorded in its own registration millisecond",
+    name: "webhook delivery follows the registration sequence, not the registration millisecond",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
       await seedClaim(fx, owner.key, {
         observation: { content: "Evidence recorded before the webhook existed." },
         claim: { statement: "Pre-registration evidence stays out of the queue." },
       });
-      const [latest] = await fx.query<{ created_at: string }>(
-        `SELECT created_at FROM events WHERE org_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
+      const [latest] = await fx.query<{ created_at: string; seq: number }>(
+        `SELECT e.created_at, eo.seq FROM event_order eo JOIN events e ON e.id = eo.event_id
+          WHERE e.org_id = ? ORDER BY eo.seq DESC LIMIT 1`,
         [owner.orgId],
       );
       const hook = await fx.call("POST", "/v1/webhooks", {
@@ -4363,19 +4364,61 @@ export const CASES: Case[] = [
       });
       expectOk(hook, 201);
       const hookId = hook.body.data.webhook_id;
+      // Registration records the committed head as its watermark, so eligibility
+      // never depends on the resolution of a wall clock.
+      const [registered] = await fx.query<{ created_seq: number }>(
+        `SELECT created_seq FROM webhooks WHERE id = ?`,
+        [hookId],
+      );
+      assert.equal(
+        Number(registered!.created_seq),
+        Number(latest!.seq),
+        "registration must record the current event sequence",
+      );
+
+      await seedClaim(fx, owner.key, {
+        observation: { content: "Evidence recorded after the webhook existed." },
+        claim: { statement: "Post-registration evidence is owed to the queue." },
+      });
       // ISO-8601 timestamps are millisecond-precision, so a fast host can register
-      // a webhook inside the millisecond an earlier event already occupies.
+      // a webhook and write its next events inside one millisecond. Collapse the
+      // webhook and every event onto a single timestamp: the wall clock can no
+      // longer separate them, and only the sequence can.
       await fx.query(`UPDATE webhooks SET created_at = ? WHERE id = ?`, [latest!.created_at, hookId]);
+      await fx.query(`UPDATE events SET created_at = ? WHERE org_id = ?`, [
+        latest!.created_at,
+        owner.orgId,
+      ]);
+
+      const before = await fx.query<{ id: string }>(
+        `SELECT e.id FROM event_order eo JOIN events e ON e.id = eo.event_id
+          WHERE e.org_id = ? AND eo.seq <= ? ORDER BY eo.seq`,
+        [owner.orgId, latest!.seq],
+      );
+      const after = await fx.query<{ id: string }>(
+        `SELECT e.id FROM event_order eo JOIN events e ON e.id = eo.event_id
+          WHERE e.org_id = ? AND eo.seq > ? ORDER BY eo.seq`,
+        [owner.orgId, latest!.seq],
+      );
+      assert.ok(before.length > 0 && after.length > 0, "both sides of the watermark must be seeded");
 
       expectOk(await fx.call("POST", "/v1/webhooks/deliver", { key: owner.key, body: {} }));
       const deliveries = await fx.call("GET", `/v1/webhooks/${hookId}/deliveries?limit=200`, {
         key: owner.key,
       });
       expectOk(deliveries);
-      assert.deepEqual(
+      const queued = new Set<string>(
         deliveries.body.data.deliveries.map((delivery: any) => delivery.event_id),
+      );
+      assert.deepEqual(
+        before.filter(({ id }) => queued.has(id)).map(({ id }) => id),
         [],
-        "a webhook must never receive an event that predates its own registration",
+        "a webhook must never receive an event that precedes its registration sequence",
+      );
+      assert.deepEqual(
+        after.filter(({ id }) => !queued.has(id)).map(({ id }) => id),
+        [],
+        "a webhook must receive every event after its registration sequence, same millisecond included",
       );
     },
   },

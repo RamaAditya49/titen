@@ -61,9 +61,12 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
 
   await ctx.app.db.batch([
     {
+      // created_seq is the delivery watermark: everything already committed is
+      // excluded, everything after it is owed, with no dependence on how many
+      // writes share the registration millisecond.
       sql: `INSERT INTO webhooks
-              (id, org_id, principal_id, url, secret_hash, secret, events, status, failure_count, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, ?)`,
+              (id, org_id, principal_id, url, secret_hash, secret, events, status, failure_count, created_at, created_seq)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, ?, (SELECT COALESCE(MAX(seq), 0) FROM event_order))`,
       params: [
         id,
         principal.orgId,
@@ -242,15 +245,15 @@ export async function listDeliveries(ctx: RequestContext): Promise<Result> {
 async function queueEvent(
   db: Db,
   orgId: string,
-  event: { id: string; kind: string; created_at: string },
+  event: { id: string; kind: string; seq: number },
   now: Date = new Date(),
   principalId?: string,
 ): Promise<void> {
   const hooks = await db.all<{ id: string; events: string; principal_id: string }>(
     `SELECT id, events, principal_id FROM webhooks
        WHERE org_id = ? AND status = 'active' AND principal_id IS NOT NULL
-         AND created_at < ? AND (? IS NULL OR principal_id = ?)`,
-    [orgId, event.created_at, principalId ?? null, principalId ?? null],
+         AND created_seq < ? AND (? IS NULL OR principal_id = ?)`,
+    [orgId, event.seq, principalId ?? null, principalId ?? null],
   );
   const statements: Stmt[] = [];
   for (const hook of hooks) {
@@ -440,21 +443,21 @@ export async function processWebhooks(options: {
   cipher: RequestContext["app"]["secretCipher"];
   principalId?: string;
 }): Promise<{ events: number; attempted: number; delivered: number; cursor: string | null }> {
-  const events = await options.db.all<{ id: string; kind: string; created_at: string }>(
-    `SELECT e.id, e.kind, e.created_at FROM events e
+  const events = await options.db.all<{ id: string; kind: string; seq: number }>(
+    `SELECT e.id, e.kind, eo.seq FROM event_order eo JOIN events e ON e.id = eo.event_id
       WHERE e.org_id = ? AND EXISTS (
         SELECT 1 FROM webhooks w
          WHERE w.org_id = e.org_id AND w.status = 'active'
            AND w.principal_id IS NOT NULL
            AND (? IS NULL OR w.principal_id = ?)
            AND ${eventAccessSql("e", "w.principal_id")}
-           AND w.created_at < e.created_at
+           AND eo.seq > w.created_seq
            AND ((',' || w.events || ',') LIKE '%,*,%' OR (',' || w.events || ',') LIKE '%,' || e.kind || ',%')
            AND NOT EXISTS (
              SELECT 1 FROM webhook_deliveries d
               WHERE d.webhook_id = w.id AND d.event_id = e.id
            )
-      ) ORDER BY e.created_at, e.id LIMIT ?`,
+      ) ORDER BY eo.seq LIMIT ?`,
     [options.orgId, options.principalId ?? null, options.principalId ?? null, options.limit],
   );
   // The durable delivery uniqueness rule advances later pages across passes.

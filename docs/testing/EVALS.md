@@ -726,8 +726,64 @@ FTS-only quality figure must be quoted with the corpus size it was measured
 at. Tier L (1,000,000) has never been run. Arresting this slope is strategic
 debt item 3 in `PONYTAIL-DEBT.md`.
 
-LoCoMo and LongMemEval are external comparability suites, not substitutes for
-Titen's isolation, evidence, conflict, and collaboration fixtures.
+LongMemEval-S is an external comparability suite, not a substitute for Titen's
+isolation, evidence, conflict, and collaboration fixtures. LoCoMo is not used at
+all — see [third-party references and licenses](#third-party-references-and-licenses).
+
+### recall@10 is saturated on LongMemEval-S; k=1 and MRR@10 are the primary metrics
+
+Measured 2026-08-04 on `rama-tuf`, LongMemEval-S, all 500 instances, one shared
+scorer, failures kept in the denominator, zero failures in every lane. Artifacts
+are `~/titen-bench-20260804/results/*-500.json`; the overall and per-question-type
+figures below are read from the `by_type` block the scorer emits, and recomputing
+each lane from its raw `.ranked.json` reproduces the stored scores exactly.
+
+| Lane, n=500 | recall@1 | recall@5 | recall@10 | MRR@10 |
+| --- | ---: | ---: | ---: | ---: |
+| Titen FTS-only | 0.880 | 0.960 | 0.982 | 0.9147 |
+| verbatim-RAG control, router embeddings | 0.854 | 0.974 | 0.990 | 0.9067 |
+| MemPalace 3.6.0, MiniLM, user-only | 0.804 | 0.964 | 0.982 | 0.8717 |
+| verbatim-RAG control, fastembed | 0.772 | 0.932 | 0.972 | 0.8427 |
+| MemPalace 3.6.0, MiniLM, full-text | 0.746 | 0.924 | 0.968 | 0.8249 |
+
+The spread between the best and worst serious lane collapses as k grows:
+**13.4 points at k=1, 5.0 at k=5, 2.2 at k=10**, against 9.0 points on MRR@10.
+k=1 discriminates roughly **six times** as strongly as k=10, and every lane sits
+within 3.2 points of the ceiling at k=10, so a lane-vs-lane difference there is
+noise. Two question types have no headroom left at all:
+`single-session-assistant` (n=56) is recall@1 **1.000** in both control arms and
+in Titen FTS-only, and `knowledge-update` (n=78) is recall@5 1.000 in four of the
+five lanes.
+
+Therefore, on this corpus:
+
+- **recall@1 and MRR@10 are the primary metrics.** A ranking improvement that
+  does not move them has not been measured.
+- **recall@5 and recall@10 must be marked saturated wherever they are quoted**,
+  in this repository and in any external material. Publishing a bare recall@10
+  table implies a discrimination that is not there.
+
+One caveat against over-reading the saturation: it is a property of the serious
+lanes, not of the metric. The MCP reference server lane scores recall@10 0.482,
+so k=10 still separates a working retriever from a broken one — it just cannot
+rank the working ones.
+
+The `single-session-assistant` ceiling is *not* explained by the questions
+restating the gold session verbatim, which was the initial hypothesis. Measured:
+a median of only **0.44** of each question's content words appear in the gold
+session's opening 1,200 characters, and a bare word-overlap ranker scores
+recall@1 **0.464** on that type against 1.000 for the real lanes. The type is
+easy for any competent retriever, lexical or dense; it is not a string match.
+
+**Better fix, future work: enlarge the haystack rather than change the metric.**
+Each instance currently carries its own small haystack — median **50** sessions
+(min 39, max 66) — while the corpus holds **19,829 distinct sessions** across
+25,112 (instance, session) pairs. Scoring against one shared haystack instead of
+~50 candidates per instance is roughly a **400x** larger candidate pool and is
+also closer to how a real store looks. This connects directly to the FTS-only
+degradation curve above: recall@1 falls 1.00 -> 0.49 from 10^3 to 10^5 claims, so
+at realistic corpus sizes the saturation disappears on its own and ranking, not
+candidate generation, becomes the binding constraint. Tracked as #267.
 
 ## Release gates
 
@@ -781,6 +837,12 @@ Every published result includes:
   throughput, quality floor, and raw trials.
 - Never compare a local self-hosted run directly with a managed network service
   as though their infrastructure were equivalent.
+- Never quote recall@5 or recall@10 from LongMemEval-S without marking it
+  saturated; report recall@1 and MRR@10 as the primary metrics on that corpus.
+- Never let a corpus into an evidence plan without reading its `LICENSE` file.
+  An SPDX lookup is not sufficient: `gh api repos/snap-research/locomo --jq
+  .license.spdx_id` returns `NOASSERTION`, which means **unknown, not
+  permissive**, while the file itself is CC BY-NC.
 
 ## Third-party references and licenses
 
@@ -789,9 +851,14 @@ their code or datasets. Referencing a project does not imply affiliation or
 endorsement.
 
 - The LoCoMo repository declares
-  [CC BY-NC 4.0](https://github.com/snap-research/locomo/blob/main/LICENSE.txt).
+  [CC BY-NC 4.0](https://github.com/snap-research/locomo/blob/main/LICENSE.txt);
+  line 1 of `LICENSE.txt` is `Attribution-NonCommercial 4.0 International`.
   Do not vendor or redistribute its dataset in Titen's Apache-2.0 release, and
-  do not assume commercial benchmark use is permitted.
+  do not assume commercial benchmark use is permitted. **Titen does not run
+  LoCoMo at all**: producing benchmark numbers to support a commercial launch is
+  commercial use. GitHub reports its SPDX id as `NOASSERTION`, so a license gate
+  that reads SPDX alone will wave it through — the restriction is only visible in
+  the file. `blueprint.md` §20.5 records the same decision.
 - The LongMemEval repository declares
   [MIT](https://github.com/xiaowu0162/LongMemEval/blob/main/LICENSE). Confirm the
   separately hosted dataset terms before redistribution.
@@ -805,8 +872,12 @@ committed into this repository.
 
 ## Primary references
 
-- [LoCoMo dataset and code](https://github.com/snap-research/locomo)
-- [LongMemEval project](https://xiaowu0162.github.io/long-mem-eval/)
+- [LongMemEval project](https://xiaowu0162.github.io/long-mem-eval/) — primary
+  external corpus, MIT
+- [Mr.TyDi](https://github.com/castorini/mr.tydi) — supporting non-English lane,
+  Apache-2.0
+- [LoCoMo dataset and code](https://github.com/snap-research/locomo) — cited for
+  its license only; not run, CC BY-NC
 - [Mem0 memory benchmark harness](https://github.com/mem0ai/memory-benchmarks)
 - [Anthropic: effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
 - [VectorDBBench methodology and metrics](https://github.com/zilliztech/VectorDBBench)

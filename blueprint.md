@@ -1128,7 +1128,25 @@ Mulai dengan fixture Indonesia + Jawa + English yang merepresentasikan:
 - paraphrase lintas bahasa;
 - “no relevant memory”.
 
-Ukur Recall@5, MRR, precision, abstention/no-result quality, token cost extraction, dan latency. Setelah itu jalankan subset reproducible LoCoMo/LongMemEval melalui harness resmi. Jangan membandingkan angka marketing antar repo yang memakai model, prompt, dan dataset split berbeda.
+Ukur recall@1, MRR@10, precision, abstention/no-result quality, token cost extraction, dan latency. Setelah itu jalankan corpus eksternal yang reproducible melalui harness sendiri. Jangan membandingkan angka marketing antar repo yang memakai model, prompt, dan dataset split berbeda.
+
+Corpus eksternal yang dipakai sebagai bukti rilis:
+
+- **LongMemEval-S ([MIT](https://github.com/xiaowu0162/LongMemEval/blob/main/LICENSE)) — corpus eksternal utama.** Inilah yang benar-benar dijalankan pada 2026-08-04, 500 instance, dan hasilnya tercatat di [`docs/testing/EVALS.md`](./docs/testing/EVALS.md). Pada corpus ini recall@1 dan MRR@10 adalah metrik primer; recall@5 dan recall@10 sudah jenuh dan harus ditandai jenuh setiap kali dikutip.
+- **Mr.TyDi ([Apache-2.0](https://github.com/castorini/mr.tydi)) — lane pendukung non-English.**
+
+**LoCoMo tidak dipakai.** `snap-research/locomo/LICENSE.txt` baris 1 berbunyi
+`Attribution-NonCommercial 4.0 International`, dan menghasilkan angka benchmark
+untuk mendukung peluncuran produk komersial adalah penggunaan komersial. LoCoMo
+juga corpus yang disengketakan antar vendor, sehingga angka apa pun yang kita
+publikasikan darinya mewarisi sengketa itu.
+
+Aturan umum, karena jebakannya tidak terlihat oleh pemeriksaan rutin: **baca
+file LICENSE setiap corpus sebelum corpus itu masuk ke rencana bukti.**
+`gh api repos/snap-research/locomo --jq .license.spdx_id` mengembalikan
+`NOASSERTION`, jadi gate berbasis SPDX meloloskannya; pembatasan CC BY-NC hanya
+terlihat saat file-nya dibaca. `NOASSERTION` berarti **tidak diketahui**, bukan
+permisif.
 
 ## 21. Estimasi biaya Cloudflare
 
@@ -1185,7 +1203,7 @@ Gate: jangan lanjut jika BGE-M3 binding, `sqlite-vec` pada Bun, atau bounded ove
 ### P3 — quality and operations
 
 - bilingual eval harness;
-- LoCoMo/LongMemEval reproducible run;
+- LongMemEval-S reproducible run, dengan Mr.TyDi sebagai lane non-English;
 - rate limiting/deletion workflows jika deployment publik membutuhkannya;
 - backup/restore drill automation;
 - optional OCI image;

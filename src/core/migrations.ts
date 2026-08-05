@@ -1347,6 +1347,19 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
        )`,
     ],
   },
+  {
+    version: 22,
+    statements: [
+      // Webhook eligibility compared millisecond wall-clock strings, so an
+      // event written in a webhook's own registration millisecond was never
+      // queued. event_order.seq is the monotonic watermark /v1/events and
+      // federation already page on; webhooks now use the same one.
+      `ALTER TABLE webhooks ADD COLUMN created_seq INTEGER`,
+      // Existing subscriptions start at the current head. Backfilling to 0
+      // would replay the entire event history into every webhook on upgrade.
+      `UPDATE webhooks SET created_seq = (SELECT COALESCE(MAX(seq), 0) FROM event_order)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

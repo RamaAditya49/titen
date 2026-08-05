@@ -392,10 +392,11 @@ async function deliverPending(
           AND (d.lease_expires_at IS NULL OR d.lease_expires_at <= ?)
        UNION ALL
        SELECT w.org_id, e.created_at AS due_at
-         FROM webhooks w JOIN events e ON e.org_id = w.org_id
+         FROM webhooks w
+         JOIN event_order eo ON eo.seq > w.created_seq
+         JOIN events e ON e.id = eo.event_id AND e.org_id = w.org_id
         WHERE w.status = 'active' AND w.principal_id IS NOT NULL
           AND ${eventAccessSql("e", "w.principal_id")}
-          AND w.created_at < e.created_at
           AND ((',' || w.events || ',') LIKE '%,*,%' OR (',' || w.events || ',') LIKE '%,' || e.kind || ',%')
           AND NOT EXISTS (
             SELECT 1 FROM webhook_deliveries d
