@@ -26,6 +26,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-08-05
+
 ### Fixed
 
 - Webhooks no longer silently drop events written in their own registration
@@ -837,7 +839,9 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.5.7...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.1
+[0.6.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.0
 [0.5.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.7
 [0.5.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.6
 [0.5.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.5
