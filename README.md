@@ -86,6 +86,44 @@ Agents connect through authenticated REST, Streamable HTTP MCP, the `titen mcp`
 stdio bridge, or the TypeScript SDK. Titen never treats retrieved memory as an
 instruction, and it does not run agent loops.
 
+## Measured against the field
+
+On [LongMemEval-S](https://github.com/xiaowu0162/LongMemEval) (MIT, externally
+authored, 500 instances), our own scorer, failures kept in the denominator,
+protocol pre-registered before each run. Full table and method at
+[titen.dev/benchmark](https://titen.dev/benchmark).
+
+| Lane, n=500 | recall@1 | LLM calls | embedding calls |
+| --- | ---: | ---: | ---: |
+| Titen 0.6.0, FTS + vector | **0.900** | 0 | 4,989 |
+| Titen 0.6.0, FTS-only | 0.880 | **0** | **0** |
+| verbatim-RAG control (~100 lines of cosine) | 0.854 | 0 | 877 |
+| MemPalace 3.6.0 | 0.804 | 0 | — |
+
+The FTS+vector lane beats the dense control on a paired sign test — 35 wins, 12
+losses, 453 ties, **p = 0.0011**. Three things we will not let that number imply:
+
+- **FTS-only is at parity**, not ahead (44/31/425, p = 0.165), and the vector arm
+  is not proven to be the cause of the win (27/17/456, p = 0.174).
+- **Answer accuracy is a flat null.** With one reader pinned across every lane,
+  eight pre-registered comparisons produce nothing significant (best p = 0.41).
+  Retrieval significance does not transfer to answers.
+- **We do not beat Mem0's LLM-free mode.** Mem0 `infer=False` scores 0.8667
+  against our 0.8833 on the shared subsample — 3/4/53, **p = 1.0**. Its default
+  `infer=True` mode spends 2,981 LLM calls to score *lower* (0.8333), so Mem0's
+  own extraction bought nothing measurable here. Any cost claim must name the
+  configuration it measured.
+
+What survives every configuration argument is the dependency floor: **Titen's
+FTS-only lane made zero LLM calls and zero embedding calls.** Mem0 without an LLM
+still needs an embedding provider. `dependencies: {}`, zero external imports in
+`src/core/`, and exactly two outbound calls in the whole codebase, both opt-in.
+
+Where Titen loses is published too: FTS-only recall@1 falls from 1.00 to 0.49
+between 10³ and 10⁵ claims on a synthetic corpus, one process saturates one core
+at 10k claims, there is no reranking stage, and no external suite scores the
+governance and collaboration primitives at all.
+
 ## Project status
 
 **Titen is pre-1.0.** Per [SemVer clause 4](https://semver.org/spec/v2.0.0.html#spec-item-4),
