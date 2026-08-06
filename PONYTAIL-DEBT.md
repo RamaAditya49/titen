@@ -55,17 +55,23 @@ the denominator. Full protocol was pre-registered before the first run.
 
 | Lane, n=500 | recall@1 | MRR@10 | LLM calls | embed calls | ingest |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| **Titen FTS-only** | **0.880** | **0.915** | 0 | 0 | 816 s |
+| **Titen FTS + vector** | **0.900** | **0.938** | 0 | 4,989 | 662 s + 13,702 s index |
+| Titen FTS-only | 0.880 | 0.915 | 0 | 0 | 816 s |
 | verbatim-RAG control, router embeddings | 0.854 | 0.907 | 0 | 877 | 2,378 s |
 | MemPalace 3.6.0, MiniLM | 0.804 | 0.872 | 0 | 0 | 486 s |
 | verbatim-RAG control, fastembed | 0.772 | 0.843 | 0 | 0 | 1,989 s |
 | MCP reference server (substring) | 0.050 | 0.151 | 0 | 0 | 13 s |
 
-Read the sign tests, not the ordering. Against the dense control on the same 500
-instances: **44 wins, 31 losses, 425 ties, p = 0.165**. Titen is *not* measurably
-better than roughly a hundred lines of cosine-over-sessions. The wins that do
-reach significance are against lanes carrying a weaker embedder, so they are
-partly a context-length artifact (#268) rather than clean retrieval wins.
+Read the sign tests, not the ordering. The **full configuration** beats the dense
+control on the same 500 instances: **35 wins, 12 losses, 453 ties, p = 0.0011**,
+and it holds at 34/13, p = 0.0031 when the control is given a matched 2,048-token
+budget, so it is not a context-length artifact. That is the first significant win
+in this programme.
+
+Two limits on how far that goes. The **vector arm is not proven to be the cause**
+— FTS+vector against FTS-only is 27/17, p = 0.174. And the **FTS-only lane
+remains at parity** with the control (44/31/425, p = 0.165). The configuration
+wins; which half of it wins is unresolved.
 
 Three things this changes.
 
@@ -78,10 +84,12 @@ Three things this changes.
    retrieval advantage over embedding the raw sessions, at roughly 350x the
    ingest time. That independently reproduces MemDelta (arXiv:2606.29914) on a
    different subsample, and it is the strongest honest statement we can make.
-2. **The FTS-only lane is the product, not the fallback.** It is our best
-   measured configuration on this corpus and it needs no provider at all. The
-   deployment story should lead with the zero-dependency operating point rather
-   than treating it as degraded.
+2. **The FTS-only lane is still the operational story, not the fallback.** It is
+   0.020 behind the full configuration and statistically indistinguishable from
+   it, while needing no provider, no key, and no 13,702-second index drain. The
+   deployment story should lead with the zero-dependency operating point; the
+   vector arm is what you add when 2 points of recall@1 are worth an embedding
+   budget.
 3. **The reranker case is real but bounded, and not automatic.** recall@10 is
    0.982 against recall@1 0.880, so ten points are retrieved and mis-ranked —
    that is the entire addressable gain. MemPalace ships a reranked mode and it
@@ -89,9 +97,11 @@ Three things this changes.
    configurations (0.733 vs 0.867, and 0.800 vs 0.850). Measure the ceiling
    before building the stage (#269).
 
-Standing limitation: the strongest Titen configuration, FTS+vector, has no
-500-instance run (#266), and recall@10 is saturated on this corpus so only k=1
-and MRR discriminate (#267).
+Standing limitation: recall@10 is saturated on this corpus (0.996 for the full
+configuration) so only k=1 and MRR discriminate (#267), and no external suite
+scores governance or collaboration at all. #266 and #268 are now closed; the
+embedding gap they resolved was 3.2 points of model quality against 5.4 points of
+context length, not the 8.2 points of model quality first published.
 
 ## Strategic debt beyond the issue tracker
 
