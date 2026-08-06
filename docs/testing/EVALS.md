@@ -284,6 +284,70 @@ pins `fixture_sha256`, the split checksum, the locked holdout, and the pre-hoc
 published run. Split it only when a future fixture revision invalidates those
 hashes anyway.
 
+## Recorded LongMemEval-S run, 2026-08-04/06
+
+Externally authored corpus (MIT, 500 instances, 246,930 turns), our own scorer,
+failures kept in the denominator, protocol pre-registered before each run.
+Published at [titen.dev/benchmark](https://titen.dev/benchmark).
+
+| Lane, n=500 | recall@1 | MRR@10 | LLM calls | embed calls |
+| --- | ---: | ---: | ---: | ---: |
+| Titen 0.6.0, FTS + vector | **0.900** | **0.9384** | 0 | 4,989 |
+| Titen 0.6.0, FTS-only | 0.880 | 0.9147 | **0** | **0** |
+| verbatim-RAG control, router embeddings | 0.854 | 0.9067 | 0 | 877 |
+| MemPalace 3.6.0, MiniLM | 0.804 | 0.8717 | 0 | — |
+| MCP reference server, substring | 0.050 | 0.1509 | 0 | — |
+
+Paired sign tests on recall@1, same instances:
+
+- FTS+vector vs the dense control: 35/12/453, **p = 0.0011** — significant, and it
+  holds at 34/13, p = 0.0031 against a control given a matched 2,048-token budget.
+- FTS-only vs that control: 44/31/425, p = 0.165 — not significant.
+- FTS+vector vs FTS-only: 27/17/456, p = 0.174 — **the vector arm is not proven to
+  be the cause of the win.**
+
+### Mem0 in both of its modes
+
+Mem0 supports `infer=False`, which skips LLM extraction entirely. Measuring only
+its default overstates its cost, so both were run on the same 60 instances.
+
+| Mem0 OSS 2.0.15 | recall@1 | MRR@10 | LLM calls | summed ingest |
+| --- | ---: | ---: | ---: | ---: |
+| `infer=False` | 0.8667 | 0.9019 | **0** | 14,827 s |
+| `infer=True` (default) | 0.8333 | 0.8882 | 2,981 | 288,021 s |
+
+The LLM-free mode is nominally ahead and the difference is noise (3/1/56,
+p = 0.625), so **Mem0's own extraction bought nothing measurable on this corpus**
+at 19x the summed ingest. Titen FTS+vector against Mem0 `infer=False` is 3/4/53,
+**p = 1.0** — indistinguishable. Zero LLM calls was verified with a raising
+monkey-patch, a negative control, and a closed-port LLM base URL, not assumed.
+
+Standing consequence for any cost claim: **name the configuration measured.**
+"Mem0 burns thousands of LLM calls" is true of its default and false of its
+LLM-free mode.
+
+### Answer accuracy is a null
+
+One reader pinned across every lane (same model, temperature 0, k=5, prompt
+byte-identical by hash). Primary metric is judge-free containment; the LLM judge
+is secondary with its model and prompt published.
+
+Eight pre-registered comparisons against the dense control, **none significant**,
+best p = 0.41. Titen FTS-only is numerically below the control. At n=60, Mem0 OSS
+and MemPalace both score above Titen. Headroom at k=5 is only 1.8 points because
+every competent retriever already holds the gold session, so this run had little
+power by construction — k=5 was fixed before the first call and deliberately not
+retuned afterwards.
+
+**Retrieval significance does not transfer to answers.**
+
+### What does not depend on configuration
+
+Titen's FTS-only lane made zero LLM calls **and zero embedding calls** and scored
+0.880. Mem0 `infer=False` still made 29,582 embedding calls and still requires an
+embedding provider. That is the one difference in this table that no competitor
+setting can erase.
+
 ## Recorded Mem0 replacement cycle
 
 The first versioned side-by-side run against `server-wulan` is documented in
