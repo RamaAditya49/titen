@@ -22,10 +22,12 @@ load-bearing).
 
 ### I1 — Pre-registration (gates everything)
 
-- [ ] Distractor-density audit of the pooled store written before any
-      prediction (AC-PRI-006).
-- [ ] Protocol, variants, gates, and predictions for E-LAT, E-RANK, E-VEC
-      committed before the first scored run.
+- [x] Distractor-density audit of the pooled store written before any
+      prediction (AC-PRI-006): median 0 full-conjunction competitors,
+      366/500 questions at <=1 — partial-overlap distractors are the failure.
+- [x] Protocol, variants, gates, and predictions for E-LAT, E-RANK, E-VEC
+      committed before the first scored run
+      ([prereg](../../testing/2026-08-08-pooled-improvements-prereg.md)).
 
 ### I2 — E-LAT: latency ablation on the pooled store (quiet box)
 
