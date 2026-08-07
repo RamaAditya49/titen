@@ -1,14 +1,13 @@
 ---
 work_id: pooled-regression-improvements
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-08
 updated: 2026-08-08
 owner: ramaaditya
-spec: docs/specs/active/2026-08-08-pooled-regression-improvements.md
-review_after: 2026-08-22
+spec: docs/specs/done/2026-08-08-pooled-regression-improvements.md
 ---
 
 # Plan — ablate the latency, measure the ranking ceiling, isolate the embedder
@@ -70,9 +69,10 @@ load-bearing).
       verdict, artifacts + SHA256SUMS.
 - [x] EVALS.md / PONYTAIL-DEBT.md updated where results change what either
       may claim; release decision (patch vs none) per release.md.
-- [ ] titen-web benchmark page updated + redeployed if any published number
-      changes.
-- [ ] Spec/plan pair to done/ with per-AC acceptance evidence.
+- [x] titen-web benchmark page updated + redeployed: full-refresh merge
+      1dbad59, Worker version 0ff77e4d-4f0b-4dc9-bd99-423ca6fa1aac, smoked on
+      both hostnames (leaderboard, improvement-cycle block, build costs).
+- [x] Spec/plan pair to done/ with per-AC acceptance evidence.
 
 ## Not in this plan
 
@@ -81,3 +81,26 @@ load-bearing).
 - Sharding-by-process implementation: remains the documented sizing rule
   unless E-LAT fails AND a measured requirement demands it (then its own
   spec).
+
+## Acceptance evidence
+
+- AC-PRI-001: prereg commit 207658d precedes every scored artifact; stores
+  were the 2026-08-07 pooled artifacts' stores, never rebuilt.
+- AC-PRI-002: E-LAT cells ran alone (1-min load 0.08), concurrency 1,
+  loopback, p50/p95/p99 with store size named; baseline reproduced within
+  0.2% of the published p95.
+- AC-PRI-003: all six E-RANK variants and the candidate-cap change failed
+  their gates and none shipped; every failure is recorded in the report.
+- AC-PRI-004: no query-plan change shipped, so the clause binds nothing;
+  the EXPLAIN evidence gathered is attached to #294 for any future change.
+- AC-PRI-005: src/core/** untouched this cycle; no dependency, migration,
+  or flag added.
+- AC-PRI-006: the prereg carries the distractor-density audit, written
+  before its predictions.
+
+## Verification
+
+Every headline number independently recomputed from artifacts by the
+adversarial verification pass (common.score / common.sign_test), which also
+surfaced and corrected the V5 null. `pnpm check:workflow` green. Artifacts +
+SHA256SUMS committed under docs/testing/results/2026-08-08-pooled-improvements/.

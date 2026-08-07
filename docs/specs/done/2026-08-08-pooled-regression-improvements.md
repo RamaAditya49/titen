@@ -1,13 +1,12 @@
 ---
 work_id: pooled-regression-improvements
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-08
 updated: 2026-08-08
 owner: ramaaditya
-review_after: 2026-08-22
 ---
 
 # Improve what the pooled-store measurement broke: latency, ranking, and the vector arm
