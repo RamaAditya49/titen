@@ -26,6 +26,37 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Changed
+
+- **The `disputed` signal now resolves through the caller's own authorization,
+  so a contradicting observation the caller may not read no longer marks the
+  claim ([#291](https://github.com/RamaAditya49/titen/issues/291)).** The flag
+  was computed from a bare `EXISTS` over `claim_sources` with no join to
+  `observations`, while the citations beside it were filtered correctly. A
+  principal who could not read the contradicting source still saw the claim
+  demoted by the 0.05 conflict term and still received a `conflicts[]` entry
+  whose `evidence_ids` omitted the source that caused it — told a contradiction
+  existed and told they could not see it. Fixed at all four query sites:
+  `POST /v1/context/compile` (lexical and vector candidates), `GET
+  /v1/context/:id`, and the Memory Atlas `conflict_freshness` lens. The
+  governance review queue was already correct and now shares the same predicate.
+
+  **Visible consequence:** in a store that already holds a cross-scope
+  contradiction, claims that were demoted for callers who cannot read the
+  contradicting source stop being demoted. Their `score` rises by up to `0.05`,
+  their `score_components.conflict` reads `1` instead of `0`, they leave
+  `conflicts[]`, and the resulting order can change. Nothing changes for a
+  caller who can read the source, and nothing changes for a claim whose own
+  `status` is `disputed` — that is the claim's own field, not an inference about
+  hidden evidence. There is no migration and no flag: the previous numbers were
+  the leak.
+
+  Response shapes, routes, and field names are unchanged, so this is a **patch**
+  under the table in
+  [release.md](./docs/engineering/release.md#versioning-and-channels) — the
+  minor slot signals shape breakage, and only values that were disclosing hidden
+  rows move here.
+
 ## [0.7.0] — 2026-08-07
 
 ### Changed

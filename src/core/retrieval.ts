@@ -3,7 +3,7 @@ import type { Db } from "./db";
 import type { Principal } from "./auth";
 import { LIMITS } from "./validate";
 import type { RankInput } from "./rank";
-import { recordAccessParams, recordAccessSql } from "./authorization";
+import { contradictedSql, recordAccessParams, recordAccessSql } from "./authorization";
 
 /**
  * Builds a bounded FTS5 MATCH expression from free task text.
@@ -132,7 +132,7 @@ export async function retrieveClaimsByIds(
 ): Promise<ClaimCandidate[]> {
   if (ids.length === 0) return [];
   const found: ClaimCandidate[] = [];
-  for (const group of chunk(ids, MAX_BOUND_PARAMS - 8)) {
+  for (const group of chunk(ids, MAX_BOUND_PARAMS - 10)) {
     const rows = await db.all<ClaimCandidate>(
       `SELECT c.id,
               c.kind,
@@ -148,10 +148,7 @@ export async function retrieveClaimsByIds(
               0.0 AS bm25,
               CASE
                 WHEN c.status = 'disputed' THEN 1
-                WHEN EXISTS (
-                  SELECT 1 FROM claim_sources s
-                   WHERE s.claim_id = c.id AND s.relation = 'contradicts'
-                ) THEN 1
+                WHEN ${contradictedSql("c")} THEN 1
                 ELSE 0
               END AS disputed,
               (SELECT COUNT(*) FROM context_feedback f
@@ -169,6 +166,9 @@ export async function retrieveClaimsByIds(
           AND (c.valid_to IS NULL OR c.valid_to > ?)
           AND ${recordAccessSql("c")}`,
       [
+        // `disputed` sits in the SELECT list, so its authorization parameters
+        // bind ahead of the id list in the WHERE clause.
+        ...recordAccessParams(principal.principalId),
         ...group,
         principal.orgId,
         scope.subjectId,
@@ -231,10 +231,7 @@ export async function retrieveClaimCandidates(
             candidate_ids.lexical_bm25 AS bm25,
             CASE
               WHEN c.status = 'disputed' THEN 1
-              WHEN EXISTS (
-                SELECT 1 FROM claim_sources s
-                 WHERE s.claim_id = c.id AND s.relation = 'contradicts'
-              ) THEN 1
+              WHEN ${contradictedSql("c")} THEN 1
               ELSE 0
             END AS disputed,
             (SELECT COUNT(*) FROM context_feedback f
@@ -257,6 +254,9 @@ export async function retrieveClaimCandidates(
       scope.at,
       ...recordAccessParams(principal.principalId),
       limit,
+      // The CTE closes before `disputed` is projected, so its authorization
+      // parameters bind after the candidate LIMIT.
+      ...recordAccessParams(principal.principalId),
     ],
   );
 }
