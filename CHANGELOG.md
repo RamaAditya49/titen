@@ -26,8 +26,36 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-08-07
+
+The measurement release: the pooled-store condition on LongMemEval-S, with
+two pre-registered falsifiers fired against Titen and published, plus the
+#291 disputed-signal authorization fix and the evidence-depth tie-break.
+
+### Added
+
+- **The pooled-store measurement: quality, latency, and build cost at
+  production store shape.** All 19,829 distinct LongMemEval-S sessions in one
+  single-subject store, all 500 questions against it, at four store sizes —
+  the condition every published number in this field (ours included) avoids by
+  giving each question its own ~50-session haystack. Pre-registered with five
+  falsifiers before the first scored run
+  ([prereg](./docs/testing/2026-08-07-pooled-store-prereg.md),
+  [report](./docs/testing/2026-08-07-pooled-store.md)). The system under test
+  is the published npm tarball, not a checkout.
+- The [2026-08-07 agent-memory landscape survey](./docs/research/2026-08-07-memory-agent-landscape.md),
+  superseding 2026-08-04 on the fame roster and correcting two of its claims,
+  and [the performance-axis answer](./docs/research/2026-08-07-performance-axis.md)
+  recording which competitive axes were adversarially killed and why.
+
 ### Changed
 
+- **A ranking dead heat now breaks on authorized evidence depth before the
+  arbitrary statement fallback** ([#288](https://github.com/RamaAditya49/titen/pull/288)).
+  Order changes only where weighted score and vector similarity are both
+  exactly tied; measured byte-identical on all 500 LongMemEval-S instances,
+  and published as capturing 0.0 of the reranking ceiling on that corpus
+  ([report](./docs/testing/2026-08-07-evidence-ranking.md)).
 - **The `disputed` signal now resolves through the caller's own authorization,
   so a contradicting observation the caller may not read no longer marks the
   claim ([#291](https://github.com/RamaAditya49/titen/issues/291)).** The flag
@@ -943,7 +971,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.1
 [0.7.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.0
 [0.6.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.1
 [0.6.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.0
