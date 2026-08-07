@@ -221,6 +221,16 @@ concentrate in `single-session-preference` (recall@1 0.400, n=30). A rerank
 stage should be justified against that type, and against a corpus in which
 evidence actually varies, before it is built.
 
+**Re-measured at the pooled condition 2026-08-08, and the cheap class is now
+spent.** The pooled store raised the top-10 ceiling to +26.2 points and
+finally de-saturated the corpus — and all six pre-registered variants
+(coverage, proximity, chunk-sum, coverage+proximity, local cross-encoder,
+RRF) lost to the shipped BM25 order on both conditions, most significantly
+([report](./docs/testing/2026-08-08-pooled-improvements.md)). The shipped
+best-chunk aggregation is ablation-backed by +11.8 points over sum-of-chunks.
+Remaining debt is unchanged in direction but narrower again: the ceiling is
+real, and no lexical-overlap or generic cross-encoder signal reaches it.
+
 ### 4. Temporal modelling is behind Graphiti, not ahead of it
 
 Graphiti models transaction time and valid time as separate interval pairs on

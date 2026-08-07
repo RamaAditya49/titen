@@ -1,0 +1,226 @@
+{
+ "lane": "improve-20260808",
+ "variant": "V3-chunk-aggregation",
+ "generated_at": "2026-08-07T17:57:00Z",
+ "config": {
+  "store": "~/titen-bench-20260807/lanes/pooled-19829.db (19829 sessions, served port 8899)",
+  "subject_id": "pooled-v1",
+  "compile": {
+   "max_tokens": 32000,
+   "max_candidates": 1000,
+   "top_k": 1000
+  },
+  "concurrency": 2,
+  "tie_break": "first occurrence in shipped best-first item order",
+  "baseline_artifact": "titen-fts-pooled-19829-20260807.ranked.json"
+ },
+ "baseline_reverified": {
+  "n": 500,
+  "recall_at_1": 0.246,
+  "recall_at_5": 0.444,
+  "recall_at_10": 0.508,
+  "mrr_at_10": 0.3259,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+   "single-session-user": {
+    "n": 70,
+    "recall_at_1": 0.1143,
+    "recall_at_5": 0.3,
+    "recall_at_10": 0.3857
+   },
+   "single-session-assistant": {
+    "n": 56,
+    "recall_at_1": 0.7143,
+    "recall_at_5": 0.8929,
+    "recall_at_10": 0.9286
+   },
+   "single-session-preference": {
+    "n": 30,
+    "recall_at_1": 0.0,
+    "recall_at_5": 0.1,
+    "recall_at_10": 0.1
+   },
+   "multi-session": {
+    "n": 133,
+    "recall_at_1": 0.1203,
+    "recall_at_5": 0.3459,
+    "recall_at_10": 0.3985
+   },
+   "temporal-reasoning": {
+    "n": 133,
+    "recall_at_1": 0.1579,
+    "recall_at_5": 0.3609,
+    "recall_at_10": 0.4361
+   },
+   "knowledge-update": {
+    "n": 78,
+    "recall_at_1": 0.4872,
+    "recall_at_5": 0.6923,
+    "recall_at_10": 0.7821
+   }
+  }
+ },
+ "shipped_rerun_score": {
+  "n": 500,
+  "recall_at_1": 0.246,
+  "recall_at_5": 0.444,
+  "recall_at_10": 0.508,
+  "mrr_at_10": 0.3259,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+   "single-session-user": {
+    "n": 70,
+    "recall_at_1": 0.1143,
+    "recall_at_5": 0.3,
+    "recall_at_10": 0.3857
+   },
+   "single-session-assistant": {
+    "n": 56,
+    "recall_at_1": 0.7143,
+    "recall_at_5": 0.8929,
+    "recall_at_10": 0.9286
+   },
+   "single-session-preference": {
+    "n": 30,
+    "recall_at_1": 0.0,
+    "recall_at_5": 0.1,
+    "recall_at_10": 0.1
+   },
+   "multi-session": {
+    "n": 133,
+    "recall_at_1": 0.1203,
+    "recall_at_5": 0.3459,
+    "recall_at_10": 0.3985
+   },
+   "temporal-reasoning": {
+    "n": 133,
+    "recall_at_1": 0.1579,
+    "recall_at_5": 0.3609,
+    "recall_at_10": 0.4361
+   },
+   "knowledge-update": {
+    "n": 78,
+    "recall_at_1": 0.4872,
+    "recall_at_5": 0.6923,
+    "recall_at_10": 0.7821
+   }
+  }
+ },
+ "sum_of_scores": {
+  "n": 500,
+  "recall_at_1": 0.128,
+  "recall_at_5": 0.314,
+  "recall_at_10": 0.43,
+  "mrr_at_10": 0.2034,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+   "single-session-user": {
+    "n": 70,
+    "recall_at_1": 0.0571,
+    "recall_at_5": 0.1286,
+    "recall_at_10": 0.2143
+   },
+   "single-session-assistant": {
+    "n": 56,
+    "recall_at_1": 0.4286,
+    "recall_at_5": 0.6964,
+    "recall_at_10": 0.8393
+   },
+   "single-session-preference": {
+    "n": 30,
+    "recall_at_1": 0.0333,
+    "recall_at_5": 0.1,
+    "recall_at_10": 0.1
+   },
+   "multi-session": {
+    "n": 133,
+    "recall_at_1": 0.0902,
+    "recall_at_5": 0.2632,
+    "recall_at_10": 0.3684
+   },
+   "temporal-reasoning": {
+    "n": 133,
+    "recall_at_1": 0.0376,
+    "recall_at_5": 0.188,
+    "recall_at_10": 0.3459
+   },
+   "knowledge-update": {
+    "n": 78,
+    "recall_at_1": 0.2308,
+    "recall_at_5": 0.5897,
+    "recall_at_10": 0.7051
+   }
+  }
+ },
+ "count_of_chunks": {
+  "n": 500,
+  "recall_at_1": 0.122,
+  "recall_at_5": 0.302,
+  "recall_at_10": 0.428,
+  "mrr_at_10": 0.1991,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+   "single-session-user": {
+    "n": 70,
+    "recall_at_1": 0.0571,
+    "recall_at_5": 0.1286,
+    "recall_at_10": 0.2
+   },
+   "single-session-assistant": {
+    "n": 56,
+    "recall_at_1": 0.3929,
+    "recall_at_5": 0.6964,
+    "recall_at_10": 0.8393
+   },
+   "single-session-preference": {
+    "n": 30,
+    "recall_at_1": 0.0333,
+    "recall_at_5": 0.1,
+    "recall_at_10": 0.1
+   },
+   "multi-session": {
+    "n": 133,
+    "recall_at_1": 0.0902,
+    "recall_at_5": 0.2331,
+    "recall_at_10": 0.3684
+   },
+   "temporal-reasoning": {
+    "n": 133,
+    "recall_at_1": 0.0376,
+    "recall_at_5": 0.1729,
+    "recall_at_10": 0.3383
+   },
+   "knowledge-update": {
+    "n": 78,
+    "recall_at_1": 0.2179,
+    "recall_at_5": 0.5897,
+    "recall_at_10": 0.7179
+   }
+  }
+ },
+ "sign_test_sum_vs_baseline": {
+  "a_wins": 19,
+  "b_wins": 78,
+  "ties": 403,
+  "p_value": 0.0
+ },
+ "sign_test_count_vs_baseline": {
+  "a_wins": 18,
+  "b_wins": 80,
+  "ties": 402,
+  "p_value": 0.0
+ },
+ "sign_test_shipped_rerun_vs_baseline": {
+  "a_wins": 0,
+  "b_wins": 0,
+  "ties": 500,
+  "p_value": 1.0
+ },
+ "failures": {},
+ "wall_seconds": 933.3,
+ "anchor_condition": "not-run: V3 requires re-querying a served anchor store (per-chunk scores are not in titen-fts-anchor-20260807.ranked.json); only warranted if the pooled result passes the primary gate."
+}

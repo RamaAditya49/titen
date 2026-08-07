@@ -1,0 +1,80 @@
+{
+  "lane": "control",
+  "embedding_arm": "fastembed-arctic-s",
+  "generated_at": "2026-08-07T18:10:25Z",
+  "n": 500,
+  "recall_at_1": 0.078,
+  "recall_at_5": 0.138,
+  "recall_at_10": 0.174,
+  "mrr_at_10": 0.1083,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0429,
+      "recall_at_10": 0.0714
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.5357,
+      "recall_at_5": 0.7143,
+      "recall_at_10": 0.75
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0333
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.0451,
+      "recall_at_5": 0.1353,
+      "recall_at_10": 0.1729
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.0075,
+      "recall_at_5": 0.0376,
+      "recall_at_10": 0.0827
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.0256,
+      "recall_at_5": 0.0385,
+      "recall_at_10": 0.0641
+    }
+  },
+  "meta": {
+    "condition": "pooled",
+    "prereg": "docs/testing/2026-08-08-pooled-improvements-prereg.md E-VEC cell",
+    "approach": "verbatim RAG dense control: one vector per whole session, exact brute-force cosine over the full pooled store, no ANN, no reranker, no chunking, no query/passage prefixes (same shape as the bge-small and router dense cells)",
+    "store_sessions": 19829,
+    "distinct_sessions_total": 19829,
+    "gold_sessions_first": 940,
+    "embed_model": "snowflake/snowflake-arctic-embed-s",
+    "embed_dims": 384,
+    "llm_calls": 0,
+    "embed_api_calls": 0,
+    "unique_texts_embedded": 18956,
+    "empty_session_texts": 623,
+    "failed_embedding_batches": 0,
+    "truncation_rule": "identical to control.py: text[:8000] chars, then model-internal truncation (512 tokens)",
+    "similarity": "cosine on L2-normalised float32 vectors (numpy dot)",
+    "query_concurrency": 1,
+    "query_latency_includes_embedding": false,
+    "query_embed_ms_mean": 3.983,
+    "query_ms": {
+      "p50": 1.15,
+      "p95": 1.24,
+      "p99": 3.03
+    },
+    "ingest_seconds": 1667.7,
+    "query_seconds": 0.64,
+    "python": "3.14.5",
+    "numpy": "2.5.1",
+    "host": "rama-tuf"
+  }
+}

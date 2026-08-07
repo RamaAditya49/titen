@@ -971,6 +971,36 @@ cannot serve the store at all) — the first significant lane-vs-lane
 separations this corpus has yielded. The per-instance condition remains a
 statistical tie for everyone; both sentences travel together.
 
+### The improvement cycle failed every gate, and that is the evidence, 2026-08-08
+
+[Full report](./2026-08-08-pooled-improvements.md), protocol
+[pre-registered](./2026-08-08-pooled-improvements-prereg.md), every number
+independently recomputed from artifacts by an adversarial verification pass.
+
+Nothing shipped. The candidate-cap latency hypothesis died (caps to 200/100
+are recall-neutral and worth **4.5%** of p95 against a predicted 30–60%);
+the scope conjunction costs 40.75% of the FTS stage but the FTS stage is a
+minority of compile time, so ~85% of pooled compile cost lives in post-CTE
+hydration — the named, unconfirmed lead is the `contradictedSql` join order
+under newer SQLite planners. **All six pre-registered ranking variants
+failed**: coverage −2.4, proximity −14.4, chunk-sum −11.8, combined −3.6,
+local cross-encoder −1.2 (at +642 ms per compile), RRF +0.2 at p = 1.0 —
+and every one of them also regressed the scoped anchor condition. A third
+embedding family (arctic-embed-s, 0.078) resolved the E-VEC verdict rule
+against the whole-session embedding space itself.
+
+Standing consequences:
+
+- **The shipped ranking is now ablation-backed, not incidental.** Best-chunk
+  aggregation beats sum-of-chunks by 11.8 points, and shipped BM25 order
+  beats coverage, proximity, their combination, RRF, and a local
+  cross-encoder on both conditions. Cite the 2026-08-08 report when a
+  reranking stage is proposed again; the cheap-lexical class is spent.
+- **The +26.2-point top-10 ceiling stays open and unclaimed.** Reaching it
+  needs a signal that is not question-term overlap.
+- The vector arm is documented for scoped/per-instance stores; at pooled
+  density three embedding families land 7.2–16.8 points below FTS-only.
+
 Standing consequences:
 
 - **Never quote the FTS-only operating point above ~10^3-session store shape

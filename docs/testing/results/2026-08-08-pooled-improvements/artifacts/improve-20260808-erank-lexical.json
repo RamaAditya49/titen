@@ -1,0 +1,603 @@
+{
+ "generated_at": "2026-08-07T17:41:46Z",
+ "prereg": "docs/testing/2026-08-08-pooled-improvements-prereg.md#e-rank",
+ "definitions": {
+  "content_words": "audit_density.py: [a-z0-9']+ lowercase, len>=3, stopworded",
+  "V1": "sort top-10 by descending fraction of query content words present; ties keep shipped order",
+  "V2": "sort top-10 by ascending minimal token window containing all matched query content words (no match = +inf); ties keep shipped order",
+  "V4": "V1 with V2 window as tie-break, then shipped order",
+  "V6": "RRF k=60 of shipped rank with V1 rank over the top-10; ties keep shipped order",
+  "scope": "re-rank strictly within shipped top-10; positions 11+ untouched",
+  "model_calls": 0
+ },
+ "conditions": {
+  "pooled": {
+   "baseline": {
+    "n": 500,
+    "recall_at_1": 0.246,
+    "recall_at_5": 0.444,
+    "recall_at_10": 0.508,
+    "mrr_at_10": 0.3259,
+    "failures": 0,
+    "failure_rate": 0.0,
+    "by_type": {
+     "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.1143,
+      "recall_at_5": 0.3,
+      "recall_at_10": 0.3857
+     },
+     "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.7143,
+      "recall_at_5": 0.8929,
+      "recall_at_10": 0.9286
+     },
+     "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.1,
+      "recall_at_10": 0.1
+     },
+     "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.1203,
+      "recall_at_5": 0.3459,
+      "recall_at_10": 0.3985
+     },
+     "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.1579,
+      "recall_at_5": 0.3609,
+      "recall_at_10": 0.4361
+     },
+     "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.4872,
+      "recall_at_5": 0.6923,
+      "recall_at_10": 0.7821
+     }
+    }
+   },
+   "rerank_latency_ms": {
+    "p50": 3.683,
+    "p95": 6.548
+   },
+   "variants": {
+    "V1": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.222,
+      "recall_at_5": 0.428,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.3138,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.1429,
+        "recall_at_5": 0.3286,
+        "recall_at_10": 0.3857
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.3214,
+        "recall_at_5": 0.7679,
+        "recall_at_10": 0.9286
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.0,
+        "recall_at_5": 0.0667,
+        "recall_at_10": 0.1
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.1805,
+        "recall_at_5": 0.3233,
+        "recall_at_10": 0.3985
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.1504,
+        "recall_at_5": 0.3308,
+        "recall_at_10": 0.4361
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.5,
+        "recall_at_5": 0.7564,
+        "recall_at_10": 0.7821
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 35,
+      "b_wins": 47,
+      "ties": 418,
+      "p_value": 0.2242
+     },
+     "delta_recall_at_1_points": -2.4
+    },
+    "V2": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.102,
+      "recall_at_5": 0.306,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.2,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.0714,
+        "recall_at_5": 0.1857,
+        "recall_at_10": 0.3857
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.2857,
+        "recall_at_5": 0.7321,
+        "recall_at_10": 0.9286
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.0333,
+        "recall_at_5": 0.0667,
+        "recall_at_10": 0.1
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.0827,
+        "recall_at_5": 0.2481,
+        "recall_at_10": 0.3985
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.0301,
+        "recall_at_5": 0.1805,
+        "recall_at_10": 0.4361
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.1795,
+        "recall_at_5": 0.5128,
+        "recall_at_10": 0.7821
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 17,
+      "b_wins": 89,
+      "ties": 394,
+      "p_value": 0.0
+     },
+     "delta_recall_at_1_points": -14.4
+    },
+    "V4": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.21,
+      "recall_at_5": 0.424,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.3061,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.2,
+        "recall_at_5": 0.3429,
+        "recall_at_10": 0.3857
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.3036,
+        "recall_at_5": 0.7321,
+        "recall_at_10": 0.9286
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.0333,
+        "recall_at_5": 0.0667,
+        "recall_at_10": 0.1
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.1654,
+        "recall_at_5": 0.3158,
+        "recall_at_10": 0.3985
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.0977,
+        "recall_at_5": 0.3383,
+        "recall_at_10": 0.4361
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.4872,
+        "recall_at_5": 0.7436,
+        "recall_at_10": 0.7821
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 36,
+      "b_wins": 54,
+      "ties": 410,
+      "p_value": 0.0725
+     },
+     "delta_recall_at_1_points": -3.6
+    },
+    "V6": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.248,
+      "recall_at_5": 0.446,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.3317,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.1286,
+        "recall_at_5": 0.3286,
+        "recall_at_10": 0.3857
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.5357,
+        "recall_at_5": 0.8929,
+        "recall_at_10": 0.9286
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.0,
+        "recall_at_5": 0.1,
+        "recall_at_10": 0.1
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.1579,
+        "recall_at_5": 0.3158,
+        "recall_at_10": 0.3985
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.1805,
+        "recall_at_5": 0.3609,
+        "recall_at_10": 0.4361
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.5128,
+        "recall_at_5": 0.7308,
+        "recall_at_10": 0.7821
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 20,
+      "b_wins": 19,
+      "ties": 461,
+      "p_value": 1.0
+     },
+     "delta_recall_at_1_points": 0.2
+    }
+   }
+  },
+  "anchor": {
+   "baseline": {
+    "n": 500,
+    "recall_at_1": 0.88,
+    "recall_at_5": 0.96,
+    "recall_at_10": 0.982,
+    "mrr_at_10": 0.9147,
+    "failures": 0,
+    "failure_rate": 0.0,
+    "by_type": {
+     "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.9,
+      "recall_at_5": 0.9714,
+      "recall_at_10": 1.0
+     },
+     "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0
+     },
+     "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.4,
+      "recall_at_5": 0.8,
+      "recall_at_10": 0.9
+     },
+     "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.9023,
+      "recall_at_5": 0.985,
+      "recall_at_10": 1.0
+     },
+     "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.8496,
+      "recall_at_5": 0.9248,
+      "recall_at_10": 0.9549
+     },
+     "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.9744,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0
+     }
+    }
+   },
+   "rerank_latency_ms": {
+    "p50": 3.532,
+    "p95": 5.771
+   },
+   "variants": {
+    "V1": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.808,
+      "recall_at_5": 0.95,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.8665,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.9,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.8214,
+        "recall_at_5": 0.9821,
+        "recall_at_10": 1.0
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.2667,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 0.9
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.8496,
+        "recall_at_5": 0.9699,
+        "recall_at_10": 1.0
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.7744,
+        "recall_at_5": 0.9248,
+        "recall_at_10": 0.9549
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.9103,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 13,
+      "b_wins": 49,
+      "ties": 438,
+      "p_value": 0.0
+     },
+     "delta_recall_at_1_points": -7.2
+    },
+    "V2": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.1,
+      "recall_at_5": 0.56,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.3009,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.0857,
+        "recall_at_5": 0.4286,
+        "recall_at_10": 1.0
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.25,
+        "recall_at_5": 0.7857,
+        "recall_at_10": 1.0
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.0,
+        "recall_at_5": 0.4333,
+        "recall_at_10": 0.9
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.0902,
+        "recall_at_5": 0.594,
+        "recall_at_10": 1.0
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.0602,
+        "recall_at_5": 0.4887,
+        "recall_at_10": 0.9549
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.1282,
+        "recall_at_5": 0.6282,
+        "recall_at_10": 1.0
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 2,
+      "b_wins": 392,
+      "ties": 106,
+      "p_value": 0.0
+     },
+     "delta_recall_at_1_points": -78.0
+    },
+    "V4": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.79,
+      "recall_at_5": 0.938,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.8512,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.8714,
+        "recall_at_5": 0.9857,
+        "recall_at_10": 1.0
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.8036,
+        "recall_at_5": 0.9821,
+        "recall_at_10": 1.0
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.2333,
+        "recall_at_5": 0.6,
+        "recall_at_10": 0.9
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.8195,
+        "recall_at_5": 0.9699,
+        "recall_at_10": 1.0
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.7594,
+        "recall_at_5": 0.9098,
+        "recall_at_10": 0.9549
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.9231,
+        "recall_at_5": 0.9872,
+        "recall_at_10": 1.0
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 15,
+      "b_wins": 60,
+      "ties": 425,
+      "p_value": 0.0
+     },
+     "delta_recall_at_1_points": -9.0
+    },
+    "V6": {
+     "score": {
+      "n": 500,
+      "recall_at_1": 0.854,
+      "recall_at_5": 0.956,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.899,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+       "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.9143,
+        "recall_at_5": 0.9714,
+        "recall_at_10": 1.0
+       },
+       "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 0.9286,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0
+       },
+       "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.3,
+        "recall_at_5": 0.7333,
+        "recall_at_10": 0.9
+       },
+       "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.9023,
+        "recall_at_5": 0.985,
+        "recall_at_10": 1.0
+       },
+       "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.8271,
+        "recall_at_5": 0.9248,
+        "recall_at_10": 0.9549
+       },
+       "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.9231,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0
+       }
+      }
+     },
+     "sign_test_vs_shipped_k1": {
+      "a_wins": 6,
+      "b_wins": 19,
+      "ties": 475,
+      "p_value": 0.0146
+     },
+     "delta_recall_at_1_points": -2.6
+    }
+   }
+  }
+ },
+ "gate": {
+  "V1": {
+   "pooled_delta_points": -2.4,
+   "pooled_p": 0.2242,
+   "anchor_delta_points": -7.2,
+   "no_provider_dependency": true,
+   "passes": false
+  },
+  "V2": {
+   "pooled_delta_points": -14.4,
+   "pooled_p": 0.0,
+   "anchor_delta_points": -78.0,
+   "no_provider_dependency": true,
+   "passes": false
+  },
+  "V4": {
+   "pooled_delta_points": -3.6,
+   "pooled_p": 0.0725,
+   "anchor_delta_points": -9.0,
+   "no_provider_dependency": true,
+   "passes": false
+  },
+  "V6": {
+   "pooled_delta_points": 0.2,
+   "pooled_p": 1.0,
+   "anchor_delta_points": -2.6,
+   "no_provider_dependency": true,
+   "passes": false
+  }
+ }
+}
