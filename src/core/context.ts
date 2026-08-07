@@ -6,9 +6,9 @@ import { contradictedSql, recordAccessParams, recordAccessSql } from "./authoriz
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
-import { packUnderBudget, rankCandidates } from "./rank";
+import { hasDeadHeat, packUnderBudget, rankCandidates } from "./rank";
 import { planFtsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./retrieval";
-import { loadAuthorizedEvidenceIds } from "./evidence";
+import { loadAuthorizedEvidenceIds, loadAuthorizedSources, supportingDepth } from "./evidence";
 import { estimateJsonTokens } from "./tokens";
 import type { RequestContext, Result } from "./http";
 import {
@@ -154,19 +154,41 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }
   }
 
-  // Applied after ranking and before the budget, so the token budget is spent
-  // on the items the caller asked for. What the bound discarded is still counted
-  // into `budget.omitted_items`: a caller who cannot tell a complete answer from
-  // a truncated one has no reason to trust either. `slice(0, undefined)` is the
-  // whole no-op path.
-  const allRanked = rankCandidates(candidates, new Date(at));
-  const ranked = allRanked.slice(0, topK);
-  const omittedByTopK = allRanked.length - ranked.length;
-  const evidence = await loadAuthorizedEvidenceIds(
+  // Corroboration decides a returned position only where the order would
+  // otherwise be arbitrary, so it is looked up only when there is a dead heat to
+  // decide. Without a tie this reads exactly the rows the pack already needs for
+  // citations; with one it widens to the whole candidate set, because a tied
+  // claim outside `top_k` can be promoted into it and would otherwise come back
+  // with no citations at all. The same rows serve both the ranking and the
+  // citations, so the widening buys the promotion for no extra read.
+  //
+  // Two costs, stated rather than implied. `loadAuthorizedSources` chunks at
+  // `MAX_BOUND_PARAMS`, so the widened lookup is one round trip per 90
+  // candidates — twelve serial hops at `max_candidates: 1000`, not one. And with
+  // `top_k` omitted, the default, both branches ask for the same ids, because
+  // every candidate is returned and therefore already needs citations; there the
+  // gate saves the second `rankCandidates` pass and no database work whatsoever.
+  const preliminary = rankCandidates(candidates, new Date(at));
+  const contested = hasDeadHeat(preliminary, topK);
+  const sources = await loadAuthorizedSources(
     ctx.app.db,
     principal,
-    ranked.map((entry) => entry.candidate.id),
+    contested
+      ? candidates.map((candidate) => candidate.id)
+      : preliminary.slice(0, topK).map((entry) => entry.candidate.id),
   );
+  if (contested)
+    for (const candidate of candidates)
+      candidate.evidence_depth = supportingDepth(sources.get(candidate.id));
+
+  const allRanked = contested ? rankCandidates(candidates, new Date(at)) : preliminary;
+  // `top_k` is applied after ranking and before the budget, so the token budget
+  // is spent on the items the caller asked for. What the bound discarded is
+  // still counted into `budget.omitted_items`: a caller who cannot tell a
+  // complete answer from a truncated one has no reason to trust either.
+  // `slice(0, undefined)` is the whole no-op path.
+  const ranked = allRanked.slice(0, topK);
+  const omittedByTopK = allRanked.length - ranked.length;
 
   const entries = ranked.map((entry) => {
     const item = {
@@ -180,7 +202,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       observer_id: entry.candidate.observer_id,
       valid_from: entry.candidate.valid_from,
       valid_to: entry.candidate.valid_to,
-      evidence_ids: evidence.get(entry.candidate.id) ?? [],
+      evidence_ids: (sources.get(entry.candidate.id) ?? []).map((source) => source.observationId),
       score: entry.score,
       score_components: entry.components,
     };

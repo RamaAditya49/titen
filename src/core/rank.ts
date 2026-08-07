@@ -28,6 +28,15 @@ export interface RankInput {
   feedback_total: number;
   /** Semantic similarity from the optional vector store, 0..1. */
   vector_boost?: number;
+  /**
+   * Authorized supporting observations behind this claim.
+   *
+   * Optional, and absent means zero: a caller that has not loaded evidence
+   * ranks exactly as it did before this field existed. Only `supports` rows
+   * count — treating a contradiction as corroboration would rank the most
+   * disputed claim in a store as the best supported one.
+   */
+  evidence_depth?: number;
 }
 
 export interface ScoreComponents {
@@ -169,6 +178,23 @@ export interface Ranked<T extends RankInput> {
  * The ceiling is honest: this makes rank reproducible, not better. It picks an
  * arbitrary-but-stable winner among genuinely tied items. What causes the ties —
  * min-max normalization pinning each arm's best to 1.0 — is untouched here.
+ *
+ * Evidence depth sits between the semantic key and the content key, and the
+ * position is the argument. Above it, `vector_boost` is a measured retrieval
+ * signal and corroboration is not, so overriding it would trade evidence for a
+ * guess. Below it, the statement key is arbitrary by construction — it exists
+ * only to be stable, not to be right — so preferring the better-corroborated
+ * claim there is strictly better than preferring the alphabetically earlier one.
+ *
+ * Corroboration is deliberately not a seventh weighted term. A weight needs data
+ * in which evidence depth varies and gold labels exist; no such corpus exists
+ * here, so a weight could only be fitted on the data it would then be scored on.
+ *
+ * Measured ceiling, LongMemEval-S, 500 instances, 2026-08-07: **zero** instances
+ * have a rank-1 tie across sessions, and every claim in that corpus has exactly
+ * one supporting observation, so this key cannot fire there at all. It is shipped
+ * on its unit contract, not on a benchmark win. See
+ * `docs/testing/2026-08-07-evidence-ranking.md`.
  */
 export function rankCandidates<T extends RankInput>(candidates: T[], now: Date): Ranked<T>[] {
   const relevance = normalizeRelevance(candidates);
@@ -187,6 +213,7 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
       (left, right) =>
         right.score - left.score ||
         (right.candidate.vector_boost ?? 0) - (left.candidate.vector_boost ?? 0) ||
+        (right.candidate.evidence_depth ?? 0) - (left.candidate.evidence_depth ?? 0) ||
         (left.candidate.statement < right.candidate.statement
           ? -1
           : left.candidate.statement > right.candidate.statement
@@ -194,6 +221,43 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
             : 0) ||
         left.candidate.id.localeCompare(right.candidate.id),
     );
+}
+
+/**
+ * Whether the returned window holds a genuine dead heat — two neighbours equal
+ * on both the weighted score and semantic similarity, so only a tie-break
+ * separates them.
+ *
+ * This exists so corroboration can be *looked up* only when it can change an
+ * answer. A tie entirely below the returned window cannot move what comes back;
+ * the pair straddling the boundary can, which is why the window is one entry
+ * wider than `limit`.
+ *
+ * Measured on LongMemEval-S, FTS-only, n=500, at the same `k` this function is
+ * called with — packs with a dead heat inside the window, so a lookup:
+ *
+ * | `top_k`   | 1 | 5  | 10 | omitted |
+ * | --------- | - | -- | -- | ------- |
+ * | of 500    | 1 | 11 | 32 | 442     |
+ *
+ * So the skip is real at small `top_k` and evaporates without one: the median
+ * pack there is 92 items with 88 distinct scores, and 442 of 500 hold a tied
+ * neighbour somewhere. That costs nothing, because with `top_k` omitted every
+ * candidate is returned and its citations were going to be read anyway — the
+ * gate then saves the second ranking pass and no query. The earlier version of
+ * this comment generalised the `k=1` figure to every window; the table is the
+ * correction. Probe: `docs/testing/results/2026-08-07-evidence-ranking/tie_probe.py`.
+ */
+export function hasDeadHeat<T extends RankInput>(ranked: Ranked<T>[], limit?: number): boolean {
+  const window = ranked.slice(0, limit === undefined ? ranked.length : limit + 1);
+  return window.some((entry, index) => {
+    const previous = window[index - 1];
+    return (
+      previous !== undefined
+      && previous.score === entry.score
+      && (previous.candidate.vector_boost ?? 0) === (entry.candidate.vector_boost ?? 0)
+    );
+  });
 }
 
 /**

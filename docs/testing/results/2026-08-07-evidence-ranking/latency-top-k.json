@@ -1,0 +1,44 @@
+{
+  "purpose": "Kill criterion 3 of the pre-registration: the signal does not ship if it costs measurable compile latency without a significant recall@1 gain. The recall gain is zero, so the cost had to be measured rather than argued.",
+  "host": "rama-tuf",
+  "store": "copy of ~/titen-bench-20260804/lanes/titen/fts-500.db, 424,168 claims / 25,112 observations",
+  "method": "harness/latency.py, serial client, 20 untimed warm-up compiles, then the first 100 corpus instances repeated; A and B alternate rounds against two servers on the same store file",
+  "builds": {
+    "A": "00e21fc — branch base, byte-identical to main at 0.7.0",
+    "B_first_design": "7f705a5 — evidence sources loaded for every candidate on every compile",
+    "B_shipped": "hasDeadHeat gate — evidence sources loaded only when the returned window holds a dead heat"
+  },
+  "first_design_rejected": {
+    "note": "This design tripped kill criterion 3 and was NOT shipped. Recorded because a rejected measurement that is deleted is not evidence of anything.",
+    "top_k_5": [
+      { "build": "A", "samples": 300, "p50_ms": 19.18, "p95_ms": 25.87, "mean_ms": 19.54 },
+      { "build": "B", "samples": 300, "p50_ms": 20.55, "p95_ms": 26.94, "mean_ms": 20.66 },
+      { "build": "A", "round": 1, "samples": 200, "p50_ms": 17.42, "mean_ms": 17.67 },
+      { "build": "B", "round": 1, "samples": 200, "p50_ms": 20.91, "mean_ms": 23.28 },
+      { "build": "A", "round": 2, "samples": 200, "p50_ms": 29.61, "mean_ms": 30.03 },
+      { "build": "B", "round": 2, "samples": 200, "p50_ms": 22.09, "mean_ms": 22.95 },
+      { "build": "A", "round": 3, "samples": 200, "p50_ms": 18.13, "mean_ms": 18.6 },
+      { "build": "B", "round": 3, "samples": 200, "p50_ms": 19.48, "mean_ms": 19.63 }
+    ],
+    "reading": "B slower on 3 of 4 comparisons, roughly +1.4 ms p50 (+7%), against round-to-round noise of the same order. Not clean enough to call either way, but the mechanism is unambiguous: the sources query grew from top_k=5 ids to up to max_candidates=200."
+  },
+  "shipped_design": {
+    "top_k_5": [
+      { "build": "A", "round": 1, "samples": 200, "p50_ms": 17.33, "p95_ms": 23.34, "p99_ms": 25.14, "mean_ms": 17.53 },
+      { "build": "B", "round": 1, "samples": 200, "p50_ms": 17.25, "p95_ms": 23.8, "p99_ms": 27.83, "mean_ms": 17.7 },
+      { "build": "A", "round": 2, "samples": 200, "p50_ms": 17.32, "p95_ms": 24.56, "p99_ms": 27.57, "mean_ms": 17.83 },
+      { "build": "B", "round": 2, "samples": 200, "p50_ms": 17.4, "p95_ms": 23.52, "p99_ms": 25.93, "mean_ms": 17.79 },
+      { "build": "A", "round": 3, "samples": 200, "p50_ms": 17.1, "p95_ms": 23.35, "p99_ms": 29.82, "mean_ms": 17.56 },
+      { "build": "B", "round": 3, "samples": 200, "p50_ms": 17.45, "p95_ms": 22.98, "p99_ms": 33.45, "mean_ms": 17.76 }
+    ],
+    "top_k_1000": [
+      { "build": "A", "samples": 300, "p50_ms": 18.64, "p95_ms": 25.24, "p99_ms": 31.04, "mean_ms": 18.97 },
+      { "build": "B", "samples": 300, "p50_ms": 18.74, "p95_ms": 25.99, "p99_ms": 31.9, "mean_ms": 19.28 }
+    ],
+    "reading": "p50 differs by at most 0.35 ms (2%) and the sign is not consistent across rounds. Kill criterion 3 passes."
+  },
+  "not_established": [
+    "These are single-client, loopback, warm-cache numbers on one host. They are not a throughput or concurrency claim.",
+    "One store, one corpus. A store whose claims carry many sources would move the contested branch's cost and has not been measured."
+  ]
+}

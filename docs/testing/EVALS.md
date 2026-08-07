@@ -849,6 +849,43 @@ degradation curve above: recall@1 falls 1.00 -> 0.49 from 10^3 to 10^5 claims, s
 at realistic corpus sizes the saturation disappears on its own and ranking, not
 candidate generation, becomes the binding constraint. Tracked as #267.
 
+### Evidence-aware ranking is a measured null on this corpus, 2026-08-07
+
+[Full report](./2026-08-07-evidence-ranking.md), protocol
+[pre-registered](./2026-08-07-evidence-ranking-prereg.md) before the first
+scored run. One store queried twice, 500 instances, same scorer, zero failures.
+
+Corroboration — authorized supporting observations per claim — was added as a
+ranking tie-break. recall@1 is **0.8800 before and 0.8800 after**, MRR@10 0.9147
+both, and the ranked lists are byte-identical on 500 of 500 instances
+(0/0/500, p = 1.0). **0.0 of the +10.2-point oracle ceiling was captured.**
+
+The cause is measured, not inferred: across all 424,168 claims in that store,
+`trust`, `status`, `confidence`, `version`, `actor_id`, source relation, and
+supporting-observation count each take exactly **one** value, there are zero
+feedback rows, and every observation carries `corpus` provenance. Five of the
+six weighted ranking components are constant, every rank-1 score in the run is
+the same number (0.794374), and **0 of 500 instances have a rank-1 tie across
+sessions** — so no tie-break signal of any kind could have moved a rank-1 answer.
+
+Three standing consequences:
+
+- **LongMemEval-S cannot score evidence-aware ranking in either direction.** Do
+  not cite this run as support for the ranker, and do not cite it against one.
+- A **`recalled` provenance penalty in the ranker is unreachable code.**
+  `src/core/claims.ts` refuses a recalled observation as claim evidence at
+  consolidation and only claims are ranked, so no claim can carry it.
+- `PONYTAIL-DEBT.md` item 2 — the score carries no cross-query signal — is now
+  **independently reproduced on an externally authored corpus**, not only on
+  Titen's own fixture.
+
+The same report adds **tokens-to-answer** as a companion to recall@1: the token
+cost of the smallest pack of whole ranked sessions containing the gold. On this
+corpus it separates the serious lanes by only 6.8% at the median (3,209–3,428)
+and is therefore a *weaker* discriminator than recall@1, but it separates a
+working retriever from a broken one by roughly 4x — the MCP reference server
+needs a 12,558-token median and never surfaces the gold at all on 259 of 500
+instances. Report it beside recall@1, never instead of it.
 ### An authorization fix cost nothing, and the benchmark caught what the suite could not, 2026-08-07
 
 [Full report](./2026-08-07-disputed-authorization.md), protocol
@@ -938,6 +975,10 @@ Every published result includes:
   as though their infrastructure were equivalent.
 - Never quote recall@5 or recall@10 from LongMemEval-S without marking it
   saturated; report recall@1 and MRR@10 as the primary metrics on that corpus.
+- Never claim that ranking on trust, conflict, provenance, corroboration, or
+  feedback improves retrieval. Measured 2026-08-07: every one of those signals
+  is constant on LongMemEval-S, the ranked output was byte-identical, and no
+  corpus is currently available in which they vary against gold labels.
 - Never present the 2026-08-07 `disputed` authorization run as evidence that the
   fix improves anything. It is a no-regression check on a corpus that holds no
   contradicting evidence at all, and it was published as such.
