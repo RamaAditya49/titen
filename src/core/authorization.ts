@@ -42,6 +42,16 @@ export function recordAccessParams(principalId: string): Param[] {
  * an unreadable source would demote the claim and announce itself while its id
  * stayed filtered out of the citations (#291). Takes `recordAccessParams` at the
  * position the fragment appears in the statement.
+ *
+ * The nested `EXISTS` is load-bearing and not a style choice. Written as a join
+ * — `FROM claim_sources s JOIN observations o ON o.id = s.observation_id` — the
+ * planner drives from `observations` on `observations_workspace_scope
+ * (org_id=?)` and scans every observation in the organization, evaluating the
+ * membership and retention predicates for each, once per candidate. Measured on
+ * a 424,168-claim store: **79 seconds** per compile against 17.8 ms. This shape
+ * seeks `claim_sources` on its primary key and probes `observations` by rowid,
+ * so a claim with no contradicting source costs one index seek, which is what
+ * the unfiltered query cost. `loadAuthorizedSources` already uses it.
  */
 export function contradictedSql(claimAlias: "c"): string {
   return `EXISTS (

@@ -57,6 +57,26 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   minor slot signals shape breakage, and only values that were disclosing hidden
   rows move here.
 
+### Fixed
+
+- **The Memory Atlas review queue no longer scans every observation in the
+  organization to decide `has_contradiction`.** It expressed the predicate as
+  `claim_sources JOIN observations`, and SQLite drove from `observations`,
+  evaluating the membership and retention subqueries for all of them once per
+  candidate. On a 424,168-claim store that is **79 s per compile against 17.8
+  ms**. The shared predicate added above uses a nested `EXISTS` so
+  `claim_sources` seeks its own primary key, and the review queue now uses it.
+  Found by benchmarking the change above; the dual-runtime contract suite passed
+  on both query shapes, because its stores hold tens of rows.
+
+### Evidence
+
+- [`docs/testing/2026-08-07-disputed-authorization.md`](./docs/testing/2026-08-07-disputed-authorization.md)
+  — n=500, ranked output byte-identical before and after (0/0/500, p = 1.0),
+  compile latency flat within repeat spread. It also states what it cannot show:
+  the corpus holds zero contradicting sources, so it cannot measure the fix
+  where the fix fires.
+
 ## [0.7.0] — 2026-08-07
 
 ### Changed
