@@ -231,9 +231,22 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
  * This exists so corroboration can be *looked up* only when it can change an
  * answer. A tie entirely below the returned window cannot move what comes back;
  * the pair straddling the boundary can, which is why the window is one entry
- * wider than `limit`. Measured on LongMemEval-S at n=500: 499 of 500 packs have
- * a unique top score, so the lookup is skipped on the overwhelming majority of
- * small-`top_k` requests rather than charged to every compile.
+ * wider than `limit`.
+ *
+ * Measured on LongMemEval-S, FTS-only, n=500, at the same `k` this function is
+ * called with — packs with a dead heat inside the window, so a lookup:
+ *
+ * | `top_k`   | 1 | 5  | 10 | omitted |
+ * | --------- | - | -- | -- | ------- |
+ * | of 500    | 1 | 11 | 32 | 442     |
+ *
+ * So the skip is real at small `top_k` and evaporates without one: the median
+ * pack there is 92 items with 88 distinct scores, and 442 of 500 hold a tied
+ * neighbour somewhere. That costs nothing, because with `top_k` omitted every
+ * candidate is returned and its citations were going to be read anyway — the
+ * gate then saves the second ranking pass and no query. The earlier version of
+ * this comment generalised the `k=1` figure to every window; the table is the
+ * correction. Probe: `docs/testing/results/2026-08-07-evidence-ranking/tie_probe.py`.
  */
 export function hasDeadHeat<T extends RankInput>(ranked: Ranked<T>[], limit?: number): boolean {
   const window = ranked.slice(0, limit === undefined ? ranked.length : limit + 1);

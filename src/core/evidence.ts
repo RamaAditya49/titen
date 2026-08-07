@@ -144,7 +144,8 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
 
 export interface AuthorizedSource {
   observationId: string;
-  relation: string;
+  /** The stored union, not `string`: a typo here would silently make depth 0. */
+  relation: SourceRow["relation"];
 }
 
 /**
@@ -155,8 +156,11 @@ export interface AuthorizedSource {
  * like the best supported one. Callers that only need citations use
  * `loadAuthorizedEvidenceIds` below and are unaffected.
  *
- * A source whose observation the caller may not read is absent here, so neither
- * a citation nor a rank position can disclose that it exists.
+ * A source whose observation the caller may not read is absent from this map, so
+ * nothing computed from it — a citation id, an evidence depth — can disclose
+ * that the source exists. That is a statement about this function, not about the
+ * response: `disputed` is computed in SQL by `retrieval.ts` and `context.ts`, and
+ * carries its own copy of this predicate (#291).
  */
 export async function loadAuthorizedSources(
   db: Db,
@@ -166,7 +170,11 @@ export async function loadAuthorizedSources(
   const grouped = new Map<string, AuthorizedSource[]>();
   for (const group of chunk(claimIds)) {
     if (group.length === 0) continue;
-    const rows = await db.all<{ claim_id: string; observation_id: string; relation: string }>(
+    const rows = await db.all<{
+      claim_id: string;
+      observation_id: string;
+      relation: SourceRow["relation"];
+    }>(
       `SELECT s.claim_id, s.observation_id, s.relation
          FROM claim_sources s
         WHERE s.claim_id IN (${group.map(() => "?").join(", ")})

@@ -75,6 +75,103 @@ async function seedClaim(
   };
 }
 
+/**
+ * Two claims that tie on every weighted component, so only the tie-break decides
+ * their order.
+ *
+ * Both statements carry the same four terms at the same length, so FTS5 returns
+ * the same bm25 for each and trust, recency, utility, conflict and confidence are
+ * equal by construction. `deep` has two supporting observations; `shallow` has
+ * one supporting and two qualifying, so a depth that counted rows instead of
+ * support would rank `shallow` first on 3 against 2. Terms must be given in
+ * descending order, because the statement fallback prefers the lower code unit
+ * and the point of the fixture is that `deep` wins *against* that fallback.
+ */
+async function seedTiedPair(
+  fx: Fixture,
+  key: string,
+  terms: [string, string, string, string],
+  options: { subjectId?: string; visibility?: string } = {},
+) {
+  const subjectId = options.subjectId ?? "user_rama";
+  const deep = terms.join(" ");
+  const shallow = [...terms].reverse().join(" ");
+  assert.ok(shallow < deep, "the shallow statement must win the statement fallback");
+
+  const write = async (content: string) => {
+    const res = await fx.call("POST", "/v1/observations", {
+      key,
+      body: observation({
+        content,
+        subject_id: subjectId,
+        ...(options.visibility ? { visibility: options.visibility } : {}),
+      }),
+    });
+    expectOk(res, 201);
+    return res.body.data.observation_id as string;
+  };
+  const [deepA, deepB, shallowA, qualifierA, qualifierB] = [
+    await write(`First independent report of the ${terms[0]} ${terms[1]} handover.`),
+    await write(`Second independent report of the ${terms[0]} ${terms[1]} handover.`),
+    await write(`Sole report of the ${terms[3]} ${terms[2]} handover.`),
+    await write(`Scheduling note that narrows the ${terms[3]} ${terms[2]} handover.`),
+    await write(`Ownership note that narrows the ${terms[3]} ${terms[2]} handover.`),
+  ];
+
+  const consolidation = await fx.call("POST", "/v1/consolidations", {
+    key,
+    body: {
+      subject_id: subjectId,
+      claims: [
+        {
+          kind: "procedural",
+          statement: deep,
+          sources: [
+            { observation_id: deepA, relation: "supports" },
+            { observation_id: deepB, relation: "supports" },
+          ],
+        },
+        {
+          kind: "procedural",
+          statement: shallow,
+          sources: [
+            { observation_id: shallowA, relation: "supports" },
+            { observation_id: qualifierA, relation: "qualifies" },
+            { observation_id: qualifierB, relation: "qualifies" },
+          ],
+        },
+      ],
+    },
+  });
+  expectOk(consolidation, 201);
+  const claims = consolidation.body.data.claims as { claim_id: string }[];
+  return {
+    subjectId,
+    deep,
+    shallow,
+    deepId: claims[0]!.claim_id,
+    shallowId: claims[1]!.claim_id,
+  };
+}
+
+/** The pair as ranked, in returned order, with everything a caller can see. */
+async function compileTiedPair(
+  fx: Fixture,
+  key: string,
+  pair: { subjectId: string; deep: string; shallow: string },
+) {
+  const compiled = await fx.call("POST", "/v1/context/compile", {
+    key,
+    body: { subject_id: pair.subjectId, task: pair.deep, max_tokens: 4000 },
+  });
+  expectOk(compiled);
+  return (compiled.body.data.items as {
+    claim: string;
+    score: number;
+    evidence_ids: string[];
+  }[]).filter((item) => item.claim === pair.deep || item.claim === pair.shallow);
+}
+
 export const CASES: Case[] = [
   {
     name: "health reports liveness without sensitive detail",
@@ -501,79 +598,113 @@ export const CASES: Case[] = [
     name: "corroboration breaks a ranking dead heat, and only support counts",
     async run(fx) {
       const agent = await fx.provision();
-      // Both statements carry the same four terms at the same length, so FTS5
-      // returns the same bm25 for each and every weighted component is equal.
-      // The order is therefore decided entirely by the tie-break, which is what
-      // this case exists to pin.
-      const CORROBORATED = "zulu yankee xray whiskey";
-      const QUALIFIED = "whiskey xray yankee zulu";
+      const pair = await seedTiedPair(fx, agent.key, ["zulu", "yankee", "xray", "whiskey"]);
 
-      const write = async (content: string) => {
-        const res = await fx.call("POST", "/v1/observations", {
-          key: agent.key,
-          body: observation({ content }),
-        });
-        expectOk(res, 201);
-        return res.body.data.observation_id as string;
-      };
-      const supportA = await write("First independent report of the zulu yankee handover.");
-      const supportB = await write("Second independent report of the zulu yankee handover.");
-      const supportC = await write("Sole report of the whiskey xray handover.");
-      const qualifierA = await write("Scheduling note that narrows the whiskey xray handover.");
-      const qualifierB = await write("Ownership note that narrows the whiskey xray handover.");
-
-      const consolidation = await fx.call("POST", "/v1/consolidations", {
-        key: agent.key,
-        body: {
-          subject_id: "user_rama",
-          claims: [
-            {
-              kind: "procedural",
-              statement: CORROBORATED,
-              sources: [
-                { observation_id: supportA, relation: "supports" },
-                { observation_id: supportB, relation: "supports" },
-              ],
-            },
-            {
-              // Three sources, one of them supporting. A depth that counted
-              // rows instead of support would rank this first on 3 against 2.
-              kind: "procedural",
-              statement: QUALIFIED,
-              sources: [
-                { observation_id: supportC, relation: "supports" },
-                { observation_id: qualifierA, relation: "qualifies" },
-                { observation_id: qualifierB, relation: "qualifies" },
-              ],
-            },
-          ],
-        },
-      });
-      expectOk(consolidation, 201);
-
-      const compiled = await fx.call("POST", "/v1/context/compile", {
-        key: agent.key,
-        body: { subject_id: "user_rama", task: CORROBORATED, max_tokens: 4000 },
-      });
-      expectOk(compiled);
-      const items = (compiled.body.data.items as {
-        claim: string;
-        score: number;
-        evidence_ids: string[];
-      }[]).filter((item) => item.claim === CORROBORATED || item.claim === QUALIFIED);
+      const items = await compileTiedPair(fx, agent.key, pair);
       assert.equal(items.length, 2, "both permutations must survive retrieval");
       assert.equal(items[0]!.score, items[1]!.score, "the fixture must actually tie on score");
       // Without the corroboration key this falls through to the statement key,
-      // which prefers "whiskey ..." over "zulu ..." and returns QUALIFIED first.
+      // which prefers "whiskey ..." over "zulu ..." and returns the shallow one.
       assert.equal(
         items[0]!.claim,
-        CORROBORATED,
+        pair.deep,
         "two supporting observations outrank one supporting and two qualifying",
       );
       // Citations are unchanged: a qualifier is still visible evidence, it is
       // just not corroboration.
       assert.equal(items[0]!.evidence_ids.length, 2);
       assert.equal(items[1]!.evidence_ids.length, 3);
+    },
+  },
+  {
+    name: "a hidden supporting observation changes neither depth nor order (AC-EVR-002)",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "agent_depth_owner" });
+      const stranger = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "agent_depth_stranger",
+      });
+      const pair = await seedTiedPair(fx, owner.key, ["victor", "uniform", "tango", "sierra"], {
+        subjectId: "user_depth_evr002",
+        visibility: "organization",
+      });
+
+      const before = await compileTiedPair(fx, owner.key, pair);
+      assert.equal(before[0]!.claim, pair.deep, "the fixture must start with the deep claim first");
+
+      // One private observation, supporting the shallow claim, owned by a
+      // principal the compiler is not. Read as depth it would make the shallow
+      // claim 3-deep against 2 and invert the pair, which is exactly the count
+      // an unauthorized `evidence_depth` would leak.
+      const secret = await fx.call("POST", "/v1/observations", {
+        key: stranger.key,
+        body: observation({
+          subject_id: "user_depth_evr002",
+          visibility: "private",
+          content: "Fourth report of the sierra tango handover, held privately.",
+        }),
+      });
+      expectOk(secret, 201);
+      await fx.query(
+        `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
+         VALUES (?, ?, 'supports', ?)`,
+        [pair.shallowId, secret.body.data.observation_id as string, new Date().toISOString()],
+      );
+
+      const after = await compileTiedPair(fx, owner.key, pair);
+      assert.deepEqual(
+        after,
+        before,
+        "an observation the caller cannot read must not move depth, order, score, or citations",
+      );
+
+      // The row is real, and it would have flipped the pair: the same compile by
+      // the principal who may read it returns the other order. Without this the
+      // case would also pass against a build that simply ignored evidence depth.
+      const authorized = await compileTiedPair(fx, stranger.key, pair);
+      assert.equal(
+        authorized[0]!.claim,
+        pair.shallow,
+        "the principal who can read the fourth support sees it outrank the pair",
+      );
+    },
+  },
+  {
+    name: "a tie promoted across the top_k boundary still returns its citations",
+    async run(fx) {
+      const agent = await fx.provision();
+      const pair = await seedTiedPair(fx, agent.key, ["romeo", "quebec", "papa", "oscar"], {
+        subjectId: "user_topk_boundary",
+      });
+
+      // `top_k: 1` is the case the gate exists for: the deep claim is second in
+      // the preliminary order and only the corroboration key lifts it into the
+      // single returned slot. A contested lookup narrowed back to the `top_k`
+      // slice never loads the deep claim's sources, so it is neither promoted
+      // nor cited — and the rest of the suite, which omits `top_k`, stays green.
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: {
+          subject_id: "user_topk_boundary",
+          task: pair.deep,
+          max_tokens: 4000,
+          top_k: 1,
+        },
+      });
+      expectOk(compiled);
+      const items = compiled.body.data.items as { claim: string; evidence_ids: string[] }[];
+      assert.equal(items.length, 1, "top_k must bound the returned pack");
+      assert.equal(items[0]!.claim, pair.deep, "the promoted claim must cross the boundary");
+      assert.deepEqual(
+        items[0]!.evidence_ids.length,
+        2,
+        "a promoted item must carry the citations that promoted it, not an empty list",
+      );
+      assert.equal(
+        compiled.body.data.budget.omitted_items,
+        1,
+        "the claim the bound discarded is still counted",
+      );
     },
   },
   {

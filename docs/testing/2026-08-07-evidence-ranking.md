@@ -183,11 +183,36 @@ across all 500 instances with
 
 - instances whose rank-1 position is tied across two different sessions: **0 of 500**;
 - packs with a unique top score: **499 of 500**;
-- median pack: 92 items carrying 88 distinct scores.
+- median pack: 92 items carrying 88 distinct scores;
+- empty packs, which stay in the denominator: **0 of 500**.
 
 So even a perfect tie-break signal — evidence, lexical, or an oracle — could
 change **zero** rank-1 answers on this corpus. That is a property of the corpus,
 not evidence against tie-breaking.
+
+### 6.1 How often the lookup gate actually fires
+
+Re-probed 2026-08-07 after review, because "499 of 500 have a unique top score"
+is a statement about rank 1 and the gate is asked about a window of `top_k + 1`.
+The probe now evaluates the same predicate `hasDeadHeat` evaluates, at each `k`,
+over all 500 instances:
+
+| `top_k` | packs with a dead heat in the window | lookup skipped |
+| --- | ---: | ---: |
+| 1 | 1 of 500 | 99.8% |
+| 5 | 11 of 500 | 97.8% |
+| 10 | 32 of 500 | 93.6% |
+| omitted (the default) | 442 of 500 | 11.6% |
+
+The skip is real at small `top_k` and essentially absent without one. A 92-item
+pack has many tied neighbours further down, and with `top_k` omitted the whole
+pack is the window. It costs nothing: with no `top_k` every candidate is
+returned, so its citations were going to be read regardless, and the gate saves
+only the second ranking pass.
+
+This is a correction, not a new result. The originally published sentence
+generalised the `k=1` figure to every window; the shipped code comment now
+carries this table instead.
 
 ## 7. Cost, and a design that was measured and rejected
 
@@ -241,7 +266,15 @@ they are counted explicitly and never imputed or dropped.
 | MemPalace 3.6.0, user-only | 0.8040 | 3,346 | 2,643 | 4,055 | 92,572 | 0 |
 | verbatim-RAG control, fastembed | 0.7720 | 3,361 | 2,686 | 4,183 | 90,896 | 0 |
 | MemPalace 3.6.0, full-text | 0.7460 | 3,428 | 2,741 | 4,569 | 94,660 | 0 |
-| MCP reference server, substring | 0.0500 | 12,558 | 7,364 | 18,636 | 31,138 | **259** |
+| MCP reference server, substring | 0.0500 | 12,558 † | 7,364 † | 18,636 † | 31,138 † | **259** |
+
+† **Computed over 241 instances, not 500.** Every other row spans all 500. The
+MCP lane finds no gold session at any depth on 259 of them, and an instance with
+no finite value cannot enter a percentile. Its `max` of 31,138 is therefore the
+best-looking worst case on the page and means the opposite of what the column
+implies: it is the worst case *among the 48% it did not fail outright*. The four
+marked cells are not comparable with the rows above them and must not be quoted
+beside them.
 
 Two things to read here and one not to.
 

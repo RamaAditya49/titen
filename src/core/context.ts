@@ -156,11 +156,18 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
 
   // Corroboration decides a returned position only where the order would
   // otherwise be arbitrary, so it is looked up only when there is a dead heat to
-  // decide. Without a tie this reads exactly the rows the pack already read for
-  // citations, so the common request pays nothing for the signal; with one, it
-  // widens to the candidate set, because a tied claim outside `top_k` can be
-  // promoted into it. Either way it is one query, and the same rows serve both
-  // the ranking and the citations.
+  // decide. Without a tie this reads exactly the rows the pack already needs for
+  // citations; with one it widens to the whole candidate set, because a tied
+  // claim outside `top_k` can be promoted into it and would otherwise come back
+  // with no citations at all. The same rows serve both the ranking and the
+  // citations, so the widening buys the promotion for no extra read.
+  //
+  // Two costs, stated rather than implied. `loadAuthorizedSources` chunks at
+  // `MAX_BOUND_PARAMS`, so the widened lookup is one round trip per 90
+  // candidates — twelve serial hops at `max_candidates: 1000`, not one. And with
+  // `top_k` omitted, the default, both branches ask for the same ids, because
+  // every candidate is returned and therefore already needs citations; there the
+  // gate saves the second `rankCandidates` pass and no database work whatsoever.
   const preliminary = rankCandidates(candidates, new Date(at));
   const contested = hasDeadHeat(preliminary, topK);
   const sources = await loadAuthorizedSources(

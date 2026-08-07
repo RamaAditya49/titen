@@ -72,13 +72,34 @@ E2 and E4. E6 is independent and runs last, from ranked lists already on disk.
 
 - [x] A contract case where two claims are identical in every ranked dimension
       except evidence depth, asserting the deeper one wins. Fails without E3.
+      `corroboration breaks a ranking dead heat, and only support counts`.
 - [x] A contract case proving a hidden observation does not change the order
       (AC-EVR-002), which is the one place this signal could leak a count.
-- [x] A contract case proving that a candidate set with uniform evidence depth
-      returns the pre-change order (AC-EVR-003).
-- [x] A determinism case: identical corpus content, fresh identifiers, identical
-      ranking (AC-EVR-004).
-- [x] Both runtimes, through the existing dual-runtime contract suite.
+      `a hidden supporting observation changes neither depth nor order
+      (AC-EVR-002)`: two principals, one private supporting observation linked
+      to the shallow claim of the tied pair, asserting the compiling principal's
+      items are unchanged and that the principal who *may* read it gets the
+      inverted order. Verified to fail with the `EXISTS` removed from
+      `loadAuthorizedSources`.
+
+      **This tick was false until 2026-08-07 and the review of #288 caught it.**
+      The box was checked against an intention, not a test. The cross-scope case
+      added for [#291](https://github.com/RamaAditya49/titen/issues/291) does
+      *not* satisfy it: that one covers the `disputed` flag, a different signal
+      computed by a different query on a different branch. Two criteria, two
+      cases.
+- [x] A contract case proving that a promotion across the `top_k` boundary still
+      carries its citations. `a tie promoted across the top_k boundary still
+      returns its citations`. Verified to fail with the contested lookup narrowed
+      back to the `top_k` slice.
+- [x] Uniform evidence depth returns the pre-change order (AC-EVR-003). Covered
+      by an assertion inside the `rankCandidates` unit test, not by a dual-runtime
+      contract case — the property is in a pure function with no SQL under it.
+- [x] Determinism: identical corpus content, fresh identifiers, identical ranking
+      (AC-EVR-004). Same, a unit test over `rankCandidates`.
+- [x] Both runtimes, through the existing dual-runtime contract suite. The three
+      cases named above run on `bun-sqlite` and D1; the two unit tests do not,
+      and do not need to.
 
 ### E5 — Measure, and publish whatever it says
 
