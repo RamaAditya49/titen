@@ -14,7 +14,7 @@ rm -f $B7/lanes/anchor.db*
 cp $B4/lanes/titen/fts-500.db $B7/lanes/anchor.db
 [ -f $B4/lanes/titen/fts-500.db-wal ] && cp $B4/lanes/titen/fts-500.db-wal $B7/lanes/anchor.db-wal
 [ -f $B4/lanes/titen/fts-500.db-shm ] && cp $B4/lanes/titen/fts-500.db-shm $B7/lanes/anchor.db-shm
-KEY=$(sed -n "s/^api_key: //p" $B4/logs/titen/fts-500.log.bootstrap | head -1)
+KEY=$(sed -n "s/^api_key: //p" $B4/logs/titen/fts-500b.log.bootstrap | head -1)
 if [ -z "$KEY" ]; then echo "ABORT: no anchor key"; exit 1; fi
 unset TITEN_EMBED_BASE_URL TITEN_EMBED_MODEL TITEN_EMBED_DIMS TITEN_EMBED_REVISION
 unset TITEN_EMBED_PROFILE TITEN_EMBED_MIN_COSINE TITEN_EMBED_API_KEY TITEN_VEC_DB_PATH

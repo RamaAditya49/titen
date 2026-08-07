@@ -292,6 +292,14 @@ in `deploy/README.md`, so remaining debt is no longer measurement or disclosure
 — it is deciding whether to shard across processes or to parallelise within
 one.
 
+**Confirmed on externally authored data 2026-08-07, steeper than the
+synthetic curve.** The [pooled-store run](./docs/testing/2026-08-07-pooled-store.md)
+put all 19,829 distinct LongMemEval-S sessions in one unscoped store:
+FTS-only recall@1 0.880 (scoped anchor) → 0.246 (full pool), compile p95
+138 ms → 865 ms. Two pre-registered falsifiers fired against Titen and were
+published. The same run measured the mitigation that already ships:
+subject scoping recovers +63.4 points and 6.3x latency on the same corpus.
+
 ### 8. Operational lifecycle is unexercised
 
 Longest observed uptime during the benchmark was about five minutes. No

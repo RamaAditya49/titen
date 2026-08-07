@@ -1,0 +1,362 @@
+{
+  "lane": "titen-fts-pooled-19829-20260807",
+  "rank1_misses": 377,
+  "cross_instance_misses": 377,
+  "own_haystack_misses": 0,
+  "sample_n": 50,
+  "answer_contained_in_top1": 10,
+  "containment_fraction": 0.2,
+  "note": "mechanical containment: lowercased fixture answer string in the retrieved session text; multi-part or paraphrased answers can read as false negatives, so this is a lower bound",
+  "sample": [
+    {
+      "qid": "8ebdbe50",
+      "qtype": "single-session-user",
+      "top1": "114c1fb7_5",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "3b6f954b",
+      "qtype": "single-session-user",
+      "top1": "ultrachat_361568",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_e061b84g",
+      "qtype": "temporal-reasoning",
+      "top1": "25021ded",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "f4f1d8a4_abs",
+      "qtype": "single-session-user",
+      "top1": "737f3685_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_1916e0ea",
+      "qtype": "temporal-reasoning",
+      "top1": "7613d5ec_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "95bcc1c8",
+      "qtype": "single-session-user",
+      "top1": "f334878c",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "8cf4d046",
+      "qtype": "multi-session",
+      "top1": "ultrachat_51161",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_372c3eed_abs",
+      "qtype": "multi-session",
+      "top1": "4f5880c6_6",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "0edc2aef",
+      "qtype": "single-session-preference",
+      "top1": "answer_d8a1af6b_3",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "0ddfec37_abs",
+      "qtype": "knowledge-update",
+      "top1": "answer_a22b654d_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "157a136e",
+      "qtype": "multi-session",
+      "top1": "c7c4cf1e_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_2487a7cb",
+      "qtype": "temporal-reasoning",
+      "top1": "0c28f7fb",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_61e13b3c",
+      "qtype": "temporal-reasoning",
+      "top1": "9f4d6054_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "22d2cb42",
+      "qtype": "knowledge-update",
+      "top1": "b52f03a1_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "a3045048",
+      "qtype": "temporal-reasoning",
+      "top1": "f1cf6f00_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_8279ba03",
+      "qtype": "temporal-reasoning",
+      "top1": "e08bf81f_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "d6062bb9",
+      "qtype": "multi-session",
+      "top1": "ac72b02a_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_59c863d7",
+      "qtype": "multi-session",
+      "top1": "c0d6fa6f_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "29f2956b",
+      "qtype": "single-session-user",
+      "top1": "1e01dbcc_1",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "8979f9ec",
+      "qtype": "multi-session",
+      "top1": "f01df2d2_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "86b68151",
+      "qtype": "single-session-user",
+      "top1": "f78a22b6_3",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "e61a7584",
+      "qtype": "knowledge-update",
+      "top1": "f5c7d070_3",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_a2d1d1f6",
+      "qtype": "temporal-reasoning",
+      "top1": "answer_febde667_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "c18a7dc8",
+      "qtype": "multi-session",
+      "top1": "478c480d",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "00ca467f",
+      "qtype": "multi-session",
+      "top1": "bf38543d_2",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "eeda8a6d_abs",
+      "qtype": "multi-session",
+      "top1": "c6d21293",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_a56e767c",
+      "qtype": "multi-session",
+      "top1": "ultrachat_206821",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "830ce83f",
+      "qtype": "knowledge-update",
+      "top1": "13c55c69_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "db467c8c",
+      "qtype": "knowledge-update",
+      "top1": "ultrachat_35159",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "60d45044",
+      "qtype": "single-session-user",
+      "top1": "aba63dc6_2",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "gpt4_68e94287",
+      "qtype": "temporal-reasoning",
+      "top1": "57da3d13",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "70b3e69b",
+      "qtype": "single-session-assistant",
+      "top1": "ultrachat_334948",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "5a7937c8",
+      "qtype": "multi-session",
+      "top1": "fe05973d_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "4bc144e2",
+      "qtype": "multi-session",
+      "top1": "f7835917_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "19b5f2b3",
+      "qtype": "single-session-user",
+      "top1": "e64f9553_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_d84a3211",
+      "qtype": "multi-session",
+      "top1": "89c7a48a_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "6456829e",
+      "qtype": "multi-session",
+      "top1": "answer_16bd5ea5_2",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "51c32626",
+      "qtype": "multi-session",
+      "top1": "61a989b5_2",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "c4ea545c",
+      "qtype": "knowledge-update",
+      "top1": "b89f68c4_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "75f70248",
+      "qtype": "single-session-preference",
+      "top1": "e2608cbd_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "6e984302",
+      "qtype": "temporal-reasoning",
+      "top1": "8fa624b2_3",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "a08a253f",
+      "qtype": "multi-session",
+      "top1": "99793133",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_4929293a",
+      "qtype": "temporal-reasoning",
+      "top1": "answer_add9b013_2",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "c4a1ceb8",
+      "qtype": "multi-session",
+      "top1": "answer_8afdebac_1",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "gpt4_93159ced_abs",
+      "qtype": "temporal-reasoning",
+      "top1": "507514d9_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_6ed717ea",
+      "qtype": "temporal-reasoning",
+      "top1": "0f78155a_1",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_ec93e27f",
+      "qtype": "temporal-reasoning",
+      "top1": "d3110bd5_2",
+      "cross_instance": true,
+      "answer_contained": true
+    },
+    {
+      "qid": "eeda8a6d",
+      "qtype": "multi-session",
+      "top1": "d76223f3",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_2f8be40d",
+      "qtype": "multi-session",
+      "top1": "sharegpt_Y6nhEqm_0",
+      "cross_instance": true,
+      "answer_contained": false
+    },
+    {
+      "qid": "gpt4_fe651585",
+      "qtype": "temporal-reasoning",
+      "top1": "43b53ac4_1",
+      "cross_instance": true,
+      "answer_contained": false
+    }
+  ]
+}

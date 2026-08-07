@@ -1,0 +1,85 @@
+{
+  "lane": "titen",
+  "embedding_arm": "fts",
+  "generated_at": "2026-08-07T11:58:17Z",
+  "n": 500,
+  "recall_at_1": 0.246,
+  "recall_at_5": 0.444,
+  "recall_at_10": 0.508,
+  "mrr_at_10": 0.3259,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.1143,
+      "recall_at_5": 0.3,
+      "recall_at_10": 0.3857
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.7143,
+      "recall_at_5": 0.8929,
+      "recall_at_10": 0.9286
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.1,
+      "recall_at_10": 0.1
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.1203,
+      "recall_at_5": 0.3459,
+      "recall_at_10": 0.3985
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.1579,
+      "recall_at_5": 0.3609,
+      "recall_at_10": 0.4361
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.4872,
+      "recall_at_5": 0.6923,
+      "recall_at_10": 0.7821
+    }
+  },
+  "meta": {
+    "condition": "pooled",
+    "subject": "pooled-v1",
+    "store_sessions": 19829,
+    "distinct_sessions_total": 19829,
+    "gold_sessions_first": 940,
+    "ingest_seconds": 363.8,
+    "index_drain_seconds": 0.0,
+    "query_seconds": 230.7,
+    "embed_calls": 0,
+    "llm_calls": 0,
+    "observations_written": 19829,
+    "claims_written": 342129,
+    "vectors_indexed": 0,
+    "outbox_remaining_after_drain": 0,
+    "chunk_chars": 700,
+    "compile": {
+      "max_tokens": 32000,
+      "max_candidates": 1000,
+      "top_k": 1000
+    },
+    "query_concurrency": 1,
+    "compile_ms": {
+      "p50": 424.69,
+      "p95": 864.91,
+      "p99": 1010.6
+    },
+    "session_id_carrier": "claim.observer_id (not FTS-indexed)",
+    "ingest_errors": 0,
+    "failures_detail": {},
+    "tag": "pooled-19829",
+    "package": "titen-memory@0.7.0 npm tarball",
+    "dist_shasum": "620af9a392b13c9bef91a215cf96eee2569e8f3e",
+    "store_size_label": "19829"
+  }
+}
