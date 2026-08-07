@@ -6,9 +6,8 @@
 // message naming neither Titen nor Bun. Line 2 is a string expression plus a
 // comment to TypeScript and the whole check to `sh`, which never reaches line 3
 // because it has already exec'd Bun or exited. One entry, one guard.
-import { createApiKey, keyLifecycleStatus, organizationStatement, SCOPES } from "../../core/auth";
-import { newOperatorAccount } from "../../core/accounts";
-import { auditStatement } from "../../core/audit";
+import { createApiKey, keyLifecycleStatus, SCOPES } from "../../core/auth";
+import type { Stmt } from "../../core/db";
 import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
@@ -19,7 +18,8 @@ import { parseSecretCipher } from "../../core/secrets";
 import { TITEN_VERSION } from "../../core/version";
 import { createBunWebhookSecurity } from "./webhooks";
 import { fetchStableRelease, stableVersionStatus } from "./release";
-import { runMcpStdio } from "./mcp-stdio";
+import { localStorePath, provisionOwner, runMcpStdio } from "./mcp-stdio";
+import { auditStore, renderReport } from "./audit";
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -29,7 +29,8 @@ const USAGE = `titen — self-hosted memory service
 Usage:
   titen --version
   titen version    [--check]
-  titen mcp        bridge inherited TITEN_MCP_URL and TITEN_API_KEY to stdio
+  titen mcp        serve MCP over stdio: the local store when no environment is
+                   set, otherwise a bridge to inherited TITEN_MCP_URL/TITEN_API_KEY
   titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
   titen migrate    [--db titen.db] [--dry-run]
   titen bootstrap  [--db titen.db] [--org "My Org"] [--username owner] [--label owner] [--print-sql]
@@ -40,8 +41,16 @@ Usage:
   titen key revoke [--db titen.db] --id <key id>
   titen backup     [--db titen.db] --out <file>   verified online copy
   titen schema     print every migration statement (for "wrangler d1 execute --file")
+  titen audit      <path> [--json]   offline write-hygiene report for a Titen
+                   store, a @modelcontextprotocol/server-memory memory.json(l),
+                   or a Mem0 export
 
 Notes:
+  With neither TITEN_MCP_URL nor TITEN_API_KEY set, "titen mcp" serves
+  ${localStorePath()} in process, creating it with one organization,
+  workspace, project, and owner on first run.
+  "audit" opens its path read-only and makes no network call of any kind. It
+  prints a report; sharing it is the reader's decision.
   --print-sql emits SQL for a remote database (Cloudflare D1) instead of writing
   locally. A raw key and temporary dashboard password are printed once and are
   never recoverable afterwards.
@@ -53,8 +62,12 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-const COMMAND_FLAGS: Record<string, { values: string[]; booleans?: string[] }> = {
+const COMMAND_FLAGS: Record<
+  string,
+  { values: string[]; booleans?: string[]; positional?: string }
+> = {
   version: { values: [], booleans: ["check"] },
+  audit: { values: [], booleans: ["json"], positional: "path" },
   mcp: { values: [] },
   serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
@@ -83,7 +96,8 @@ function parseArgs(argv: string[]) {
     console.log(USAGE);
     process.exit(0);
   }
-  if (argv.length === 0) return { command: undefined, action: undefined, flags: {} };
+  if (argv.length === 0)
+    return { command: undefined, action: undefined, flags: {}, positional: undefined };
 
   const command = argv[0]!;
   const action = command === "key" ? argv[1] : undefined;
@@ -94,7 +108,16 @@ function parseArgs(argv: string[]) {
   const flags: Record<string, string | boolean> = {};
   const values = new Set(schema.values);
   const booleans = new Set(schema.booleans ?? []);
-  for (let index = action ? 2 : 1; index < argv.length; index += 1) {
+  let start = action ? 2 : 1;
+  let positional: string | undefined;
+  if (schema.positional) {
+    const token = argv[start];
+    if (token === undefined || token.startsWith("--"))
+      fail(`${name} requires a ${schema.positional}`);
+    positional = token;
+    start += 1;
+  }
+  for (let index = start; index < argv.length; index += 1) {
     const token = argv[index]!;
     if (!token.startsWith("--") || token === "--") fail(`unexpected argument "${token}"`);
     const key = token.slice(2);
@@ -109,7 +132,7 @@ function parseArgs(argv: string[]) {
     flags[key] = value;
     index += 1;
   }
-  return { command, action, flags };
+  return { command, action, flags, positional };
 }
 
 const text = (value: string | boolean | undefined, fallback: string) =>
@@ -137,9 +160,9 @@ function sqlLiteral(value: string | number | null): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function renderStatement(statement: { sql: string; params: (string | number | null)[] }): string {
+function renderStatement(statement: Stmt): string {
   let index = 0;
-  const inlined = statement.sql.replace(/\?/g, () => sqlLiteral(statement.params[index++] ?? null));
+  const inlined = statement.sql.replace(/\?/g, () => sqlLiteral(statement.params?.[index++] ?? null));
   return `${inlined.replace(/\s+/g, " ").trim()};`;
 }
 
@@ -206,10 +229,23 @@ async function existingDatabase<T>(
   }
 }
 
-const { flags, command, action } = parseArgs(process.argv.slice(2));
+const { flags, command, action, positional } = parseArgs(process.argv.slice(2));
 const dbPath = text(flags.db, "titen.db");
 
 switch (command) {
+  case "audit": {
+    // Offline by construction: nothing below opens a socket, and the report is
+    // written to this process's stdout only. See src/runtime/bun/audit.ts.
+    let audit: Awaited<ReturnType<typeof auditStore>>;
+    try {
+      audit = await auditStore(positional!);
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "audit failed");
+    }
+    console.log(flags.json ? JSON.stringify(audit, null, 2) : renderReport(audit));
+    break;
+  }
+
   case "mcp": {
     try {
       await runMcpStdio();
@@ -324,30 +360,11 @@ switch (command) {
 
   case "bootstrap": {
     const orgName = text(flags.org, "Titen");
-    const ownerUsername = text(flags.username, "owner");
-    const orgId = newId("org");
-    const now = new Date();
-    const key = await createApiKey({
-      orgId,
-      principalId: "owner",
-      principalKind: "human",
+    const { orgId, key, owner, statements } = await provisionOwner({
+      orgName,
+      username: text(flags.username, "owner"),
       label: text(flags.label, "owner"),
-      scopes: ["*"],
-      maxTrust: "policy_approved",
-    }, now);
-    const owner = await newOperatorAccount({
-      orgId,
-      createdBy: "owner",
-      username: ownerUsername,
-      role: "owner",
-      scopes: ["*"],
-      maxTrust: "policy_approved",
-      now,
-      principalId: "owner",
     });
-    const org = organizationStatement(orgId, orgName, now);
-    const statements = [org, key.statement, ...owner.statements,
-      auditStatement(orgId, "owner", "operator_account.create", "operator_account", now.toISOString(), owner.accountId)];
     if (flags["print-sql"]) {
       console.error(`-- organization ${orgId} (${orgName})`);
       for (const statement of statements) console.log(renderStatement(statement));

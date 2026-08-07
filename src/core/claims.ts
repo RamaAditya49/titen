@@ -18,6 +18,7 @@ import {
   CLAIM_KINDS,
   CLAIM_RELATIONS,
   LIMITS,
+  RECALLED_SOURCE_TYPE,
   TRUST_LEVELS,
   TRUST_RANK,
   VISIBILITIES,
@@ -53,6 +54,7 @@ interface SourceRow {
   actor_id: string;
   content: string;
   content_hash: string;
+  source_type: string;
 }
 
 interface ClaimReplayRow {
@@ -96,7 +98,7 @@ async function loadSources(
   const ids = [...new Set(sources.map((source) => source.observationId))];
   const rows = await db.all<SourceRow>(
     `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.trust, o.visibility, o.actor_id,
-            o.content, o.content_hash
+            o.content, o.content_hash, o.source_type
        FROM observations o
       WHERE o.org_id = ? AND o.id IN (${ids.map(() => "?").join(", ")})
         AND ${recordAccessSql("o")}`,
@@ -156,6 +158,13 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     const rows = await loadSources(ctx.app.db, principal, sources);
     for (const source of sources) {
       const row = rows.get(source.observationId)!;
+      // Closes the loop instead of labelling it: evidence Titen itself handed
+      // back through a context pack may never be promoted into a new claim,
+      // which is how one preference gets stored two hundred times (#280).
+      if (row.source_type === RECALLED_SOURCE_TYPE)
+        throw validationError(
+          "Claim evidence may not be a recalled observation: consolidating context Titen issued would re-materialize its own output.",
+        );
       if (
         row.subject_id !== subjectId
         || row.project_id !== projectId

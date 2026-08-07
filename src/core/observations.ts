@@ -1,5 +1,5 @@
-import { assertTrustCeiling } from "./auth";
-import { first, type Stmt } from "./db";
+import { assertTrustCeiling, type Principal } from "./auth";
+import { first, type Db, type Stmt } from "./db";
 import { eventStatement } from "./events";
 import { conflict, notFound, validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
@@ -13,6 +13,7 @@ export { historyStatement, outboxStatement } from "./writes";
 import {
   LIMITS,
   OBSERVATION_KINDS,
+  RECALLED_SOURCE_TYPE,
   TRUST_LEVELS,
   VISIBILITIES,
   optionalEnum,
@@ -73,6 +74,40 @@ export function isRedactedObservation(content: string, contentHash: string): boo
  */
 const DEFAULT_VISIBILITY = "private";
 
+/**
+ * A context token is the identifier `POST /v1/context/compile` issued for a run
+ * the caller is entitled to read, so it is verified against the same boundary
+ * `getContext` enforces: own run, or one delegated by a live handoff.
+ *
+ * Deliberately not an HMAC. Titen's signing keyring (`TITEN_SECRET_KEYS`) is
+ * optional, so a stateless token would be unavailable in exactly the
+ * zero-configuration deployments that need this most, and a token a caller can
+ * always mint by compiling gains nothing from a signature it cannot forge
+ * anyway. The row already exists; one primary-key lookup replaces a key
+ * dependency, a migration, and an expiry policy.
+ */
+async function isIssuedContextToken(
+  db: Db,
+  principal: Principal,
+  token: string,
+): Promise<boolean> {
+  return Boolean(await first<{ present: number }>(
+    db,
+    `SELECT 1 AS present FROM context_runs r
+      WHERE r.id = ? AND r.org_id = ?
+        AND (
+          r.actor_id = ?
+          OR EXISTS (
+            SELECT 1 FROM handoffs h
+             WHERE h.org_id = r.org_id AND h.context_id = r.id
+               AND h.to_principal = ? AND h.status IN ('pending', 'accepted')
+          )
+        )
+      LIMIT 1`,
+    [token, principal.orgId, principal.principalId, principal.principalId],
+  ));
+}
+
 export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const raw = await ctx.rawBody();
@@ -88,9 +123,38 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const runId = optionalString(body, "run_id", LIMITS.identifier);
   const occurredAt = optionalTimestamp(body, "occurred_at");
   const source = requireObject(body.source, "source");
-  const sourceType = requireString(source, "type", LIMITS.label, "source.type");
-  const sourceRef = optionalString(source, "ref", LIMITS.identifier, "source.ref");
+  const declaredSourceType = requireString(source, "type", LIMITS.label, "source.type");
+  // A pointer back to the origin is mandatory, not advisory: an audit that
+  // cannot trace an entry to where it came from cannot tell junk from evidence.
+  // This is the obligation the MCP tool spec already stated (#280).
+  const sourceRef = requireString(source, "ref", LIMITS.identifier, "source.ref");
   const sourceId = optionalString(source, "id", LIMITS.identifier, "source.id");
+
+  /**
+   * Provenance is the one field a caller may not author. `recalled` means Titen
+   * itself returned this content through a context pack, which is the write that
+   * turns a memory store into an echo chamber. It is stamped from a server-issued
+   * context token, refused when merely declared, and not overridable by a caller
+   * that holds one.
+   *
+   * Known ceiling: the stamp proves the write was made while holding a
+   * Titen-issued pack, not that its content came out of that pack, and a caller
+   * that simply omits the token is not stamped at all. `recalled` is therefore a
+   * sound lower bound on the recall loop and never an upper one. Tightening it
+   * means comparing written content against the pack's items, which is a
+   * similarity decision this path has no business making synchronously; that
+   * belongs in `titen audit`.
+   */
+  const contextToken = optionalString(body, "context_token", LIMITS.identifier);
+  if (declaredSourceType === RECALLED_SOURCE_TYPE)
+    throw validationError(
+      `Source type "${RECALLED_SOURCE_TYPE}" is assigned by Titen from a "context_token" issued by POST /v1/context/compile and may not be declared by a caller.`,
+    );
+  // Fail closed: silently downgrading an unrecognized token to "new input" is
+  // exactly the mislabelled recall loop this path exists to prevent.
+  if (contextToken !== null && !(await isIssuedContextToken(ctx.app.db, principal, contextToken)))
+    throw validationError('Field "context_token" is not a context token issued to this principal.');
+  const sourceType = contextToken === null ? declaredSourceType : RECALLED_SOURCE_TYPE;
 
   // Trust is authority, not a payload field: a key cannot promote its evidence.
   assertTrustCeiling(principal, trust);

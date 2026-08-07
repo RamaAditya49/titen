@@ -17,6 +17,7 @@ import {
   assertPopulatedV14SemanticOutageMigration,
 } from "./integrity-migration";
 import { acquireD1Lane, D1RunDiagnostics } from "./d1-harness";
+import { assertConcurrentWriterDurability, PAYLOADS, WRITERS } from "./durability";
 import { assertEnrichmentContract } from "./enrichment";
 import {
   assertSemanticIndexOwnership,
@@ -226,7 +227,7 @@ d1Test("workerd dispatches JSON-object extraction without following redirects", 
           subject_id: `subject_workerd_extraction_${suffix}`,
           kind: "user_statement",
           content: `Synthetic workerd extraction evidence ${suffix}.`,
-          source: { type: "test" },
+          source: { type: "test", ref: "contract://d1" },
         }),
       });
       assert.equal(response.status, 201);
@@ -553,3 +554,13 @@ for (const contractCase of CASES) {
   const run = async () => contractCase.run(fixture);
   d1Test(name, run);
 }
+
+// Last on purpose: its I3 check compares unscoped row counts across the whole
+// database, so it must not run while another case is populating it.
+d1Test("D1 holds the durability invariants under concurrent writers", async () => {
+  const report = await assertConcurrentWriterDurability(db, "cloudflare-d1");
+  assert.equal(report.observation_requests, WRITERS * PAYLOADS);
+  assert.equal(report.observation_rows, PAYLOADS);
+  assert.equal(report.claim_rows, 1);
+  assert.equal(report.partial_rows, 0);
+}, 60_000);

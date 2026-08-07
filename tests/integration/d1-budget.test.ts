@@ -114,7 +114,7 @@ test("a max-bound enrichment pass fits Paid D1 and saturation stops before model
           subject_id: "subject_d1_max_bound",
           kind: "user_statement",
           content: `Maximum reflection premise ${index}.`,
-          source: { type: "d1_budget_fixture" },
+          source: { type: "d1_budget_fixture", ref: "contract://d1-budget" },
         },
       });
       assert.equal(observed.status, 201);
@@ -157,7 +157,7 @@ test("a max-bound enrichment pass fits Paid D1 and saturation stops before model
           subject_id: `subject_d1_saturation_${index}`,
           kind: "user_statement",
           content: `Due job that must not reach the model ${index}.`,
-          source: { type: "d1_budget_fixture" },
+          source: { type: "d1_budget_fixture", ref: "contract://d1-budget" },
         },
       });
       assert.equal(observed.status, 201);

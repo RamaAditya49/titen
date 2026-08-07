@@ -138,7 +138,9 @@ test("ping answers, and the full handshake completes in order", async () => {
 
   const tools = await rpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
   assert.ok(Array.isArray(tools.body.result.tools), "tools must be an array");
-  assert.equal(tools.body.result.tools.length, 9, "every ordinary-agent tool must be advertised");
+  // Nine native `titen_*` tools plus the nine @modelcontextprotocol/server-memory
+  // names served for drop-in substitution (#279).
+  assert.equal(tools.body.result.tools.length, 18, "every ordinary-agent tool must be advertised");
   for (const tool of tools.body.result.tools) {
     assert.ok(typeof tool.name === "string" && tool.name.length > 0);
     assert.ok(typeof tool.description === "string" && tool.description.length > 0);

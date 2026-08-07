@@ -261,6 +261,12 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   return {
     data: {
       context_id: contextId,
+      // Server-issued proof that what follows came out of Titen. A caller that
+      // writes an observation derived from this pack passes it back as
+      // `context_token` and the write is stamped `source.type: "recalled"`,
+      // which is the only way a recall loop can be counted rather than
+      // self-reported (#280). Opaque: verified, never parsed.
+      context_token: contextId,
       query: task,
       scope: effectiveScope(subjectId, projectId, projectMode, at),
       budget: {

@@ -12,6 +12,14 @@ export const TRUST_RANK: Record<Trust, number> = {
 export const VISIBILITIES = ["private", "team", "organization"] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
 
+/**
+ * Server-assigned provenance for content Titen itself handed back through a
+ * context pack. A caller may never declare it and may never override it, which
+ * is the whole point: a recall loop is only countable while the label is a
+ * server verdict rather than a self-report (#280).
+ */
+export const RECALLED_SOURCE_TYPE = "recalled";
+
 export const OBSERVATION_KINDS = [
   "user_statement",
   "tool_result",

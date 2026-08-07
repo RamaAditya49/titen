@@ -124,6 +124,32 @@ between 10³ and 10⁵ claims on a synthetic corpus, one process saturates one c
 at 10k claims, there is no reranking stage, and no external suite scores the
 governance and collaboration primitives at all.
 
+## Audit any agent memory store
+
+Every published memory benchmark measures retrieval on a corpus somebody
+curated. The failure people actually report is on the write side: a store fills
+with copies of its own output. The one public audit of a production store found
+97.8% of 10,134 entries were junk after 32 days. Nothing measures that.
+
+```sh
+npx titen-memory audit ~/.titen/memory.db        # a Titen store
+npx titen-memory audit ./memory.jsonl            # @modelcontextprotocol/server-memory
+npx titen-memory audit ./mem0-export.json --json # a Mem0 export
+```
+
+Five counts — exact duplicate, near duplicate, recall loop, secret pattern,
+stale — each with per-item evidence you can check by hand. **No network, no
+model, no upload:** it opens the path read-only and prints a report; sharing it
+is your decision. A store that lacks the signal a metric needs is reported as
+*not measurable from this export*, never as a failure. There is no composite
+score and there is no leaderboard.
+
+The detection rules are published in
+[audit rules](https://github.com/RamaAditya49/titen/blob/main/docs/reference/audit.md).
+Titen's own numbers — including 17.9% duplicates and 96.7% stale in its own
+store, and a compatibility-surface defect the tool found in Titen itself — are in
+[the self-report](https://github.com/RamaAditya49/titen/blob/main/docs/testing/2026-08-07-titen-audit-self-report.md).
+
 ## Project status
 
 **Titen is pre-1.0.** Per [SemVer clause 4](https://semver.org/spec/v2.0.0.html#spec-item-4),
@@ -292,6 +318,11 @@ variables above:
 
 The bridge keeps no state. It only forwards newline-delimited MCP messages to
 the authenticated HTTP endpoint.
+
+Titen is not listed in the official MCP registry yet, so no client will offer it
+from a built-in directory — configure it by hand as above. The manifest and the
+manual publishing procedure are in
+[MCP registry listing](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/mcp-registry.md).
 
 ### 4. Prove the connection
 
@@ -526,6 +557,8 @@ for private Tailscale Serve access or Cloudflare Tunnel protected by Access.
 | [VPS deployment](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md) | Bun, containers, persistence, and hardening |
 | [Cloudflare deployment](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/cloudflare.md) | Worker and D1 setup |
 | [Secure dashboard ingress](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/secure-ingress.md) | Tailscale Serve or Cloudflare Tunnel with Access |
+| [MCP registry listing](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/mcp-registry.md) | Publishing `server.json` to the official MCP registry |
+| [Audit rules](https://github.com/RamaAditya49/titen/blob/main/docs/reference/audit.md) | How `titen audit` counts duplicates, recall loops, secrets, and staleness |
 | [Roadmap](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md) | Evidence-based maturity and planned work |
 | [Documentation index](https://github.com/RamaAditya49/titen/blob/main/docs/README.md) | Product, engineering, security, and research docs |
 
