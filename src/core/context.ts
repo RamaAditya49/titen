@@ -8,7 +8,7 @@ import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
 import { packUnderBudget, rankCandidates } from "./rank";
 import { planFtsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./retrieval";
-import { loadAuthorizedEvidenceIds } from "./evidence";
+import { loadAuthorizedEvidenceIds, loadAuthorizedSources, supportingDepth } from "./evidence";
 import { estimateJsonTokens } from "./tokens";
 import type { RequestContext, Result } from "./http";
 import {
@@ -154,19 +154,29 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }
   }
 
-  // Applied after ranking and before the budget, so the token budget is spent
-  // on the items the caller asked for. What the bound discarded is still counted
-  // into `budget.omitted_items`: a caller who cannot tell a complete answer from
-  // a truncated one has no reason to trust either. `slice(0, undefined)` is the
-  // whole no-op path.
-  const allRanked = rankCandidates(candidates, new Date(at));
-  const ranked = allRanked.slice(0, topK);
-  const omittedByTopK = allRanked.length - ranked.length;
-  const evidence = await loadAuthorizedEvidenceIds(
+  // Corroboration is a ranking input, not a presentation detail, so the sources
+  // are loaded before ranking and the same rows are reused for citations below.
+  // This is the query the pack already ran, moved: `top_k` defaults to the whole
+  // candidate set, so the default request reads exactly the rows it read before,
+  // and an explicit `top_k` trades a bounded number of extra ids — capped by
+  // `max_candidates` — for a rank position decided by evidence rather than by
+  // alphabetical order.
+  const sources = await loadAuthorizedSources(
     ctx.app.db,
     principal,
-    ranked.map((entry) => entry.candidate.id),
+    candidates.map((candidate) => candidate.id),
   );
+  for (const candidate of candidates)
+    candidate.evidence_depth = supportingDepth(sources.get(candidate.id));
+
+  const allRanked = rankCandidates(candidates, new Date(at));
+  // `top_k` is applied after ranking and before the budget, so the token budget
+  // is spent on the items the caller asked for. What the bound discarded is
+  // still counted into `budget.omitted_items`: a caller who cannot tell a
+  // complete answer from a truncated one has no reason to trust either.
+  // `slice(0, undefined)` is the whole no-op path.
+  const ranked = allRanked.slice(0, topK);
+  const omittedByTopK = allRanked.length - ranked.length;
 
   const entries = ranked.map((entry) => {
     const item = {
@@ -180,7 +190,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       observer_id: entry.candidate.observer_id,
       valid_from: entry.candidate.valid_from,
       valid_to: entry.candidate.valid_to,
-      evidence_ids: evidence.get(entry.candidate.id) ?? [],
+      evidence_ids: (sources.get(entry.candidate.id) ?? []).map((source) => source.observationId),
       score: entry.score,
       score_components: entry.components,
     };

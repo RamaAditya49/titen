@@ -584,6 +584,81 @@ test("confidence is an explicit weighted and auditable ranking factor", () => {
   assert.equal(ranked[0]!.score - ranked[1]!.score, 0.07);
 });
 
+test("corroboration decides a dead heat and never overrides score or cosine", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+  // Equal bm25 and no semantic signal: the FTS-only dead heat that the
+  // statement key used to decide alphabetically. Measured on LongMemEval-S at
+  // n=500 this never happens at rank 1, which is why the signal ships on this
+  // contract rather than on a benchmark win.
+  const shallow = { ...rankInput("zzz", 0.8), statement: "Alpha rehearsal.", bm25: -4 };
+  const deep = {
+    ...rankInput("aaa", 0.8),
+    statement: "Zulu rehearsal.",
+    bm25: -4,
+    evidence_depth: 3,
+  };
+  const ranked = rankCandidates([shallow, deep], now);
+  assert.equal(ranked[0]!.score, ranked[1]!.score, "the fixture must actually tie on score");
+  // Without the corroboration key this returns "zzz", whose statement sorts first.
+  assert.equal(ranked[0]!.candidate.id, "aaa");
+
+  // Corroboration is a tie-break, not a seventh weighted term: no score and no
+  // component moves, so no fitted weight enters the ranker.
+  const withoutDepth = rankCandidates([{ ...deep, evidence_depth: undefined }], now);
+  assert.equal(ranked.find((entry) => entry.candidate.id === "aaa")!.score, withoutDepth[0]!.score);
+  assert.deepEqual(
+    ranked.find((entry) => entry.candidate.id === "aaa")!.components,
+    withoutDepth[0]!.components,
+  );
+
+  // Uniform depth leaves the pre-change order exactly as it was.
+  assert.deepEqual(
+    rankCandidates([{ ...deep, evidence_depth: 3 }, { ...shallow, evidence_depth: 3 }], now)
+      .map((entry) => entry.candidate.id),
+    ["zzz", "aaa"],
+  );
+
+  // A stronger lexical match still wins on score; corroboration cannot rescue a
+  // worse match.
+  const scored = rankCandidates(
+    [
+      { ...rankInput("weak", 0.8), bm25: -1, evidence_depth: 9 },
+      { ...rankInput("strong", 0.8), bm25: -8 },
+    ],
+    now,
+  );
+  assert.equal(scored[0]!.candidate.id, "strong");
+  assert.ok(scored[0]!.score > scored[1]!.score);
+
+  // A stronger cosine also still wins: an unmeasured signal does not override a
+  // measured one.
+  const semantic = rankCandidates(
+    [
+      { ...rankInput("cosine", 0.8, 0.91), bm25: -4 },
+      { ...rankInput("corroborated", 0.8, 0.72), bm25: -4, evidence_depth: 9 },
+    ],
+    now,
+  );
+  assert.equal(semantic[0]!.score, semantic[1]!.score);
+  assert.equal(semantic[0]!.candidate.id, "cosine");
+});
+
+test("identical corpus content ranks identically across ingests that mint fresh ids", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+  // #226: two stores holding the same claims must answer in the same order even
+  // though every uuid differs. Corroboration is content-derived, so it has to
+  // keep that property rather than reintroduce the coin flip it replaces.
+  const corpus = (ids: [string, string, string]) => [
+    { ...rankInput(ids[0], 0.8), statement: "Alpha rehearsal.", bm25: -4, evidence_depth: 1 },
+    { ...rankInput(ids[1], 0.8), statement: "Zulu rehearsal.", bm25: -4, evidence_depth: 2 },
+    { ...rankInput(ids[2], 0.8), statement: "Mike rehearsal.", bm25: -4, evidence_depth: 1 },
+  ];
+  const order = (ids: [string, string, string]) =>
+    rankCandidates(corpus(ids), now).map((entry) => entry.candidate.statement);
+  assert.deepEqual(order(["c1", "c2", "c3"]), order(["z9", "a0", "m5"]));
+  assert.equal(order(["c1", "c2", "c3"])[0], "Zulu rehearsal.");
+});
+
 test("dispute is an explicit ranking penalty, never a bonus", () => {
   const clean = rankInput("clean", 0.8);
   const disputed = { ...rankInput("disputed", 0.8), disputed: true };

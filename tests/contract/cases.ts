@@ -498,6 +498,85 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "corroboration breaks a ranking dead heat, and only support counts",
+    async run(fx) {
+      const agent = await fx.provision();
+      // Both statements carry the same four terms at the same length, so FTS5
+      // returns the same bm25 for each and every weighted component is equal.
+      // The order is therefore decided entirely by the tie-break, which is what
+      // this case exists to pin.
+      const CORROBORATED = "zulu yankee xray whiskey";
+      const QUALIFIED = "whiskey xray yankee zulu";
+
+      const write = async (content: string) => {
+        const res = await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({ content }),
+        });
+        expectOk(res, 201);
+        return res.body.data.observation_id as string;
+      };
+      const supportA = await write("First independent report of the zulu yankee handover.");
+      const supportB = await write("Second independent report of the zulu yankee handover.");
+      const supportC = await write("Sole report of the whiskey xray handover.");
+      const qualifierA = await write("Scheduling note that narrows the whiskey xray handover.");
+      const qualifierB = await write("Ownership note that narrows the whiskey xray handover.");
+
+      const consolidation = await fx.call("POST", "/v1/consolidations", {
+        key: agent.key,
+        body: {
+          subject_id: "user_rama",
+          claims: [
+            {
+              kind: "procedural",
+              statement: CORROBORATED,
+              sources: [
+                { observation_id: supportA, relation: "supports" },
+                { observation_id: supportB, relation: "supports" },
+              ],
+            },
+            {
+              // Three sources, one of them supporting. A depth that counted
+              // rows instead of support would rank this first on 3 against 2.
+              kind: "procedural",
+              statement: QUALIFIED,
+              sources: [
+                { observation_id: supportC, relation: "supports" },
+                { observation_id: qualifierA, relation: "qualifies" },
+                { observation_id: qualifierB, relation: "qualifies" },
+              ],
+            },
+          ],
+        },
+      });
+      expectOk(consolidation, 201);
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: "user_rama", task: CORROBORATED, max_tokens: 4000 },
+      });
+      expectOk(compiled);
+      const items = (compiled.body.data.items as {
+        claim: string;
+        score: number;
+        evidence_ids: string[];
+      }[]).filter((item) => item.claim === CORROBORATED || item.claim === QUALIFIED);
+      assert.equal(items.length, 2, "both permutations must survive retrieval");
+      assert.equal(items[0]!.score, items[1]!.score, "the fixture must actually tie on score");
+      // Without the corroboration key this falls through to the statement key,
+      // which prefers "whiskey ..." over "zulu ..." and returns QUALIFIED first.
+      assert.equal(
+        items[0]!.claim,
+        CORROBORATED,
+        "two supporting observations outrank one supporting and two qualifying",
+      );
+      // Citations are unchanged: a qualifier is still visible evidence, it is
+      // just not corroboration.
+      assert.equal(items[0]!.evidence_ids.length, 2);
+      assert.equal(items[1]!.evidence_ids.length, 3);
+    },
+  },
+  {
     name: "a deterministic claim links evidence without calling a model",
     async run(fx) {
       const agent = await fx.provision();

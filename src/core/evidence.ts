@@ -142,17 +142,32 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
   };
 }
 
-/** Citation ids are serialized only after their observation is authorized. */
-export async function loadAuthorizedEvidenceIds(
+export interface AuthorizedSource {
+  observationId: string;
+  relation: string;
+}
+
+/**
+ * Authorized sources per claim, relation kept.
+ *
+ * The relation is what separates corroboration from contradiction: counting a
+ * `contradicts` row as depth would make the most disputed claim in a store look
+ * like the best supported one. Callers that only need citations use
+ * `loadAuthorizedEvidenceIds` below and are unaffected.
+ *
+ * A source whose observation the caller may not read is absent here, so neither
+ * a citation nor a rank position can disclose that it exists.
+ */
+export async function loadAuthorizedSources(
   db: Db,
   principal: Principal,
   claimIds: string[],
-): Promise<Map<string, string[]>> {
-  const grouped = new Map<string, string[]>();
+): Promise<Map<string, AuthorizedSource[]>> {
+  const grouped = new Map<string, AuthorizedSource[]>();
   for (const group of chunk(claimIds)) {
     if (group.length === 0) continue;
-    const rows = await db.all<{ claim_id: string; observation_id: string }>(
-      `SELECT s.claim_id, s.observation_id
+    const rows = await db.all<{ claim_id: string; observation_id: string; relation: string }>(
+      `SELECT s.claim_id, s.observation_id, s.relation
          FROM claim_sources s
         WHERE s.claim_id IN (${group.map(() => "?").join(", ")})
           AND EXISTS (
@@ -170,9 +185,29 @@ export async function loadAuthorizedEvidenceIds(
     );
     for (const row of rows) {
       const list = grouped.get(row.claim_id) ?? [];
-      list.push(row.observation_id);
+      list.push({ observationId: row.observation_id, relation: row.relation });
       grouped.set(row.claim_id, list);
     }
   }
   return grouped;
+}
+
+/** Independent supporting observations behind a claim, authorization applied. */
+export function supportingDepth(sources: AuthorizedSource[] | undefined): number {
+  return (sources ?? []).filter((source) => source.relation === "supports").length;
+}
+
+/** Citation ids are serialized only after their observation is authorized. */
+export async function loadAuthorizedEvidenceIds(
+  db: Db,
+  principal: Principal,
+  claimIds: string[],
+): Promise<Map<string, string[]>> {
+  const sources = await loadAuthorizedSources(db, principal, claimIds);
+  return new Map(
+    [...sources].map(([claimId, rows]) => [
+      claimId,
+      rows.map((row) => row.observationId),
+    ]),
+  );
 }

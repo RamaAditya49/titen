@@ -2,7 +2,7 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import type { Principal } from "../../src/core/auth";
 import type { Db, Param } from "../../src/core/db";
-import { loadAuthorizedEvidenceIds } from "../../src/core/evidence";
+import { loadAuthorizedEvidenceIds, supportingDepth } from "../../src/core/evidence";
 import { packUnderBudget } from "../../src/core/rank";
 import { planFtsQuery, retrieveClaimCandidates } from "../../src/core/retrieval";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
@@ -133,6 +133,20 @@ test("hot retrieval SQL bounds candidates and drives evidence from claim sources
   ]);
 
   await loadAuthorizedEvidenceIds(db, principal, ["claim_late", "claim_early"]);
+  // The relation travels with the source so ranking can tell corroboration from
+  // contradiction. Counting rows instead would make the most disputed claim in a
+  // store look like the best supported one.
+  assert.match(capturedSql, /SELECT s\.claim_id, s\.observation_id, s\.relation/);
+  assert.equal(supportingDepth(undefined), 0);
+  assert.equal(
+    supportingDepth([
+      { observationId: "obs_a", relation: "supports" },
+      { observationId: "obs_b", relation: "supports" },
+      { observationId: "obs_c", relation: "contradicts" },
+      { observationId: "obs_d", relation: "qualifies" },
+    ]),
+    2,
+  );
   assert.match(capturedSql, /FROM claim_sources s/);
   assert.doesNotMatch(capturedSql, /JOIN observations/);
   assert.match(capturedSql, /EXISTS \([\s\S]*FROM observations o/);
