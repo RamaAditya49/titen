@@ -42,7 +42,7 @@ async function victim(directory: string) {
     subject_id: "subject_shutdown",
     kind: "tool_result",
     content: "Synthetic shutdown evidence.",
-    source: { type: "test" },
+    source: { type: "test", ref: "contract://maintenance" },
     trust: "verified",
   });
   const consolidation = await call(running.url, principal.key, "POST", "/v1/consolidations", {
@@ -96,7 +96,7 @@ async function multiphaseVictim(directory: string) {
     subject_id: "subject_multiphase_shutdown",
     kind: "tool_result",
     content: "Synthetic multiphase shutdown evidence.",
-    source: { type: "test" },
+    source: { type: "test", ref: "contract://maintenance" },
     trust: "verified",
   });
   const consolidation = await call(running.url, principal.key, "POST", "/v1/consolidations", {

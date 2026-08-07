@@ -2156,3 +2156,67 @@ async function importHistory(orgId: string, recordType: string, recordId: string
     params: [id, orgId, recordType, recordId, actorId, id, at],
   };
 }
+
+// --- @modelcontextprotocol/server-memory store ---
+
+/**
+ * The reference MCP memory server keeps its whole state in one file of
+ * newline-delimited JSON, one `{"type":"entity"|"relation", ...}` object per
+ * line. It is named `memory.jsonl` today and was named `memory.json` before
+ * 0.6.3, which renames the old file in place; both carry this same format.
+ *
+ * Parsing is here rather than in a runtime adapter because it is pure string
+ * work with no filesystem, and because `titen audit` reads the same files.
+ */
+export interface ReferenceEntity { name: string; entityType: string; observations: string[] }
+export interface ReferenceRelation { from: string; to: string; relationType: string }
+export interface ReferenceGraph { entities: ReferenceEntity[]; relations: ReferenceRelation[] }
+
+function referenceText(row: Record<string, unknown>, field: string, line: number): string {
+  const value = row[field];
+  if (typeof value !== "string" || value === "")
+    throw validationError(`Line ${line} of the memory store needs a non-empty "${field}".`);
+  return value;
+}
+
+/**
+ * Mirrors that server's own loader: lines it does not recognize are not part of
+ * the graph. A line it *would* have accepted but that is malformed throws
+ * instead of being dropped, because an import that silently loses records is
+ * worse than one that refuses.
+ */
+export function parseReferenceGraph(text: string): ReferenceGraph {
+  const graph: ReferenceGraph = { entities: [], relations: [] };
+  for (const [index, raw] of text.split("\n").entries()) {
+    const line = index + 1;
+    if (!raw.trim()) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw validationError(`Line ${line} of the memory store is not valid JSON.`);
+    }
+    if (!isRecord(parsed)) continue;
+    if (parsed.type === "entity") {
+      const observations = parsed.observations ?? [];
+      if (!Array.isArray(observations))
+        throw validationError(`Line ${line} of the memory store has non-array "observations".`);
+      graph.entities.push({
+        name: referenceText(parsed, "name", line),
+        entityType: referenceText(parsed, "entityType", line),
+        observations: observations.map((observation, position) => {
+          if (typeof observation !== "string" || observation === "")
+            throw validationError(`Line ${line} observation ${position + 1} is not a non-empty string.`);
+          return observation;
+        }),
+      });
+    } else if (parsed.type === "relation") {
+      graph.relations.push({
+        from: referenceText(parsed, "from", line),
+        to: referenceText(parsed, "to", line),
+        relationType: referenceText(parsed, "relationType", line),
+      });
+    }
+  }
+  return graph;
+}

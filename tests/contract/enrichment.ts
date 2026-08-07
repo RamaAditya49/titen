@@ -399,7 +399,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
         visibility: scope?.visibility ?? "private",
         ...(scope ? { workspace_id: scope.workspaceId } : {}),
         ...(occurredAt ? { occurred_at: occurredAt } : {}),
-        source: { type: "contract_fixture" },
+        source: { type: "contract_fixture", ref: "contract://enrichment" },
       },
     });
     assert.equal(response.status, 201);
@@ -479,7 +479,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       subject_id: "subject_capability_recovery",
       kind: "user_statement",
       content: "Corrected extraction startup must recover this canonical evidence.",
-      source: { type: "contract_fixture" },
+      source: { type: "contract_fixture", ref: "contract://enrichment" },
     },
   });
   assert.equal(acceptedWithoutJob.status, 201);
@@ -608,7 +608,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       subject_id: "subject_capability_snapshot",
       kind: "user_statement",
       content: "Capability provenance is frozen before traffic.",
-      source: { type: "contract_fixture" },
+      source: { type: "contract_fixture", ref: "contract://enrichment" },
     },
   });
   assert.equal(mutableObservation.status, 201);

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.RamaAditya49/titen-memory",
+  "title": "Titen Memory",
+  "description": "Evidence-grounded agent memory with mandatory provenance, on local SQLite or Cloudflare D1",
+  "version": "0.6.1",
+  "websiteUrl": "https://titen.dev",
+  "repository": {
+    "url": "https://github.com/RamaAditya49/titen",
+    "source": "github",
+    "id": "1315644626"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "titen-memory",
+      "version": "0.6.1",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TITEN_MCP_URL",
+          "description": "Optional. Streamable HTTP /mcp endpoint of a running Titen service. Set together with TITEN_API_KEY to use a shared store instead of the local one.",
+          "format": "string",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TITEN_API_KEY",
+          "description": "Optional. API key for the Titen service named by TITEN_MCP_URL. Required only when TITEN_MCP_URL is set.",
+          "format": "string",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

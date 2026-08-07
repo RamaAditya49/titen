@@ -280,11 +280,39 @@ Visibility defaults to `private`. `team` requires `workspace_id` and an active
 non-reader membership; this predicate is applied before retrieval, export,
 events, Atlas limits/counts, and webhook delivery.
 
+`source.type` and `source.ref` are both **required**. `source.ref` became
+mandatory in 0.6.0, matching the obligation the MCP `titen_remember` tool spec
+already stated; a write without it returns `400 VALIDATION_ERROR`. Existing rows
+stored before 0.6.0 may still have a null `source_ref` and are unaffected.
+
 `source.id` is an optional stable source-event identity. Re-ingesting the exact
 same normalized observation with that ID converges on the original canonical
 record even after the request `Idempotency-Key` expires. Reusing the ID with
 different content or scope creates a distinct canonical hash; `source.ref`
 remains a provenance pointer and is not treated as a uniqueness key.
+
+#### Recalled provenance
+
+`recalled` is a reserved, server-assigned `source.type`: it marks content Titen
+itself handed back through a context pack, which is the write that turns a
+memory store into an echo chamber. A caller may never author it.
+
+- Declaring `"source": {"type": "recalled"}` returns `400 VALIDATION_ERROR`.
+- Passing the optional top-level `context_token` from a
+  [`POST /v1/context/compile`](#post-v1contextcompile) response stamps the
+  stored row with `source_type` `recalled`, **overriding** whatever
+  `source.type` the caller declared.
+- A `context_token` that was not issued to this principal — unknown, foreign
+  organization, or another actor without a live handoff — returns
+  `400 VALIDATION_ERROR` rather than being ignored. Silently downgrading an
+  unrecognized token would record a recalled write as fresh input, which is the
+  exact mislabelling this rule exists to prevent.
+- A `recalled` observation cannot be cited as claim evidence:
+  `POST /v1/consolidations` refuses it with `400 VALIDATION_ERROR`, so the loop
+  is closed rather than merely labelled.
+
+The token is verified against the stored context run and the same read boundary
+`GET /v1/context/:id` enforces. It is opaque; do not parse it.
 
 ### `DELETE /v1/observations/:id`
 
@@ -381,6 +409,13 @@ scope reports the normalized `as_of` instant. The response includes selected cla
 evidence IDs, trust, temporal validity, conflicts, score components, token usage,
 and a `context_id`. Each item carries `untrusted: true`; this is structured
 provenance for the caller, not an instruction-enforcement claim.
+
+The response also carries `context_token`, a server-issued opaque token for this
+run. Pass it as `context_token` on any `POST /v1/observations` derived from this
+pack and the write is stamped `recalled`; see
+[recalled provenance](#recalled-provenance). It is what makes a recall loop a
+server verdict instead of a self-report, so a recall-loop rate measured from
+Titen's own store is checkable rather than caller-declared.
 
 Project scope is fail-closed:
 
@@ -925,8 +960,10 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes nine wire tools in eight ordinary-agent
-families:
+The implemented `/mcp` endpoint exposes nine native wire tools in eight
+ordinary-agent families, plus the nine
+[reference-server compatibility](#reference-memory-server-compatibility) names
+below, for eighteen tools in `tools/list`:
 
 - `titen_project_resolve`;
 - `titen_remember`;
@@ -954,6 +991,91 @@ conservative when a tool can mutate or is idempotent only with an optional key.
 credential needs ordinary `mcp:call` authority and the separate
 `context:compile:all` capability for that flag; omitting the flag and
 `project_id` remains unscoped-only.
+
+### Reference memory-server compatibility
+
+Titen also serves the nine tool names of
+`@modelcontextprotocol/server-memory` — `create_entities`, `create_relations`,
+`add_observations`, `delete_entities`, `delete_observations`,
+`delete_relations`, `read_graph`, `search_nodes`, `open_nodes` — with that
+server's argument shapes, response shapes, tool descriptions and annotations
+reproduced from its `src/memory/index.ts`. Each returns both the text content
+that server returns and the same object as `structuredContent`. The `titen_*`
+tools are unchanged; this is an addition, not a mode.
+
+Switching is one line of MCP configuration — replace the reference server's
+command with `npx -y titen-memory mcp` and keep the same tool vocabulary. No
+`outputSchema` is published for these tools, and the reference server's
+`memory://knowledge-graph` resource and its resource subscriptions are not
+served; tool calls are.
+
+**Adopting an existing store.** On the first local-mode start, `titen mcp`
+imports `MEMORY_FILE_PATH` if set, otherwise `./memory.jsonl`, otherwise
+`./memory.json`, in the reference server's newline-delimited JSON format.
+Import runs through these same MCP tools, reports its counts on stderr, and
+records the source path in `~/.titen/memory.db.imported` so a later start does
+not resurrect entities deleted since. A failed import leaves that marker
+unwritten and retries on the next start; entities are created before their
+observations are added, so a resumed import loses nothing. Lines that are
+neither an entity nor a relation are ignored as that server ignores them; a
+malformed entity or relation line fails the import rather than being dropped.
+
+**How the graph is stored.** Every record lives under the subject
+`knowledge_graph` with `private` visibility, so each principal has its own
+graph exactly as each client configuration had its own `memory.json`, and
+Titen's subject-scoped retrieval can search the whole graph in one pass:
+
+| Reference concept | Titen record |
+| --- | --- |
+| entity (`name`, `entityType`) | observation, `source_ref` `memory://entity`, `agent_id` the name, content the type |
+| entity observation string | observation, `source_ref` `memory://observation`, content verbatim |
+| relation (`from`, `to`, `relationType`) | observation, `source_ref` `memory://relation`, content the JSON triple |
+| — | one `semantic_fact` claim per entity and per observation, `"<name>: <text>"`, which is what `search_nodes` ranks |
+
+Those observations are canonical and round-trip exactly; the claims are a
+searchable projection, so a statement longer than the 4,000-character claim
+limit is truncated there while the observation keeps the full text.
+
+**`search_nodes` is the one tool that is not a reimplementation.** The
+reference server lower-cases the query and runs a substring scan over the whole
+graph re-read from disk, so a query phrased as a question matches nothing.
+Titen compiles the query through ordinary retrieval — stemmed FTS, ranking, and
+the vector index when one is configured — and returns entities best-first,
+bounded by the compiler's candidate and token ceilings rather than returning
+every substring hit. Relations still reach outside the matched set, as they do
+there. An empty query returns the whole graph, matching that server's
+`includes("")`. Each search records a context run, as `titen_compile` does.
+Relation text is not searched, which is also true of the server being replaced.
+
+**Deleting is a purge.** `delete_entities`, `delete_observations` and
+`delete_relations` purge the underlying observations: content becomes
+irrecoverable, the row's hash and history survive, and dependent claims are
+revoked. Those three tools require `observations:purge` in addition to
+`mcp:call`, so a credential that may write memory cannot destroy it by way of
+the compatibility surface.
+
+**Bounds that the reference server does not have.** Entity names and relation
+endpoints are limited to 200 characters, entity and relation types to 120, and
+observation text to 32,000; empty strings are rejected. Duplicate entity names
+inside one file or one call collapse to the first, where that server would
+write two nodes with the same name.
+
+### Local mode
+
+`titen mcp` (`npx titen-memory mcp`) with neither `TITEN_MCP_URL` nor
+`TITEN_API_KEY` set serves the same MCP surface over stdio against
+`~/.titen/memory.db`, creating that store on first run. It is an additional
+entry point, not a relaxation: the store is provisioned with an ordinary
+organization, workspace (`Local`), project (reference `local`) and owner
+principal, and every request is authenticated and authorized by the same core
+predicates a served deployment uses. The owner credential is a real API key row;
+its raw value is written once to `~/.titen/memory.db.key` with mode `0600` so a
+restart reuses one owner instead of minting a credential per process.
+
+Nothing listens on a socket, no request leaves the process, and no embedding
+provider is configured, so retrieval is lexical FTS only and
+`meta.degraded.vector` reports `disabled`. Setting exactly one of the two
+variables remains an error rather than a silent downgrade to the local store.
 
 The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
 `GET /mcp` therefore returns `405`. A present `Origin` must match the request URL

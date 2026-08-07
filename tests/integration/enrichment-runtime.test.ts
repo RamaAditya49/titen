@@ -58,7 +58,7 @@ test("the Bun timer derives recallable memory without an operator drain", async 
       subject_id: "subject_runtime",
       kind: "user_statement",
       content: "The Bun timer should enrich this raw conversation.",
-      source: { type: "runtime_fixture" },
+      source: { type: "runtime_fixture", ref: "contract://enrichment-runtime" },
     });
     assert.equal(observation.response.status, 201);
 
@@ -183,7 +183,7 @@ test("an incomplete HTTP completion leaves no durable semantic output", async ()
         subject_id: "subject_incomplete",
         kind: "user_statement",
         content: "Synthetic incomplete completion evidence.",
-        source: { type: "test" },
+        source: { type: "test", ref: "contract://enrichment-runtime" },
       }),
     });
     assert.equal(observation.status, 201);
@@ -246,7 +246,7 @@ test("the Bun drain route outlives the default ten-second idle timeout", async (
         subject_id: "subject_slow",
         kind: "user_statement",
         content: "Synthetic slow provider evidence.",
-        source: { type: "test" },
+        source: { type: "test", ref: "contract://enrichment-runtime" },
       }),
     })).status, 201);
     const started = performance.now();
@@ -301,7 +301,7 @@ test("the Bun drain returns a retryable result at the extraction timeout", async
         subject_id: "subject_timeout",
         kind: "user_statement",
         content: "Synthetic timeout evidence.",
-        source: { type: "test" },
+        source: { type: "test", ref: "contract://enrichment-runtime" },
       }),
     })).status, 201);
     const drain = await fetch(`${running.url}/v1/enrichment/drain?limit=1`, {

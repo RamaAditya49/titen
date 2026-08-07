@@ -315,6 +315,124 @@ export const CASES: Case[] = [
     },
   },
   {
+    /**
+     * The write path's provenance is only worth measuring while it is a server
+     * verdict. This is the fail-closed check for that: if a forged `recalled`
+     * write is ever accepted, the recall-loop count becomes self-declared and
+     * every number built on it is worthless (#280).
+     */
+    name: "recalled provenance is server-issued, unforgeable, and closes the loop",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subjectId = `recall_loop_${fx.runtime}`;
+
+      // A pointer back to the origin is mandatory, not advisory. This omits
+      // `source.ref` on purpose — do not "fix" it by adding one.
+      expectError(
+        await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({ subject_id: subjectId, source: { type: "tool" } }),
+        }),
+        400,
+        "VALIDATION_ERROR",
+      );
+
+      // Forging the stamp by declaring it.
+      expectError(
+        await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({
+            subject_id: subjectId,
+            source: { type: "recalled", ref: "loop#forged" },
+          }),
+        }),
+        400,
+        "VALIDATION_ERROR",
+      );
+
+      // Forging the stamp by inventing the token it is issued from. Refusing
+      // rather than ignoring it keeps an unrecognized token from silently
+      // recording a recalled write as fresh input.
+      expectError(
+        await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({
+            subject_id: subjectId,
+            context_token: "ctx_00000000000000000000000000000000",
+          }),
+        }),
+        400,
+        "VALIDATION_ERROR",
+      );
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: subjectId, task: "what do we know about this deploy", max_tokens: 1200 },
+      });
+      expectOk(compiled);
+      const token = compiled.body.data.context_token as string;
+      assert.equal(typeof token, "string", "compile must issue a context token");
+
+      // Another organization's token is not a token here.
+      const stranger = await fx.provision();
+      const strangerCompile = await fx.call("POST", "/v1/context/compile", {
+        key: stranger.key,
+        body: { subject_id: subjectId, task: "borrowed pack", max_tokens: 1200 },
+      });
+      expectOk(strangerCompile);
+      expectError(
+        await fx.call("POST", "/v1/observations", {
+          key: agent.key,
+          body: observation({
+            subject_id: subjectId,
+            context_token: strangerCompile.body.data.context_token,
+          }),
+        }),
+        400,
+        "VALIDATION_ERROR",
+      );
+
+      // A caller carrying a genuine token cannot override the stamp either.
+      const stamped = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: observation({
+          subject_id: subjectId,
+          content: "The compiled pack said deploys need a rollback smoke, so I stored that.",
+          context_token: token,
+          source: { type: "tool", ref: "loop#stamped" },
+        }),
+      });
+      expectOk(stamped, 201);
+      const observationId = stamped.body.data.observation_id as string;
+      const stored = await fx.query<{ source_type: string }>(
+        `SELECT source_type FROM observations WHERE id = ?`,
+        [observationId],
+      );
+      assert.equal(
+        stored[0]?.source_type,
+        "recalled",
+        "a write carrying a context token must be stamped recalled by the server",
+      );
+
+      // Closed, not merely labelled.
+      expectError(
+        await fx.call("POST", "/v1/consolidations", {
+          key: agent.key,
+          body: {
+            subject_id: subjectId,
+            claims: [{
+              kind: "semantic_fact",
+              statement: "Deploys need a rollback smoke.",
+              sources: [{ observation_id: observationId, relation: "supports" }],
+            }],
+          },
+        }),
+        400,
+        "VALIDATION_ERROR",
+      );
+    },
+  },
+  {
     name: "stable source identities and canonical claims converge outside request-key replay",
     async run(fx) {
       const agent = await fx.provision();
@@ -3431,7 +3549,9 @@ export const CASES: Case[] = [
         key: agent.key,
         body: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
       });
-      assert.equal(tools.body.result.tools.length, 9);
+      // Nine native `titen_*` tools plus the nine @modelcontextprotocol/server-memory
+// names served for drop-in substitution (#279).
+      assert.equal(tools.body.result.tools.length, 18);
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_remember"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_consolidate"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_compile"));

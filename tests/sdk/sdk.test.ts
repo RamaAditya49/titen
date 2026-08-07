@@ -144,7 +144,7 @@ test("claim lifecycle calls resolve through the client", async () => {
     subject_id: "user_sdk_lifecycle",
     kind: "user_statement",
     content: "The old retry budget was three attempts.",
-    source: { type: "chat" },
+    source: { type: "chat", ref: "contract://sdk" },
     trust: "verified",
   });
   const first = await titen.consolidate("user_sdk_lifecycle", [
@@ -211,7 +211,7 @@ test("key management round-trips and a scoped key is enforced", async () => {
         subject_id: "user_sdk",
         kind: "tool_result",
         content: "This write is not permitted for a compile-only key.",
-        source: { type: "tool" },
+        source: { type: "tool", ref: "contract://sdk" },
       }),
     (error: unknown) => {
       assert.ok(error instanceof TitenError, "the SDK must throw TitenError");
@@ -679,7 +679,7 @@ test("typed mutation sends one idempotency header and the capability matrix stay
       subject_id: "subject",
       kind: "tool_result",
       content: "captured",
-      source: { type: "test" },
+      source: { type: "test", ref: "contract://sdk" },
     },
     { idempotencyKey: "retry-one" },
   );

@@ -1,17 +1,28 @@
 import type { RequestContext, Result } from "./http";
-import { ApiError } from "./errors";
-import { appendObservation } from "./observations";
+import { ApiError, validationError } from "./errors";
+import { requireScope } from "./auth";
+import { recordAccessParams, recordAccessSql } from "./authorization";
+import { chunk } from "./db";
+import { appendObservation, isRedactedObservation, purgeObservation } from "./observations";
 import { compileContext, recordFeedback } from "./context";
 import { consolidate } from "./claims";
 import { resolveProject } from "./projects";
 import { getCheckpoint, saveCheckpoint } from "./checkpoints";
 import { acquireLease, createHandoff } from "./collaboration";
+import type {
+  ReferenceEntity,
+  ReferenceGraph,
+  ReferenceRelation,
+} from "./portability";
 import {
   CLAIM_KINDS,
   CLAIM_RELATIONS,
+  LIMITS,
   OBSERVATION_KINDS,
   TRUST_LEVELS,
   VISIBILITIES,
+  requireObject,
+  requireString,
 } from "./validate";
 import { TITEN_VERSION } from "./version";
 
@@ -273,6 +284,587 @@ const toolLeaseAcquire = (ctx: RequestContext, args: Record<string, unknown>) =>
 const toolHandoff = (ctx: RequestContext, args: Record<string, unknown>) =>
   callDomain(ctx, "POST", "/v1/handoffs", args, createHandoff);
 
+// --- @modelcontextprotocol/server-memory compatibility ---
+
+/**
+ * The nine tool names of `@modelcontextprotocol/server-memory`, served against
+ * Titen observations and claims.
+ *
+ * Schemas, descriptions, annotations and response shapes are reproduced from
+ * that server's `src/memory/index.ts` rather than from memory: the entire offer
+ * is that switching costs one line of MCP configuration, so an argument that
+ * differs by one field name breaks a caller silently.
+ *
+ * Mapping, and what it costs:
+ *
+ * - Every record lives under one subject, `knowledge_graph`, because Titen
+ *   retrieval is subject-scoped and a graph split across subjects could not be
+ *   searched in one pass. The graph is `private` visibility, so each principal
+ *   sees its own, exactly as each config gets its own `memory.json`.
+ * - An entity is an observation holding its `entityType`, keyed by name in
+ *   `agent_id`; each of its observation strings is another observation with the
+ *   text verbatim; a relation is an observation holding the triple as JSON.
+ *   Those rows are canonical and round-trip exactly.
+ * - Each entity and each observation string also materializes one
+ *   `semantic_fact` claim, `"<name>: <text>"`, which is what `search_nodes`
+ *   ranks. Statements are truncated to the claim limit, so the claim is a
+ *   searchable projection and the observation stays the evidence of record.
+ * - Deleting purges: content becomes irrecoverable, its hash and history
+ *   survive, and dependent claims are revoked. That is stronger than the
+ *   reference server's file rewrite, and it needs `observations:purge`.
+ */
+const COMPAT_SUBJECT = "knowledge_graph";
+const COMPAT_SOURCE_TYPE = "mcp_memory";
+const ENTITY_REF = "memory://entity";
+const OBSERVATION_REF = "memory://observation";
+const RELATION_REF = "memory://relation";
+
+const ENTITY_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string", description: "The name of the entity" },
+    entityType: { type: "string", description: "The type of the entity" },
+    observations: {
+      type: "array",
+      items: { type: "string" },
+      description: "An array of observation contents associated with the entity",
+    },
+  },
+  required: ["name", "entityType", "observations"],
+  additionalProperties: false,
+};
+
+const RELATION_SCHEMA = {
+  type: "object",
+  properties: {
+    from: { type: "string", description: "The name of the entity where the relation starts" },
+    to: { type: "string", description: "The name of the entity where the relation ends" },
+    relationType: { type: "string", description: "The type of the relation" },
+  },
+  required: ["from", "to", "relationType"],
+  additionalProperties: false,
+};
+
+const compatSchema = (properties: Record<string, unknown>) => ({
+  type: "object",
+  properties,
+  required: Object.keys(properties),
+  additionalProperties: false,
+});
+
+const COMPAT_TOOLS = [
+  {
+    name: "create_entities",
+    title: "Create Entities",
+    description: "Create multiple new entities in the knowledge graph",
+    inputSchema: compatSchema({
+      entities: {
+        type: "array",
+        items: ENTITY_SCHEMA,
+        description: "An array of entities to create",
+      },
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "create_relations",
+    title: "Create Relations",
+    description:
+      "Create multiple new relations between entities in the knowledge graph. Relations should be in active voice",
+    inputSchema: compatSchema({
+      relations: {
+        type: "array",
+        items: RELATION_SCHEMA,
+        description: "An array of relations to create",
+      },
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "add_observations",
+    title: "Add Observations",
+    description: "Add new observations to existing entities in the knowledge graph",
+    inputSchema: compatSchema({
+      observations: {
+        type: "array",
+        description: "An array of per-entity observation additions",
+        items: {
+          type: "object",
+          properties: {
+            entityName: { type: "string", description: "The name of the entity to add the observations to" },
+            contents: {
+              type: "array",
+              items: { type: "string" },
+              description: "An array of observation contents to add",
+            },
+          },
+          required: ["entityName", "contents"],
+          additionalProperties: false,
+        },
+      },
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "delete_entities",
+    title: "Delete Entities",
+    description: "Delete multiple entities and their associated relations from the knowledge graph",
+    inputSchema: compatSchema({
+      entityNames: {
+        type: "array",
+        items: { type: "string" },
+        description: "An array of entity names to delete",
+      },
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "delete_observations",
+    title: "Delete Observations",
+    description: "Delete specific observations from entities in the knowledge graph",
+    inputSchema: compatSchema({
+      deletions: {
+        type: "array",
+        description: "An array of per-entity observation deletions",
+        items: {
+          type: "object",
+          properties: {
+            entityName: { type: "string", description: "The name of the entity containing the observations" },
+            observations: {
+              type: "array",
+              items: { type: "string" },
+              description: "An array of observations to delete",
+            },
+          },
+          required: ["entityName", "observations"],
+          additionalProperties: false,
+        },
+      },
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "delete_relations",
+    title: "Delete Relations",
+    description: "Delete multiple relations from the knowledge graph",
+    inputSchema: compatSchema({
+      relations: {
+        type: "array",
+        items: RELATION_SCHEMA,
+        description: "An array of relations to delete",
+      },
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "read_graph",
+    title: "Read Graph",
+    description: "Read the entire knowledge graph",
+    inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "search_nodes",
+    title: "Search Nodes",
+    description: "Search for nodes in the knowledge graph based on a query",
+    inputSchema: compatSchema({
+      query: {
+        type: "string",
+        description: "The search query to match against entity names, types, and observation content",
+      },
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "open_nodes",
+    title: "Open Nodes",
+    description: "Open specific nodes in the knowledge graph by their names",
+    inputSchema: compatSchema({
+      names: { type: "array", items: { type: "string" }, description: "An array of entity names to retrieve" },
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+];
+
+interface CompatReply {
+  content: { type: "text"; text: string }[];
+  structuredContent: unknown;
+}
+
+/** The reference server prints its results; both fields carry the same result. */
+const compatReply = (text: unknown, structuredContent: unknown): CompatReply => ({
+  content: [{
+    type: "text",
+    text: typeof text === "string" ? text : JSON.stringify(text, null, 2),
+  }],
+  structuredContent,
+});
+
+/** Reuses the request validators, which also reject unsafe control characters. */
+const compatText = (value: unknown, max: number, path: string): string =>
+  requireString({ value }, "value", max, path);
+
+function compatList<Item>(
+  args: Record<string, unknown>,
+  field: string,
+  parse: (row: unknown, path: string) => Item,
+): Item[] {
+  const value = args[field];
+  if (!Array.isArray(value)) throw validationError(`Field "${field}" must be an array.`);
+  return value.map((row, index) => parse(row, `${field}[${index}]`));
+}
+
+const compatStrings = (value: unknown, path: string): string[] => {
+  if (!Array.isArray(value)) throw validationError(`Field "${path}" must be an array.`);
+  return value.map((item, index) => compatText(item, LIMITS.content, `${path}[${index}]`));
+};
+
+const compatEntity = (row: unknown, path: string): ReferenceEntity => {
+  const entity = requireObject(row, path);
+  return {
+    name: compatText(entity.name, LIMITS.identifier, `${path}.name`),
+    entityType: compatText(entity.entityType, LIMITS.label, `${path}.entityType`),
+    observations: compatStrings(entity.observations ?? [], `${path}.observations`),
+  };
+};
+
+const compatRelation = (row: unknown, path: string): ReferenceRelation => {
+  const relation = requireObject(row, path);
+  return {
+    from: compatText(relation.from, LIMITS.identifier, `${path}.from`),
+    to: compatText(relation.to, LIMITS.identifier, `${path}.to`),
+    relationType: compatText(relation.relationType, LIMITS.label, `${path}.relationType`),
+  };
+};
+
+interface CompatStore {
+  /** Insertion-ordered, like the lines of the file this replaces. */
+  entities: Map<string, { entityId: string; entityType: string; observations: { id: string; content: string }[] }>;
+  relations: { id: string; from: string; to: string; relationType: string }[];
+  /** Observation id to the entity it belongs to, for mapping retrieval hits back. */
+  owner: Map<string, string>;
+}
+
+/**
+ * Reads the whole graph on every call, exactly as the server it replaces
+ * re-reads its file. Only the *search* path had to stop scanning; if a store
+ * ever outgrows one read, the mutating tools are where to push filters into SQL.
+ */
+async function loadCompatStore(ctx: RequestContext): Promise<CompatStore> {
+  const principal = ctx.principal!;
+  const rows = await ctx.app.db.all<{
+    id: string;
+    agent_id: string | null;
+    content: string;
+    content_hash: string;
+    source_ref: string | null;
+  }>(
+    `SELECT o.id, o.agent_id, o.content, o.content_hash, o.source_ref
+       FROM observations o
+      WHERE o.org_id = ? AND o.subject_id = ? AND o.source_type = ?
+        AND o.source_ref IN (?, ?, ?)
+        AND ${recordAccessSql("o")}
+      ORDER BY o.ingested_at, o.id`,
+    [
+      principal.orgId,
+      COMPAT_SUBJECT,
+      COMPAT_SOURCE_TYPE,
+      ENTITY_REF,
+      OBSERVATION_REF,
+      RELATION_REF,
+      ...recordAccessParams(principal.principalId),
+    ],
+  );
+  // A purged row keeps its hash and its history but is no longer in the graph.
+  const live = rows.filter((row) => !isRedactedObservation(row.content, row.content_hash));
+  const store: CompatStore = { entities: new Map(), relations: [], owner: new Map() };
+  for (const row of live) {
+    if (row.source_ref !== ENTITY_REF || !row.agent_id || store.entities.has(row.agent_id)) continue;
+    store.entities.set(row.agent_id, { entityId: row.id, entityType: row.content, observations: [] });
+    store.owner.set(row.id, row.agent_id);
+  }
+  for (const row of live) {
+    if (row.source_ref === OBSERVATION_REF) {
+      const entity = row.agent_id ? store.entities.get(row.agent_id) : undefined;
+      if (!entity) continue;
+      entity.observations.push({ id: row.id, content: row.content });
+      store.owner.set(row.id, row.agent_id!);
+    } else if (row.source_ref === RELATION_REF) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(row.content);
+      } catch {
+        continue; // Not a relation this server wrote, so not part of the graph.
+      }
+      const relation = parsed as ReferenceRelation;
+      if (typeof relation?.from === "string" && typeof relation?.to === "string"
+        && typeof relation?.relationType === "string")
+        store.relations.push({ id: row.id, ...relation });
+    }
+  }
+  return store;
+}
+
+const compatGraph = (store: CompatStore): ReferenceGraph => ({
+  entities: [...store.entities].map(([name, entity]) => ({
+    name,
+    entityType: entity.entityType,
+    observations: entity.observations.map((observation) => observation.content),
+  })),
+  relations: store.relations.map(({ from, to, relationType }) => ({ from, to, relationType })),
+});
+
+/** Relations reach outside the matched set so a caller can see its edges. */
+const compatSubgraph = (graph: ReferenceGraph, entities: ReferenceEntity[]): ReferenceGraph => {
+  const names = new Set(entities.map((entity) => entity.name));
+  return {
+    entities,
+    relations: graph.relations.filter((relation) => names.has(relation.from) || names.has(relation.to)),
+  };
+};
+
+async function appendCompat(
+  ctx: RequestContext,
+  ref: string,
+  content: string,
+  agentId: string | null,
+): Promise<string> {
+  const result = await callDomain(ctx, "POST", "/v1/observations", {
+    subject_id: COMPAT_SUBJECT,
+    kind: ref === OBSERVATION_REF ? "user_statement" : "system_event",
+    content,
+    agent_id: agentId,
+    source: { type: COMPAT_SOURCE_TYPE, ref },
+  }, appendObservation) as { data: { observation_id: string } };
+  return result.data.observation_id;
+}
+
+const compatStatement = (name: string, text: string) =>
+  `${name}: ${text}`.slice(0, LIMITS.statement);
+
+/** Materializes the searchable projection of rows already written as evidence. */
+async function materializeCompat(
+  ctx: RequestContext,
+  claims: { statement: string; observationId: string }[],
+): Promise<void> {
+  for (const group of chunk(claims, LIMITS.claimsPerConsolidation)) {
+    if (!group.length) continue;
+    await callDomain(ctx, "POST", "/v1/consolidations", {
+      subject_id: COMPAT_SUBJECT,
+      claims: group.map((claim) => ({
+        kind: "semantic_fact",
+        statement: claim.statement,
+        sources: [{ observation_id: claim.observationId, relation: "supports" }],
+      })),
+    }, consolidate);
+  }
+}
+
+/**
+ * Deleting evidence is a power the MCP surface did not previously hold, so it
+ * asks for the purge capability by name rather than inheriting `mcp:call`.
+ */
+async function purgeCompat(ctx: RequestContext, ids: string[]): Promise<void> {
+  requireScope(ctx.principal!, "observations:purge");
+  for (const id of ids)
+    await callDomain(
+      ctx, "DELETE", `/v1/observations/${encodeURIComponent(id)}`, {}, purgeObservation, { id },
+    );
+}
+
+const compatCreateEntities = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const requested = compatList(args, "entities", compatEntity);
+  const store = await loadCompatStore(ctx);
+  const created: ReferenceEntity[] = [];
+  const claims: { statement: string; observationId: string }[] = [];
+  for (const entity of requested) {
+    if (store.entities.has(entity.name) || created.some((done) => done.name === entity.name)) continue;
+    claims.push({
+      statement: compatStatement(entity.name, entity.entityType),
+      observationId: await appendCompat(ctx, ENTITY_REF, entity.entityType, entity.name),
+    });
+    for (const text of entity.observations)
+      claims.push({
+        statement: compatStatement(entity.name, text),
+        observationId: await appendCompat(ctx, OBSERVATION_REF, text, entity.name),
+      });
+    created.push(entity);
+  }
+  await materializeCompat(ctx, claims);
+  return compatReply(created, { entities: created });
+};
+
+const compatCreateRelations = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const requested = compatList(args, "relations", compatRelation);
+  const store = await loadCompatStore(ctx);
+  const key = (relation: ReferenceRelation) =>
+    JSON.stringify([relation.from, relation.to, relation.relationType]);
+  const known = new Set(store.relations.map(key));
+  const created: ReferenceRelation[] = [];
+  for (const relation of requested) {
+    if (known.has(key(relation))) continue;
+    known.add(key(relation));
+    await appendCompat(ctx, RELATION_REF, JSON.stringify(relation), null);
+    created.push(relation);
+  }
+  return compatReply(created, { relations: created });
+};
+
+const compatAddObservations = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const requested = compatList(args, "observations", (row, path) => {
+    const entry = requireObject(row, path);
+    return {
+      entityName: compatText(entry.entityName, LIMITS.identifier, `${path}.entityName`),
+      contents: compatStrings(entry.contents ?? [], `${path}.contents`),
+    };
+  });
+  const store = await loadCompatStore(ctx);
+  // The reference server throws before saving anything, so a missing entity
+  // leaves the whole call without effect. Check every name before writing one.
+  for (const entry of requested)
+    if (!store.entities.has(entry.entityName))
+      throw validationError(`Entity with name ${entry.entityName} not found`);
+
+  const results: { entityName: string; addedObservations: string[] }[] = [];
+  const claims: { statement: string; observationId: string }[] = [];
+  for (const entry of requested) {
+    const entity = store.entities.get(entry.entityName)!;
+    const present = new Set(entity.observations.map((observation) => observation.content));
+    const added: string[] = [];
+    for (const text of entry.contents) {
+      if (present.has(text)) continue;
+      present.add(text);
+      claims.push({
+        statement: compatStatement(entry.entityName, text),
+        observationId: await appendCompat(ctx, OBSERVATION_REF, text, entry.entityName),
+      });
+      added.push(text);
+    }
+    results.push({ entityName: entry.entityName, addedObservations: added });
+  }
+  await materializeCompat(ctx, claims);
+  return compatReply(results, { results });
+};
+
+const compatDeleteEntities = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const names = new Set(compatList(args, "entityNames", (row, path) =>
+    compatText(row, LIMITS.identifier, path)));
+  const store = await loadCompatStore(ctx);
+  const ids: string[] = [];
+  for (const [name, entity] of store.entities) {
+    if (!names.has(name)) continue;
+    ids.push(entity.entityId, ...entity.observations.map((observation) => observation.id));
+  }
+  for (const relation of store.relations)
+    if (names.has(relation.from) || names.has(relation.to)) ids.push(relation.id);
+  await purgeCompat(ctx, ids);
+  const message = "Entities deleted successfully";
+  return compatReply(message, { success: true, message });
+};
+
+const compatDeleteObservations = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const requested = compatList(args, "deletions", (row, path) => {
+    const entry = requireObject(row, path);
+    return {
+      entityName: compatText(entry.entityName, LIMITS.identifier, `${path}.entityName`),
+      observations: compatStrings(entry.observations ?? [], `${path}.observations`),
+    };
+  });
+  const store = await loadCompatStore(ctx);
+  const ids: string[] = [];
+  for (const entry of requested) {
+    const entity = store.entities.get(entry.entityName);
+    if (!entity) continue; // Unknown entities are ignored, as in the reference server.
+    const removing = new Set(entry.observations);
+    for (const observation of entity.observations)
+      if (removing.has(observation.content)) ids.push(observation.id);
+  }
+  await purgeCompat(ctx, ids);
+  const message = "Observations deleted successfully";
+  return compatReply(message, { success: true, message });
+};
+
+const compatDeleteRelations = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const requested = compatList(args, "relations", compatRelation);
+  const store = await loadCompatStore(ctx);
+  const removing = new Set(requested.map((relation) =>
+    JSON.stringify([relation.from, relation.to, relation.relationType])));
+  await purgeCompat(
+    ctx,
+    store.relations
+      .filter((relation) =>
+        removing.has(JSON.stringify([relation.from, relation.to, relation.relationType])))
+      .map((relation) => relation.id),
+  );
+  const message = "Relations deleted successfully";
+  return compatReply(message, { success: true, message });
+};
+
+const compatReadGraph = async (ctx: RequestContext) => {
+  const graph = compatGraph(await loadCompatStore(ctx));
+  return compatReply(graph, { ...graph });
+};
+
+/**
+ * The one tool that is not a reimplementation. The server this replaces answers
+ * a search by lower-casing the whole query and running `String.includes` over
+ * every entity it just re-read from disk, so "which service handles refunds"
+ * matches nothing unless that exact sentence is stored. Here the query goes
+ * through the ordinary context compiler: FTS with stemming, ranking, and the
+ * vector index when one is configured. Results come back best-first.
+ */
+const compatSearchNodes = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const store = await loadCompatStore(ctx);
+  const graph = compatGraph(store);
+  // `includes("")` is true for every node, so an empty query is the whole graph.
+  if (typeof args.query === "string" && args.query.trim() === "")
+    return compatReply(graph, { ...graph });
+  const query = compatText(args.query, LIMITS.statement, "query");
+
+  const compiled = await callDomain(ctx, "POST", "/v1/context/compile", {
+    subject_id: COMPAT_SUBJECT,
+    task: query,
+    max_tokens: LIMITS.maxTokens,
+    max_candidates: LIMITS.maxCandidates,
+  }, compileContext) as { data: { items: { evidence_ids: string[] }[] } };
+
+  const ranked = new Set<string>();
+  for (const item of compiled.data.items)
+    for (const evidenceId of item.evidence_ids) {
+      const owner = store.owner.get(evidenceId);
+      if (owner) ranked.add(owner);
+    }
+  const byName = new Map(graph.entities.map((entity) => [entity.name, entity]));
+  const found = compatSubgraph(
+    graph,
+    [...ranked].map((name) => byName.get(name)).filter((entity) => entity !== undefined),
+  );
+  return compatReply(found, { ...found });
+};
+
+const compatOpenNodes = async (ctx: RequestContext, args: Record<string, unknown>) => {
+  const names = new Set(compatList(args, "names", (row, path) =>
+    compatText(row, LIMITS.identifier, path)));
+  const graph = compatGraph(await loadCompatStore(ctx));
+  const found = compatSubgraph(graph, graph.entities.filter((entity) => names.has(entity.name)));
+  return compatReply(found, { ...found });
+};
+
+const COMPAT_HANDLERS: Record<
+  string,
+  (ctx: RequestContext, args: Record<string, unknown>) => Promise<CompatReply>
+> = {
+  create_entities: compatCreateEntities,
+  create_relations: compatCreateRelations,
+  add_observations: compatAddObservations,
+  delete_entities: compatDeleteEntities,
+  delete_observations: compatDeleteObservations,
+  delete_relations: compatDeleteRelations,
+  read_graph: compatReadGraph,
+  search_nodes: compatSearchNodes,
+  open_nodes: compatOpenNodes,
+};
+
 // --- Dispatch ---
 
 const TOOL_HANDLERS: Record<string, (ctx: RequestContext, args: Record<string, unknown>) => Promise<unknown>> = {
@@ -401,14 +993,7 @@ async function dispatchRpc(
       return respond(rpcOk(id, {}));
 
     case "tools/list":
-      return respond(rpcOk(id, {
-        tools: TOOLS.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          annotations: tool.annotations,
-        })),
-      }));
+      return respond(rpcOk(id, { tools: [...TOOLS, ...COMPAT_TOOLS] }));
 
     case "tools/call": {
       const params = (request.params ?? {}) as {
@@ -418,14 +1003,15 @@ async function dispatchRpc(
       if (typeof params.name !== "string")
         return respond(rpcError(id, INVALID_PARAMS, "Missing tool name."));
       const handler = TOOL_HANDLERS[params.name];
-      if (!handler)
+      const compat = COMPAT_HANDLERS[params.name];
+      if (!handler && !compat)
         return respond(rpcError(id, INVALID_PARAMS, `Unknown tool: ${params.name}`));
 
       try {
-        const result = await handler(ctx, params.arguments ?? {});
-        return respond(rpcOk(id, {
-          content: [{ type: "text", text: JSON.stringify(result) }],
-        }));
+        const args = params.arguments ?? {};
+        return respond(rpcOk(id, compat
+          ? await compat(ctx, args)
+          : { content: [{ type: "text", text: JSON.stringify(await handler!(ctx, args)) }] }));
       } catch (error) {
         // A tool failure is a result the model must be able to read, not a
         // transport error that hides what went wrong.

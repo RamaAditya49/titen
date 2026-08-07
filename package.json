@@ -1,6 +1,7 @@
 {
   "name": "titen-memory",
   "version": "0.6.1",
+  "mcpName": "io.github.RamaAditya49/titen-memory",
   "description": "The Level 6 collaborative memory fabric for AI agents — evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
   "license": "Apache-2.0",
   "type": "module",

@@ -337,7 +337,7 @@ const readerRes = await fetch(`${URL_BASE}/v1/observations`, {
     subject_id: SUBJECT,
     kind: "tool_result",
     content: "a compile-only key must not be able to write this",
-    source: { type: "tool" },
+    source: { type: "tool", ref: "contract://verify-live" },
   }),
 });
 assert.equal(readerRes.status, 403, "a scoped key must be refused a write");
