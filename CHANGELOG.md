@@ -26,6 +26,59 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-07
+
+### Changed
+
+- **Breaking: `source.ref` is now required on every observation write.** A
+  caller that omitted it received `201`; it now receives `400
+  VALIDATION_ERROR`. The MCP tool spec already stated the obligation, so MCP
+  callers are unaffected; direct HTTP callers must add a pointer back to where
+  the content came from. **Migration:** add `"ref"` to the `source` object on
+  `POST /v1/observations` — any stable identifier for the origin (a commit sha,
+  a ticket id, a URL, a tool invocation id). There is no compatibility flag: an
+  entry that cannot be traced to an origin cannot be told apart from junk, which
+  is the whole point of the audit work below. Part of #280.
+
+### Added
+
+- **Zero-config local mode.** `npx titen-memory mcp` with no environment opens
+  or creates `~/.titen/memory.db`, provisions an organization, workspace,
+  project and owner as real rows, and serves MCP over stdio in-process — no HTTP
+  hop, no key to paste, no outbound call, FTS-only. The served mode and its auth
+  path are unchanged; this is an additional entry point, not a relaxation.
+  Closes #278.
+- **Drop-in compatibility with `@modelcontextprotocol/server-memory`.** The nine
+  reference-server tool names are served alongside the native ones, `search_nodes`
+  is routed through Titen retrieval rather than a substring scan, and an existing
+  `memory.json` is imported on first run. The switching cost is one line of MCP
+  config. Closes #279.
+- **`recalled` provenance is server-issued.** `POST /v1/context/compile` returns
+  a signed context token; an observation written while carrying it is stamped
+  `source.type: "recalled"` by the server, and a caller that merely declares
+  `recalled` is refused. Stateless HMAC, so no new table and no migration.
+  Known ceiling, stated in the code: the stamp proves the write was made while
+  holding a Titen-issued pack, not that its content came from that pack, so it
+  is a sound lower bound on the recall loop and never an upper one. Closes #280.
+- **`titen audit`.** Reports exact-duplicate, near-duplicate, recall-loop,
+  secret-pattern and stale rates over a `memory.json`, a Mem0 export, or a Titen
+  store. No network, no LLM, no upload, no composite score, no leaderboard. Its
+  first published run is against Titen's own store and opens by naming two
+  defects in this product. Closes #281.
+- **Concurrent-writer durability suite** on both runtimes, with the invariants
+  published before the run and each re-run with its primitive removed to prove
+  the suite can fail. Closes #282.
+
+### Evidence
+
+- [`docs/testing/2026-08-07-titen-audit-self-report.md`](./docs/testing/2026-08-07-titen-audit-self-report.md)
+  — 17.9% byte-identical duplicates six seconds after write, 96.7% never read
+  back, and the compatibility surface turning one entity into six. It also names
+  the number it cannot report: there is no 32-day Titen store, so nothing in it
+  bounds long-run accumulation.
+- [`docs/testing/2026-08-07-durability.md`](./docs/testing/2026-08-07-durability.md)
+  — invariants held on both runtimes under concurrent writers.
+
 ## [0.6.1] — 2026-08-05
 
 ### Fixed
@@ -839,7 +892,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.0
 [0.6.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.1
 [0.6.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.0
 [0.5.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.5.7
