@@ -2,7 +2,7 @@ import { first } from "./db";
 import type { Stmt } from "./db";
 import { notFound, validationError } from "./errors";
 import { requireScope } from "./auth";
-import { recordAccessParams, recordAccessSql } from "./authorization";
+import { contradictedSql, recordAccessParams, recordAccessSql } from "./authorization";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
@@ -377,10 +377,8 @@ export async function getContext(ctx: RequestContext): Promise<Result> {
     `SELECT c.id, c.kind, c.statement, c.confidence, c.trust, c.status,
             c.observer_id, c.valid_from, c.valid_to, i.score,
             i.score_components,
-            CASE WHEN c.status = 'disputed' OR EXISTS (
-              SELECT 1 FROM claim_sources s
-               WHERE s.claim_id = c.id AND s.relation = 'contradicts'
-            ) THEN 1 ELSE 0 END AS disputed
+            CASE WHEN c.status = 'disputed' OR ${contradictedSql("c")}
+              THEN 1 ELSE 0 END AS disputed
        FROM context_run_items i
        JOIN claims c ON c.id = i.claim_id
       WHERE i.context_id = ? AND c.org_id = ? AND c.subject_id = ?
@@ -388,6 +386,8 @@ export async function getContext(ctx: RequestContext): Promise<Result> {
         AND ${recordAccessSql("c")}
       ORDER BY i.position`,
     [
+      // `disputed` is projected before the WHERE clause binds.
+      ...recordAccessParams(principal.principalId),
       contextId,
       principal.orgId,
       run.subject_id,

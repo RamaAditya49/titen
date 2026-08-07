@@ -26,6 +26,57 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Changed
+
+- **The `disputed` signal now resolves through the caller's own authorization,
+  so a contradicting observation the caller may not read no longer marks the
+  claim ([#291](https://github.com/RamaAditya49/titen/issues/291)).** The flag
+  was computed from a bare `EXISTS` over `claim_sources` with no join to
+  `observations`, while the citations beside it were filtered correctly. A
+  principal who could not read the contradicting source still saw the claim
+  demoted by the 0.05 conflict term and still received a `conflicts[]` entry
+  whose `evidence_ids` omitted the source that caused it — told a contradiction
+  existed and told they could not see it. Fixed at all four query sites:
+  `POST /v1/context/compile` (lexical and vector candidates), `GET
+  /v1/context/:id`, and the Memory Atlas `conflict_freshness` lens. The
+  governance review queue was already correct and now shares the same predicate.
+
+  **Visible consequence:** in a store that already holds a cross-scope
+  contradiction, claims that were demoted for callers who cannot read the
+  contradicting source stop being demoted. Their `score` rises by up to `0.05`,
+  their `score_components.conflict` reads `1` instead of `0`, they leave
+  `conflicts[]`, and the resulting order can change. Nothing changes for a
+  caller who can read the source, and nothing changes for a claim whose own
+  `status` is `disputed` — that is the claim's own field, not an inference about
+  hidden evidence. There is no migration and no flag: the previous numbers were
+  the leak.
+
+  Response shapes, routes, and field names are unchanged, so this is a **patch**
+  under the table in
+  [release.md](./docs/engineering/release.md#versioning-and-channels) — the
+  minor slot signals shape breakage, and only values that were disclosing hidden
+  rows move here.
+
+### Fixed
+
+- **The Memory Atlas review queue no longer scans every observation in the
+  organization to decide `has_contradiction`.** It expressed the predicate as
+  `claim_sources JOIN observations`, and SQLite drove from `observations`,
+  evaluating the membership and retention subqueries for all of them once per
+  candidate. On a 424,168-claim store that is **79 s per compile against 17.8
+  ms**. The shared predicate added above uses a nested `EXISTS` so
+  `claim_sources` seeks its own primary key, and the review queue now uses it.
+  Found by benchmarking the change above; the dual-runtime contract suite passed
+  on both query shapes, because its stores hold tens of rows.
+
+### Evidence
+
+- [`docs/testing/2026-08-07-disputed-authorization.md`](./docs/testing/2026-08-07-disputed-authorization.md)
+  — n=500, ranked output byte-identical before and after (0/0/500, p = 1.0),
+  compile latency flat within repeat spread. It also states what it cannot show:
+  the corpus holds zero contradicting sources, so it cannot measure the fix
+  where the fix fires.
+
 ## [0.7.0] — 2026-08-07
 
 ### Changed

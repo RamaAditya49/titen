@@ -1,6 +1,6 @@
 import { chunk, first, MAX_BOUND_PARAMS } from "./db";
 import { hasScope } from "./auth";
-import { recordAccessParams, recordAccessSql } from "./authorization";
+import { contradictedSql, recordAccessParams, recordAccessSql } from "./authorization";
 import { loadAuthorizedEvidenceIds } from "./evidence";
 import { notFound, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
@@ -165,13 +165,19 @@ async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: 
 
   // Claims that have at least one contradicting source
   const disputed = await ctx.app.db.all<{ id: string; statement: string; trust: string; status: string; visibility: string; actor_id: string; created_at: string }>(
-    `SELECT DISTINCT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
+    `SELECT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
        FROM claims c
-       JOIN claim_sources s ON s.claim_id = c.id AND s.relation = 'contradicts'
       WHERE c.org_id = ? AND c.subject_id = ? AND c.status != 'revoked'
         AND ${recordAccessSql("c")}
+        AND ${contradictedSql("c")}
       ORDER BY c.created_at DESC LIMIT ?`,
-    [orgId, subjectId, ...recordAccessParams(principalId), limit],
+    [
+      orgId,
+      subjectId,
+      ...recordAccessParams(principalId),
+      ...recordAccessParams(principalId),
+      limit,
+    ],
   );
 
   const nodes: Node[] = [];
@@ -272,12 +278,7 @@ async function reviewQueue(
   }>(
     `WITH scored AS (
        SELECT c.id, c.statement, c.trust, c.status, c.actor_id, c.confidence, c.valid_to, c.created_at,
-              EXISTS (
-                SELECT 1 FROM claim_sources s
-                JOIN observations o ON o.id = s.observation_id
-                WHERE s.claim_id = c.id AND s.relation = 'contradicts'
-                  AND o.org_id = c.org_id AND ${recordAccessSql("o")}
-              ) AS has_contradiction,
+              ${contradictedSql("c")} AS has_contradiction,
               (SELECT COUNT(*) FROM context_feedback f
                 WHERE f.org_id = c.org_id AND f.claim_id = c.id AND f.outcome = 'incorrect') AS incorrect_count,
               (SELECT COUNT(*) FROM context_feedback f
