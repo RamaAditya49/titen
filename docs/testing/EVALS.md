@@ -849,6 +849,41 @@ degradation curve above: recall@1 falls 1.00 -> 0.49 from 10^3 to 10^5 claims, s
 at realistic corpus sizes the saturation disappears on its own and ranking, not
 candidate generation, becomes the binding constraint. Tracked as #267.
 
+### An authorization fix cost nothing, and the benchmark caught what the suite could not, 2026-08-07
+
+[Full report](./2026-08-07-disputed-authorization.md), protocol
+[pre-registered](./2026-08-07-disputed-authorization-prereg.md) before the first
+scored run.
+
+[#291](https://github.com/RamaAditya49/titen/issues/291) added the caller's own
+access predicate to the `disputed` flag. Paired A/B over one frozen store,
+n=500, `main` against the fix: recall@1 **0.8800 both**, MRR@10 **0.9147 both**,
+zero failures, and the ranked outputs **byte-identical on 500 of 500 instances**
+(0/0/500, p = 1.0).
+
+That null was predicted exactly, and published as a prediction before the run,
+because the corpus holds **zero** rows with `relation = 'contradicts'`, zero
+disputed claims, and one principal. **LongMemEval-S cannot exercise this fix in
+either direction**, and no synthetic corpus was built to make it fire. The
+behaviour change is evidenced by a dual-runtime contract case, not by this run.
+
+The reason to run it anyway is the second arm. The first implementation
+expressed the predicate as `claim_sources JOIN observations`, and SQLite drove
+from `observations`, scanning all 25,112 of them per candidate: **79 s per
+compile against 17.8 ms**. Rewriting it so `claim_sources` seeks its own primary
+key restored the baseline. **The dual-runtime contract suite passed on both
+shapes at every stage** — its stores hold tens of rows, so a plan that collapses
+at 10^5 claims is invisible to it.
+
+Two standing consequences:
+
+- **A contract suite is not a performance gate.** Any change to the candidate
+  query or to `recordAccessSql` needs `EXPLAIN QUERY PLAN` against a store with a
+  realistic row count before it ships. A green suite says nothing about the plan.
+- Prefer a **nested `EXISTS`** to a join inside a correlated authorization
+  predicate. `loadAuthorizedSources` already used that shape; the join copied
+  into `atlas.ts` did not, and it was on the slow plan in production.
+
 ## Release gates
 
 | Gate | Required result                                                                                                                              |
@@ -903,6 +938,9 @@ Every published result includes:
   as though their infrastructure were equivalent.
 - Never quote recall@5 or recall@10 from LongMemEval-S without marking it
   saturated; report recall@1 and MRR@10 as the primary metrics on that corpus.
+- Never present the 2026-08-07 `disputed` authorization run as evidence that the
+  fix improves anything. It is a no-regression check on a corpus that holds no
+  contradicting evidence at all, and it was published as such.
 - Never let a corpus into an evidence plan without reading its `LICENSE` file.
   An SPDX lookup is not sufficient: `gh api repos/snap-research/locomo --jq
   .license.spdx_id` returns `NOASSERTION`, which means **unknown, not

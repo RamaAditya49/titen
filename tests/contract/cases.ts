@@ -1208,6 +1208,97 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "an unreadable contradicting source moves neither the rank nor conflicts (#291)",
+    async run(fx) {
+      const subjectId = "user_disputed_291";
+      const task = "quarterly ledger reconciliation handover checklist";
+      const owner = await fx.provision({ principalId: "agent_disputed_owner" });
+      const insider = await fx.provision({
+        orgId: owner.orgId,
+        principalId: "agent_disputed_insider",
+      });
+      const seeded = await seedClaim(fx, owner.key, {
+        observation: {
+          subject_id: subjectId,
+          visibility: "organization",
+          content: "The quarterly ledger reconciliation handover ran with a signed checklist.",
+        },
+        claim: {
+          statement: "The quarterly ledger reconciliation handover needs a signed checklist.",
+        },
+      });
+
+      const compile = async (key: string) => {
+        const res = await fx.call("POST", "/v1/context/compile", {
+          key,
+          body: { subject_id: subjectId, task, max_tokens: 4000 },
+        });
+        expectOk(res);
+        return res.body.data as {
+          items: { claim_id: string; score: number; score_components: Record<string, number> }[];
+          conflicts: { claim_id: string; evidence_ids: string[] }[];
+        };
+      };
+
+      // The reference: this store, before the hidden source exists at all.
+      const before = await compile(owner.key);
+      assert.equal(before.items.length, 1, "the fixture must return the claim to rank");
+      assert.deepEqual(before.conflicts, [], "an unopposed claim carries no conflict");
+
+      const secret = await fx.call("POST", "/v1/observations", {
+        key: insider.key,
+        body: observation({
+          subject_id: subjectId,
+          visibility: "private",
+          content: "The quarterly ledger reconciliation handover skipped the checklist entirely.",
+        }),
+      });
+      expectOk(secret, 201);
+      const secretId = secret.body.data.observation_id as string;
+      // Consolidation clamps a claim to its narrowest source, so this state is
+      // reached by federation, import, or any writer below the API rather than
+      // by POST /v1/consolidations. Retrieval must be safe on its own regardless:
+      // "scope and authorization happen before retrieval" (AGENTS.md).
+      await fx.query(
+        `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
+         VALUES (?, ?, 'contradicts', ?)`,
+        [seeded.claimId, secretId, new Date().toISOString()],
+      );
+
+      // Whole-day recency keeps repeated compilation stable, so anything that
+      // differs here is the hidden row talking.
+      const after = await compile(owner.key);
+      assert.deepEqual(
+        after.items,
+        before.items,
+        "a contradicting source the caller cannot read must not move the score or the order",
+      );
+      assert.deepEqual(
+        after.conflicts,
+        before.conflicts,
+        "a contradicting source the caller cannot read must not be announced in conflicts[]",
+      );
+
+      // The same row must still count for the principal who may read it: the
+      // fix is authorization, not the removal of the signal.
+      const authorized = await compile(insider.key);
+      assert.deepEqual(
+        authorized.conflicts.map((conflict) => conflict.claim_id),
+        [seeded.claimId],
+        "the principal who can read the contradiction still sees the dispute",
+      );
+      assert.equal(
+        authorized.items[0]!.score_components.conflict,
+        0,
+        "and still pays the conflict term for it",
+      );
+      assert.ok(
+        authorized.conflicts[0]!.evidence_ids.includes(secretId),
+        "and still receives the source id as a citation",
+      );
+    },
+  },
+  {
     name: "missing project scope is unscoped-only and broad compile needs an explicit grant",
     async run(fx) {
       const subjectId = "user_project_scope_141";
