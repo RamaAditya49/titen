@@ -1,0 +1,61 @@
+{
+  "lane": "mcp-memory",
+  "arm": "substring",
+  "condition": "pooled",
+  "n": 60,
+  "recall_at_1": 0.0,
+  "recall_at_5": 0.0,
+  "recall_at_10": 0.0,
+  "mrr_at_10": 0.0,
+  "failures": 60,
+  "failure_rate": 1.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 10,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0
+    },
+    "single-session-assistant": {
+      "n": 10,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0
+    },
+    "single-session-preference": {
+      "n": 10,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0
+    },
+    "multi-session": {
+      "n": 10,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0
+    },
+    "temporal-reasoning": {
+      "n": 10,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0
+    },
+    "knowledge-update": {
+      "n": 10,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0
+    }
+  },
+  "meta": {
+    "pool_sessions": 19829,
+    "ingest_seconds": 771.0,
+    "query_seconds": 1.9,
+    "n_questions": 60,
+    "query_ms": {
+      "p50": 0.0,
+      "p95": 0.0,
+      "p99": 1851.0
+    }
+  }
+}

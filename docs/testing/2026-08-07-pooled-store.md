@@ -142,11 +142,15 @@ documents, MiniLM — the configuration that scored 0.804 per-instance):
 pooled 19,829 recall@1 **0.164**, recall@5 0.276, recall@10 0.374, MRR@10
 0.2152, query p50 127.9 ms (HNSW + query embedding), ingest 346.7 s local.
 
-**MCP reference server** (substring, n=60 stratified): running at
-publication; its per-query cost on a 19,829-entity graph — the server
-re-reads and re-parses the whole ~300 MB graph file on every tool call — is
-itself the result, and the measured figure is appended to the artifacts when
-the lane completes.
+**MCP reference server** (substring, n=60 stratified): **infeasible at this
+scale, which is the result.** Building the 19,829-entity graph through its
+own `create_entities` tool took 771 s — the server rewrites the whole growing
+JSON file on every batch — and the server process closed the connection on
+the first `search_nodes` call against the finished ~300 MB graph. Under the
+failures-stay-in-the-denominator rule the lane scores 0.0 with 60/60
+failures. The reference implementation cannot serve a store of this size at
+all; its published per-instance 0.050 was already the floor, and the pooled
+condition removes even that.
 
 ### Paired sign tests, recall@1, identical instances
 

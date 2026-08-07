@@ -47,7 +47,7 @@ lanes precede P4 phase-2 lanes. P5 publishes; P6 is the website handoff.
       per size, 500 queries each, concurrency 1, latency per compile.
 - [x] Control fastembed at the same four sizes from one embedding cache.
 - [x] MemPalace 3.6.0 published-benchmark shape (user-only, MiniLM) pooled.
-- [ ] MCP reference pooled at n=60 questions (per-query cost is the result if
+- [x] MCP reference pooled at n=60 questions (per-query cost is the result if
       it is infeasible at 500).
 - [x] Artifacts + SHA256SUMS under results/ before any summary is written.
 
