@@ -1,0 +1,5014 @@
+{
+  "summary": {
+    "instances": 500,
+    "rank1_tie_across_sessions": 0,
+    "tie_contains_gold_but_rank1_is_not_gold": 0,
+    "rank1_is_gold_and_contested": 0,
+    "contested_by_type": {},
+    "top_scores_observed": [
+      0.794374
+    ]
+  },
+  "per_instance": {
+    "e47becba": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 2,
+      "items": 2
+    },
+    "118b2229": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 82,
+      "items": 94
+    },
+    "51a45a95": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 17,
+      "items": 18
+    },
+    "58bf7951": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 93
+    },
+    "1e043500": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 78,
+      "items": 91
+    },
+    "c5e8278d": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "6ade9755": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 70,
+      "items": 92
+    },
+    "6f9b354f": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 25,
+      "items": 26
+    },
+    "58ef2f1c": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "f8c5f88b": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 90
+    },
+    "5d3d2817": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 11,
+      "items": 11
+    },
+    "7527f7e2": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 75,
+      "items": 92
+    },
+    "c960da58": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 62,
+      "items": 80
+    },
+    "3b6f954b": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 69,
+      "items": 73
+    },
+    "726462e0": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "94f70d80": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 92
+    },
+    "66f24dbb": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 29,
+      "items": 29
+    },
+    "ad7109d1": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 91
+    },
+    "af8d2e46": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 67,
+      "items": 92
+    },
+    "dccbc061": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 21,
+      "items": 23
+    },
+    "c8c3f81d": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "8ebdbe50": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 80,
+      "items": 87
+    },
+    "6b168ec8": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 75,
+      "items": 91
+    },
+    "75499fd8": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 18,
+      "items": 18
+    },
+    "21436231": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 78,
+      "items": 91
+    },
+    "95bcc1c8": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "0862e8bf": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 44,
+      "items": 49
+    },
+    "853b0a1d": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 49,
+      "items": 49
+    },
+    "a06e4cfe": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 67,
+      "items": 78
+    },
+    "37d43f65": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 36,
+      "items": 43
+    },
+    "b86304ba": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 64,
+      "items": 73
+    },
+    "d52b4f67": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 19,
+      "items": 20
+    },
+    "25e5aa4f": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 55,
+      "items": 62
+    },
+    "caf9ead2": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "8550ddae": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "60d45044": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 58,
+      "items": 66
+    },
+    "3f1e9474": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 19,
+      "items": 21
+    },
+    "86b68151": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 75,
+      "items": 94
+    },
+    "577d4d32": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "ec81a493": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 63,
+      "items": 83
+    },
+    "15745da0": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 80,
+      "items": 85
+    },
+    "e01b8e2f": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 92
+    },
+    "bc8a6e93": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 39,
+      "items": 42
+    },
+    "ccb36322": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "001be529": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 57,
+      "items": 67
+    },
+    "b320f3f8": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "19b5f2b3": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 25,
+      "items": 29
+    },
+    "4fd1909e": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 19,
+      "items": 20
+    },
+    "545bd2b5": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "8a137a7f": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "76d63226": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 76,
+      "items": 94
+    },
+    "86f00804": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "8e9d538c": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 94
+    },
+    "311778f1": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "c19f7a0b": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "4100d0a0": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 6,
+      "items": 7
+    },
+    "29f2956b": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "1faac195": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 23,
+      "items": 28
+    },
+    "faba32e5": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 74,
+      "items": 82
+    },
+    "f4f1d8a4": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 70,
+      "items": 93
+    },
+    "c14c00dd": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 92
+    },
+    "36580ce8": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 93
+    },
+    "3d86fd0a": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 31,
+      "items": 33
+    },
+    "a82c026e": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 61,
+      "items": 65
+    },
+    "0862e8bf_abs": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 11,
+      "items": 12
+    },
+    "15745da0_abs": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 76,
+      "items": 84
+    },
+    "bc8a6e93_abs": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 21,
+      "items": 21
+    },
+    "19b5f2b3_abs": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 28,
+      "items": 29
+    },
+    "29f2956b_abs": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 86,
+      "items": 93
+    },
+    "f4f1d8a4_abs": {
+      "qtype": "single-session-user",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 37,
+      "items": 38
+    },
+    "0a995998": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 90
+    },
+    "6d550036": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 96
+    },
+    "gpt4_59c863d7": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "b5ef892d": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "e831120c": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 90
+    },
+    "3a704032": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 93
+    },
+    "gpt4_d84a3211": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "aae3761f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 91
+    },
+    "gpt4_f2262a51": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 77,
+      "items": 91
+    },
+    "dd2973ad": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "c4a1ceb8": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "gpt4_a56e767c": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 76,
+      "items": 87
+    },
+    "6cb6f249": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "46a3abf7": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "36b9f61e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "28dc39ac": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 95,
+      "items": 95
+    },
+    "gpt4_2f8be40d": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "2e6d26dc": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_15e38248": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "88432d0a": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "80ec1f4f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 94,
+      "items": 96
+    },
+    "d23cf73b": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_7fce9456": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "d682f1a2": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "7024f17c": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "gpt4_5501fe77": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_2ba83207": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "2318644b": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "2ce6a0f2": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "gpt4_d12ceb0e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 36,
+      "items": 36
+    },
+    "00ca467f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 73,
+      "items": 92
+    },
+    "b3c15d39": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "gpt4_31ff4165": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 93
+    },
+    "eeda8a6d": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 93
+    },
+    "2788b940": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "60bf93ed": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "9d25d4e0": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 90
+    },
+    "129d1232": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 94
+    },
+    "60472f9c": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 95
+    },
+    "gpt4_194be4b3": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 90,
+      "items": 94
+    },
+    "a9f6b44c": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "d851d5ba": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 92
+    },
+    "5a7937c8": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 94
+    },
+    "gpt4_ab202e7f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 91
+    },
+    "gpt4_e05b82a6": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "gpt4_731e37d7": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "edced276": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "10d9b85a": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 95
+    },
+    "e3038f8c": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "2b8f3739": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "1a8a66a6": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 72,
+      "items": 91
+    },
+    "c2ac3c61": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "bf659f65": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 95
+    },
+    "gpt4_372c3eed": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "gpt4_2f91af09": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "81507db6": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 93
+    },
+    "88432d0a_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "80ec1f4f_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "eeda8a6d_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 80,
+      "items": 93
+    },
+    "60bf93ed_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "edced276_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 91
+    },
+    "gpt4_372c3eed_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "8a2466db": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "06878be2": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "75832dbd": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "0edc2aef": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "35a27287": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "32260d93": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 63,
+      "items": 81
+    },
+    "195a1a1b": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 91,
+      "items": 95
+    },
+    "afdc33df": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "caf03d32": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "54026fce": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "06f04340": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 60,
+      "items": 67
+    },
+    "6b7dfb22": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "1a1907b4": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "09d032c9": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "38146c39": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "d24813b1": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "57f827a0": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "95228167": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "505af2f5": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "75f70248": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "d6233ab6": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "1da05512": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 90
+    },
+    "fca70973": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "b6025781": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "a89d7624": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "b0479f84": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "1d4e3b97": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "07b6f563": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "1c0ddc50": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "0a34ad58": {
+      "qtype": "single-session-preference",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 94
+    },
+    "d3ab962e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 44,
+      "items": 49
+    },
+    "2311e44b": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 93
+    },
+    "cc06de0d": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "a11281a2": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "4f54b7c9": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "85fa3a3f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "9aaed6a3": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 73,
+      "items": 76
+    },
+    "1f2b8d4f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "e6041065": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 90
+    },
+    "51c32626": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "d905b33f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 92
+    },
+    "7405e8b1": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "f35224e0": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "6456829e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "a4996e51": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "3c1045c8": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 81,
+      "items": 94
+    },
+    "60036106": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "681a1674": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 67,
+      "items": 82
+    },
+    "e25c3b8d": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 74,
+      "items": 92
+    },
+    "4adc0475": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 91
+    },
+    "4bc144e2": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 84
+    },
+    "ef66a6e5": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 75,
+      "items": 91
+    },
+    "5025383b": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 94
+    },
+    "a1cc6108": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 27,
+      "items": 28
+    },
+    "9ee3ecd6": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "3fdac837": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 91
+    },
+    "91b15a6e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "27016adc": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "720133ac": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 62,
+      "items": 70
+    },
+    "77eafa52": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "8979f9ec": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "0100672e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "a96c20ee": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 57,
+      "items": 65
+    },
+    "92a0aa75": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 83,
+      "items": 92
+    },
+    "3fe836c9": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "1c549ce4": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 93
+    },
+    "6c49646a": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 78,
+      "items": 83
+    },
+    "1192316e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "0ea62687": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "67e0d0f2": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 90
+    },
+    "bb7c3b45": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 2,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 47,
+      "items": 50
+    },
+    "ba358f49": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 78,
+      "items": 92
+    },
+    "61f8c8f8": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 91
+    },
+    "60159905": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 94
+    },
+    "ef9cf60a": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 56,
+      "items": 56
+    },
+    "73d42213": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 92
+    },
+    "bc149d6b": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "099778bb": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "09ba9854": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 90
+    },
+    "d6062bb9": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "157a136e": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 72,
+      "items": 93
+    },
+    "c18a7dc8": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 89,
+      "items": 94
+    },
+    "a3332713": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 71,
+      "items": 77
+    },
+    "55241a1f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "a08a253f": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "f0e564bc": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 90
+    },
+    "078150f1": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "8cf4d046": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 21,
+      "items": 21
+    },
+    "a346bb18": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 86,
+      "items": 94
+    },
+    "37f165cf": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 70,
+      "items": 74
+    },
+    "8e91e7d9": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 39,
+      "items": 42
+    },
+    "87f22b4a": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 91
+    },
+    "e56a43b9": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 81,
+      "items": 91
+    },
+    "efc3f7c2": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "21d02d0d": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 95
+    },
+    "2311e44b_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 93
+    },
+    "6456829e_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "e5ba910e_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 57,
+      "items": 65
+    },
+    "a96c20ee_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 81,
+      "items": 93
+    },
+    "ba358f49_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 58,
+      "items": 81
+    },
+    "09ba9854_abs": {
+      "qtype": "multi-session",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 91
+    },
+    "gpt4_59149c77": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "gpt4_f49edff3": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "71017276": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "b46e15ed": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "gpt4_fa19884c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 90
+    },
+    "0bc8ad92": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "af082822": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "gpt4_4929293a": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "gpt4_b5700ca9": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "9a707b81": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "gpt4_1d4ab0c9": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "gpt4_e072b769": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "0db4c65d": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "gpt4_1d80365e": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "gpt4_7f6b06db": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 80,
+      "items": 88
+    },
+    "gpt4_6dc9b45b": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "gpt4_8279ba02": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 76,
+      "items": 91
+    },
+    "gpt4_18c2b244": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "gpt4_a1b77f9c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "gpt4_1916e0ea": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_7a0daae1": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "gpt4_468eb063": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 80,
+      "items": 94
+    },
+    "gpt4_7abb270c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "gpt4_1e4a8aeb": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "gpt4_4fc4f797": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "4dfccbf7": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_61e13b3c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "gpt4_45189cb4": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "2ebe6c90": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 93
+    },
+    "gpt4_e061b84f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 86,
+      "items": 90
+    },
+    "370a8ff4": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "gpt4_d6585ce8": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "gpt4_4ef30696": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "gpt4_ec93e27f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "6e984301": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "8077ef71": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "gpt4_f420262c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "gpt4_8e165409": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "gpt4_74aed68e": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 92
+    },
+    "bcbe585f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "gpt4_21adecb5": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 93
+    },
+    "5e1b23de": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 82,
+      "items": 91
+    },
+    "gpt4_98f46fc6": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 92
+    },
+    "gpt4_af6db32f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 92
+    },
+    "eac54adc": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 90
+    },
+    "gpt4_7ddcf75f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "gpt4_a2d1d1f6": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 92
+    },
+    "gpt4_85da3956": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 94
+    },
+    "gpt4_b0863698": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "gpt4_68e94287": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "gpt4_e414231e": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "gpt4_7ca326fa": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "gpt4_7bc6cf22": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "2ebe6c92": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 82,
+      "items": 91
+    },
+    "gpt4_e061b84g": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "71017277": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 73,
+      "items": 88
+    },
+    "b46e15ee": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 77,
+      "items": 81
+    },
+    "gpt4_d6585ce9": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "gpt4_1e4a8aec": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 77,
+      "items": 89
+    },
+    "gpt4_f420262d": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 91
+    },
+    "gpt4_59149c78": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "gpt4_e414231f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 74,
+      "items": 81
+    },
+    "gpt4_4929293b": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 90,
+      "items": 96
+    },
+    "gpt4_468eb064": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 78,
+      "items": 93
+    },
+    "gpt4_fa19884d": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "9a707b82": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 86,
+      "items": 93
+    },
+    "eac54add": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 74,
+      "items": 87
+    },
+    "4dfccbf8": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 36,
+      "items": 40
+    },
+    "0bc8ad93": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "6e984302": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 75,
+      "items": 80
+    },
+    "gpt4_8279ba03": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 80,
+      "items": 92
+    },
+    "gpt4_b5700ca0": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 84,
+      "items": 91
+    },
+    "gpt4_68e94288": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 86,
+      "items": 93
+    },
+    "gpt4_2655b836": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_2487a7cb": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "gpt4_76048e76": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "gpt4_2312f94c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 92
+    },
+    "0bb5a684": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "08f4fc43": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "2c63a862": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 94,
+      "items": 94
+    },
+    "gpt4_385a5000": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 93
+    },
+    "2a1811e2": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 95
+    },
+    "bbf86515": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 90
+    },
+    "gpt4_5dcc0aab": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 91
+    },
+    "gpt4_0b2f1d21": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "f0853d11": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "gpt4_6ed717ea": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_70e84552": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 69,
+      "items": 79
+    },
+    "a3838d2b": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_93159ced": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "gpt4_2d58bcd6": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "gpt4_65aabe59": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "982b5123": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "b9cfe692": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 92
+    },
+    "gpt4_4edbafa2": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "c8090214": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "gpt4_483dd43c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "e4e14d04": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "c9f37c46": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "gpt4_2c50253f": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 95
+    },
+    "dcfa8644": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 93
+    },
+    "gpt4_b4a80587": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "gpt4_9a159967": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 91
+    },
+    "cc6d1ec1": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "gpt4_8c8961ae": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "gpt4_d9af6064": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "gpt4_7de946e7": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "d01c6aa8": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 54,
+      "items": 62
+    },
+    "993da5e2": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 93
+    },
+    "a3045048": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "gpt4_d31cdae3": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "gpt4_cd90e484": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "gpt4_88806d6e": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 72,
+      "items": 75
+    },
+    "gpt4_4cd9eba1": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "gpt4_93f6379c": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "b29f3365": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 95
+    },
+    "gpt4_2f56ae70": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "6613b389": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "gpt4_78cf46a3": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "gpt4_0a05b494": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 93
+    },
+    "gpt4_1a1dc16d": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 90
+    },
+    "gpt4_2f584639": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 76,
+      "items": 79
+    },
+    "gpt4_213fd887": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "gpt4_5438fa52": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "gpt4_c27434e8": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "gpt4_fe651585": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 55,
+      "items": 59
+    },
+    "8c18457d": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "gpt4_70e84552_abs": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "gpt4_93159ced_abs": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "982b5123_abs": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 56,
+      "items": 77
+    },
+    "c8090214_abs": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 94
+    },
+    "gpt4_c27434e8_abs": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "gpt4_fe651585_abs": {
+      "qtype": "temporal-reasoning",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 35,
+      "items": 37
+    },
+    "6a1eabeb": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "6aeb4375": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 80,
+      "items": 93
+    },
+    "830ce83f": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 95
+    },
+    "852ce960": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 67,
+      "items": 92
+    },
+    "945e3d21": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 91
+    },
+    "d7c942c3": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "71315a70": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 91
+    },
+    "89941a93": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 93
+    },
+    "ce6d2d27": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 93
+    },
+    "9ea5eabc": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "07741c44": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "a1eacc2a": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "184da446": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "031748ae": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "4d6b87c8": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 75,
+      "items": 93
+    },
+    "0f05491a": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "08e075c7": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "f9e8c073": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 94
+    },
+    "41698283": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "2698e78f": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 77,
+      "items": 94
+    },
+    "b6019101": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 90
+    },
+    "45dc21b6": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 92
+    },
+    "5a4f22c0": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 91
+    },
+    "6071bd76": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "e493bb7c": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 60,
+      "items": 65
+    },
+    "618f13b2": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "72e3ee87": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "c4ea545c": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 94
+    },
+    "01493427": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "6a27ffc2": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "2133c1b5": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 91
+    },
+    "18bc8abd": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "db467c8c": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 92
+    },
+    "7a87bd0c": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 41,
+      "items": 43
+    },
+    "e61a7584": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 63,
+      "items": 74
+    },
+    "1cea1afa": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 84,
+      "items": 93
+    },
+    "ed4ddc30": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "8fb83627": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 84,
+      "items": 92
+    },
+    "b01defab": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 58,
+      "items": 67
+    },
+    "22d2cb42": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 83,
+      "items": 94
+    },
+    "0e4e4c46": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 61,
+      "items": 62
+    },
+    "4b24c848": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 76,
+      "items": 94
+    },
+    "7e974930": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "603deb26": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "59524333": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 93
+    },
+    "5831f84d": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 90
+    },
+    "eace081b": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 91
+    },
+    "affe2881": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 93
+    },
+    "50635ada": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 90
+    },
+    "e66b632c": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "0ddfec37": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 93
+    },
+    "f685340e": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 93
+    },
+    "cc5ded98": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 91
+    },
+    "dfde3500": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 92
+    },
+    "69fee5aa": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 86,
+      "items": 92
+    },
+    "7401057b": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "cf22b7bf": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 94
+    },
+    "a2f3aa27": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 82,
+      "items": 93
+    },
+    "c7dc5443": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 64,
+      "items": 64
+    },
+    "06db6396": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "3ba21379": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "9bbe84a2": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "10e09553": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "dad224aa": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": false,
+      "rank1_is_gold": false,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "ba61f0b9": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "42ec0761": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 80,
+      "items": 92
+    },
+    "5c40ec5b": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 94,
+      "items": 94
+    },
+    "c6853660": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 90
+    },
+    "26bdc477": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 79,
+      "items": 92
+    },
+    "0977f2af": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "6aeb4375_abs": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 95
+    },
+    "031748ae_abs": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "2698e78f_abs": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 71,
+      "items": 92
+    },
+    "2133c1b5_abs": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 58,
+      "items": 69
+    },
+    "0ddfec37_abs": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "f685340e_abs": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "89941a94": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "07741c45": {
+      "qtype": "knowledge-update",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 87,
+      "items": 92
+    },
+    "7161e7e2": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "c4f10528": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "89527b6b": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 90
+    },
+    "e9327a54": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "4c36ccef": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 81,
+      "items": 92
+    },
+    "6ae235be": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 94
+    },
+    "7e00a6cb": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "1903aded": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 92
+    },
+    "ceb54acb": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 95,
+      "items": 96
+    },
+    "f523d9fe": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 94
+    },
+    "0e5e2d1a": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 94
+    },
+    "fea54f57": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 94
+    },
+    "cc539528": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "dc439ea3": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 95
+    },
+    "18dcd5a5": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 93
+    },
+    "488d3006": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 90
+    },
+    "58470ed2": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 94
+    },
+    "8cf51dda": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "1d4da289": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "8464fc84": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "8aef76bc": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "71a3fd6b": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 92
+    },
+    "2bf43736": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "70b3e69b": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 94,
+      "items": 95
+    },
+    "8752c811": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 85,
+      "items": 93
+    },
+    "3249768e": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "1b9b7252": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "1568498a": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "6222b6eb": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "e8a79c70": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 90
+    },
+    "d596882b": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "e3fc4d6e": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 94
+    },
+    "51b23612": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 89,
+      "items": 95
+    },
+    "3e321797": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 94,
+      "items": 94
+    },
+    "e982271f": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "352ab8bd": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 93
+    },
+    "fca762bc": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "7a8d0b71": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "a40e080f": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 95,
+      "items": 95
+    },
+    "8b9d4367": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 94
+    },
+    "5809eb10": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 94,
+      "items": 94
+    },
+    "41275add": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "4388e9dd": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    },
+    "4baee567": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 88,
+      "items": 91
+    },
+    "561fabcd": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "b759caee": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 93
+    },
+    "ac031881": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 91
+    },
+    "28bcfaac": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "16c90bf4": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "c8f1aeed": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 92
+    },
+    "eaca4986": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 91
+    },
+    "c7cf7dfd": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 92,
+      "items": 92
+    },
+    "e48988bc": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 93
+    },
+    "1de5cff2": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 90,
+      "items": 92
+    },
+    "65240037": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 93,
+      "items": 94
+    },
+    "778164c6": {
+      "qtype": "single-session-assistant",
+      "top_score": 0.794374,
+      "tied_claims": 1,
+      "tied_sessions": 1,
+      "gold_in_tie": true,
+      "rank1_is_gold": true,
+      "distinct_scores": 91,
+      "items": 93
+    }
+  }
+}

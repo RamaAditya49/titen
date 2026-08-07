@@ -38,60 +38,66 @@ E2 and E4. E6 is independent and runs last, from ranked lists already on disk.
 
 ### E2 — Baseline pass, before the change is written
 
-- [ ] Copy the 2026-08-04 `fts-500.db` store rather than re-ingesting. The
+- [x] Copy the 2026-08-04 `fts-500.db` store rather than re-ingesting. The
       original is never opened.
-- [ ] Query all 500 instances with the branch at its base commit and store the
+- [x] Query all 500 instances with the branch at its base commit and store the
       ranked list.
-- [ ] Measure the actual distribution of every signal in the inventory directly
+- [x] Measure the actual distribution of every signal in the inventory directly
       from the store — distinct trust values, disputed count, recalled-evidence
       count, feedback totals, and the histogram of supporting observations per
       claim. Measured, not assumed.
-- [ ] Compare pass A against the published 0.6.0 ranked list and report any
+- [x] Compare pass A against the published 0.6.0 ranked list and report any
       discrepancy rather than smoothing it.
 
 ### E3 — The change
 
-- [ ] `evidence_depth` on `RankInput`, optional, defaulting to zero so every
+- [x] `evidence_depth` on `RankInput`, optional, defaulting to zero so every
       existing caller and fixture keeps compiling.
-- [ ] Populate it in `src/core/context.ts` by hoisting the
+- [x] Populate it in `src/core/context.ts` by hoisting the
       `loadAuthorizedEvidenceIds` call above `rankCandidates` and reusing its
       result for the pack. No new query, no new SQL, no migration: the call
       already ran, just later and over fewer rows.
-- [ ] One tie-break key in `rankCandidates`, after score and after vector
+- [x] One tie-break key in `rankCandidates`, after score and after vector
       similarity, ahead of the statement fallback.
-- [ ] No configuration flag. The A/B is achieved by running the passes from two
+- [x] No configuration flag. The A/B is achieved by running the passes from two
       commits, which is also a stronger control than a runtime switch.
+- [x] The first design loaded evidence for every candidate on every compile and
+      measured at roughly +1.4 ms p50 at `top_k=5`. That trips kill criterion 3,
+      so it was rejected rather than argued down: `hasDeadHeat` now gates the
+      lookup on whether the returned window is actually tied, which is decided
+      with no database work. Re-measured flat, and the 500-instance ranked output
+      is byte-identical between the two designs. The rejected numbers are kept.
 
 ### E4 — Runnable checks that fail without it
 
-- [ ] A contract case where two claims are identical in every ranked dimension
+- [x] A contract case where two claims are identical in every ranked dimension
       except evidence depth, asserting the deeper one wins. Fails without E3.
-- [ ] A contract case proving a hidden observation does not change the order
+- [x] A contract case proving a hidden observation does not change the order
       (AC-EVR-002), which is the one place this signal could leak a count.
-- [ ] A contract case proving that a candidate set with uniform evidence depth
+- [x] A contract case proving that a candidate set with uniform evidence depth
       returns the pre-change order (AC-EVR-003).
-- [ ] A determinism case: identical corpus content, fresh identifiers, identical
+- [x] A determinism case: identical corpus content, fresh identifiers, identical
       ranking (AC-EVR-004).
-- [ ] Both runtimes, through the existing dual-runtime contract suite.
+- [x] Both runtimes, through the existing dual-runtime contract suite.
 
 ### E5 — Measure, and publish whatever it says
 
-- [ ] Pass B over the same store; paired two-sided sign test against pass A.
-- [ ] recall@1 and MRR@10 before and after; recall@5/@10 marked saturated.
-- [ ] The fraction of the +10.2-point oracle ceiling captured, published even
+- [x] Pass B over the same store; paired two-sided sign test against pass A.
+- [x] recall@1 and MRR@10 before and after; recall@5/@10 marked saturated.
+- [x] The fraction of the +10.2-point oracle ceiling captured, published even
       when it is zero.
-- [ ] Comparison against the lexical signals that already failed at p = 0.61.
-- [ ] Per-question-type breakdown, since a signal that helps one type and hurts
+- [x] Comparison against the lexical signals that already failed at p = 0.61.
+- [x] Per-question-type breakdown, since a signal that helps one type and hurts
       another is a different finding from one that helps uniformly.
-- [ ] Write-up in `docs/testing/2026-08-07-evidence-ranking.md`, including what
+- [x] Write-up in `docs/testing/2026-08-07-evidence-ranking.md`, including what
       the measurement does not establish, and update `docs/testing/EVALS.md` and
       `PONYTAIL-DEBT.md` if the result changes what either may claim.
 
 ### E6 — Tokens-to-answer, from lists already on disk
 
-- [ ] Score the existing `results/*.ranked.json` for the token cost of the
+- [x] Score the existing `results/*.ranked.json` for the token cost of the
       smallest pack containing the gold. No new run.
-- [ ] Report per lane, alongside recall@1 rather than replacing it, with the
+- [x] Report per lane, alongside recall@1 rather than replacing it, with the
       no-gold-at-any-depth instances counted explicitly.
 
 ## Not in this plan

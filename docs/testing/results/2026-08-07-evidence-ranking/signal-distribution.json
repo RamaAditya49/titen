@@ -1,0 +1,84 @@
+{
+  "store": "/home/ramaaditya/titen-evidence-rank/bench/lane/fts-500.db",
+  "claims": [
+    {
+      "n": 424168
+    }
+  ],
+  "observations": [
+    {
+      "n": 25112
+    }
+  ],
+  "trust": [
+    {
+      "trust": "asserted",
+      "n": 424168
+    }
+  ],
+  "status": [
+    {
+      "status": "active",
+      "n": 424168
+    }
+  ],
+  "visibility": [
+    {
+      "visibility": "private",
+      "n": 424168
+    }
+  ],
+  "kind": [
+    {
+      "kind": "episodic_event",
+      "n": 424168
+    }
+  ],
+  "confidence": [
+    {
+      "confidence": 0.8,
+      "n": 424168
+    }
+  ],
+  "version": [
+    {
+      "version": 1,
+      "n": 424168
+    }
+  ],
+  "distinct_actors": [
+    {
+      "n": 1
+    }
+  ],
+  "created_at_span": [
+    {
+      "distinct_days": 1,
+      "earliest": "2026-08-04T14:59:04.153Z",
+      "latest": "2026-08-04T15:12:36.371Z"
+    }
+  ],
+  "claim_source_relations": [
+    {
+      "relation": "supports",
+      "n": 424168
+    }
+  ],
+  "observation_provenance": [
+    {
+      "source_type": "corpus",
+      "n": 25112
+    }
+  ],
+  "feedback_rows": [
+    {
+      "n": 0
+    }
+  ],
+  "supporting_depth_histogram": [
+    {
+      "depth": 1,
+      "claims": 424168
+    }
+  ]
+}

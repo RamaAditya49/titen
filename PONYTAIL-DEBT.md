@@ -183,6 +183,16 @@ Debt: emit a calibrated absolute score. `TITEN_EMBED_MIN_COSINE` has no shipped
 default and vectors fail closed without it, so every operator currently
 calibrates alone.
 
+**Reproduced externally 2026-08-07, and it is worse than "no cross-query
+signal".** On LongMemEval-S at n=500, *every* instance returns a rank-1 score of
+exactly **0.794374** — one value for the whole corpus — because trust, recency,
+utility, conflict and confidence contribute a constant 0.394374 and min-max
+normalization pins the best relevance to 1.0. Measured across all 424,168 claims
+in that store, `trust`, `status`, `confidence`, `version`, `actor_id` and
+supporting-observation count each take exactly one value. See
+[evidence-aware ranking](./docs/testing/2026-08-07-evidence-ranking.md). This is
+no longer a property of one Titen-authored fixture.
+
 ### 3. There is no reranking stage at all
 
 Titen fuses lexical and vector retrieval and stops. Mem0 ships a reranker,
@@ -194,6 +204,22 @@ represented in the issue tracker.
 
 Debt: a cross-encoder or LLM rerank stage over the top-k, opt-in and degrading
 cleanly when absent, in the same shape as the existing optional vector path.
+
+**Partly answered 2026-08-07, and the answer narrows the debt rather than
+closing it.** The ceiling is real — an oracle over Titen's own top-10 is
+recall@1 0.982 against 0.880, so **+10.2 points** are retrieved and mis-ranked.
+Nothing tried has captured them. Six lexical variants captured at most +0.6
+points at p = 0.61 and two were significantly *worse* than the baseline
+(p = 0.0079 and p = 0.0293). [Evidence-aware
+ranking](./docs/testing/2026-08-07-evidence-ranking.md) captured **0.0 points**,
+because every evidence signal is constant on that corpus and 0 of 500 instances
+even have a rank-1 tie to break.
+
+So the remaining debt is narrower and more specific than "build a reranker":
+the +10.2 points are not reachable from any signal measured so far, and they
+concentrate in `single-session-preference` (recall@1 0.400, n=30). A rerank
+stage should be justified against that type, and against a corpus in which
+evidence actually varies, before it is built.
 
 ### 4. Temporal modelling is behind Graphiti, not ahead of it
 
