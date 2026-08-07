@@ -71,10 +71,13 @@ lanes precede P4 phase-2 lanes. P5 publishes; P6 is the website handoff.
 
 ### P6 — Release and website handoff
 
-- [ ] CHANGELOG Unreleased -> 0.7.1; verify-pack; npm publish; tag; GitHub
-      Release.
-- [ ] titen-web: release:sync 0.7.1, benchmark page updated from the committed
-      records only, deploy, smoke /version.json and /benchmark.
+- [x] CHANGELOG Unreleased -> 0.7.1; verify-pack on rama-tuf ("titen-memory
+      -0.7.1.tgz is publishable"); npm publish (registry date 2026-08-07
+      matches the heading); tag v0.7.1 -> e8ca89e; GitHub Release live.
+- [x] titen-web: release:sync 0.7.1, benchmark page section 06b from the
+      committed records only, deployed as Worker version
+      2e7b44cb-29f9-4f63-9eb7-320744c8bf96, smoked /version.json (0.7.1),
+      /releases/0.7.1 (200), homepage badge, and /benchmark on both hostnames.
 
 ## Not in this plan
 
