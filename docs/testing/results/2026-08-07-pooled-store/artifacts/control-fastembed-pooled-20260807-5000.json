@@ -1,0 +1,79 @@
+{
+  "lane": "control",
+  "embedding_arm": "fastembed",
+  "generated_at": "2026-08-07T12:24:09Z",
+  "n": 500,
+  "recall_at_1": 0.212,
+  "recall_at_5": 0.404,
+  "recall_at_10": 0.528,
+  "mrr_at_10": 0.2993,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.0286,
+      "recall_at_5": 0.1571,
+      "recall_at_10": 0.2571
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.75,
+      "recall_at_5": 0.875,
+      "recall_at_10": 0.9643
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.0667,
+      "recall_at_5": 0.2333,
+      "recall_at_10": 0.2667
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.1654,
+      "recall_at_5": 0.3985,
+      "recall_at_10": 0.5714
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.1729,
+      "recall_at_5": 0.3985,
+      "recall_at_10": 0.5113
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.1923,
+      "recall_at_5": 0.3718,
+      "recall_at_10": 0.5128
+    }
+  },
+  "meta": {
+    "condition": "pooled",
+    "approach": "verbatim RAG control: one vector per whole session, exact brute-force cosine over the pooled store prefix, no ANN, no reranker, no chunking",
+    "store_sessions": 5000,
+    "distinct_sessions_total": 19829,
+    "gold_sessions_first": 940,
+    "embed_model": "BAAI/bge-small-en-v1.5",
+    "embed_dims": 384,
+    "llm_calls": 0,
+    "embed_api_calls": 0,
+    "unique_texts_embedded": 18956,
+    "empty_session_texts": 623,
+    "failed_embedding_batches": 0,
+    "truncation_rule": "identical to control.py: text[:8000] chars, then model-internal truncation",
+    "similarity": "cosine on L2-normalised float32 vectors (numpy dot)",
+    "query_concurrency": 1,
+    "query_latency_includes_embedding": false,
+    "query_embed_ms_mean": 4.562,
+    "query_ms": {
+      "p50": 0.18,
+      "p95": 0.19,
+      "p99": 0.25
+    },
+    "ingest_seconds": 1548.1,
+    "query_seconds": 0.09,
+    "python": "3.14.5",
+    "numpy": "2.5.1",
+    "host": "rama-tuf"
+  }
+}

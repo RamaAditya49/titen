@@ -1,13 +1,12 @@
 ---
 work_id: evidence-aware-ranking
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-07
 updated: 2026-08-07
 owner: ramaaditya
-review_after: 2026-08-20
 ---
 
 # Rank on the evidence only Titen holds, and publish what that is worth

@@ -921,6 +921,49 @@ Two standing consequences:
   predicate. `loadAuthorizedSources` already used that shape; the join copied
   into `atlas.ts` did not, and it was on the slow plan in production.
 
+### The pooled-store condition: the per-instance haystack was the ceiling's floor, 2026-08-07
+
+[Full report](./2026-08-07-pooled-store.md), protocol
+[pre-registered](./2026-08-07-pooled-store-prereg.md) with five falsifiers
+before the first scored run. All 19,829 distinct sessions in one
+single-subject store, all 500 questions, `titen-memory@0.7.0` from the npm
+registry, four store sizes, per-compile latency, zero failures.
+
+**Two pre-registered falsifiers fired against Titen and are published with
+the same prominence a win would have received.** FTS-only recall@1 falls
+0.880 → **0.246** from the per-instance condition to the full pool, and
+compile p95 crosses the 250 ms kill line at the 10,000-session cell
+(430.8 ms; 864.9 ms at the full pool). The prereg's prediction (0.70–0.85)
+was wrong by 45+ points: LongMemEval-S personas share topics by
+construction, so the pooled store is denser in cross-persona near-duplicates
+than the synthetic generator — all 377 rank-1 misses retrieved
+cross-instance sessions, zero retrieved a wrong session from the question's
+own haystack.
+
+The subject-scoped anchor arm — the same 424,168-claim corpus behind one
+subject per instance — reproduced the published 0.880 / 0.9147 exactly under
+the 0.7.0 tarball at p95 138 ms. **Scoping is worth +63.4 points of recall@1
+and 6.3x latency on this corpus**; that is the measured value of
+authorization-before-retrieval, and the measured answer to "just scope by
+user_id".
+
+The instrument half worked: recall@10 falls 0.982 → 0.508 at the full pool,
+so the k-saturation that made every serious lane tie disappears — ranking,
+not candidate generation, becomes the binding constraint, as #267 predicted.
+
+Standing consequences:
+
+- **Never quote the FTS-only operating point above ~10^3-session store shape
+  without this curve beside it.** The zero-provider lane's published 0.880 is
+  a scoped-store number; unscoped pooled shape is a different regime and the
+  honest cells are 0.524 / 0.364 / 0.308 / 0.246 across the four sizes.
+- The pooled cells and the per-instance cells are different conditions of the
+  same corpus, not competing measurements of one thing. Every future
+  LongMemEval-S quote names its condition.
+- The 1,000-session pooled cell is 94% gold by construction and carries a
+  ±1-point dead-heat wobble across invocations; it is a curve endpoint, never
+  a headline.
+
 ## Release gates
 
 | Gate | Required result                                                                                                                              |
@@ -982,6 +1025,10 @@ Every published result includes:
 - Never present the 2026-08-07 `disputed` authorization run as evidence that the
   fix improves anything. It is a no-regression check on a corpus that holds no
   contradicting evidence at all, and it was published as such.
+- Never quote a LongMemEval-S figure without naming its condition —
+  per-instance (scoped) or pooled — and never quote the FTS-only lane above a
+  ~10^3-session store shape without the pooled degradation curve beside it.
+  Measured 2026-08-07: 0.880 scoped against 0.246 at the 19,829-session pool.
 - Never let a corpus into an evidence plan without reading its `LICENSE` file.
   An SPDX lookup is not sufficient: `gh api repos/snap-research/locomo --jq
   .license.spdx_id` returns `NOASSERTION`, which means **unknown, not

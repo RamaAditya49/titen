@@ -1,0 +1,256 @@
+{
+  "scores": {
+    "titen_anchor": {
+      "n": 500,
+      "recall_at_1": 0.88,
+      "recall_at_5": 0.96,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.9147,
+      "failures": 0,
+      "query_seconds": 38.2,
+      "embed_calls": 0
+    },
+    "titen_pooled_1000": {
+      "n": 500,
+      "recall_at_1": 0.524,
+      "recall_at_5": 0.754,
+      "recall_at_10": 0.83,
+      "mrr_at_10": 0.6239,
+      "failures": 0,
+      "ingest_seconds": 16.8,
+      "query_seconds": 23.0,
+      "embed_calls": 0,
+      "store_sessions": 1000,
+      "claims_written": 23084
+    },
+    "titen_pooled_5000": {
+      "n": 500,
+      "recall_at_1": 0.364,
+      "recall_at_5": 0.614,
+      "recall_at_10": 0.7,
+      "mrr_at_10": 0.4675,
+      "failures": 0,
+      "ingest_seconds": 86.4,
+      "query_seconds": 64.9,
+      "embed_calls": 0,
+      "store_sessions": 5000,
+      "claims_written": 91105
+    },
+    "titen_pooled_10000": {
+      "n": 500,
+      "recall_at_1": 0.308,
+      "recall_at_5": 0.506,
+      "recall_at_10": 0.626,
+      "mrr_at_10": 0.3976,
+      "failures": 0,
+      "ingest_seconds": 172.1,
+      "query_seconds": 118.0,
+      "embed_calls": 0,
+      "store_sessions": 10000,
+      "claims_written": 175306
+    },
+    "titen_pooled_19829": {
+      "n": 500,
+      "recall_at_1": 0.246,
+      "recall_at_5": 0.444,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.3259,
+      "failures": 0,
+      "ingest_seconds": 363.8,
+      "query_seconds": 230.7,
+      "embed_calls": 0,
+      "store_sessions": 19829,
+      "claims_written": 342129
+    },
+    "control_published": {
+      "n": 500,
+      "recall_at_1": 0.772,
+      "recall_at_5": 0.932,
+      "recall_at_10": 0.972,
+      "mrr_at_10": 0.8427,
+      "failures": 0,
+      "ingest_seconds": 1988.5,
+      "query_seconds": 2.69,
+      "embed_api_calls": 0
+    },
+    "control_pooled_1000": {
+      "n": 500,
+      "recall_at_1": 0.33,
+      "recall_at_5": 0.562,
+      "recall_at_10": 0.674,
+      "mrr_at_10": 0.4328,
+      "failures": 0,
+      "ingest_seconds": 1548.1,
+      "query_seconds": 0.03,
+      "embed_api_calls": 0,
+      "store_sessions": 1000
+    },
+    "control_pooled_5000": {
+      "n": 500,
+      "recall_at_1": 0.212,
+      "recall_at_5": 0.404,
+      "recall_at_10": 0.528,
+      "mrr_at_10": 0.2993,
+      "failures": 0,
+      "ingest_seconds": 1548.1,
+      "query_seconds": 0.09,
+      "embed_api_calls": 0,
+      "store_sessions": 5000
+    },
+    "control_pooled_10000": {
+      "n": 500,
+      "recall_at_1": 0.166,
+      "recall_at_5": 0.326,
+      "recall_at_10": 0.428,
+      "mrr_at_10": 0.2392,
+      "failures": 0,
+      "ingest_seconds": 1548.1,
+      "query_seconds": 0.23,
+      "embed_api_calls": 0,
+      "store_sessions": 10000
+    },
+    "control_pooled_19829": {
+      "n": 500,
+      "recall_at_1": 0.124,
+      "recall_at_5": 0.266,
+      "recall_at_10": 0.334,
+      "mrr_at_10": 0.1868,
+      "failures": 0,
+      "ingest_seconds": 1548.1,
+      "query_seconds": 0.59,
+      "embed_api_calls": 0,
+      "store_sessions": 19829
+    },
+    "mempalace_published": {
+      "n": 500,
+      "recall_at_1": 0.804,
+      "recall_at_5": 0.964,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.8717,
+      "failures": 0,
+      "ingest_seconds": 486.1,
+      "query_seconds": 67.9
+    },
+    "mempalace_pooled_19829": {
+      "n": 500,
+      "recall_at_1": 0.164,
+      "recall_at_5": 0.276,
+      "recall_at_10": 0.374,
+      "mrr_at_10": 0.2152,
+      "failures": 0,
+      "ingest_seconds": 346.7,
+      "query_seconds": 63.97,
+      "embed_api_calls": 0,
+      "store_sessions": 19154
+    }
+  },
+  "latency": {
+    "titen_anchor": {
+      "p50": 70.47,
+      "p95": 138.08,
+      "p99": 194.09
+    },
+    "titen_pooled_1000": {
+      "p50": 44.63,
+      "p95": 69.31,
+      "p99": 77.97
+    },
+    "titen_pooled_5000": {
+      "p50": 122.0,
+      "p95": 227.4,
+      "p99": 258.43
+    },
+    "titen_pooled_10000": {
+      "p50": 219.16,
+      "p95": 430.79,
+      "p99": 492.27
+    },
+    "titen_pooled_19829": {
+      "p50": 424.69,
+      "p95": 864.91,
+      "p99": 1010.6
+    },
+    "control_pooled_1000": {
+      "p50": 0.06,
+      "p95": 0.07,
+      "p99": 0.12
+    },
+    "control_pooled_5000": {
+      "p50": 0.18,
+      "p95": 0.19,
+      "p99": 0.25
+    },
+    "control_pooled_10000": {
+      "p50": 0.39,
+      "p95": 0.46,
+      "p99": 2.98
+    },
+    "control_pooled_19829": {
+      "p50": 1.12,
+      "p95": 1.19,
+      "p99": 1.67
+    },
+    "mempalace_pooled_19829": {
+      "p50": 127.9,
+      "p95": 130.59,
+      "p99": 132.47
+    }
+  },
+  "sign_tests": {
+    "titen_pooled_vs_anchor": {
+      "a_wins": 0,
+      "b_wins": 317,
+      "ties": 183,
+      "p_value": 0.0
+    },
+    "control_pooled_vs_published": {
+      "a_wins": 0,
+      "b_wins": 324,
+      "ties": 176,
+      "p_value": 0.0
+    },
+    "mempalace_pooled_vs_published": {
+      "a_wins": 0,
+      "b_wins": 320,
+      "ties": 180,
+      "p_value": 0.0
+    },
+    "titen_vs_control_pooled": {
+      "a_wins": 86,
+      "b_wins": 25,
+      "ties": 389,
+      "p_value": 0.0
+    },
+    "titen_vs_mempalace_pooled": {
+      "a_wins": 76,
+      "b_wins": 35,
+      "ties": 389,
+      "p_value": 0.0001
+    },
+    "control_vs_mempalace_pooled": {
+      "a_wins": 27,
+      "b_wins": 47,
+      "ties": 426,
+      "p_value": 0.0265
+    }
+  },
+  "k_spread": {
+    "recall_at_1": 12.2,
+    "recall_at_5": 17.8,
+    "recall_at_10": 17.4
+  },
+  "missing": [],
+  "falsifiers": {
+    "1_anchor_gate": "PASS",
+    "taxes_points_lost": {
+      "titen": 63.4,
+      "control": 64.8,
+      "mempalace": 64.0
+    },
+    "2_axis_existence": "AXIS EXISTS (some serious lane loses >= 2 points)",
+    "3_frontier_floor_gap_points": -12.2,
+    "3_frontier": "HOLDS on the floor test",
+    "5_latency_p95_ms": 864.91,
+    "5_latency": "FIRED: p95 > 250 ms"
+  }
+}

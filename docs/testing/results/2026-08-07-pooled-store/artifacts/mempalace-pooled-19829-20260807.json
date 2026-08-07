@@ -1,0 +1,73 @@
+{
+  "lane": "mempalace",
+  "embedding_arm": "useronly-minilm",
+  "generated_at": "2026-08-07T12:31:03Z",
+  "n": 500,
+  "recall_at_1": 0.164,
+  "recall_at_5": 0.276,
+  "recall_at_10": 0.374,
+  "mrr_at_10": 0.2152,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.0286,
+      "recall_at_5": 0.1143,
+      "recall_at_10": 0.3
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.7321,
+      "recall_at_5": 0.8393,
+      "recall_at_10": 0.875
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.0333,
+      "recall_at_5": 0.1333,
+      "recall_at_10": 0.2333
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.0977,
+      "recall_at_5": 0.2105,
+      "recall_at_10": 0.2932
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.0602,
+      "recall_at_5": 0.2105,
+      "recall_at_10": 0.2632
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.2179,
+      "recall_at_5": 0.2949,
+      "recall_at_10": 0.4615
+    }
+  },
+  "meta": {
+    "condition": "pooled",
+    "approach": "MemPalace published-benchmark raw shape: bare chromadb, user-turns-only documents, default MiniLM embeddings, vector distance ranking; NOT the mempalace product path",
+    "store_sessions": 19154,
+    "sessions_without_user_turns": 675,
+    "distinct_sessions_total": 19829,
+    "gold_sessions_first": 940,
+    "embed_model": "chromadb DefaultEmbeddingFunction (all-MiniLM-L6-v2 ONNX)",
+    "llm_calls": 0,
+    "embed_api_calls": 0,
+    "ingest_seconds": 346.7,
+    "embed_seconds": 339.1,
+    "query_seconds": 63.97,
+    "query_concurrency": 1,
+    "query_latency_includes_embedding": true,
+    "query_ms": {
+      "p50": 127.9,
+      "p95": 130.59,
+      "p99": 132.47
+    },
+    "n_results": 100,
+    "host": "rama-tuf"
+  }
+}

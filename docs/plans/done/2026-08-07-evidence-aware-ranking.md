@@ -1,14 +1,13 @@
 ---
 work_id: evidence-aware-ranking
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-07
 updated: 2026-08-07
 owner: ramaaditya
-spec: docs/specs/active/2026-08-07-evidence-aware-ranking.md
-review_after: 2026-08-20
+spec: docs/specs/done/2026-08-07-evidence-aware-ranking.md
 ---
 
 # Plan — audit the signals, ship the one that is real, publish the number
@@ -143,3 +142,33 @@ says the corpus cannot measure this.
 
 That is a worse headline and a better piece of evidence than a tuned win, and it
 is the reason the kill criteria are written down before the numbers exist.
+
+## Acceptance evidence
+
+- AC-EVR-001: the tie-break key lands in `rankCandidates` after weighted score
+  and vector similarity; the dual-runtime contract case `corroboration breaks a
+  ranking dead heat, and only support counts` fails without it (E4).
+- AC-EVR-002: the dual-runtime contract case `a hidden supporting observation
+  changes neither depth nor order (AC-EVR-002)` — two principals, one private
+  supporting observation, order unchanged for the excluded principal and
+  inverted for the authorized one; verified to fail with the `EXISTS` removed
+  from `loadAuthorizedSources` (E4).
+- AC-EVR-003: uniform-depth assertion inside the `rankCandidates` unit test
+  returns the pre-change order byte-for-byte (E4).
+- AC-EVR-004: determinism unit test — identical corpus content under fresh
+  identifiers ranks identically (E4).
+- AC-EVR-005: `src/core/**` gained no import, no migration, and no
+  configuration flag; the A/B ran from two commits rather than a switch (E3),
+  reconfirmed in the #288 review.
+- AC-EVR-006: the published measurement states that 0.0 of the +10.2-point
+  oracle ceiling was captured, that the ranked lists were byte-identical on
+  500/500 instances, and what the measurement does not establish
+  ([2026-08-07-evidence-ranking.md](../../testing/2026-08-07-evidence-ranking.md), E5).
+- AC-EVR-007: tokens-to-answer reports the 259/500 no-gold-at-any-depth MCP
+  reference instances as their own count in the denominator, never dropped (E6).
+
+## Verification
+
+`pnpm check:workflow` green; dual-runtime contract suite green on bun-sqlite
+and D1 for the three E4 contract cases; the E5/E6 artifacts recomputed from raw
+`.ranked.json` reproduce the stored scores exactly.
