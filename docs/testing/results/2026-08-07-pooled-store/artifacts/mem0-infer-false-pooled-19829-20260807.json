@@ -1,0 +1,80 @@
+{
+  "lane": "mem0-oss-2.0.15-infer-false",
+  "embedding_arm": "pooled",
+  "generated_at": "2026-08-07T17:19:27Z",
+  "n": 500,
+  "recall_at_1": 0.182,
+  "recall_at_5": 0.384,
+  "recall_at_10": 0.494,
+  "mrr_at_10": 0.2716,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.0571,
+      "recall_at_5": 0.2429,
+      "recall_at_10": 0.3143
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.6964,
+      "recall_at_5": 0.9286,
+      "recall_at_10": 0.9821
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.1,
+      "recall_at_5": 0.1667,
+      "recall_at_10": 0.2333
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.0526,
+      "recall_at_5": 0.2857,
+      "recall_at_10": 0.3759
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.0827,
+      "recall_at_5": 0.2632,
+      "recall_at_10": 0.4286
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.3462,
+      "recall_at_5": 0.5769,
+      "recall_at_10": 0.7179
+    }
+  },
+  "meta": {
+    "condition": "pooled",
+    "package": "mem0ai==2.0.15 (PyPI, Apache-2.0), qdrant-client==1.18.0",
+    "mode": "infer=False - NO LLM extraction; one memory per message",
+    "store_sessions": 19829,
+    "gold_sessions_first": 940,
+    "shards": 12,
+    "sharding": "concurrency device only: qdrant local mode is an exact full scan, per-shard hits merged by descending score are byte-equivalent to one exact store; one ingest thread per shard because in-RAM qdrant is not concurrency-safe",
+    "embedding_model": "tuf/embeddinggemma",
+    "embedding_dims": 768,
+    "llm_model": "NONE (tripwire raises; LLM base URL closed port)",
+    "search": "Memory.search(top_k=500 per shard, threshold=0.0) x 12 shards, merged by score, dedup by metadata.session_id, cap 100 sessions",
+    "query_concurrency": 1,
+    "query_latency_includes_embedding": true,
+    "query_ms": {
+      "p50": 2215.58,
+      "p95": 2826.47,
+      "p99": 3045.33
+    },
+    "ingest_seconds_wall": 3953.0,
+    "query_seconds": 1151.1,
+    "llm_calls": 0,
+    "embed_calls": 205641,
+    "memories_stored_total": 199641,
+    "add_errors_total": 0,
+    "add_retries_total": 0,
+    "telemetry": "MEM0_TELEMETRY=False",
+    "bm25_hybrid": "DISABLED - fastembed not a base dependency, same as every prior mem0 lane",
+    "host": "rama-tuf"
+  }
+}

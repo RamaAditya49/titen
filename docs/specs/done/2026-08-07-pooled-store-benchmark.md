@@ -1,13 +1,12 @@
 ---
 work_id: pooled-store-benchmark
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-07
-updated: 2026-08-07
+updated: 2026-08-08
 owner: ramaaditya
-review_after: 2026-08-21
 ---
 
 # Measure the pooled-store condition: quality, latency, and cost at production store shape

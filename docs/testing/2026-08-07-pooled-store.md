@@ -37,12 +37,12 @@ in every scored lane.
    **63.4 points** of recall@1 from the per-instance condition to the full
    pool (0.880 → 0.246). The ≥2-point threshold is exceeded thirty-fold.
 3. **Frontier: HOLDS, in the opposite direction from the fear.** Titen
-   FTS-only at the full pool is **12.2 points above** the best zero-LLM
-   control lane run so far (0.246 against 0.124), not 10 below it, and its
-   paired tax (63.4 points) is statistically indistinguishable from the
-   control's (64.8) rather than ≥5 points worse. The stronger router-embedded
-   control is phase 2 and could still change this row; the verdict is scoped
-   to the lanes actually run.
+   FTS-only at the full pool is **7.2 points above** the best zero-LLM
+   control lane (0.246 against the router control's 0.174, 12.2 above the
+   fastembed control's 0.124), not 10 below, and its paired tax (63.4 points)
+   is the *smallest* of any lane rather than ≥5 points worse — the strong
+   router control loses 68.0. The phase-2 router cell confirmed the day-1
+   verdict instead of overturning it.
 4. **No-relative-claim: does not fire.** The lane-vs-lane differences at the
    pooled condition are significant, not indistinguishable — see the sign
    tests below.
@@ -179,17 +179,77 @@ Two readings, both required:
   the router-embedded control and Mem0 `infer=False` are phase 2, and no
   managed product is compared.
 
+## Phase-2 lanes, same prereg
+
+**verbatim-RAG control, router arm** (the strong control: the same
+`embeddinggemma` service Titen's vector arm uses; per-instance it scored
+0.854): pooled 19,829 recall@1 **0.174**, recall@5 0.336, recall@10 0.418,
+MRR@10 0.2459, embed ingest 916.3 s. The strongest dense control loses 68.0
+points — the largest tax of any lane — and lands **7.2 points below Titen
+FTS-only**.
+
+**Titen FTS+vector** (router `embeddinggemma`, explicit drain, 342,129
+vectors, outbox drained to zero): pooled 19,829 recall@1 **0.212**, recall@5
+0.460, recall@10 0.526, MRR@10 0.3153, compile p50 1,182.5 ms / p95
+1,653.2 ms. **The vector arm hurts at the pooled shape**: 3.4 points below
+Titen's own FTS-only lane after 9,054 s of index drain, at 2.8x the compile
+latency. The hybrid fusion that was worth +2.0 points in the per-instance
+condition is worth −3.4 here, with the same embedder that also collapsed the
+dense control — consistent with the embedding space, not the fusion, being
+what fails at this density of cross-persona near-duplicates.
+
+**Mem0 OSS 2.0.15 `infer=False`** (its LLM-free mode, named per the standing
+rule; one memory per message, 199,641 memories, LLM tripwire enforced, zero
+add errors, zero scoring failures): pooled 19,829 recall@1 **0.182**,
+recall@5 0.384, recall@10 0.494, MRR@10 0.2716. Ingest: **3,953 s wall and
+205,641 embedding calls** against Titen FTS-only's 363.8 s and zero calls.
+Query p50 **2,215.6 ms** / p95 2,826.5 ms at concurrency 1 — 2.6x Titen's
+fired-falsifier latency, reported under the same rules. Store sharded across
+12 in-process qdrant instances as a concurrency device only; qdrant local
+mode is an exact scan, so merged-by-score shards are byte-equivalent to one
+store.
+
+### The full-pool leaderboard, final
+
+| Lane, pooled 19,829 | recall@1 | tax | vs Titen FTS-only (W/L/T, p) |
+| --- | ---: | ---: | --- |
+| **Titen 0.7.0 FTS-only** | **0.246** | **−63.4** | — |
+| Titen 0.7.0 FTS+vector | 0.212 | −68.8¹ | 34/51, p = 0.082 |
+| Mem0 OSS 2.0.15 infer=False | 0.182 | −68.5² | 27/59, **p = 0.0007** |
+| verbatim-RAG control, router | 0.174 | −68.0 | 29/65, **p = 0.0003** |
+| MemPalace 3.6.0 published shape | 0.164 | −64.0 | 35/76, **p = 0.0001** |
+| verbatim-RAG control, fastembed | 0.124 | −64.8 | 25/86, **p < 0.0001** |
+| MCP reference server | 0.000 | −5.0³ | dead at this scale |
+
+¹ vs its own per-instance 0.900. ² vs Mem0's per-instance 0.8667 (n=60).
+³ vs its per-instance 0.050; the server could not serve the store at all.
+
+**Titen's zero-provider lane is significantly above every measured
+competitor at the pooled condition** — the first such separation this
+programme has produced — while carrying the smallest tax, the cheapest
+build, and no provider. The two caveats that must travel with that sentence:
+Titen's own FTS+vector arm is *not* significantly different from FTS-only
+(p = 0.082, numerically worse), and the per-instance condition remains a
+statistical tie for everyone, exactly as section 02's published numbers say.
+
 ### Build cost at the full pool
 
 | Lane | Ingest | Provider calls | $ |
 | --- | ---: | ---: | ---: |
 | Titen FTS-only | **363.8 s** | 0 | 0 |
-| control fastembed | 1,548.1 s embed (local CPU) | 0 external | 0 |
 | MemPalace raw shape | 346.7 s (local MiniLM) | 0 external | 0 |
+| control router | 916.3 s (610 router calls) | 610 | ~0 (local router) |
+| control fastembed | 1,548.1 s embed (local CPU) | 0 external | 0 |
+| Mem0 infer=False | 3,953.0 s wall | 205,641 | ~0 (local router) |
+| Titen FTS+vector | 450.5 s ingest + **9,054.3 s drain** | 3,620 | ~0 (local router) |
 
-Every day-1 lane is locally reproducible for $0; the cost asymmetries that
-motivated the frontier framing (Mem0's modes) belong to phase 2 and are not
-quoted here.
+Every lane is locally reproducible for ~$0 on one machine; the asymmetry is
+time and calls, not dollars, and it spans 10.9x wall clock between the
+fastest serious lane and Mem0's LLM-free mode. Mem0's default `infer=True`
+mode is not run at pooled scale: at its measured 288,021 summed seconds and
+2,981 LLM calls for 60 per-instance haystacks, the pooled store would cost a
+five-figure LLM-call ingest — that infeasibility-on-one-machine is the
+extrapolation-labelled cost row, and the reason it has no scored cell.
 
 ## What this run does not show
 
@@ -198,9 +258,9 @@ quoted here.
   subject-scoped anchor row is the single-user shape. Neither alone is "the"
   deployment, and no shipped product — Titen included — serves the unscoped
   query pattern by default.
-- Phase-2 lanes (Titen FTS+vector, control router arm, Mem0 OSS 2.0.15
-  `infer=False`) had not completed at publication; their cells are em dashes,
-  never extrapolations.
+- Mem0's cell is its `infer=False` mode; its default extraction mode has no
+  scored pooled cell because it is infeasible on one machine, and that cost
+  asymmetry is itself reported rather than extrapolated into a score.
 - The 20% audit containment is a lower bound from mechanical string matching,
   not a human judgment.
 

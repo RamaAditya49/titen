@@ -41,6 +41,10 @@ def main():
         "control_pooled_19829": "control-fastembed-pooled-20260807-19829",
         "mempalace_published": "mempalace-vendorrepro-useronly-minilm-500",
         "mempalace_pooled_19829": "mempalace-pooled-19829-20260807",
+        "control_router_published": "control-router-500",
+        "control_router_pooled_19829": "control-router-pooled-20260807-19829",
+        "titen_router_pooled_19829": "titen-router-pooled-19829-20260807",
+        "mem0_pooled_19829": "mem0-infer-false-pooled-19829-20260807",
     }
 
     out = {"scores": {}, "latency": {}, "sign_tests": {}, "k_spread": {},
@@ -71,14 +75,23 @@ def main():
         ("titen_vs_control_pooled", "titen_pooled_19829", "control_pooled_19829"),
         ("titen_vs_mempalace_pooled", "titen_pooled_19829", "mempalace_pooled_19829"),
         ("control_vs_mempalace_pooled", "control_pooled_19829", "mempalace_pooled_19829"),
+        ("ctrl_router_pooled_vs_published", "control_router_pooled_19829", "control_router_published"),
+        ("titen_fts_vs_ctrl_router_pooled", "titen_pooled_19829", "control_router_pooled_19829"),
+        ("titen_router_vs_titen_fts_pooled", "titen_router_pooled_19829", "titen_pooled_19829"),
+        ("titen_router_vs_ctrl_router_pooled", "titen_router_pooled_19829", "control_router_pooled_19829"),
+        ("mem0_vs_ctrl_router_pooled", "mem0_pooled_19829", "control_router_pooled_19829"),
+        ("mem0_vs_titen_fts_pooled", "mem0_pooled_19829", "titen_pooled_19829"),
+        ("mem0_vs_titen_router_pooled", "mem0_pooled_19829", "titen_router_pooled_19829"),
     ]
     for name, a, b in pairs:
         if a in ranks and b in ranks:
             out["sign_tests"][name] = common.sign_test(instances, ranks[a], ranks[b], k=1)
 
     # k-saturation re-check at the full pool across serious lanes present.
-    serious = [k for k in ("titen_pooled_19829", "control_pooled_19829",
-                           "mempalace_pooled_19829") if k in out["scores"]]
+    serious = [k for k in ("titen_pooled_19829", "titen_router_pooled_19829",
+                           "control_pooled_19829", "control_router_pooled_19829",
+                           "mempalace_pooled_19829", "mem0_pooled_19829")
+               if k in out["scores"]]
     for kk in ("recall_at_1", "recall_at_5", "recall_at_10"):
         vals = [out["scores"][s][kk] for s in serious if out["scores"][s].get(kk) is not None]
         if vals:
@@ -92,7 +105,8 @@ def main():
     taxes = {}
     for lane, pooled, pub in (("titen", "titen_pooled_19829", "titen_anchor"),
                               ("control", "control_pooled_19829", "control_published"),
-                              ("mempalace", "mempalace_pooled_19829", "mempalace_published")):
+                              ("mempalace", "mempalace_pooled_19829", "mempalace_published"),
+                              ("control_router", "control_router_pooled_19829", "control_router_published")):
         if pooled in sc and pub in sc:
             taxes[lane] = round((sc[pub]["recall_at_1"] - sc[pooled]["recall_at_1"]) * 100, 1)
     v["taxes_points_lost"] = taxes

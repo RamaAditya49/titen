@@ -951,12 +951,35 @@ The instrument half worked: recall@10 falls 0.982 → 0.508 at the full pool,
 so the k-saturation that made every serious lane tie disappears — ranking,
 not candidate generation, becomes the binding constraint, as #267 predicted.
 
+The phase-2 lanes sharpened rather than softened this. The **strong router
+control** (same `embeddinggemma` service as Titen's vector arm; 0.854
+per-instance) scored **0.174** pooled — the largest tax of any lane (68.0
+points) and 7.2 below Titen FTS-only. **Titen's own FTS+vector arm scored
+0.212 pooled, 3.4 points below its own FTS-only lane**, after a 9,054 s
+index drain and at 2.8x the compile latency: the hybrid fusion that bought
++2.0 points per-instance is worth −3.4 at the pooled shape, with the same
+embedder that collapsed the dense control. At this density of cross-persona
+near-duplicates the embedding space, not the fusion, is what fails.
+
+**Mem0 OSS 2.0.15 `infer=False` pooled: 0.182** — significantly below Titen
+FTS-only (27/59, p = 0.0007) at 10.9x the ingest wall clock (3,953 s,
+205,641 embedding calls) and 2.6x the query latency (p50 2,215.6 ms). The
+final pooled leaderboard puts **Titen's zero-provider lane significantly
+above every measured competitor** — Mem0, the router and fastembed dense
+controls, MemPalace's published shape, and the MCP reference server (which
+cannot serve the store at all) — the first significant lane-vs-lane
+separations this corpus has yielded. The per-instance condition remains a
+statistical tie for everyone; both sentences travel together.
+
 Standing consequences:
 
 - **Never quote the FTS-only operating point above ~10^3-session store shape
   without this curve beside it.** The zero-provider lane's published 0.880 is
   a scoped-store number; unscoped pooled shape is a different regime and the
   honest cells are 0.524 / 0.364 / 0.308 / 0.246 across the four sizes.
+- **Never claim the vector arm helps without naming the condition.** Measured
+  2026-08-07: FTS+vector is +2.0 points over FTS-only per-instance (p = 0.174,
+  unproven) and **−3.4 points pooled**, at 2.8x the compile latency.
 - The pooled cells and the per-instance cells are different conditions of the
   same corpus, not competing measurements of one thing. Every future
   LongMemEval-S quote names its condition.

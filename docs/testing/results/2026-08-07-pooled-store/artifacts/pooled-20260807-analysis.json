@@ -142,6 +142,53 @@
       "query_seconds": 63.97,
       "embed_api_calls": 0,
       "store_sessions": 19154
+    },
+    "control_router_published": {
+      "n": 500,
+      "recall_at_1": 0.854,
+      "recall_at_5": 0.974,
+      "recall_at_10": 0.99,
+      "mrr_at_10": 0.9067,
+      "failures": 0,
+      "ingest_seconds": 2377.5,
+      "query_seconds": 6.79,
+      "embed_api_calls": 877
+    },
+    "control_router_pooled_19829": {
+      "n": 500,
+      "recall_at_1": 0.174,
+      "recall_at_5": 0.336,
+      "recall_at_10": 0.418,
+      "mrr_at_10": 0.2459,
+      "failures": 0,
+      "ingest_seconds": 916.3,
+      "query_seconds": 2.65,
+      "embed_api_calls": 610,
+      "store_sessions": 19829
+    },
+    "titen_router_pooled_19829": {
+      "n": 500,
+      "recall_at_1": 0.212,
+      "recall_at_5": 0.46,
+      "recall_at_10": 0.526,
+      "mrr_at_10": 0.3153,
+      "failures": 0,
+      "ingest_seconds": 450.5,
+      "query_seconds": 609.8,
+      "embed_calls": 3620,
+      "store_sessions": 19829,
+      "claims_written": 342129
+    },
+    "mem0_pooled_19829": {
+      "n": 500,
+      "recall_at_1": 0.182,
+      "recall_at_5": 0.384,
+      "recall_at_10": 0.494,
+      "mrr_at_10": 0.2716,
+      "failures": 0,
+      "query_seconds": 1151.1,
+      "embed_calls": 205641,
+      "store_sessions": 19829
     }
   },
   "latency": {
@@ -194,6 +241,21 @@
       "p50": 127.9,
       "p95": 130.59,
       "p99": 132.47
+    },
+    "control_router_pooled_19829": {
+      "p50": 3.15,
+      "p95": 18.02,
+      "p99": 34.7
+    },
+    "titen_router_pooled_19829": {
+      "p50": 1182.5,
+      "p95": 1653.21,
+      "p99": 1770.91
+    },
+    "mem0_pooled_19829": {
+      "p50": 2215.58,
+      "p95": 2826.47,
+      "p99": 3045.33
     }
   },
   "sign_tests": {
@@ -232,12 +294,54 @@
       "b_wins": 47,
       "ties": 426,
       "p_value": 0.0265
+    },
+    "ctrl_router_pooled_vs_published": {
+      "a_wins": 0,
+      "b_wins": 340,
+      "ties": 160,
+      "p_value": 0.0
+    },
+    "titen_fts_vs_ctrl_router_pooled": {
+      "a_wins": 65,
+      "b_wins": 29,
+      "ties": 406,
+      "p_value": 0.0003
+    },
+    "titen_router_vs_titen_fts_pooled": {
+      "a_wins": 34,
+      "b_wins": 51,
+      "ties": 415,
+      "p_value": 0.0821
+    },
+    "titen_router_vs_ctrl_router_pooled": {
+      "a_wins": 51,
+      "b_wins": 32,
+      "ties": 417,
+      "p_value": 0.0475
+    },
+    "mem0_vs_ctrl_router_pooled": {
+      "a_wins": 40,
+      "b_wins": 36,
+      "ties": 424,
+      "p_value": 0.731
+    },
+    "mem0_vs_titen_fts_pooled": {
+      "a_wins": 27,
+      "b_wins": 59,
+      "ties": 414,
+      "p_value": 0.0007
+    },
+    "mem0_vs_titen_router_pooled": {
+      "a_wins": 34,
+      "b_wins": 49,
+      "ties": 417,
+      "p_value": 0.1239
     }
   },
   "k_spread": {
     "recall_at_1": 12.2,
-    "recall_at_5": 17.8,
-    "recall_at_10": 17.4
+    "recall_at_5": 19.4,
+    "recall_at_10": 19.2
   },
   "missing": [],
   "falsifiers": {
@@ -245,7 +349,8 @@
     "taxes_points_lost": {
       "titen": 63.4,
       "control": 64.8,
-      "mempalace": 64.0
+      "mempalace": 64.0,
+      "control_router": 68.0
     },
     "2_axis_existence": "AXIS EXISTS (some serious lane loses >= 2 points)",
     "3_frontier_floor_gap_points": -12.2,
