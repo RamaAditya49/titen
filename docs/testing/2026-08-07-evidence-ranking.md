@@ -23,8 +23,8 @@ direction.** We are not claiming a retrieval improvement, here or anywhere.
 ## What was actually built, and what turned out not to need building
 
 Five signals were named as candidates before any measurement. Resolving each
-against the shipped 0.7.0 code — the audit is the first half of the deliverable
-— left one.
+against the shipped 0.7.0 code left one. That audit is the first half of the
+deliverable.
 
 | Signal | Status at 0.7.0 | Built |
 | --- | --- | --- |
@@ -36,8 +36,9 @@ against the shipped 0.7.0 code — the audit is the first half of the deliverabl
 
 The `recalled` row is worth stating plainly, because it is the signal the
 strategy leans hardest on. `src/core/claims.ts` refuses a `recalled` observation
-as claim evidence at consolidation — S3 closed the loop at the write path rather
-than labelling it — and `src/core/context.ts` ranks claims, never observations.
+as claim evidence at consolidation, because S3 closed the loop at the write path
+rather than labelling it, and `src/core/context.ts` ranks claims, never
+observations.
 **No claim can carry recalled provenance, so a ranking penalty for one is code
 that can never execute.** The store confirms it: 25,112 observations, provenance
 `corpus` on every one, zero `recalled`.
@@ -45,7 +46,7 @@ that can never execute.** The store confirms it: 25,112 observations, provenance
 What shipped is corroboration: `evidence_depth`, the count of authorized
 *supporting* observations behind a claim, as a **tie-break key** placed after the
 weighted score and after vector similarity, ahead of the existing statement
-fallback. It is deliberately not a seventh weighted term — no corpus on this
+fallback. It is deliberately not a seventh weighted term. No corpus on this
 machine has both varying evidence depth and gold labels, so a weight could only
 have been fitted on the data it would then be scored on. A tie-break needs no
 weight, so nothing was fitted.
@@ -91,7 +92,7 @@ everywhere.
 
 ## 2. Pass A against pass B
 
-One store — a copy of the 2026-08-04 `fts-500.db`, never re-ingested — queried
+One store, a copy of the 2026-08-04 `fts-500.db`, never re-ingested, queried
 twice. Pass A ran from the branch base commit *before the ranker was written*;
 pass B from the branch head against the same file.
 
@@ -113,7 +114,7 @@ Pass A reproduces the published 0.6.0 `titen-fts-500.ranked.json` at rank 1 on
 **500 of 500** instances and in the top 10 on **499 of 500**, with identical
 recall@1, recall@5, recall@10 and MRR@10. The full list differs on 113
 instances; every one of those differences is a candidate-*set* difference, and
-the earliest differing position across all 113 is **rank 10** — the 1,000-row
+the earliest differing position across all 113 is **rank 10**: the 1,000-row
 candidate cutoff admitting slightly different claims at its boundary, not a
 reordering. This is reported rather than smoothed over, and it is a stronger
 reproduction than the run needed.
@@ -203,9 +204,9 @@ design does not ship, so it did not. Its numbers are kept in
 [`latency-top-k.json`](./results/2026-08-07-evidence-ranking/latency-top-k.json)
 rather than deleted.
 
-The shipped design decides from the preliminary ranking alone — no database work
-— whether the returned window holds a genuine dead heat, and looks corroboration
-up only then. Re-measured, alternating builds against the same store:
+The shipped design decides whether the returned window holds a genuine dead
+heat from the preliminary ranking alone, with no database work, and looks
+corroboration up only then. Re-measured, alternating builds against the same store:
 
 | `top_k` | build | p50 | p95 | mean |
 | ---: | --- | ---: | ---: | ---: |
@@ -226,8 +227,8 @@ caller actually pays for is how many tokens they must buy before the answer is
 in the pack.
 
 Definition: the token count of the smallest pack of **whole ranked sessions**
-that contains a gold session — the sessions at ranks 1..r where r is the rank of
-the first gold session. Tokenizer:
+that contains a gold session, meaning the sessions at ranks 1..r where r is the
+rank of the first gold session. Tokenizer:
 `onnx-community/embeddinggemma-300m-ONNX` `tokenizer.json`, one tokenizer for
 every lane. Instances with no gold session at any depth have no finite value;
 they are counted explicitly and never imputed or dropped.
@@ -252,8 +253,8 @@ one, and it should not be promoted over it. The tail is where the lanes differ:
 worst-case cost ranges from 37k tokens to 95k.
 
 **It does separate a working retriever from a broken one, dramatically.** The
-MCP reference server needs a 12,558-token median — roughly **4x** — and on 259
-of 500 instances never surfaces the gold at all, so no budget buys the answer.
+MCP reference server needs a 12,558-token median, roughly **4x**, and on 259 of
+500 instances never surfaces the gold at all, so no budget buys the answer.
 That is the same 441,501-downloads-a-month default the substitution spec targets.
 
 **What not to read into it:** this is not a cost or a price claim. It counts
@@ -281,7 +282,7 @@ withheld. Its benefit on a real store is **unmeasured, not demonstrated.**
   single-actor, single-trust, single-confidence, no-conflict, no-feedback,
   one-observation-per-claim corpus. Every store this ranker is designed for
   looks nothing like it. Whether corroboration helps real memory is untested,
-  and this run does not make it more likely — it only fails to make it less.
+  and this run does not make it more likely. It only fails to make it less.
 - **Nothing about the vector arm.** Pre-registered as conditional on pass B
   differing from pass A anywhere; it did not, and a byte-identical ranking
   cannot become non-identical by adding cosines. The router lane was not run.
@@ -298,7 +299,7 @@ withheld. Its benefit on a real store is **unmeasured, not demonstrated.**
 ## What would falsify the design, next time
 
 A corpus in which evidence signals actually vary, with gold labels. It does not
-exist here and building one ourselves would be grading our own homework — a
+exist here, and building one ourselves would be grading our own homework: a
 Titen-authored fixture with Titen-shaped evidence would prove only that we can
 write a fixture. The honest next step is to find or construct a corpus where
 corroboration count is externally determined, publish its construction before

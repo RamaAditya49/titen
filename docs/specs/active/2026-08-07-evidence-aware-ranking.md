@@ -98,8 +98,8 @@ Refused, with reasons:
 - **AC-EVR-004 — Ubiquitous:** Titen shall produce identical rankings for
   identical corpus content across independent ingests that mint different record
   identifiers, preserving the determinism contract of #226.
-- **AC-EVR-005 — Ubiquitous:** `src/core/**` shall retain zero external imports
-  and shall add no database migration, no configuration flag, and no dependency.
+- **AC-EVR-005 — Ubiquitous:** `src/core/**` shall retain zero external imports,
+  and the change shall add no database migration and no configuration flag.
 - **AC-EVR-006 — Event-driven:** When the evidence-ranking measurement is
   published, Titen shall state how much of the +10.2-point oracle ceiling it
   captured, including when that figure is zero, and shall state what the
