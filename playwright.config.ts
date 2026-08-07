@@ -1,6 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = process.env.PLAYWRIGHT_PORT ?? String(20_000 + [...process.cwd()].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 40_000);
+// Deterministic per worktree so parallel checkouts do not collide and
+// reuseExistingServer can find its own server. Kept under 32768 — the kernel's
+// ephemeral floor — so it is never a port an unrelated outbound socket holds.
+const port = process.env.PLAYWRIGHT_PORT ?? String(20_000 + [...process.cwd()].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 12_000);
 
 export default defineConfig({
   testDir: "./tests",

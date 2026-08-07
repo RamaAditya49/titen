@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
-const upstreamPort = 47_000 + Math.floor(Math.random() * 1_000);
-const adapterPort = 48_000 + Math.floor(Math.random() * 1_000);
-const base = `http://127.0.0.1:${adapterPort}`;
+let upstreamPort = 0;
+let adapterPort = 0;
+let base = "";
 const sessionKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const principals: Record<string, Record<string, unknown>> = {
   titen_sk_session_a: {
@@ -87,7 +87,7 @@ async function startAdapter(sharedKey = true) {
 beforeAll(async () => {
   upstream = Bun.serve({
     hostname: "127.0.0.1",
-    port: upstreamPort,
+    port: 0,
     async fetch(request) {
       const url = new URL(request.url);
       const key = bearer(request);
@@ -172,6 +172,14 @@ beforeAll(async () => {
       return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
     },
   });
+  upstreamPort = upstream.port;
+  // The adapter binds in a child process, so its port has to be known first.
+  // Reserve one from the OS and release it: a narrow race, unlike guessing a
+  // number inside the kernel's ephemeral range.
+  const reservation = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("reserved") });
+  adapterPort = reservation.port;
+  base = `http://127.0.0.1:${adapterPort}`;
+  await reservation.stop(true);
   await startAdapter();
 });
 

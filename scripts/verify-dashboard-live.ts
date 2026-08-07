@@ -222,7 +222,12 @@ await call("/v1/handoffs", {
   message: "Verify the live dashboard product map as its human owner.",
 }, approver);
 
-const port = 44_000 + Math.floor(Math.random() * 1000);
+// The adapter binds in a child process, so its port has to be known first.
+// Reserve one from the OS and release it: a narrow race, unlike guessing a
+// number inside the kernel's ephemeral range.
+const reservation = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("reserved") });
+const port = reservation.port;
+await reservation.stop(true);
 const adapter = Bun.spawn({
   cmd: [process.execPath, "scripts/dashboard-adapter.ts"],
   env: {
