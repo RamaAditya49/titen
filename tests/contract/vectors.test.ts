@@ -12,6 +12,7 @@ import { clientVia, fakeVectors, provisionWith } from "./harness";
 import { outboxStatement } from "../../src/core/writes";
 import {
   RANK_WEIGHTS,
+  hasDeadHeat,
   normalizeVectorSimilarity,
   rankCandidates,
   type RankInput,
@@ -641,6 +642,40 @@ test("corroboration decides a dead heat and never overrides score or cosine", ()
   );
   assert.equal(semantic[0]!.score, semantic[1]!.score);
   assert.equal(semantic[0]!.candidate.id, "cosine");
+});
+
+test("a dead heat is detected only inside the window that is returned", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+  // Three tie on score; the fourth is a strictly worse lexical match. Only the
+  // returned window can be changed by a tie-break, so a tie below it must not
+  // charge the request for an evidence lookup it cannot use.
+  const ranked = rankCandidates(
+    [
+      { ...rankInput("a", 0.9), bm25: -8 },
+      { ...rankInput("b", 0.8), bm25: -4, statement: "Bravo." },
+      { ...rankInput("c", 0.8), bm25: -4, statement: "Charlie." },
+      { ...rankInput("d", 0.8), bm25: -4, statement: "Delta." },
+    ],
+    now,
+  );
+  assert.deepEqual(ranked.map((entry) => entry.candidate.id), ["a", "b", "c", "d"]);
+  assert.equal(hasDeadHeat(ranked, 1), false, "rank 1 is unique and rank 2 does not tie it");
+  assert.equal(hasDeadHeat(ranked, 2), true, "the pair straddling the boundary can move");
+  assert.equal(hasDeadHeat(ranked), true);
+  assert.equal(hasDeadHeat([]), false);
+  assert.equal(hasDeadHeat(ranked.slice(0, 1)), false);
+
+  // Equal score but different cosine is not a dead heat: the semantic key
+  // already decides it, so no lookup is needed.
+  const semantic = rankCandidates(
+    [
+      { ...rankInput("x", 0.8, 0.91), bm25: -4 },
+      { ...rankInput("y", 0.8, 0.72), bm25: -4 },
+    ],
+    now,
+  );
+  assert.equal(semantic[0]!.score, semantic[1]!.score);
+  assert.equal(hasDeadHeat(semantic), false);
 });
 
 test("identical corpus content ranks identically across ingests that mint fresh ids", () => {

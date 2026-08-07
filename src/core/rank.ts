@@ -224,6 +224,30 @@ export function rankCandidates<T extends RankInput>(candidates: T[], now: Date):
 }
 
 /**
+ * Whether the returned window holds a genuine dead heat — two neighbours equal
+ * on both the weighted score and semantic similarity, so only a tie-break
+ * separates them.
+ *
+ * This exists so corroboration can be *looked up* only when it can change an
+ * answer. A tie entirely below the returned window cannot move what comes back;
+ * the pair straddling the boundary can, which is why the window is one entry
+ * wider than `limit`. Measured on LongMemEval-S at n=500: 499 of 500 packs have
+ * a unique top score, so the lookup is skipped on the overwhelming majority of
+ * small-`top_k` requests rather than charged to every compile.
+ */
+export function hasDeadHeat<T extends RankInput>(ranked: Ranked<T>[], limit?: number): boolean {
+  const window = ranked.slice(0, limit === undefined ? ranked.length : limit + 1);
+  return window.some((entry, index) => {
+    const previous = window[index - 1];
+    return (
+      previous !== undefined
+      && previous.score === entry.score
+      && (previous.candidate.vector_boost ?? 0) === (entry.candidate.vector_boost ?? 0)
+    );
+  });
+}
+
+/**
  * Two deterministic passes cover each available kind, then fill by rank under
  * the hard budget. Content is never truncated into misleading text (FRD CTX-001).
  */

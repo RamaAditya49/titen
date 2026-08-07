@@ -6,7 +6,7 @@ import { recordAccessParams, recordAccessSql } from "./authorization";
 import { newId, sha256Hex } from "./ids";
 import { commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
-import { packUnderBudget, rankCandidates } from "./rank";
+import { hasDeadHeat, packUnderBudget, rankCandidates } from "./rank";
 import { planFtsQuery, retrieveClaimCandidates, retrieveClaimsByIds } from "./retrieval";
 import { loadAuthorizedEvidenceIds, loadAuthorizedSources, supportingDepth } from "./evidence";
 import { estimateJsonTokens } from "./tokens";
@@ -154,22 +154,27 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     }
   }
 
-  // Corroboration is a ranking input, not a presentation detail, so the sources
-  // are loaded before ranking and the same rows are reused for citations below.
-  // This is the query the pack already ran, moved: `top_k` defaults to the whole
-  // candidate set, so the default request reads exactly the rows it read before,
-  // and an explicit `top_k` trades a bounded number of extra ids — capped by
-  // `max_candidates` — for a rank position decided by evidence rather than by
-  // alphabetical order.
+  // Corroboration decides a returned position only where the order would
+  // otherwise be arbitrary, so it is looked up only when there is a dead heat to
+  // decide. Without a tie this reads exactly the rows the pack already read for
+  // citations, so the common request pays nothing for the signal; with one, it
+  // widens to the candidate set, because a tied claim outside `top_k` can be
+  // promoted into it. Either way it is one query, and the same rows serve both
+  // the ranking and the citations.
+  const preliminary = rankCandidates(candidates, new Date(at));
+  const contested = hasDeadHeat(preliminary, topK);
   const sources = await loadAuthorizedSources(
     ctx.app.db,
     principal,
-    candidates.map((candidate) => candidate.id),
+    contested
+      ? candidates.map((candidate) => candidate.id)
+      : preliminary.slice(0, topK).map((entry) => entry.candidate.id),
   );
-  for (const candidate of candidates)
-    candidate.evidence_depth = supportingDepth(sources.get(candidate.id));
+  if (contested)
+    for (const candidate of candidates)
+      candidate.evidence_depth = supportingDepth(sources.get(candidate.id));
 
-  const allRanked = rankCandidates(candidates, new Date(at));
+  const allRanked = contested ? rankCandidates(candidates, new Date(at)) : preliminary;
   // `top_k` is applied after ranking and before the budget, so the token budget
   // is spent on the items the caller asked for. What the bound discarded is
   // still counted into `budget.omitted_items`: a caller who cannot tell a
