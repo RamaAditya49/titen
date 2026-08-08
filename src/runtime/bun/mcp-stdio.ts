@@ -9,7 +9,15 @@ import { parseReferenceGraph } from "../../core/portability";
 import { prepareSigningSecrets } from "../../core/secrets";
 import { TITEN_VERSION } from "../../core/version";
 import { createSqliteDb, openDatabase } from "./sqlite";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
@@ -243,18 +251,51 @@ const LOCAL_ENDPOINT = "http://127.0.0.1/mcp";
 
 // --- Adopting an existing @modelcontextprotocol/server-memory store ---
 
+/** Where the reference server's package lives once installed, relative to a root. */
+const REFERENCE_PACKAGE = join("node_modules", "@modelcontextprotocol", "server-memory", "dist");
+
 /**
- * Where the reference MCP memory server keeps its graph. It reads
- * `MEMORY_FILE_PATH` first and otherwise writes beside its own module; a user
- * switching to Titen has that file in the directory they run from, under either
- * the current `memory.jsonl` name or the pre-0.6.3 `memory.json`.
+ * Every place a `@modelcontextprotocol/server-memory` graph can be, most
+ * explicit first.
+ *
+ * `MEMORY_FILE_PATH` wins outright when it is set, because the user has said
+ * where the file is. With it unset the reference server writes **beside its own
+ * module**, not in the directory you launched it from — so the store of anyone
+ * who ran it the documented way is inside its install, and for the documented
+ * `npx -y @modelcontextprotocol/server-memory` that install is a hashed
+ * directory under npm's `_npx` cache. Searching only the cwd found neither, and
+ * an MCP server launched by a desktop client inherits the client's working
+ * directory anyway, so the cwd guess was weakest exactly where it was relied
+ * on. Both names are tried: `memory.jsonl` since 2025.11.25, `memory.json`
+ * before it.
  */
-export function referenceMemoryPath(cwd = process.cwd()): string | undefined {
+export function referenceMemoryCandidates(cwd = process.cwd()): string[] {
   const configured = process.env.MEMORY_FILE_PATH;
-  const candidates = configured
-    ? [isAbsolute(configured) ? configured : join(cwd, configured)]
-    : [join(cwd, "memory.jsonl"), join(cwd, "memory.json")];
-  return candidates.find((path) => existsSync(path));
+  if (configured) return [isAbsolute(configured) ? configured : join(cwd, configured)];
+  const roots = [cwd, join(cwd, REFERENCE_PACKAGE), ...npxCachedReferenceDirs()];
+  return roots.flatMap((root) => [join(root, "memory.jsonl"), join(root, "memory.json")]);
+}
+
+/**
+ * Reference-server installs that `npx` has left in npm's cache. Each run gets
+ * its own hashed directory, so there can be several and the newest is not
+ * knowable from the name; every one is offered as a candidate and the first
+ * that exists wins.
+ */
+function npxCachedReferenceDirs(): string[] {
+  const cache = join(homedir(), ".npm", "_npx");
+  if (!existsSync(cache)) return [];
+  try {
+    return readdirSync(cache)
+      .map((entry) => join(cache, entry, REFERENCE_PACKAGE))
+      .filter((dir) => existsSync(dir));
+  } catch {
+    return []; // an unreadable cache is not a reason to fail the server
+  }
+}
+
+export function referenceMemoryPath(cwd = process.cwd()): string | undefined {
+  return referenceMemoryCandidates(cwd).find((path) => existsSync(path));
 }
 
 /** Splits a list so no single MCP request approaches the 1 MiB body limit. */
@@ -366,6 +407,18 @@ async function runLocalMcpStdio(options: StdioOptions): Promise<void> {
     } catch (error) {
       console.error(
         `titen: could not import ${source}: ${error instanceof Error ? error.message : "unknown error"}`,
+      );
+    } else if (process.env.MEMORY_FILE_PATH) {
+      // The user said where their graph is and it is not there. Silence here
+      // reads as "Titen lost my memories", so name the path actually tried.
+      //
+      // Only this case warns. A first run that simply finds no graph says
+      // nothing: most first runs are not migrations, some clients surface
+      // stderr as an error, and `local-mode.test.ts` holds the stdio entry
+      // point to a clean stderr on a normal start. Finding the graph is what
+      // fixes the silent-empty-store failure — see referenceMemoryCandidates.
+      console.error(
+        `titen: MEMORY_FILE_PATH is set to ${referenceMemoryCandidates()[0]} but no file is there; starting empty.`,
       );
     }
     await runMcpStdio({

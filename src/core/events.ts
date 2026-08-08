@@ -83,24 +83,6 @@ export function eventStatement(
   };
 }
 
-/** Standalone write for callers that have no batch of their own. */
-export async function recordEvent(
-  db: Db,
-  orgId: string,
-  kind: string,
-  actorId: string,
-  resourceType: string,
-  resourceId: string,
-  payload: Record<string, unknown>,
-): Promise<string> {
-  const stmt = eventStatement(
-    orgId, kind, actorId, resourceType, resourceId, payload,
-    new Date().toISOString(),
-  );
-  await db.batch([{ sql: stmt.sql, params: stmt.params }]);
-  return stmt.id;
-}
-
 /**
  * GET /v1/events — cursor-based polling.
  * Query params: after (cursor), limit (default 50, max 200), kind (optional filter).

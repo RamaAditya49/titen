@@ -87,6 +87,31 @@ export function bearerToken(request: Request): string | undefined {
 }
 
 /**
+ * How stale `last_used_at` has to be before a request refreshes it.
+ *
+ * Every authenticated request runs the UPDATE below, so the only thing keeping
+ * a `GET` from costing a durable write is that SQLite skips the page write
+ * when the `CASE` leaves the stored value untouched. Measured on WAL with
+ * `synchronous = FULL`: fifty updates whose `CASE` is a no-op grow the WAL by
+ * **0 bytes**, fifty that actually change the value grow it by 206,032 —
+ * 4,120 each, one page plus a frame header, each with its own fsync.
+ *
+ * Comparing against `now` meant the `CASE` fired on every request whose clock
+ * had advanced by a millisecond, which in production is all of them: 25 of the
+ * 27 `GET` routes paid a WAL frame and an fsync to record that they had been
+ * read, and one billed write on D1. Comparing against `now - this` bounds that
+ * to one write per key per interval.
+ *
+ * The value stays monotonic, which is what `GET /v1/keys` documents: the guard
+ * only ever replaces a timestamp older than `staleBefore` with `now`, so a
+ * request arriving out of order — or after the clock steps backwards — cannot
+ * move it into the past. What it loses is resolution: a key used continuously
+ * reports a `last_used_at` up to this interval stale. That is a reporting
+ * field, not an authorization input, and nothing reads it back.
+ */
+export const LAST_USED_RESOLUTION_MS = 60_000;
+
+/**
  * Verification is a single indexed lookup on the key hash. A revoked key stops
  * working on the next request because nothing about the principal is cached.
  */
@@ -98,6 +123,7 @@ export async function authenticate(
   const token = bearerToken(request);
   if (!token || !token.startsWith(KEY_PREFIX)) throw unauthenticated();
   const at = now.toISOString();
+  const staleBefore = new Date(now.getTime() - LAST_USED_RESOLUTION_MS).toISOString();
   const rows = await db.all<KeyRow>(
     `UPDATE api_keys
         SET last_used_at = CASE
@@ -108,7 +134,7 @@ export async function authenticate(
         AND not_before <= ? AND (expires_at IS NULL OR expires_at > ?)
       RETURNING id, org_id, principal_id, principal_kind, scopes, max_trust,
                 not_before, expires_at, revoked_at`,
-    [at, at, await sha256Hex(token), at, at],
+    [staleBefore, at, await sha256Hex(token), at, at],
   );
   const row = rows[0];
   if (!row) throw unauthenticated();

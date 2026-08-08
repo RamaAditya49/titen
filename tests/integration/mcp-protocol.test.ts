@@ -348,8 +348,12 @@ test("a tool call returns MCP content and a failure stays readable", async () =>
 });
 
 test("protocol-level errors use JSON-RPC error codes", async () => {
-  const unknownMethod = await rpc({ jsonrpc: "2.0", id: 1, method: "resources/list" });
+  // `resources/list` used to stand in for "unknown method" here; it is served
+  // now, so this needs a method that genuinely is not implemented.
+  const unknownMethod = await rpc({ jsonrpc: "2.0", id: 1, method: "completion/complete" });
   assert.equal(unknownMethod.body.error.code, -32601, "unknown method is -32601");
+  const served = await rpc({ jsonrpc: "2.0", id: 1, method: "resources/list" });
+  assert.equal(served.body.error, undefined, "resources/list is implemented, not unknown");
 
   const unknownTool = await rpc({
     jsonrpc: "2.0",

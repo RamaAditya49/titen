@@ -51,8 +51,19 @@ claude mcp add --transport stdio --scope user titen -- npx -y titen-memory mcp
 ```
 
 Already using `@modelcontextprotocol/server-memory`? Titen serves the same nine
-tool names and imports your existing `memory.json` on first run, so the switch
-is that one line. Point `titen` at a served instance later by setting
+tool names with the same schemas, and answers `memory://knowledge-graph` too, so
+a client does not notice the swap. On the first local-mode start it imports your
+existing graph. **Pass the old store's path**, because that server writes beside
+its own install rather than in the directory you launch it from:
+
+```bash
+claude mcp add --transport stdio --scope user titen \
+  --env MEMORY_FILE_PATH=/path/to/memory.jsonl -- npx -y titen-memory mcp
+```
+
+Without it Titen still checks the working directory, its `node_modules`, and
+npm's `npx` cache — and says on stderr when it found nothing, rather than
+starting empty in silence. Point `titen` at a served instance later by setting
 `TITEN_MCP_URL` and `TITEN_API_KEY` — [full setup below](#install-and-connect-an-agent).
 
 Audit what any agent memory store has accumulated, including one Titen does not

@@ -89,10 +89,6 @@ export function planFtsQuery(task: string, maxTerms = LIMITS.queryTerms): FtsQue
   };
 }
 
-export function ftsQuery(task: string, maxTerms = LIMITS.queryTerms): string | null {
-  return planFtsQuery(task, maxTerms).match;
-}
-
 export interface ClaimCandidate extends RankInput {
   statement: string;
   confidence: number;

@@ -2,7 +2,7 @@ import { assertTrustCeiling, hasScope, requestedScopes, requireScope, SCOPES } f
 import { auditStatement } from "./audit";
 import { authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import { purgedEvidenceGuardStatement } from "./claims";
-import { MAX_BOUND_PARAMS, chunk, type Stmt } from "./db";
+import { MAX_BOUND_PARAMS, chunk, type Param, type Stmt } from "./db";
 import { conflict, unresolvedReference, validationError } from "./errors";
 import { eventStatement } from "./events";
 import {
@@ -720,7 +720,13 @@ async function exportPage(
 }
 
 type Source = { observation_id: string; relation: string; created_at: string };
-type Prepared = Record<string, unknown>;
+/**
+ * A prepared row is columns only, and every value in it has already been through
+ * validation, so `Param` is the honest type: `Record<string, unknown>` erased
+ * that at the most hostile input boundary in the repo and made 63 assignments
+ * to SQL parameters unprovable.
+ */
+type Prepared = Record<string, Param>;
 type EnrichmentLink = {
   id: string;
   source_claim_id: string;

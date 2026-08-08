@@ -4,7 +4,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Db } from "../../src/core/db";
-import { authenticate, createApiKey, organizationStatement } from "../../src/core/auth";
+import {
+  authenticate,
+  createApiKey,
+  LAST_USED_RESOLUTION_MS,
+  organizationStatement,
+} from "../../src/core/auth";
 import { migrate } from "../../src/core/migrations";
 import {
   createSecretCipher,
@@ -34,6 +39,48 @@ function database(): { db: Db; close(): void } {
 
 afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
+test("last_used_at is coarsened so a read does not cost a durable write", async () => {
+  const { db, close } = database();
+  await migrate(db);
+  const issued = new Date("2026-08-01T09:00:00.000Z");
+  const key = await createApiKey({
+    orgId: "org_key_coarsen",
+    principalId: "agent_key_coarsen",
+    principalKind: "agent",
+    label: "coarsened key",
+    scopes: ["context:compile"],
+    maxTrust: "asserted",
+    notBefore: issued,
+    expiresAt: null,
+  }, issued);
+  await db.batch([organizationStatement("org_key_coarsen", "Coarsen", issued), key.statement]);
+  const request = new Request("http://titen.test/v1/context/compile", {
+    headers: { authorization: `Bearer ${key.key}` },
+  });
+  const stored = async () => (await db.all<{ last_used_at: string | null }>(
+    "SELECT last_used_at FROM api_keys WHERE id = ?", [key.id],
+  ))[0]!.last_used_at;
+
+  const first = new Date("2026-08-01T10:00:00.000Z");
+  await authenticate(db, request, first);
+  assert.equal(await stored(), first.toISOString(), "the first use records itself");
+
+  // Anything inside the interval leaves the row untouched, which is what keeps
+  // the UPDATE from writing a WAL frame: SQLite skips the page when the CASE
+  // resolves to the value already stored.
+  await authenticate(db, request, new Date(first.getTime() + LAST_USED_RESOLUTION_MS - 1));
+  assert.equal(await stored(), first.toISOString(), "a use inside the interval writes nothing");
+
+  const later = new Date(first.getTime() + LAST_USED_RESOLUTION_MS + 1);
+  await authenticate(db, request, later);
+  assert.equal(await stored(), later.toISOString(), "a use past the interval refreshes it");
+
+  // Monotonic under a backwards clock step larger than the interval.
+  await authenticate(db, request, new Date(first.getTime() - LAST_USED_RESOLUTION_MS * 10));
+  assert.equal(await stored(), later.toISOString(), "it never moves into the past");
+  close();
 });
 
 test("API key lifecycle uses exact boundaries and monotonic atomic usage", async () => {

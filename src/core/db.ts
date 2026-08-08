@@ -28,11 +28,6 @@ export async function first<Row>(
   return rows[0];
 }
 
-/** SQLite rejects `undefined`; normalize optional values once, at the edge. */
-export function param(value: string | number | null | undefined): Param {
-  return value === undefined ? null : value;
-}
-
 /**
  * D1 caps bound parameters per statement at 100, so any dynamic `IN (...)` list
  * must be chunked. bun:sqlite is far more permissive, but the shared core keeps
