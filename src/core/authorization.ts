@@ -51,14 +51,28 @@ export function recordAccessParams(principalId: string): Param[] {
  * a 424,168-claim store: **79 seconds** per compile against 17.8 ms. This shape
  * seeks `claim_sources` on its primary key and probes `observations` by rowid,
  * so a claim with no contradicting source costs one index seek, which is what
- * the unfiltered query cost. `loadAuthorizedSources` already uses it.
+ * the unfiltered query cost. `loadAuthorizedSources` uses the same shape.
+ *
+ * That comment was true of the intent and false of the code until 2026-08-08:
+ * the fix shipped in 0.7.1 wrote the join spelling while claiming the nested
+ * one, and a join *inside* `EXISTS` is still a join the planner may reorder.
+ * SQLite 3.53.0 — the version Bun 1.3.14 links — did reorder it, choosing
+ * `SEARCH o USING INDEX observations_workspace_scope (org_id=?)` ahead of the
+ * `claim_sources` seek: the 79-second shape, back in a release that believed it
+ * had prevented it. Only the genuinely nested form below survives that planner.
+ * Any future edit here needs `EXPLAIN QUERY PLAN` from `bun:sqlite` against a
+ * store with a realistic row count; the contract suite cannot see this.
  */
 export function contradictedSql(claimAlias: "c"): string {
   return `EXISTS (
     SELECT 1 FROM claim_sources s
-    JOIN observations o ON o.id = s.observation_id
     WHERE s.claim_id = ${claimAlias}.id AND s.relation = 'contradicts'
-      AND o.org_id = ${claimAlias}.org_id AND ${recordAccessSql("o")}
+      AND EXISTS (
+        SELECT 1 FROM observations o
+         WHERE o.id = s.observation_id
+           AND o.org_id = ${claimAlias}.org_id
+           AND ${recordAccessSql("o")}
+      )
   )`;
 }
 
