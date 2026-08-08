@@ -94,7 +94,9 @@ async function boundedResponseText(response: Response): Promise<string> {
   let text = "";
   try {
     while (true) {
-      let next: ReadableStreamReadResult<Uint8Array>;
+      // Inferred, not annotated: bun-types and lib.dom each declare their own
+      // read-result type, so naming either one breaks under the other runtime.
+      let next;
       try {
         next = await reader.read();
       } catch {

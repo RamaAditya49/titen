@@ -3,6 +3,7 @@ import type {
   EmbeddingProvider,
   EmbeddingProfile,
   VectorInitialization,
+  VectorMetadata,
   VectorStore,
 } from "../../core/vectors";
 import {
@@ -10,9 +11,13 @@ import {
   embeddingProfileMatchesModel,
 } from "../../core/vectors";
 
-/** Minimal Vectorize binding interface (no @cloudflare/workers-types needed). */
+/**
+ * Minimal Vectorize binding interface (no @cloudflare/workers-types needed).
+ * Vectorize accepts string | number | boolean | string[] metadata values; the
+ * canonical scope we write is string-only, so the binding is declared with it.
+ */
 export interface VectorizeIndex {
-  upsert(vectors: { id: string; values: number[]; metadata?: Record<string, string> }[]): Promise<unknown>;
+  upsert(vectors: { id: string; values: number[]; metadata?: VectorMetadata }[]): Promise<unknown>;
   query(vector: number[], options: { topK: number; filter?: Record<string, unknown> }): Promise<{ matches: { id: string; score: number }[] }>;
   deleteByIds(ids: string[]): Promise<unknown>;
   getByIds(ids: string[]): Promise<{ id: string }[]>;

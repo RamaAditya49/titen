@@ -92,33 +92,65 @@ npx titen-memory audit ./memory.json
   falsifiers fired against Titen, and they are printed on the chart below
   rather than left out of it.
 
-## Memory for a team, not a chatbot
+## Already running `@modelcontextprotocol/server-memory`?
 
-A storage-only memory saves text. A retrieval-only memory embeds it and returns
-nearby passages. Both leave the caller to decide what is current, permitted, or
-true, and neither stops two agents from quietly claiming the same work.
+That server had **106,662 downloads in the week of 31 July 2026** — it is the
+default memory for a large part of the MCP ecosystem, and it is deliberately
+minimal. Reading its published `2026.7.4` tarball: the store is one
+newline-delimited JSON file rewritten in full on every mutation, and a search is
 
-Titen's Level 5 kernel turns source observations into evidence-linked, temporal
-claims and compiles only the context a caller is allowed to see. Level 6 joins
-that kernel to checkpoints, leases, handoffs, governance, audit, and signed
-federation.
+```js
+graph.entities.filter(e => e.name.toLowerCase().includes(query.toLowerCase()) || ...)
+```
 
-<p align="center">
-  <code>Level 6 = evidence-grounded context + coordinated work + governance</code>
-</p>
+`String.includes` on a lowercased needle. No tokenizer, no stemming, no ranking
+— results arrive in insertion order — no scoping or authorization, and no
+eviction, so the file grows without bound and every call is O(n) in the whole
+graph. Ask it *"which service handles refunds"* and it matches nothing unless
+that exact sentence is stored.
 
-<p align="center"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-levels.svg" alt="Four memory models as rising steps: logs and files, vector recall, Titen's Level 5 kernel, and Titen's Level 6 fabric, each labelled with what it can do and where it stops. Level 6 is Titen's product model, not an external certification" width="100%"></p>
+Titen answers the same nine tool names, with the same argument schemas, and the
+same `memory://knowledge-graph` resource, so a client does not notice the swap.
+What changes is underneath: `search_nodes` runs the real retrieval path — FTS5
+with stemming, ranked best-first, and the vector index when one is configured —
+and every read is scoped to a subject and filtered by authorization before it is
+retrieved, not after.
 
-| Memory model | What it can do | Where it stops |
+| | `@modelcontextprotocol/server-memory` | Titen |
 | --- | --- | --- |
-| Logs and files | Keep past text | The caller must decide what is current, trusted, and relevant |
-| Vector recall | Find semantically similar passages | Similarity does not prove provenance, permission, or truth |
-| Titen Level 5 kernel | Compile bounded context from scoped evidence, claims, time, trust, and conflicts | It remembers well, but does not coordinate parallel work by itself |
-| Titen Level 6 fabric | Add task ownership, resumable state, handoffs, policy, audit, and federation | Titen records coordination; your agents or orchestrator still choose what runs next |
+| Search | `String.includes`, insertion order | FTS5 + stemming, ranked, optional vectors |
+| Scope | the whole graph, always | org / subject / project / workspace, enforced pre-retrieval |
+| Contradictions | overwritten | kept, linked to evidence, flagged |
+| Growth | full-file rewrite, unbounded | SQLite, retention and eviction policies |
+| Provider | none | none — no key, no LLM, no embedding provider |
 
-Level 6 is Titen's product model, not an external certification. The distinction
-is observable in the API: memory and collaboration share one authorization,
-evidence, and audit boundary.
+Import is on first start; [the switch is above](#try-it-in-30-seconds).
+
+## Audit any agent memory store
+
+Every published memory benchmark measures retrieval on a corpus somebody
+curated. The failure people actually report is on the write side: a store fills
+with copies of its own output. The one public audit of a production store found
+97.8% of 10,134 entries were junk after 32 days. Nothing measures that.
+
+```sh
+npx titen-memory audit ~/.titen/memory.db        # a Titen store
+npx titen-memory audit ./memory.jsonl            # @modelcontextprotocol/server-memory
+npx titen-memory audit ./mem0-export.json --json # a Mem0 export
+```
+
+Five counts — exact duplicate, near duplicate, recall loop, secret pattern,
+stale — each with per-item evidence you can check by hand. **No network, no
+model, no upload:** it opens the path read-only and prints a report; sharing it
+is your decision. A store that lacks the signal a metric needs is reported as
+*not measurable from this export*, never as a failure. There is no composite
+score and there is no leaderboard.
+
+The detection rules are published in
+[audit rules](https://github.com/RamaAditya49/titen/blob/main/docs/reference/audit.md).
+Titen's own numbers — including 17.9% duplicates and 96.7% stale in its own
+store, and a compatibility-surface defect the tool found in Titen itself — are in
+[the self-report](https://github.com/RamaAditya49/titen/blob/main/docs/testing/2026-08-07-titen-audit-self-report.md).
 
 ## You author the claims
 
@@ -300,31 +332,33 @@ degradation above — one process saturates one core at 10k claims, there is no
 reranking stage, and no external suite scores the governance and collaboration
 primitives at all.
 
-## Audit any agent memory store
+## Memory for a team, not a chatbot
 
-Every published memory benchmark measures retrieval on a corpus somebody
-curated. The failure people actually report is on the write side: a store fills
-with copies of its own output. The one public audit of a production store found
-97.8% of 10,134 entries were junk after 32 days. Nothing measures that.
+A storage-only memory saves text. A retrieval-only memory embeds it and returns
+nearby passages. Both leave the caller to decide what is current, permitted, or
+true, and neither stops two agents from quietly claiming the same work.
 
-```sh
-npx titen-memory audit ~/.titen/memory.db        # a Titen store
-npx titen-memory audit ./memory.jsonl            # @modelcontextprotocol/server-memory
-npx titen-memory audit ./mem0-export.json --json # a Mem0 export
-```
+Titen's Level 5 kernel turns source observations into evidence-linked, temporal
+claims and compiles only the context a caller is allowed to see. Level 6 joins
+that kernel to checkpoints, leases, handoffs, governance, audit, and signed
+federation.
 
-Five counts — exact duplicate, near duplicate, recall loop, secret pattern,
-stale — each with per-item evidence you can check by hand. **No network, no
-model, no upload:** it opens the path read-only and prints a report; sharing it
-is your decision. A store that lacks the signal a metric needs is reported as
-*not measurable from this export*, never as a failure. There is no composite
-score and there is no leaderboard.
+<p align="center">
+  <code>Level 6 = evidence-grounded context + coordinated work + governance</code>
+</p>
 
-The detection rules are published in
-[audit rules](https://github.com/RamaAditya49/titen/blob/main/docs/reference/audit.md).
-Titen's own numbers — including 17.9% duplicates and 96.7% stale in its own
-store, and a compatibility-surface defect the tool found in Titen itself — are in
-[the self-report](https://github.com/RamaAditya49/titen/blob/main/docs/testing/2026-08-07-titen-audit-self-report.md).
+<p align="center"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-levels.svg" alt="Four memory models as rising steps: logs and files, vector recall, Titen's Level 5 kernel, and Titen's Level 6 fabric, each labelled with what it can do and where it stops. Level 6 is Titen's product model, not an external certification" width="100%"></p>
+
+| Memory model | What it can do | Where it stops |
+| --- | --- | --- |
+| Logs and files | Keep past text | The caller must decide what is current, trusted, and relevant |
+| Vector recall | Find semantically similar passages | Similarity does not prove provenance, permission, or truth |
+| Titen Level 5 kernel | Compile bounded context from scoped evidence, claims, time, trust, and conflicts | It remembers well, but does not coordinate parallel work by itself |
+| Titen Level 6 fabric | Add task ownership, resumable state, handoffs, policy, audit, and federation | Titen records coordination; your agents or orchestrator still choose what runs next |
+
+Level 6 is Titen's product model, not an external certification. The distinction
+is observable in the API: memory and collaboration share one authorization,
+evidence, and audit boundary.
 
 ## Project status
 

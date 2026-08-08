@@ -58,7 +58,7 @@ function base64Url(bytes: Uint8Array): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-function bytes(value: string): Uint8Array | undefined {
+function bytes(value: string): Uint8Array<ArrayBuffer> | undefined {
   try {
     const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
     const binary = atob(padded);
@@ -68,7 +68,11 @@ function bytes(value: string): Uint8Array | undefined {
   }
 }
 
-async function derive(material: Uint8Array, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+async function derive(
+  material: Uint8Array<ArrayBuffer>,
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey("raw", material, "PBKDF2", false, ["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-256", salt, iterations },
@@ -77,7 +81,7 @@ async function derive(material: Uint8Array, salt: Uint8Array, iterations: number
   ));
 }
 
-async function derivePassword(password: string, salt: Uint8Array): Promise<Uint8Array> {
+async function derivePassword(password: string, salt: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   let material = encoder.encode(password);
   for (let round = 0; round < PASSWORD_ROUNDS; round += 1) {
     const roundSalt = new Uint8Array(salt.length + 1);

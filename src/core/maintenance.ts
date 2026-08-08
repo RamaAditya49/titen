@@ -471,9 +471,10 @@ export async function runMaintenance(options: {
   onSemanticLease?: (leaseToken: string) => void;
 }): Promise<MaintenanceResult> {
   const limit = options.limit ?? 50;
-  const sourceNow = typeof options.now === "function"
-    ? options.now
-    : () => options.now ?? new Date();
+  // Bound to a local so the narrowing survives into the deferred arrow; the
+  // arrow still defers `new Date()` to call time.
+  const now = options.now;
+  const sourceNow = typeof now === "function" ? now : () => now ?? new Date();
   const result: MaintenanceResult = { enriched: 0, indexed: 0, delivered: 0, errors: [] };
 
   if (options.extraction) {

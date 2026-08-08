@@ -27,7 +27,9 @@ type StdioOptions = {
   endpoint?: string;
   apiKey?: string;
   input?: AsyncIterable<Uint8Array>;
-  fetcher?: typeof fetch;
+  // The call signature actually used, not `typeof fetch`: Bun's fetch type also
+  // carries a `preconnect` static, which no in-process adapter or test stub has.
+  fetcher?: (input: string | URL, init?: RequestInit) => Promise<Response>;
   write?: (line: string) => void;
 };
 
@@ -425,7 +427,7 @@ async function runLocalMcpStdio(options: StdioOptions): Promise<void> {
       ...options,
       endpoint: LOCAL_ENDPOINT,
       apiKey: local.apiKey,
-      fetcher: (input, init) => local.app(new Request(input as string | URL, init)),
+      fetcher: (input, init) => local.app(new Request(input, init)),
     });
   } finally {
     local.close();
