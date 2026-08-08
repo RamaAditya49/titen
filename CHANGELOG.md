@@ -26,6 +26,100 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-08-08
+
+Prompted by an external audit of `b2d2fba`. 61 of its claims were verified
+against HEAD before any of them was acted on: 32 held, 4 were already fixed,
+18 held in part, and 7 were wrong. Everything below survived that check.
+
+### Fixed
+
+- **Switching from `@modelcontextprotocol/server-memory` imported nothing, and
+  said nothing.** The search covered `MEMORY_FILE_PATH` and the working
+  directory. That server writes **beside its own module** when the variable is
+  unset, so anyone who ran it the documented way — `npx -y
+  @modelcontextprotocol/server-memory` — has their graph inside a hashed
+  directory in npm's `_npx` cache, which was never searched; and an MCP server
+  launched by a desktop client inherits the client's working directory, so the
+  one fallback was weakest exactly where it was relied on. Both populations
+  imported zero entities and were told nothing, which reads as Titen losing
+  their memories. The search now covers the working directory,
+  `node_modules/@modelcontextprotocol/server-memory/dist` beneath it, and every
+  such install in the `_npx` cache, under both the current `memory.jsonl` name
+  and the older `memory.json`. A `MEMORY_FILE_PATH` that points at nothing now
+  says so on stderr.
+- **`memory://knowledge-graph` is served.** `resources/list` returned `-32601`,
+  so a client that reads the graph as an MCP resource rather than through
+  `read_graph` broke on the switch however well the nine tool names matched.
+  `resources/list` and `resources/read` now answer with the same JSON body
+  `read_graph` returns. `initialize` declares `resources` with
+  `subscribe: false`: the graph is readable, and no change notifications are
+  sent.
+- **Every authenticated request paid a durable write to record that it had
+  read.** `authenticate` compared `last_used_at` against `now`, so the `CASE`
+  fired on any request whose clock had advanced a millisecond — in production,
+  all of them. Measured on WAL with `synchronous = FULL`: fifty updates whose
+  `CASE` is a no-op grow the WAL by **0 bytes**, fifty that change the value
+  grow it by **206,032** — one page and one `fsync` each, and one billed write
+  on D1. 25 of the 27 `GET` routes paid it. Now bounded to one write per key
+  per minute. `last_used_at` stays monotonic and loses resolution, which
+  `GET /v1/keys` documents.
+- **An imported credential colliding with another organization told the
+  operator to retry forever.** `api_keys.id` is a global primary key, but the
+  credential preflight is scoped `WHERE org_id = ?` and so cannot see a
+  collision elsewhere. The constraint surfaced through the concurrent-write
+  handler as *"Import collided with a concurrent write; retry after exporting
+  current state"* — advice that can never succeed, because the collision is
+  with another organization's row. The foreign-id preflight now covers
+  `api_key`, so it reports what actually happened, as every other record type
+  does.
+
+### Changed
+
+- **`score` is comparable across queries (#227).** The relevance term was
+  rescaled against the candidate set, which pinned the best candidate to
+  exactly `1` however poor the match; with every other component constant on a
+  uniformly ingested corpus, rank 1 returned the same number on every query and
+  threshold-based abstention was arithmetically impossible. Relevance is now
+  `strength / (strength + 3.7)` where `strength` is the `bm25` magnitude
+  divided by the query's term count, and the semantic arm uses raw cosine.
+  Measured on the 424,168-claim anchor store, 500 questions: rank-1 `score`
+  went from **1 distinct value** to **498**, spanning 0.4875–0.6632.
+
+  Pre-registered before any cell was scored, then measured on both bench
+  conditions with the baselines reproduced first: anchor recall@1 **0.8800 →
+  0.8800**, pooled **0.2460 → 0.2460**, sign tests W0/L0/T500 at p = 1.0,
+  compile p95 +1.21% and +0.67%.
+
+  **That gate could not have failed, and the report says so.** Both stores were
+  ingested in one pass, so all five non-relevance components are constant
+  across 89,467 packed items; with those constant the order is identical by
+  arithmetic. Where they vary the behaviour does change: at `bm25` −60 against
+  −45 the relevance gap compresses from 0.250 to 0.018 and the order flips to
+  the `verified` claim over the marginally better-matching `asserted` one. That
+  is intended, it is pinned by contract, and it is bounded — a genuinely weak
+  match still loses to a strong one however trusted.
+
+  Two limits: `3.7` is calibrated on LongMemEval-S and BM25 is not portable
+  across corpora, so the absolute band shifts with the corpus while the
+  ordering does not; and the vector arm's move off set-relative scaling is
+  **unmeasured**, because both benchmark lanes ran with vectors disabled.
+
+### Removed
+
+- Five exports that shipped in the tarball with no caller anywhere in the
+  source, tests, scripts or dashboard: `ftsQuery`, `canReadRecord`,
+  `recordEvent`, `param`, `FEEDBACK_ENDPOINT`.
+
+### Internal
+
+- `@types/node` and `@types/bun` were never installed, so `tsc` could not
+  resolve `process`, `Bun`, or any `node:`/`bun:` import and the tree reported
+  791 errors. With them, and with `Prepared` typed at the untrusted-import
+  boundary, `src/` is clean under `tsc --noEmit`. A `typecheck` script now
+  exists so the number cannot drift unobserved. No `any`, `@ts-ignore`, or new
+  cast was added.
+
 ## [0.7.2] — 2026-08-08
 
 An urgent fix: 0.7.1 cannot serve a large single-subject store. Upgrade from
@@ -1042,7 +1136,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.3
 [0.7.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.2
 [0.7.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.1
 [0.7.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.0
