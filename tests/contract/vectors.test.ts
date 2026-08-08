@@ -689,6 +689,53 @@ test("a dead heat is detected only inside the window that is returned", () => {
   assert.equal(hasDeadHeat(semantic), false);
 });
 
+test("compressing relevance lets the other components decide between two strong matches", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+  // The one behavioural consequence of #227 that the benchmark could not
+  // measure. Both bench stores were ingested in a single pass, so trust,
+  // confidence, recency, conflict and feedback are constant across every
+  // candidate -- exactly one distinct non-relevance tuple across 89,467 packed
+  // items. With those held constant, score is monotone in relevance and both
+  // the old and the new transform are monotone in -bm25, so the order is
+  // identical by arithmetic and recall could not have moved. It did not.
+  //
+  // Here they are not constant, which is the case the corpus never contained.
+  // The old transform was s / best -- proportional, so a 25% gap in bm25 stayed
+  // a 25% gap in relevance and outweighed a full trust level. The new one
+  // saturates: at this strength both matches are already near the ceiling, the
+  // gap compresses from 0.250 to 0.018, and a verified claim beats a marginally
+  // better-matching asserted one.
+  //
+  // That is the intended direction. When two candidates both match well, which
+  // of them matches 25% better is a weaker signal than which of them a human
+  // verified. Asserting it here is what keeps it from being silent.
+  const candidates = [
+    { ...rankInput("asserted-better", 0.8), bm25: -60, trust: "asserted" as const },
+    { ...rankInput("verified-worse", 0.8), bm25: -45, trust: "verified" as const },
+  ];
+  const ranked = rankCandidates(candidates, now);
+  assert.equal(ranked[0]!.candidate.id, "verified-worse");
+  assert.ok(
+    ranked[0]!.components.relevance < ranked[1]!.components.relevance,
+    "the winner is the worse lexical match; trust is what carried it",
+  );
+  assert.ok(
+    ranked[1]!.components.relevance - ranked[0]!.components.relevance < 0.05,
+    "and it only carries because saturation compressed the relevance gap",
+  );
+
+  // The compression is bounded, not unlimited: a genuinely weak match still
+  // loses to a strong one however trusted it is.
+  const wide = rankCandidates(
+    [
+      { ...rankInput("strong-asserted", 0.8), bm25: -60, trust: "asserted" as const },
+      { ...rankInput("weak-verified", 0.8), bm25: -0.5, trust: "verified" as const },
+    ],
+    now,
+  );
+  assert.equal(wide[0]!.candidate.id, "strong-asserted", "trust cannot rescue a poor match");
+});
+
 test("identical corpus content ranks identically across ingests that mint fresh ids", () => {
   const now = new Date("2026-07-30T00:00:00.000Z");
   // #226: two stores holding the same claims must answer in the same order even

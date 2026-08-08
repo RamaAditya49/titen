@@ -448,11 +448,19 @@ explicit weighted factor, not a hidden multiplier. The conflict component is
 evidence lowers relative rank by `0.05` while remaining visible in the item
 status and `conflicts`.
 
-Because both signals are rescaled inside the candidate set, `score` is
-comparable **within one response only**. It is not a cross-query confidence and
-a threshold set on one query does not transfer to the next: on a uniformly
-ingested corpus rank 1 returns the same number on every query. Issue 227 tracks
-that limitation and is open.
+`score` is comparable **across queries**. The relevance term is
+`strength / (strength + 3.7)` where `strength` is the FTS `bm25` magnitude
+divided by the number of query terms, and the semantic term is raw cosine, so
+neither is rescaled against the rest of the candidate set. Measured on the
+424,168-claim anchor store: rank 1 returned **one** distinct value over 500
+questions before this change and **498** after, spanning 0.4875–0.6632. A
+confidence floor is therefore possible; #227 is closed.
+
+Two limits are worth stating plainly. `3.7` is calibrated on LongMemEval-S and
+BM25 is not portable across corpora, so the absolute band shifts with the
+corpus — the ordering does not. And relevance saturates, so between two
+candidates that both match well the remaining components carry relatively more
+weight than they used to.
 
 Equal scores are ordered by the stronger vector similarity, then by `claim_id`.
 Within-set normalization scores each signal's own best at exactly `1`, so when

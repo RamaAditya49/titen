@@ -210,6 +210,42 @@ confidence, disputes or feedback vary between candidates, the compression is
 real and reordering is possible; nothing here measured that, and the
 pre-registration's own reasoning for why it would happen is untouched.
 
+### The reordering the corpus could not contain, pinned by contract instead
+
+Two corrections belong here, both found while checking this section rather than
+accepting it.
+
+**The old transform was not min-max.** `worst` was clamped by
+`Math.min(...scores, 0)`, so the floor was always 0 and the transform was
+`s / best`, not `(s − min) / (max − min)`. The pre-registration and this
+report both call it min-max. What that language got right is the part the issue
+turned on — the best candidate scored exactly `1` by construction, and a
+zero span short-circuited to `1` — and what it got wrong is the shape of the
+rest: relevance was **proportional** to `-bm25`, so ratios between candidates
+were preserved rather than stretched. The pre-registration is left as written,
+because a protocol edited after the numbers is not a protocol.
+
+**That makes the untested risk sharper, not softer.** Proportional means a 25%
+gap in `bm25` stayed a 25% gap in relevance; saturating means it does not.
+Measured directly, `bm25` −60 against −45:
+
+| | relevance gap | winner |
+| --- | ---: | --- |
+| `s / best` (before) | 0.250 | the better match, `asserted` |
+| `s / (s + 3.7)` (after) | **0.018** | the worse match, **`verified`** |
+
+The order flips. That is the intended direction — between two candidates that
+both match well, which one matches 25% better is a weaker signal than which one
+a human verified — but it is a real behaviour change, and the benchmark was
+structurally incapable of showing it.
+
+It is now a contract case,
+`compressing relevance lets the other components decide between two strong
+matches`, together with its bound: a genuinely weak match still loses to a
+strong one however trusted it is. A deterministic assertion is not a recall
+measurement, and it is not offered as one. It is what stops this from being
+silent until someone's store hits it.
+
 ## Falsifiers
 
 1. **The blend reorders and recall drops.** Did not fire — and, per the section
