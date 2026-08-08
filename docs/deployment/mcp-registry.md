@@ -39,15 +39,17 @@ Two hard prerequisites. Neither can be satisfied by editing `server.json`.
 The registry proves package ownership by fetching
 `https://registry.npmjs.org/titen-memory/<version>` and comparing its `mcpName`
 field to the `name` in `server.json`. The comparison is exact, including case.
-No published version of `titen-memory` has the field today:
+This is satisfied from 0.7.0 onward, and each new release must carry it too —
+the registry reads npm, not this repository:
 
 ```console
-$ curl -s https://registry.npmjs.org/titen-memory/0.6.1 | jq .mcpName
+$ curl -s https://registry.npmjs.org/titen-memory/0.7.2 | jq .mcpName
+"io.github.RamaAditya49/titen-memory"
+$ curl -s https://registry.npmjs.org/titen-memory/0.6.1 | jq .mcpName   # before it was added
 null
 ```
 
-So `package.json` needs one added line, and it only counts once a release
-carrying it is on npm — the registry reads npm, not this repository:
+The line in `package.json` that does it:
 
 ```diff
    "name": "titen-memory",
@@ -59,16 +61,17 @@ carrying it is on npm — the registry reads npm, not this repository:
 ### 2. `titen mcp` must run with no environment
 
 `server.json` describes `npx -y titen-memory@<version> mcp` as a stdio server
-whose environment variables are all optional. On `0.6.1` that is not yet true:
+whose environment variables are all optional. Zero-config local mode shipped in
+0.7.0, which is what made this true; before it, the command refused to start:
 
 ```console
 $ npx -y titen-memory@0.6.1 mcp
 error: TITEN_MCP_URL and TITEN_API_KEY are required
 ```
 
-Publishing before zero-config local mode ships would put a listing in a public
-index that fails on first launch for everyone who installs it. Do not publish a
-version older than the one where `titen mcp` opens a local store on its own.
+Publishing before zero-config local mode shipped would have put a listing in a
+public index that fails on first launch for everyone who installs it. Never
+publish a version older than 0.7.0.
 
 ## Proving ownership of the namespace
 
