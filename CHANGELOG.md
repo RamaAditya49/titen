@@ -26,6 +26,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-08-08
+
+An urgent fix: 0.7.1 cannot serve a large single-subject store. Upgrade from
+0.7.1 without delay; 0.7.0 is unaffected.
+
 ### Fixed
 
 - **`titen-memory@0.7.1` cannot serve a large single-subject store: one context
@@ -1021,7 +1026,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.2
 [0.7.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.1
 [0.7.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.0
 [0.6.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.6.1

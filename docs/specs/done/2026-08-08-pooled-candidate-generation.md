@@ -1,13 +1,12 @@
 ---
 work_id: pooled-candidate-generation
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-08
 updated: 2026-08-08
 owner: ramaaditya
-review_after: 2026-08-21
 ---
 
 # Attack the pooled recall loss below the re-ranking window
@@ -137,6 +136,20 @@ falsifier 0 may hand the evidence to a future *deep* re-ranking spec. No
 embedding/vector work (three families measured below FTS at pooled
 density). No LLM anywhere. No change to scoring, gold labels, or the
 corpus. G4 never ships in this cycle regardless of outcome.
+
+## Outcome — falsifier 0 fired, 2026-08-08
+
+C1 ran and **redirected the cycle before any experiment**: 85% of the pooled
+top-10 misses are already inside the candidate pool (111 in the returned pack
+at rank 11+, 98 in the 1,000-candidate pool but cut by the token budget, only
+37 outside the pool). G1-G4 were not run; each addresses at best the 15%
+slice. The measured successors are a **deep re-ranker over the top-50** (a
+class the six 2026-08-08 losers never tested, since all re-ranked inside the
+top-10) and **packing/budget allocation**. `single-session-preference` is the
+only type where candidate generation genuinely fails, and it is 30 instances.
+
+Full accounting in
+[the report](../../testing/2026-08-08-pooled-candidate-generation.md).
 
 ## Evidence
 

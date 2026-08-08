@@ -1,13 +1,12 @@
 ---
 work_id: pooled-compile-latency
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-08
 updated: 2026-08-08
 owner: ramaaditya
-review_after: 2026-08-21
 ---
 
 # Bring pooled compile p95 under 250 ms without changing what it returns

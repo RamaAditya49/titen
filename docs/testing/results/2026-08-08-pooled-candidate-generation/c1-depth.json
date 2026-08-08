@@ -1,0 +1,4291 @@
+{
+  "spec": "2026-08-08-pooled-candidate-generation",
+  "phase": "C1",
+  "n": 500,
+  "pool_limit": 1000,
+  "by_class": {
+    "in_pack_below_10": 111,
+    "in_pool_not_pack": 98,
+    "hit_top10": 254,
+    "outside_pool": 37
+  },
+  "misses": 246,
+  "by_type": {
+    "single-session-user": {
+      "in_pack_below_10": 17,
+      "in_pool_not_pack": 22,
+      "hit_top10": 27,
+      "outside_pool": 4
+    },
+    "multi-session": {
+      "in_pack_below_10": 41,
+      "in_pool_not_pack": 34,
+      "hit_top10": 53,
+      "outside_pool": 5
+    },
+    "single-session-preference": {
+      "in_pack_below_10": 5,
+      "in_pool_not_pack": 9,
+      "hit_top10": 3,
+      "outside_pool": 13
+    },
+    "temporal-reasoning": {
+      "in_pack_below_10": 34,
+      "in_pool_not_pack": 26,
+      "hit_top10": 58,
+      "outside_pool": 15
+    },
+    "knowledge-update": {
+      "in_pack_below_10": 13,
+      "in_pool_not_pack": 4,
+      "hit_top10": 61,
+      "outside_pool": 0
+    },
+    "single-session-assistant": {
+      "in_pack_below_10": 1,
+      "in_pool_not_pack": 3,
+      "hit_top10": 52,
+      "outside_pool": 0
+    }
+  },
+  "rows": [
+    {
+      "qid": "e47becba",
+      "qtype": "single-session-user",
+      "pack_depth": 59,
+      "pack_rank": 49,
+      "pool_claims": 1000,
+      "pool_sessions": 427,
+      "pool_gold_session_rank": 52,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "118b2229",
+      "qtype": "single-session-user",
+      "pack_depth": 64,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 447,
+      "pool_gold_session_rank": 219,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "51a45a95",
+      "qtype": "single-session-user",
+      "pack_depth": 40,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "58bf7951",
+      "qtype": "single-session-user",
+      "pack_depth": 44,
+      "pack_rank": 18,
+      "pool_claims": 1000,
+      "pool_sessions": 587,
+      "pool_gold_session_rank": 18,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "1e043500",
+      "qtype": "single-session-user",
+      "pack_depth": 59,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 417,
+      "pool_gold_session_rank": 95,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "c5e8278d",
+      "qtype": "single-session-user",
+      "pack_depth": 55,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6ade9755",
+      "qtype": "single-session-user",
+      "pack_depth": 55,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 300,
+      "pool_gold_session_rank": 137,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "6f9b354f",
+      "qtype": "single-session-user",
+      "pack_depth": 50,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "58ef2f1c",
+      "qtype": "single-session-user",
+      "pack_depth": 54,
+      "pack_rank": 23,
+      "pool_claims": 1000,
+      "pool_sessions": 337,
+      "pool_gold_session_rank": 25,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "f8c5f88b",
+      "qtype": "single-session-user",
+      "pack_depth": 38,
+      "pack_rank": 20,
+      "pool_claims": 1000,
+      "pool_sessions": 395,
+      "pool_gold_session_rank": 2,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "5d3d2817",
+      "qtype": "single-session-user",
+      "pack_depth": 64,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 674,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "7527f7e2",
+      "qtype": "single-session-user",
+      "pack_depth": 43,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 589,
+      "pool_gold_session_rank": 7,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "c960da58",
+      "qtype": "single-session-user",
+      "pack_depth": 60,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 376,
+      "pool_gold_session_rank": 67,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "3b6f954b",
+      "qtype": "single-session-user",
+      "pack_depth": 52,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 604,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "726462e0",
+      "qtype": "single-session-user",
+      "pack_depth": 71,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "94f70d80",
+      "qtype": "single-session-user",
+      "pack_depth": 57,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "66f24dbb",
+      "qtype": "single-session-user",
+      "pack_depth": 65,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ad7109d1",
+      "qtype": "single-session-user",
+      "pack_depth": 40,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 556,
+      "pool_gold_session_rank": 44,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "af8d2e46",
+      "qtype": "single-session-user",
+      "pack_depth": 38,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "dccbc061",
+      "qtype": "single-session-user",
+      "pack_depth": 63,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c8c3f81d",
+      "qtype": "single-session-user",
+      "pack_depth": 51,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8ebdbe50",
+      "qtype": "single-session-user",
+      "pack_depth": 72,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6b168ec8",
+      "qtype": "single-session-user",
+      "pack_depth": 75,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 351,
+      "pool_gold_session_rank": 176,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "75499fd8",
+      "qtype": "single-session-user",
+      "pack_depth": 53,
+      "pack_rank": 22,
+      "pool_claims": 1000,
+      "pool_sessions": 332,
+      "pool_gold_session_rank": 23,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "21436231",
+      "qtype": "single-session-user",
+      "pack_depth": 28,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "95bcc1c8",
+      "qtype": "single-session-user",
+      "pack_depth": 34,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0862e8bf",
+      "qtype": "single-session-user",
+      "pack_depth": 59,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 336,
+      "pool_gold_session_rank": 11,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "853b0a1d",
+      "qtype": "single-session-user",
+      "pack_depth": 49,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a06e4cfe",
+      "qtype": "single-session-user",
+      "pack_depth": 39,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "37d43f65",
+      "qtype": "single-session-user",
+      "pack_depth": 32,
+      "pack_rank": 15,
+      "pool_claims": 1000,
+      "pool_sessions": 264,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "b86304ba",
+      "qtype": "single-session-user",
+      "pack_depth": 63,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 696,
+      "pool_gold_session_rank": 451,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "d52b4f67",
+      "qtype": "single-session-user",
+      "pack_depth": 51,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 443,
+      "pool_gold_session_rank": 54,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "25e5aa4f",
+      "qtype": "single-session-user",
+      "pack_depth": 54,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 443,
+      "pool_gold_session_rank": 71,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "caf9ead2",
+      "qtype": "single-session-user",
+      "pack_depth": 76,
+      "pack_rank": 38,
+      "pool_claims": 1000,
+      "pool_sessions": 696,
+      "pool_gold_session_rank": 42,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "8550ddae",
+      "qtype": "single-session-user",
+      "pack_depth": 70,
+      "pack_rank": 8,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "60d45044",
+      "qtype": "single-session-user",
+      "pack_depth": 65,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 561,
+      "pool_gold_session_rank": 179,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "3f1e9474",
+      "qtype": "single-session-user",
+      "pack_depth": 47,
+      "pack_rank": 8,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "86b68151",
+      "qtype": "single-session-user",
+      "pack_depth": 44,
+      "pack_rank": 21,
+      "pool_claims": 1000,
+      "pool_sessions": 591,
+      "pool_gold_session_rank": 21,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "577d4d32",
+      "qtype": "single-session-user",
+      "pack_depth": 60,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ec81a493",
+      "qtype": "single-session-user",
+      "pack_depth": 71,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "15745da0",
+      "qtype": "single-session-user",
+      "pack_depth": 49,
+      "pack_rank": 37,
+      "pool_claims": 1000,
+      "pool_sessions": 255,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "e01b8e2f",
+      "qtype": "single-session-user",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 600,
+      "pool_gold_session_rank": 23,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "bc8a6e93",
+      "qtype": "single-session-user",
+      "pack_depth": 61,
+      "pack_rank": 23,
+      "pool_claims": 1000,
+      "pool_sessions": 454,
+      "pool_gold_session_rank": 25,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "ccb36322",
+      "qtype": "single-session-user",
+      "pack_depth": 53,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 593,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "001be529",
+      "qtype": "single-session-user",
+      "pack_depth": 41,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "b320f3f8",
+      "qtype": "single-session-user",
+      "pack_depth": 68,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "19b5f2b3",
+      "qtype": "single-session-user",
+      "pack_depth": 59,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 319,
+      "pool_gold_session_rank": 131,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "4fd1909e",
+      "qtype": "single-session-user",
+      "pack_depth": 60,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "545bd2b5",
+      "qtype": "single-session-user",
+      "pack_depth": 71,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8a137a7f",
+      "qtype": "single-session-user",
+      "pack_depth": 38,
+      "pack_rank": 13,
+      "pool_claims": 1000,
+      "pool_sessions": 180,
+      "pool_gold_session_rank": 13,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "76d63226",
+      "qtype": "single-session-user",
+      "pack_depth": 44,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 414,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "86f00804",
+      "qtype": "single-session-user",
+      "pack_depth": 77,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 460,
+      "pool_gold_session_rank": 85,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "8e9d538c",
+      "qtype": "single-session-user",
+      "pack_depth": 20,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "311778f1",
+      "qtype": "single-session-user",
+      "pack_depth": 58,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c19f7a0b",
+      "qtype": "single-session-user",
+      "pack_depth": 78,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4100d0a0",
+      "qtype": "single-session-user",
+      "pack_depth": 68,
+      "pack_rank": null,
+      "pool_claims": 429,
+      "pool_sessions": 259,
+      "pool_gold_session_rank": 95,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "29f2956b",
+      "qtype": "single-session-user",
+      "pack_depth": 76,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 644,
+      "pool_gold_session_rank": 86,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "1faac195",
+      "qtype": "single-session-user",
+      "pack_depth": 54,
+      "pack_rank": 16,
+      "pool_claims": 1000,
+      "pool_sessions": 436,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "faba32e5",
+      "qtype": "single-session-user",
+      "pack_depth": 49,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "f4f1d8a4",
+      "qtype": "single-session-user",
+      "pack_depth": 58,
+      "pack_rank": 49,
+      "pool_claims": 1000,
+      "pool_sessions": 425,
+      "pool_gold_session_rank": 2,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "c14c00dd",
+      "qtype": "single-session-user",
+      "pack_depth": 40,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 552,
+      "pool_gold_session_rank": 90,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "36580ce8",
+      "qtype": "single-session-user",
+      "pack_depth": 72,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 642,
+      "pool_gold_session_rank": 167,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "3d86fd0a",
+      "qtype": "single-session-user",
+      "pack_depth": 25,
+      "pack_rank": 15,
+      "pool_claims": 1000,
+      "pool_sessions": 512,
+      "pool_gold_session_rank": 3,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "a82c026e",
+      "qtype": "single-session-user",
+      "pack_depth": 81,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0862e8bf_abs",
+      "qtype": "single-session-user",
+      "pack_depth": 49,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 421,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "15745da0_abs",
+      "qtype": "single-session-user",
+      "pack_depth": 52,
+      "pack_rank": 48,
+      "pool_claims": 1000,
+      "pool_sessions": 384,
+      "pool_gold_session_rank": 52,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "bc8a6e93_abs",
+      "qtype": "single-session-user",
+      "pack_depth": 70,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 487,
+      "pool_gold_session_rank": 215,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "19b5f2b3_abs",
+      "qtype": "single-session-user",
+      "pack_depth": 44,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 626,
+      "pool_gold_session_rank": 62,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "29f2956b_abs",
+      "qtype": "single-session-user",
+      "pack_depth": 65,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 742,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "f4f1d8a4_abs",
+      "qtype": "single-session-user",
+      "pack_depth": 65,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 401,
+      "pool_gold_session_rank": 167,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "0a995998",
+      "qtype": "multi-session",
+      "pack_depth": 71,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6d550036",
+      "qtype": "multi-session",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 695,
+      "pool_gold_session_rank": 76,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_59c863d7",
+      "qtype": "multi-session",
+      "pack_depth": 52,
+      "pack_rank": 21,
+      "pool_claims": 1000,
+      "pool_sessions": 608,
+      "pool_gold_session_rank": 22,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "b5ef892d",
+      "qtype": "multi-session",
+      "pack_depth": 76,
+      "pack_rank": 19,
+      "pool_claims": 1000,
+      "pool_sessions": 672,
+      "pool_gold_session_rank": 20,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "e831120c",
+      "qtype": "multi-session",
+      "pack_depth": 44,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "3a704032",
+      "qtype": "multi-session",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 716,
+      "pool_gold_session_rank": 8,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_d84a3211",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 510,
+      "pool_gold_session_rank": 308,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "aae3761f",
+      "qtype": "multi-session",
+      "pack_depth": 60,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 462,
+      "pool_gold_session_rank": 53,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_f2262a51",
+      "qtype": "multi-session",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 678,
+      "pool_gold_session_rank": 171,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "dd2973ad",
+      "qtype": "multi-session",
+      "pack_depth": 68,
+      "pack_rank": 25,
+      "pool_claims": 1000,
+      "pool_sessions": 572,
+      "pool_gold_session_rank": 25,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "c4a1ceb8",
+      "qtype": "multi-session",
+      "pack_depth": 42,
+      "pack_rank": 38,
+      "pool_claims": 1000,
+      "pool_sessions": 471,
+      "pool_gold_session_rank": 38,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_a56e767c",
+      "qtype": "multi-session",
+      "pack_depth": 80,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 527,
+      "pool_gold_session_rank": 112,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "6cb6f249",
+      "qtype": "multi-session",
+      "pack_depth": 60,
+      "pack_rank": 19,
+      "pool_claims": 1000,
+      "pool_sessions": 544,
+      "pool_gold_session_rank": 19,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "46a3abf7",
+      "qtype": "multi-session",
+      "pack_depth": 65,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "36b9f61e",
+      "qtype": "multi-session",
+      "pack_depth": 49,
+      "pack_rank": 25,
+      "pool_claims": 1000,
+      "pool_sessions": 505,
+      "pool_gold_session_rank": 28,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "28dc39ac",
+      "qtype": "multi-session",
+      "pack_depth": 56,
+      "pack_rank": 39,
+      "pool_claims": 1000,
+      "pool_sessions": 548,
+      "pool_gold_session_rank": 40,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_2f8be40d",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": 17,
+      "pool_claims": 1000,
+      "pool_sessions": 601,
+      "pool_gold_session_rank": 18,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2e6d26dc",
+      "qtype": "multi-session",
+      "pack_depth": 79,
+      "pack_rank": 36,
+      "pool_claims": 1000,
+      "pool_sessions": 677,
+      "pool_gold_session_rank": 39,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_15e38248",
+      "qtype": "multi-session",
+      "pack_depth": 69,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 652,
+      "pool_gold_session_rank": 141,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "88432d0a",
+      "qtype": "multi-session",
+      "pack_depth": 87,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 820,
+      "pool_gold_session_rank": 622,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "80ec1f4f",
+      "qtype": "multi-session",
+      "pack_depth": 73,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 488,
+      "pool_gold_session_rank": 18,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "d23cf73b",
+      "qtype": "multi-session",
+      "pack_depth": 73,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 677,
+      "pool_gold_session_rank": 207,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_7fce9456",
+      "qtype": "multi-session",
+      "pack_depth": 69,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "d682f1a2",
+      "qtype": "multi-session",
+      "pack_depth": 63,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 655,
+      "pool_gold_session_rank": 88,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "7024f17c",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_5501fe77",
+      "qtype": "multi-session",
+      "pack_depth": 67,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_2ba83207",
+      "qtype": "multi-session",
+      "pack_depth": 54,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 517,
+      "pool_gold_session_rank": 204,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "2318644b",
+      "qtype": "multi-session",
+      "pack_depth": 57,
+      "pack_rank": 48,
+      "pool_claims": 1000,
+      "pool_sessions": 553,
+      "pool_gold_session_rank": 52,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2ce6a0f2",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 713,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_d12ceb0e",
+      "qtype": "multi-session",
+      "pack_depth": 59,
+      "pack_rank": 27,
+      "pool_claims": 1000,
+      "pool_sessions": 495,
+      "pool_gold_session_rank": 29,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "00ca467f",
+      "qtype": "multi-session",
+      "pack_depth": 54,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 600,
+      "pool_gold_session_rank": 118,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "b3c15d39",
+      "qtype": "multi-session",
+      "pack_depth": 37,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_31ff4165",
+      "qtype": "multi-session",
+      "pack_depth": 76,
+      "pack_rank": 64,
+      "pool_claims": 1000,
+      "pool_sessions": 638,
+      "pool_gold_session_rank": 1,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "eeda8a6d",
+      "qtype": "multi-session",
+      "pack_depth": 42,
+      "pack_rank": 21,
+      "pool_claims": 1000,
+      "pool_sessions": 443,
+      "pool_gold_session_rank": 22,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2788b940",
+      "qtype": "multi-session",
+      "pack_depth": 77,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 641,
+      "pool_gold_session_rank": 419,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "60bf93ed",
+      "qtype": "multi-session",
+      "pack_depth": 47,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 620,
+      "pool_gold_session_rank": 2,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "9d25d4e0",
+      "qtype": "multi-session",
+      "pack_depth": 65,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "129d1232",
+      "qtype": "multi-session",
+      "pack_depth": 57,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 249,
+      "pool_gold_session_rank": 48,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "60472f9c",
+      "qtype": "multi-session",
+      "pack_depth": 41,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_194be4b3",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 532,
+      "pool_gold_session_rank": 426,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "a9f6b44c",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": 17,
+      "pool_claims": 1000,
+      "pool_sessions": 481,
+      "pool_gold_session_rank": 18,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "d851d5ba",
+      "qtype": "multi-session",
+      "pack_depth": 58,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "5a7937c8",
+      "qtype": "multi-session",
+      "pack_depth": 75,
+      "pack_rank": 32,
+      "pool_claims": 1000,
+      "pool_sessions": 722,
+      "pool_gold_session_rank": 33,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_ab202e7f",
+      "qtype": "multi-session",
+      "pack_depth": 72,
+      "pack_rank": 30,
+      "pool_claims": 1000,
+      "pool_sessions": 615,
+      "pool_gold_session_rank": 7,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_e05b82a6",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_731e37d7",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "edced276",
+      "qtype": "multi-session",
+      "pack_depth": 74,
+      "pack_rank": 28,
+      "pool_claims": 1000,
+      "pool_sessions": 600,
+      "pool_gold_session_rank": 28,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "10d9b85a",
+      "qtype": "multi-session",
+      "pack_depth": 64,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 596,
+      "pool_gold_session_rank": 36,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "e3038f8c",
+      "qtype": "multi-session",
+      "pack_depth": 57,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "2b8f3739",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1a8a66a6",
+      "qtype": "multi-session",
+      "pack_depth": 64,
+      "pack_rank": 47,
+      "pool_claims": 1000,
+      "pool_sessions": 606,
+      "pool_gold_session_rank": 49,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "c2ac3c61",
+      "qtype": "multi-session",
+      "pack_depth": 80,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "bf659f65",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": 10,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_372c3eed",
+      "qtype": "multi-session",
+      "pack_depth": 60,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 545,
+      "pool_gold_session_rank": 80,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_2f91af09",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": 41,
+      "pool_claims": 1000,
+      "pool_sessions": 694,
+      "pool_gold_session_rank": 9,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "81507db6",
+      "qtype": "multi-session",
+      "pack_depth": 52,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 612,
+      "pool_gold_session_rank": 63,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "88432d0a_abs",
+      "qtype": "multi-session",
+      "pack_depth": 69,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 679,
+      "pool_gold_session_rank": 126,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "80ec1f4f_abs",
+      "qtype": "multi-session",
+      "pack_depth": 72,
+      "pack_rank": 14,
+      "pool_claims": 1000,
+      "pool_sessions": 482,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "eeda8a6d_abs",
+      "qtype": "multi-session",
+      "pack_depth": 33,
+      "pack_rank": 17,
+      "pool_claims": 1000,
+      "pool_sessions": 245,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "60bf93ed_abs",
+      "qtype": "multi-session",
+      "pack_depth": 72,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 812,
+      "pool_gold_session_rank": 162,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "edced276_abs",
+      "qtype": "multi-session",
+      "pack_depth": 72,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 517,
+      "pool_gold_session_rank": 107,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_372c3eed_abs",
+      "qtype": "multi-session",
+      "pack_depth": 59,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 519,
+      "pool_gold_session_rank": 113,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "8a2466db",
+      "qtype": "single-session-preference",
+      "pack_depth": 79,
+      "pack_rank": 13,
+      "pool_claims": 1000,
+      "pool_sessions": 652,
+      "pool_gold_session_rank": 13,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "06878be2",
+      "qtype": "single-session-preference",
+      "pack_depth": 77,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 705,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "75832dbd",
+      "qtype": "single-session-preference",
+      "pack_depth": 83,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 780,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "0edc2aef",
+      "qtype": "single-session-preference",
+      "pack_depth": 50,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 531,
+      "pool_gold_session_rank": 138,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "35a27287",
+      "qtype": "single-session-preference",
+      "pack_depth": 76,
+      "pack_rank": 56,
+      "pool_claims": 1000,
+      "pool_sessions": 683,
+      "pool_gold_session_rank": 61,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "32260d93",
+      "qtype": "single-session-preference",
+      "pack_depth": 70,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 482,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "195a1a1b",
+      "qtype": "single-session-preference",
+      "pack_depth": 82,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 772,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "afdc33df",
+      "qtype": "single-session-preference",
+      "pack_depth": 80,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 680,
+      "pool_gold_session_rank": 604,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "caf03d32",
+      "qtype": "single-session-preference",
+      "pack_depth": 34,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "54026fce",
+      "qtype": "single-session-preference",
+      "pack_depth": 87,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "06f04340",
+      "qtype": "single-session-preference",
+      "pack_depth": 83,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 649,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "6b7dfb22",
+      "qtype": "single-session-preference",
+      "pack_depth": 86,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 807,
+      "pool_gold_session_rank": 414,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "1a1907b4",
+      "qtype": "single-session-preference",
+      "pack_depth": 85,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 835,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "09d032c9",
+      "qtype": "single-session-preference",
+      "pack_depth": 46,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 565,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "38146c39",
+      "qtype": "single-session-preference",
+      "pack_depth": 61,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 670,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "d24813b1",
+      "qtype": "single-session-preference",
+      "pack_depth": 73,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 741,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "57f827a0",
+      "qtype": "single-session-preference",
+      "pack_depth": 66,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 569,
+      "pool_gold_session_rank": 197,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "95228167",
+      "qtype": "single-session-preference",
+      "pack_depth": 66,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 693,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "505af2f5",
+      "qtype": "single-session-preference",
+      "pack_depth": 46,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 629,
+      "pool_gold_session_rank": 136,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "75f70248",
+      "qtype": "single-session-preference",
+      "pack_depth": 78,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 712,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "d6233ab6",
+      "qtype": "single-session-preference",
+      "pack_depth": 61,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 771,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "1da05512",
+      "qtype": "single-session-preference",
+      "pack_depth": 39,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "fca70973",
+      "qtype": "single-session-preference",
+      "pack_depth": 67,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 691,
+      "pool_gold_session_rank": 255,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "b6025781",
+      "qtype": "single-session-preference",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 418,
+      "pool_gold_session_rank": 104,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "a89d7624",
+      "qtype": "single-session-preference",
+      "pack_depth": 74,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 755,
+      "pool_gold_session_rank": 228,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "b0479f84",
+      "qtype": "single-session-preference",
+      "pack_depth": 76,
+      "pack_rank": 22,
+      "pool_claims": 1000,
+      "pool_sessions": 739,
+      "pool_gold_session_rank": 24,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "1d4e3b97",
+      "qtype": "single-session-preference",
+      "pack_depth": 67,
+      "pack_rank": 31,
+      "pool_claims": 1000,
+      "pool_sessions": 426,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "07b6f563",
+      "qtype": "single-session-preference",
+      "pack_depth": 74,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 608,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "1c0ddc50",
+      "qtype": "single-session-preference",
+      "pack_depth": 69,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 563,
+      "pool_gold_session_rank": 455,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "0a34ad58",
+      "qtype": "single-session-preference",
+      "pack_depth": 76,
+      "pack_rank": 50,
+      "pool_claims": 1000,
+      "pool_sessions": 605,
+      "pool_gold_session_rank": 55,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "d3ab962e",
+      "qtype": "multi-session",
+      "pack_depth": 76,
+      "pack_rank": 58,
+      "pool_claims": 1000,
+      "pool_sessions": 676,
+      "pool_gold_session_rank": 62,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2311e44b",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "cc06de0d",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a11281a2",
+      "qtype": "multi-session",
+      "pack_depth": 59,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4f54b7c9",
+      "qtype": "multi-session",
+      "pack_depth": 60,
+      "pack_rank": 16,
+      "pool_claims": 1000,
+      "pool_sessions": 495,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "85fa3a3f",
+      "qtype": "multi-session",
+      "pack_depth": 33,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "9aaed6a3",
+      "qtype": "multi-session",
+      "pack_depth": 32,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1f2b8d4f",
+      "qtype": "multi-session",
+      "pack_depth": 43,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e6041065",
+      "qtype": "multi-session",
+      "pack_depth": 49,
+      "pack_rank": 20,
+      "pool_claims": 1000,
+      "pool_sessions": 467,
+      "pool_gold_session_rank": 2,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "51c32626",
+      "qtype": "multi-session",
+      "pack_depth": 34,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "d905b33f",
+      "qtype": "multi-session",
+      "pack_depth": 72,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "7405e8b1",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "f35224e0",
+      "qtype": "multi-session",
+      "pack_depth": 67,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6456829e",
+      "qtype": "multi-session",
+      "pack_depth": 44,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 341,
+      "pool_gold_session_rank": 31,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "a4996e51",
+      "qtype": "multi-session",
+      "pack_depth": 79,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "3c1045c8",
+      "qtype": "multi-session",
+      "pack_depth": 67,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 724,
+      "pool_gold_session_rank": 11,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "60036106",
+      "qtype": "multi-session",
+      "pack_depth": 69,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 415,
+      "pool_gold_session_rank": 3,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "681a1674",
+      "qtype": "multi-session",
+      "pack_depth": 37,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e25c3b8d",
+      "qtype": "multi-session",
+      "pack_depth": 41,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4adc0475",
+      "qtype": "multi-session",
+      "pack_depth": 41,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4bc144e2",
+      "qtype": "multi-session",
+      "pack_depth": 42,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ef66a6e5",
+      "qtype": "multi-session",
+      "pack_depth": 70,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 644,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "5025383b",
+      "qtype": "multi-session",
+      "pack_depth": 75,
+      "pack_rank": 14,
+      "pool_claims": 1000,
+      "pool_sessions": 751,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "a1cc6108",
+      "qtype": "multi-session",
+      "pack_depth": 60,
+      "pack_rank": 13,
+      "pool_claims": 1000,
+      "pool_sessions": 514,
+      "pool_gold_session_rank": 13,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "9ee3ecd6",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "3fdac837",
+      "qtype": "multi-session",
+      "pack_depth": 63,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 585,
+      "pool_gold_session_rank": 199,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "91b15a6e",
+      "qtype": "multi-session",
+      "pack_depth": 50,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "27016adc",
+      "qtype": "multi-session",
+      "pack_depth": 44,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "720133ac",
+      "qtype": "multi-session",
+      "pack_depth": 35,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 456,
+      "pool_gold_session_rank": 70,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "77eafa52",
+      "qtype": "multi-session",
+      "pack_depth": 85,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8979f9ec",
+      "qtype": "multi-session",
+      "pack_depth": 77,
+      "pack_rank": 48,
+      "pool_claims": 1000,
+      "pool_sessions": 453,
+      "pool_gold_session_rank": 24,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "0100672e",
+      "qtype": "multi-session",
+      "pack_depth": 41,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a96c20ee",
+      "qtype": "multi-session",
+      "pack_depth": 45,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 377,
+      "pool_gold_session_rank": 5,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "92a0aa75",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 729,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "3fe836c9",
+      "qtype": "multi-session",
+      "pack_depth": 73,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1c549ce4",
+      "qtype": "multi-session",
+      "pack_depth": 63,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6c49646a",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1192316e",
+      "qtype": "multi-session",
+      "pack_depth": 60,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 547,
+      "pool_gold_session_rank": 125,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "0ea62687",
+      "qtype": "multi-session",
+      "pack_depth": 63,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 693,
+      "pool_gold_session_rank": 1,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "67e0d0f2",
+      "qtype": "multi-session",
+      "pack_depth": 72,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 606,
+      "pool_gold_session_rank": 8,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "bb7c3b45",
+      "qtype": "multi-session",
+      "pack_depth": 56,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ba358f49",
+      "qtype": "multi-session",
+      "pack_depth": 84,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "61f8c8f8",
+      "qtype": "multi-session",
+      "pack_depth": 58,
+      "pack_rank": 58,
+      "pool_claims": 1000,
+      "pool_sessions": 514,
+      "pool_gold_session_rank": 60,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "60159905",
+      "qtype": "multi-session",
+      "pack_depth": 77,
+      "pack_rank": 38,
+      "pool_claims": 1000,
+      "pool_sessions": 553,
+      "pool_gold_session_rank": 40,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "ef9cf60a",
+      "qtype": "multi-session",
+      "pack_depth": 58,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "73d42213",
+      "qtype": "multi-session",
+      "pack_depth": 62,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 555,
+      "pool_gold_session_rank": 1,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "bc149d6b",
+      "qtype": "multi-session",
+      "pack_depth": 55,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "099778bb",
+      "qtype": "multi-session",
+      "pack_depth": 37,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "09ba9854",
+      "qtype": "multi-session",
+      "pack_depth": 50,
+      "pack_rank": 16,
+      "pool_claims": 1000,
+      "pool_sessions": 477,
+      "pool_gold_session_rank": 3,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "d6062bb9",
+      "qtype": "multi-session",
+      "pack_depth": 67,
+      "pack_rank": 20,
+      "pool_claims": 1000,
+      "pool_sessions": 565,
+      "pool_gold_session_rank": 20,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "157a136e",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 575,
+      "pool_gold_session_rank": 172,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "c18a7dc8",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 623,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "a3332713",
+      "qtype": "multi-session",
+      "pack_depth": 46,
+      "pack_rank": 8,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "55241a1f",
+      "qtype": "multi-session",
+      "pack_depth": 64,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a08a253f",
+      "qtype": "multi-session",
+      "pack_depth": 70,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 657,
+      "pool_gold_session_rank": 11,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "f0e564bc",
+      "qtype": "multi-session",
+      "pack_depth": 53,
+      "pack_rank": 18,
+      "pool_claims": 1000,
+      "pool_sessions": 410,
+      "pool_gold_session_rank": 21,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "078150f1",
+      "qtype": "multi-session",
+      "pack_depth": 49,
+      "pack_rank": 16,
+      "pool_claims": 1000,
+      "pool_sessions": 293,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "8cf4d046",
+      "qtype": "multi-session",
+      "pack_depth": 54,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a346bb18",
+      "qtype": "multi-session",
+      "pack_depth": 61,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "37f165cf",
+      "qtype": "multi-session",
+      "pack_depth": 69,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8e91e7d9",
+      "qtype": "multi-session",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 548,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "87f22b4a",
+      "qtype": "multi-session",
+      "pack_depth": 73,
+      "pack_rank": 18,
+      "pool_claims": 1000,
+      "pool_sessions": 726,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "e56a43b9",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "efc3f7c2",
+      "qtype": "multi-session",
+      "pack_depth": 55,
+      "pack_rank": 17,
+      "pool_claims": 1000,
+      "pool_sessions": 417,
+      "pool_gold_session_rank": 17,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "21d02d0d",
+      "qtype": "multi-session",
+      "pack_depth": 84,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "2311e44b_abs",
+      "qtype": "multi-session",
+      "pack_depth": 65,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6456829e_abs",
+      "qtype": "multi-session",
+      "pack_depth": 52,
+      "pack_rank": 33,
+      "pool_claims": 1000,
+      "pool_sessions": 435,
+      "pool_gold_session_rank": 34,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "e5ba910e_abs",
+      "qtype": "multi-session",
+      "pack_depth": 64,
+      "pack_rank": 20,
+      "pool_claims": 1000,
+      "pool_sessions": 561,
+      "pool_gold_session_rank": 21,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "a96c20ee_abs",
+      "qtype": "multi-session",
+      "pack_depth": 66,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 476,
+      "pool_gold_session_rank": 108,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "ba358f49_abs",
+      "qtype": "multi-session",
+      "pack_depth": 80,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 592,
+      "pool_gold_session_rank": 5,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "09ba9854_abs",
+      "qtype": "multi-session",
+      "pack_depth": 56,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_59149c77",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_f49edff3",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 62,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "71017276",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "b46e15ed",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 393,
+      "pool_gold_session_rank": 105,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_fa19884c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0bc8ad92",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 614,
+      "pool_gold_session_rank": 87,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "af082822",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 78,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_4929293a",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 60,
+      "pack_rank": 14,
+      "pool_claims": 1000,
+      "pool_sessions": 593,
+      "pool_gold_session_rank": 2,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_b5700ca9",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 51,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 575,
+      "pool_gold_session_rank": 4,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "9a707b81",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 70,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_1d4ab0c9",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 53,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_e072b769",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 56,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 479,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "0db4c65d",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 65,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_1d80365e",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 53,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_7f6b06db",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 79,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 771,
+      "pool_gold_session_rank": 742,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_6dc9b45b",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 44,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_8279ba02",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 62,
+      "pack_rank": 22,
+      "pool_claims": 1000,
+      "pool_sessions": 721,
+      "pool_gold_session_rank": 22,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_18c2b244",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 42,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_a1b77f9c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 67,
+      "pack_rank": 21,
+      "pool_claims": 1000,
+      "pool_sessions": 592,
+      "pool_gold_session_rank": 24,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_1916e0ea",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 59,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_7a0daae1",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 47,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_468eb063",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 60,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 623,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_7abb270c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": 26,
+      "pool_claims": 1000,
+      "pool_sessions": 500,
+      "pool_gold_session_rank": 28,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_1e4a8aeb",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 55,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 504,
+      "pool_gold_session_rank": 3,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_4fc4f797",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 32,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4dfccbf7",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 53,
+      "pack_rank": 51,
+      "pool_claims": 1000,
+      "pool_sessions": 405,
+      "pool_gold_session_rank": 22,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_61e13b3c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 56,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_45189cb4",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 73,
+      "pack_rank": 44,
+      "pool_claims": 1000,
+      "pool_sessions": 580,
+      "pool_gold_session_rank": 49,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2ebe6c90",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 74,
+      "pack_rank": 22,
+      "pool_claims": 1000,
+      "pool_sessions": 657,
+      "pool_gold_session_rank": 24,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_e061b84f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 83,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 688,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "370a8ff4",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 73,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_d6585ce8",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": 28,
+      "pool_claims": 1000,
+      "pool_sessions": 559,
+      "pool_gold_session_rank": 25,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_4ef30696",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 56,
+      "pack_rank": 15,
+      "pool_claims": 1000,
+      "pool_sessions": 656,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_ec93e27f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": 60,
+      "pool_claims": 1000,
+      "pool_sessions": 546,
+      "pool_gold_session_rank": 62,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "6e984301",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 49,
+      "pack_rank": 27,
+      "pool_claims": 1000,
+      "pool_sessions": 705,
+      "pool_gold_session_rank": 3,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "8077ef71",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 75,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 670,
+      "pool_gold_session_rank": 468,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_f420262c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 73,
+      "pack_rank": 41,
+      "pool_claims": 1000,
+      "pool_sessions": 577,
+      "pool_gold_session_rank": 30,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_8e165409",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 53,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_74aed68e",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 54,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "bcbe585f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 47,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_21adecb5",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 65,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 502,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "5e1b23de",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 59,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 545,
+      "pool_gold_session_rank": 208,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_98f46fc6",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 55,
+      "pack_rank": 48,
+      "pool_claims": 1000,
+      "pool_sessions": 235,
+      "pool_gold_session_rank": 40,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_af6db32f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 62,
+      "pack_rank": 24,
+      "pool_claims": 1000,
+      "pool_sessions": 726,
+      "pool_gold_session_rank": 25,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "eac54adc",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 65,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_7ddcf75f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 64,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_a2d1d1f6",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 57,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_85da3956",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 45,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_b0863698",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 59,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 292,
+      "pool_gold_session_rank": 81,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_68e94287",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_e414231e",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 52,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_7ca326fa",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": 15,
+      "pool_claims": 1000,
+      "pool_sessions": 576,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_7bc6cf22",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 47,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 683,
+      "pool_gold_session_rank": 2,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "2ebe6c92",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 73,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 734,
+      "pool_gold_session_rank": 130,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_e061b84g",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 81,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 657,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "71017277",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 54,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 361,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "b46e15ee",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 61,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 245,
+      "pool_gold_session_rank": 142,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_d6585ce9",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 77,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 632,
+      "pool_gold_session_rank": 79,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_1e4a8aec",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 76,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 785,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_f420262d",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 65,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 310,
+      "pool_gold_session_rank": 75,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_59149c78",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 77,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 679,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_e414231f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 61,
+      "pack_rank": 10,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_4929293b",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 69,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 604,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_468eb064",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 66,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 619,
+      "pool_gold_session_rank": 552,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_fa19884d",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 74,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 702,
+      "pool_gold_session_rank": 63,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "9a707b82",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 79,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 767,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "eac54add",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 80,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 811,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "4dfccbf8",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 78,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 752,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "0bc8ad93",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 72,
+      "pack_rank": 14,
+      "pool_claims": 1000,
+      "pool_sessions": 546,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "6e984302",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 84,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 797,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_8279ba03",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 50,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 635,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_b5700ca0",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 77,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 672,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_68e94288",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 73,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 564,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "gpt4_2655b836",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 75,
+      "pack_rank": 72,
+      "pool_claims": 1000,
+      "pool_sessions": 621,
+      "pool_gold_session_rank": 75,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_2487a7cb",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 59,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 471,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_76048e76",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 68,
+      "pack_rank": 19,
+      "pool_claims": 1000,
+      "pool_sessions": 449,
+      "pool_gold_session_rank": 21,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_2312f94c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 40,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0bb5a684",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 72,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "08f4fc43",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 39,
+      "pack_rank": 18,
+      "pool_claims": 1000,
+      "pool_sessions": 553,
+      "pool_gold_session_rank": 18,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2c63a862",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 77,
+      "pack_rank": 19,
+      "pool_claims": 1000,
+      "pool_sessions": 775,
+      "pool_gold_session_rank": 19,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_385a5000",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 46,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "2a1811e2",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 41,
+      "pack_rank": 22,
+      "pool_claims": 1000,
+      "pool_sessions": 505,
+      "pool_gold_session_rank": 23,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "bbf86515",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 60,
+      "pack_rank": 10,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_5dcc0aab",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 59,
+      "pack_rank": 17,
+      "pool_claims": 1000,
+      "pool_sessions": 368,
+      "pool_gold_session_rank": 18,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_0b2f1d21",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 51,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "f0853d11",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 55,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_6ed717ea",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 46,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 301,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_70e84552",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 47,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a3838d2b",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 54,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_93159ced",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 79,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 729,
+      "pool_gold_session_rank": 13,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_2d58bcd6",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 66,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_65aabe59",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 35,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 389,
+      "pool_gold_session_rank": 60,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "982b5123",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 49,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "b9cfe692",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 68,
+      "pack_rank": 8,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_4edbafa2",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c8090214",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 54,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_483dd43c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 54,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e4e14d04",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c9f37c46",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 35,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_2c50253f",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 57,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 412,
+      "pool_gold_session_rank": 23,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "dcfa8644",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 59,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_b4a80587",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 66,
+      "pack_rank": 25,
+      "pool_claims": 1000,
+      "pool_sessions": 520,
+      "pool_gold_session_rank": 26,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_9a159967",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 60,
+      "pack_rank": 16,
+      "pool_claims": 1000,
+      "pool_sessions": 397,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "cc6d1ec1",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_8c8961ae",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 57,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_d9af6064",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 40,
+      "pack_rank": 15,
+      "pool_claims": 1000,
+      "pool_sessions": 326,
+      "pool_gold_session_rank": 15,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_7de946e7",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 61,
+      "pack_rank": 12,
+      "pool_claims": 1000,
+      "pool_sessions": 587,
+      "pool_gold_session_rank": 1,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "d01c6aa8",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 82,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 657,
+      "pool_gold_session_rank": 96,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "993da5e2",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 65,
+      "pack_rank": 21,
+      "pool_claims": 1000,
+      "pool_sessions": 340,
+      "pool_gold_session_rank": 22,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "a3045048",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 61,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_d31cdae3",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 66,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_cd90e484",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 62,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_88806d6e",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 52,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_4cd9eba1",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 80,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_93f6379c",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 79,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "b29f3365",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 43,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_2f56ae70",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 56,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 561,
+      "pool_gold_session_rank": 122,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "6613b389",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 65,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_78cf46a3",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 62,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_0a05b494",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 52,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 596,
+      "pool_gold_session_rank": 11,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_1a1dc16d",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 75,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 621,
+      "pool_gold_session_rank": 61,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_2f584639",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 52,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_213fd887",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 52,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_5438fa52",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 530,
+      "pool_gold_session_rank": 422,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_c27434e8",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 58,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_fe651585",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 71,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 552,
+      "pool_gold_session_rank": 307,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "8c18457d",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 64,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 483,
+      "pool_gold_session_rank": 179,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_70e84552_abs",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 66,
+      "pack_rank": 33,
+      "pool_claims": 1000,
+      "pool_sessions": 554,
+      "pool_gold_session_rank": 8,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "gpt4_93159ced_abs",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 81,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 727,
+      "pool_gold_session_rank": null,
+      "klass": "outside_pool"
+    },
+    {
+      "qid": "982b5123_abs",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 66,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 497,
+      "pool_gold_session_rank": 26,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "c8090214_abs",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 63,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 730,
+      "pool_gold_session_rank": 46,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "gpt4_c27434e8_abs",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 60,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "gpt4_fe651585_abs",
+      "qtype": "temporal-reasoning",
+      "pack_depth": 68,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 543,
+      "pool_gold_session_rank": 421,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "6a1eabeb",
+      "qtype": "knowledge-update",
+      "pack_depth": 70,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6aeb4375",
+      "qtype": "knowledge-update",
+      "pack_depth": 60,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "830ce83f",
+      "qtype": "knowledge-update",
+      "pack_depth": 71,
+      "pack_rank": 64,
+      "pool_claims": 1000,
+      "pool_sessions": 587,
+      "pool_gold_session_rank": 71,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "852ce960",
+      "qtype": "knowledge-update",
+      "pack_depth": 47,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "945e3d21",
+      "qtype": "knowledge-update",
+      "pack_depth": 43,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 331,
+      "pool_gold_session_rank": 329,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "d7c942c3",
+      "qtype": "knowledge-update",
+      "pack_depth": 56,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "71315a70",
+      "qtype": "knowledge-update",
+      "pack_depth": 48,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "89941a93",
+      "qtype": "knowledge-update",
+      "pack_depth": 66,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ce6d2d27",
+      "qtype": "knowledge-update",
+      "pack_depth": 72,
+      "pack_rank": 35,
+      "pool_claims": 1000,
+      "pool_sessions": 683,
+      "pool_gold_session_rank": 38,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "9ea5eabc",
+      "qtype": "knowledge-update",
+      "pack_depth": 82,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "07741c44",
+      "qtype": "knowledge-update",
+      "pack_depth": 55,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a1eacc2a",
+      "qtype": "knowledge-update",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "184da446",
+      "qtype": "knowledge-update",
+      "pack_depth": 62,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "031748ae",
+      "qtype": "knowledge-update",
+      "pack_depth": 49,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4d6b87c8",
+      "qtype": "knowledge-update",
+      "pack_depth": 74,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0f05491a",
+      "qtype": "knowledge-update",
+      "pack_depth": 46,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "08e075c7",
+      "qtype": "knowledge-update",
+      "pack_depth": 47,
+      "pack_rank": 23,
+      "pool_claims": 1000,
+      "pool_sessions": 354,
+      "pool_gold_session_rank": 23,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "f9e8c073",
+      "qtype": "knowledge-update",
+      "pack_depth": 75,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "41698283",
+      "qtype": "knowledge-update",
+      "pack_depth": 69,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "2698e78f",
+      "qtype": "knowledge-update",
+      "pack_depth": 39,
+      "pack_rank": 18,
+      "pool_claims": 1000,
+      "pool_sessions": 409,
+      "pool_gold_session_rank": 12,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "b6019101",
+      "qtype": "knowledge-update",
+      "pack_depth": 63,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "45dc21b6",
+      "qtype": "knowledge-update",
+      "pack_depth": 78,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "5a4f22c0",
+      "qtype": "knowledge-update",
+      "pack_depth": 73,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6071bd76",
+      "qtype": "knowledge-update",
+      "pack_depth": 40,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e493bb7c",
+      "qtype": "knowledge-update",
+      "pack_depth": 58,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "618f13b2",
+      "qtype": "knowledge-update",
+      "pack_depth": 49,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "72e3ee87",
+      "qtype": "knowledge-update",
+      "pack_depth": 59,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c4ea545c",
+      "qtype": "knowledge-update",
+      "pack_depth": 79,
+      "pack_rank": 74,
+      "pool_claims": 1000,
+      "pool_sessions": 706,
+      "pool_gold_session_rank": 78,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "01493427",
+      "qtype": "knowledge-update",
+      "pack_depth": 21,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6a27ffc2",
+      "qtype": "knowledge-update",
+      "pack_depth": 68,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "2133c1b5",
+      "qtype": "knowledge-update",
+      "pack_depth": 63,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "18bc8abd",
+      "qtype": "knowledge-update",
+      "pack_depth": 40,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "db467c8c",
+      "qtype": "knowledge-update",
+      "pack_depth": 65,
+      "pack_rank": 8,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "7a87bd0c",
+      "qtype": "knowledge-update",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e61a7584",
+      "qtype": "knowledge-update",
+      "pack_depth": 47,
+      "pack_rank": 16,
+      "pool_claims": 1000,
+      "pool_sessions": 178,
+      "pool_gold_session_rank": 17,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "1cea1afa",
+      "qtype": "knowledge-update",
+      "pack_depth": 64,
+      "pack_rank": 46,
+      "pool_claims": 1000,
+      "pool_sessions": 447,
+      "pool_gold_session_rank": 50,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "ed4ddc30",
+      "qtype": "knowledge-update",
+      "pack_depth": 59,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8fb83627",
+      "qtype": "knowledge-update",
+      "pack_depth": 60,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "b01defab",
+      "qtype": "knowledge-update",
+      "pack_depth": 71,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "22d2cb42",
+      "qtype": "knowledge-update",
+      "pack_depth": 49,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0e4e4c46",
+      "qtype": "knowledge-update",
+      "pack_depth": 54,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4b24c848",
+      "qtype": "knowledge-update",
+      "pack_depth": 90,
+      "pack_rank": 54,
+      "pool_claims": 1000,
+      "pool_sessions": 843,
+      "pool_gold_session_rank": 59,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "7e974930",
+      "qtype": "knowledge-update",
+      "pack_depth": 62,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "603deb26",
+      "qtype": "knowledge-update",
+      "pack_depth": 68,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "59524333",
+      "qtype": "knowledge-update",
+      "pack_depth": 63,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "5831f84d",
+      "qtype": "knowledge-update",
+      "pack_depth": 60,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "eace081b",
+      "qtype": "knowledge-update",
+      "pack_depth": 64,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "affe2881",
+      "qtype": "knowledge-update",
+      "pack_depth": 53,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "50635ada",
+      "qtype": "knowledge-update",
+      "pack_depth": 48,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e66b632c",
+      "qtype": "knowledge-update",
+      "pack_depth": 66,
+      "pack_rank": 9,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0ddfec37",
+      "qtype": "knowledge-update",
+      "pack_depth": 58,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "f685340e",
+      "qtype": "knowledge-update",
+      "pack_depth": 56,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "cc5ded98",
+      "qtype": "knowledge-update",
+      "pack_depth": 81,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "dfde3500",
+      "qtype": "knowledge-update",
+      "pack_depth": 52,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "69fee5aa",
+      "qtype": "knowledge-update",
+      "pack_depth": 44,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "7401057b",
+      "qtype": "knowledge-update",
+      "pack_depth": 41,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "cf22b7bf",
+      "qtype": "knowledge-update",
+      "pack_depth": 77,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a2f3aa27",
+      "qtype": "knowledge-update",
+      "pack_depth": 66,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 399,
+      "pool_gold_session_rank": 11,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "c7dc5443",
+      "qtype": "knowledge-update",
+      "pack_depth": 36,
+      "pack_rank": 18,
+      "pool_claims": 1000,
+      "pool_sessions": 457,
+      "pool_gold_session_rank": 19,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "06db6396",
+      "qtype": "knowledge-update",
+      "pack_depth": 81,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "3ba21379",
+      "qtype": "knowledge-update",
+      "pack_depth": 74,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 623,
+      "pool_gold_session_rank": 81,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "9bbe84a2",
+      "qtype": "knowledge-update",
+      "pack_depth": 42,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "10e09553",
+      "qtype": "knowledge-update",
+      "pack_depth": 26,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "dad224aa",
+      "qtype": "knowledge-update",
+      "pack_depth": 59,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ba61f0b9",
+      "qtype": "knowledge-update",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "42ec0761",
+      "qtype": "knowledge-update",
+      "pack_depth": 57,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "5c40ec5b",
+      "qtype": "knowledge-update",
+      "pack_depth": 62,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c6853660",
+      "qtype": "knowledge-update",
+      "pack_depth": 81,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "26bdc477",
+      "qtype": "knowledge-update",
+      "pack_depth": 39,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0977f2af",
+      "qtype": "knowledge-update",
+      "pack_depth": 48,
+      "pack_rank": 11,
+      "pool_claims": 1000,
+      "pool_sessions": 660,
+      "pool_gold_session_rank": 11,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "6aeb4375_abs",
+      "qtype": "knowledge-update",
+      "pack_depth": 65,
+      "pack_rank": 53,
+      "pool_claims": 1000,
+      "pool_sessions": 600,
+      "pool_gold_session_rank": 14,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "031748ae_abs",
+      "qtype": "knowledge-update",
+      "pack_depth": 60,
+      "pack_rank": 6,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "2698e78f_abs",
+      "qtype": "knowledge-update",
+      "pack_depth": 55,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 520,
+      "pool_gold_session_rank": 141,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "2133c1b5_abs",
+      "qtype": "knowledge-update",
+      "pack_depth": 46,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 607,
+      "pool_gold_session_rank": 196,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "0ddfec37_abs",
+      "qtype": "knowledge-update",
+      "pack_depth": 63,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "f685340e_abs",
+      "qtype": "knowledge-update",
+      "pack_depth": 53,
+      "pack_rank": 14,
+      "pool_claims": 1000,
+      "pool_sessions": 603,
+      "pool_gold_session_rank": 5,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "89941a94",
+      "qtype": "knowledge-update",
+      "pack_depth": 55,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "07741c45",
+      "qtype": "knowledge-update",
+      "pack_depth": 51,
+      "pack_rank": 5,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "7161e7e2",
+      "qtype": "single-session-assistant",
+      "pack_depth": 70,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c4f10528",
+      "qtype": "single-session-assistant",
+      "pack_depth": 73,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "89527b6b",
+      "qtype": "single-session-assistant",
+      "pack_depth": 70,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e9327a54",
+      "qtype": "single-session-assistant",
+      "pack_depth": 80,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4c36ccef",
+      "qtype": "single-session-assistant",
+      "pack_depth": 61,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6ae235be",
+      "qtype": "single-session-assistant",
+      "pack_depth": 78,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "7e00a6cb",
+      "qtype": "single-session-assistant",
+      "pack_depth": 81,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1903aded",
+      "qtype": "single-session-assistant",
+      "pack_depth": 64,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 493,
+      "pool_gold_session_rank": 16,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "ceb54acb",
+      "qtype": "single-session-assistant",
+      "pack_depth": 84,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "f523d9fe",
+      "qtype": "single-session-assistant",
+      "pack_depth": 70,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "0e5e2d1a",
+      "qtype": "single-session-assistant",
+      "pack_depth": 62,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "fea54f57",
+      "qtype": "single-session-assistant",
+      "pack_depth": 63,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "cc539528",
+      "qtype": "single-session-assistant",
+      "pack_depth": 69,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "dc439ea3",
+      "qtype": "single-session-assistant",
+      "pack_depth": 61,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "18dcd5a5",
+      "qtype": "single-session-assistant",
+      "pack_depth": 82,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "488d3006",
+      "qtype": "single-session-assistant",
+      "pack_depth": 74,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "58470ed2",
+      "qtype": "single-session-assistant",
+      "pack_depth": 77,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8cf51dda",
+      "qtype": "single-session-assistant",
+      "pack_depth": 74,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1d4da289",
+      "qtype": "single-session-assistant",
+      "pack_depth": 56,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8464fc84",
+      "qtype": "single-session-assistant",
+      "pack_depth": 76,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8aef76bc",
+      "qtype": "single-session-assistant",
+      "pack_depth": 67,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "71a3fd6b",
+      "qtype": "single-session-assistant",
+      "pack_depth": 86,
+      "pack_rank": 44,
+      "pool_claims": 1000,
+      "pool_sessions": 733,
+      "pool_gold_session_rank": 1,
+      "klass": "in_pack_below_10"
+    },
+    {
+      "qid": "2bf43736",
+      "qtype": "single-session-assistant",
+      "pack_depth": 65,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "70b3e69b",
+      "qtype": "single-session-assistant",
+      "pack_depth": 78,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 663,
+      "pool_gold_session_rank": 1,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "8752c811",
+      "qtype": "single-session-assistant",
+      "pack_depth": 58,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "3249768e",
+      "qtype": "single-session-assistant",
+      "pack_depth": 62,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1b9b7252",
+      "qtype": "single-session-assistant",
+      "pack_depth": 71,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1568498a",
+      "qtype": "single-session-assistant",
+      "pack_depth": 76,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "6222b6eb",
+      "qtype": "single-session-assistant",
+      "pack_depth": 70,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e8a79c70",
+      "qtype": "single-session-assistant",
+      "pack_depth": 69,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "d596882b",
+      "qtype": "single-session-assistant",
+      "pack_depth": 81,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e3fc4d6e",
+      "qtype": "single-session-assistant",
+      "pack_depth": 73,
+      "pack_rank": 7,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "51b23612",
+      "qtype": "single-session-assistant",
+      "pack_depth": 63,
+      "pack_rank": 3,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "3e321797",
+      "qtype": "single-session-assistant",
+      "pack_depth": 85,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e982271f",
+      "qtype": "single-session-assistant",
+      "pack_depth": 47,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "352ab8bd",
+      "qtype": "single-session-assistant",
+      "pack_depth": 48,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "fca762bc",
+      "qtype": "single-session-assistant",
+      "pack_depth": 60,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "7a8d0b71",
+      "qtype": "single-session-assistant",
+      "pack_depth": 45,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "a40e080f",
+      "qtype": "single-session-assistant",
+      "pack_depth": 61,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "8b9d4367",
+      "qtype": "single-session-assistant",
+      "pack_depth": 68,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "5809eb10",
+      "qtype": "single-session-assistant",
+      "pack_depth": 62,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "41275add",
+      "qtype": "single-session-assistant",
+      "pack_depth": 68,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4388e9dd",
+      "qtype": "single-session-assistant",
+      "pack_depth": 66,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "4baee567",
+      "qtype": "single-session-assistant",
+      "pack_depth": 78,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "561fabcd",
+      "qtype": "single-session-assistant",
+      "pack_depth": 80,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "b759caee",
+      "qtype": "single-session-assistant",
+      "pack_depth": 72,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "ac031881",
+      "qtype": "single-session-assistant",
+      "pack_depth": 77,
+      "pack_rank": 2,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "28bcfaac",
+      "qtype": "single-session-assistant",
+      "pack_depth": 46,
+      "pack_rank": 8,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "16c90bf4",
+      "qtype": "single-session-assistant",
+      "pack_depth": 72,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "c8f1aeed",
+      "qtype": "single-session-assistant",
+      "pack_depth": 74,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "eaca4986",
+      "qtype": "single-session-assistant",
+      "pack_depth": 51,
+      "pack_rank": null,
+      "pool_claims": 1000,
+      "pool_sessions": 465,
+      "pool_gold_session_rank": 66,
+      "klass": "in_pool_not_pack"
+    },
+    {
+      "qid": "c7cf7dfd",
+      "qtype": "single-session-assistant",
+      "pack_depth": 44,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "e48988bc",
+      "qtype": "single-session-assistant",
+      "pack_depth": 71,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "1de5cff2",
+      "qtype": "single-session-assistant",
+      "pack_depth": 65,
+      "pack_rank": 4,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "65240037",
+      "qtype": "single-session-assistant",
+      "pack_depth": 51,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    },
+    {
+      "qid": "778164c6",
+      "qtype": "single-session-assistant",
+      "pack_depth": 76,
+      "pack_rank": 1,
+      "klass": "hit_top10"
+    }
+  ]
+}
