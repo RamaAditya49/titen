@@ -96,8 +96,9 @@ function parseArgs(argv: string[]) {
     console.log(USAGE);
     process.exit(0);
   }
+  const flags: Record<string, string | boolean> = {};
   if (argv.length === 0)
-    return { command: undefined, action: undefined, flags: {}, positional: undefined };
+    return { command: undefined, action: undefined, flags, positional: undefined };
 
   const command = argv[0]!;
   const action = command === "key" ? argv[1] : undefined;
@@ -105,7 +106,6 @@ function parseArgs(argv: string[]) {
   const schema = COMMAND_FLAGS[name];
   if (!schema) fail(command === "key" ? "key needs create, list, or revoke" : `unknown command "${command}"`);
 
-  const flags: Record<string, string | boolean> = {};
   const values = new Set(schema.values);
   const booleans = new Set(schema.booleans ?? []);
   let start = action ? 2 : 1;
@@ -504,7 +504,7 @@ switch (command) {
     try {
       const database = openDatabase(sourcePath, { create: false });
       try {
-        database.run(`VACUUM INTO ?`, temporary);
+        database.run(`VACUUM INTO ?`, [temporary]);
       } finally {
         database.close();
       }

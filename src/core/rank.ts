@@ -9,6 +9,26 @@ export const RANK_WEIGHTS = {
   confidence: 0.1,
 } as const;
 
+/**
+ * Per-term BM25 strength at which the relevance term reaches 0.5.
+ *
+ * Relevance was min-max normalized inside the candidate set, which pinned the
+ * best candidate to exactly 1 whatever it matched, so `score` was a constant
+ * on a uniformly ingested corpus — 0.796667 at rank 1 on every query — and
+ * threshold-based abstention was arithmetically impossible (#227).
+ *
+ * Calibrated, not chosen: over the first 300 LongMemEval-S questions against
+ * the 424,168-claim anchor store, rank-1 `|bm25|` has a median of 25.73 across
+ * a median of 7 query terms, so 3.7 per term puts a median-quality best match
+ * at 0.50, the 10th percentile at 0.40 and the 90th at 0.60.
+ *
+ * BM25 is not portable across corpora — that is exactly why the old code
+ * normalized within the set — so this constant is corpus-calibrated. The claim
+ * is not that it is universal, only that a documented default beats a value
+ * that is constant by construction everywhere.
+ */
+export const RELEVANCE_HALF_STRENGTH = 3.7;
+
 /** Feedback only moves ranking once enough signals exist (FRD CTX-002). */
 export const UTILITY_MIN_SIGNALS = 3;
 export const RECENCY_HALF_LIFE_DAYS = 90;
@@ -56,41 +76,43 @@ const round = (value: number) => Math.round(value * 1e6) / 1e6;
  * candidate set only. That keeps the component explainable without promising a
  * stable provider score (FRD RET-001).
  */
-export function normalizeRelevance(candidates: RankInput[]): Map<string, number> {
-  // A candidate the lexical index never matched carries bm25 = 0, because bm25()
-  // is negative for a real match. Those are normalized to zero rather than
-  // included in the span: otherwise a set with no lexical signal at all has a
-  // zero span and every candidate scores 1, which silently discards the ordering
-  // a vector store just provided.
-  const lexical = candidates.filter((candidate) => candidate.bm25 !== 0);
-  const scores = lexical.map((candidate) => -candidate.bm25);
-  const best = Math.max(...scores, 0);
-  const worst = Math.min(...scores, 0);
-  const span = best - worst;
-  const byId = new Map(
-    lexical.map((candidate, index) => [
+export function normalizeRelevance(
+  candidates: RankInput[],
+  termsUsed = 1,
+): Map<string, number> {
+  // A candidate the lexical index never matched carries bm25 = 0, because
+  // bm25() is negative for a real match. Those score zero.
+  //
+  // Dividing by termsUsed is not cosmetic. BM25 magnitude grows with the
+  // number of matched terms, so without it a long question would outscore a
+  // short one on the same quality of match and the number would partly measure
+  // the query rather than the answer -- the opposite of comparable across
+  // queries, which is the whole point of the change.
+  const terms = Math.max(1, termsUsed);
+  return new Map(candidates.map((candidate) => {
+    const strength = candidate.bm25 === 0 ? 0 : -candidate.bm25 / terms;
+    return [
       candidate.id,
-      span === 0 ? 1 : (scores[index]! - worst) / span,
-    ]),
-  );
-  return new Map(
-    candidates.map((candidate) => [candidate.id, byId.get(candidate.id) ?? 0]),
-  );
+      strength <= 0 ? 0 : strength / (strength + RELEVANCE_HALF_STRENGTH),
+    ];
+  }));
 }
 
-/** Vector scores are provider-relative, so calibrate them inside this result set. */
+/**
+ * Cosine similarity is already an absolute 0..1, so it is used as it stands.
+ *
+ * It used to be min-max normalized inside the result set for the same reason
+ * the lexical arm was, and that had the same defect: the best semantic match
+ * scored exactly 1 however poor it was. It also has to change together with
+ * the lexical arm — `scoreCandidate` takes `max()` of the two, and leaving one
+ * set-relative while the other became absolute would compare two different
+ * scales, with the min-max arm winning nearly every time.
+ */
 export function normalizeVectorSimilarity(candidates: RankInput[]): Map<string, number> {
-  const semantic = candidates.filter((candidate) => (candidate.vector_boost ?? 0) > 0);
-  if (semantic.length === 0) return new Map();
-  const scores = semantic.map((candidate) => candidate.vector_boost!);
-  const best = Math.max(...scores);
-  const worst = Math.min(...scores);
-  const span = best - worst;
   return new Map(
-    semantic.map((candidate, index) => [
-      candidate.id,
-      span === 0 ? 1 : (scores[index]! - worst) / span,
-    ]),
+    candidates
+      .filter((candidate) => (candidate.vector_boost ?? 0) > 0)
+      .map((candidate) => [candidate.id, Math.min(1, candidate.vector_boost!)]),
   );
 }
 
@@ -196,8 +218,12 @@ export interface Ranked<T extends RankInput> {
  * on its unit contract, not on a benchmark win. See
  * `docs/testing/2026-08-07-evidence-ranking.md`.
  */
-export function rankCandidates<T extends RankInput>(candidates: T[], now: Date): Ranked<T>[] {
-  const relevance = normalizeRelevance(candidates);
+export function rankCandidates<T extends RankInput>(
+  candidates: T[],
+  now: Date,
+  termsUsed = 1,
+): Ranked<T>[] {
+  const relevance = normalizeRelevance(candidates, termsUsed);
   const vectorRelevance = normalizeVectorSimilarity(candidates);
   return candidates
     .map((candidate) => ({

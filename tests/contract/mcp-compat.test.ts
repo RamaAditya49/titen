@@ -4,7 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseReferenceGraph, type ReferenceGraph } from "../../src/core/portability";
-import { importReferenceMemory, openLocalStore } from "../../src/runtime/bun/mcp-stdio";
+import {
+  importReferenceMemory,
+  openLocalStore,
+  referenceMemoryCandidates,
+} from "../../src/runtime/bun/mcp-stdio";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { provisionWith } from "./harness";
 
@@ -127,6 +131,34 @@ afterAll(() => {
   rmSync(directory, { recursive: true, force: true });
 });
 
+test("the search covers where the reference server actually writes", () => {
+  const previous = process.env.MEMORY_FILE_PATH;
+  delete process.env.MEMORY_FILE_PATH;
+  try {
+    const candidates = referenceMemoryCandidates("/work");
+    const pkg = "node_modules/@modelcontextprotocol/server-memory/dist";
+
+    // The cwd is a guess — an MCP server launched by a desktop client inherits
+    // the client's directory — so it must not be the only place we look.
+    assert.ok(candidates.includes("/work/memory.jsonl"));
+    assert.ok(candidates.includes("/work/memory.json"));
+
+    // Where the reference server writes with MEMORY_FILE_PATH unset: beside its
+    // own module. Missing this is what made a switch import zero and say nothing.
+    assert.ok(candidates.includes(`/work/${pkg}/memory.jsonl`));
+    assert.ok(candidates.includes(`/work/${pkg}/memory.json`));
+
+    // Explicit configuration still wins outright, relative or absolute.
+    process.env.MEMORY_FILE_PATH = "graph.jsonl";
+    assert.deepEqual(referenceMemoryCandidates("/work"), ["/work/graph.jsonl"]);
+    process.env.MEMORY_FILE_PATH = "/elsewhere/graph.jsonl";
+    assert.deepEqual(referenceMemoryCandidates("/work"), ["/elsewhere/graph.jsonl"]);
+  } finally {
+    if (previous === undefined) delete process.env.MEMORY_FILE_PATH;
+    else process.env.MEMORY_FILE_PATH = previous;
+  }
+});
+
 test("an existing memory.json is imported without data loss", async () => {
   const imported = await importReferenceMemory(local, memoryFile, `${dbPath}.imported`);
   assert.deepEqual(imported, { entities: 4, relations: 2 });
@@ -187,6 +219,30 @@ test("the installed entry point adopts a memory.json in the working directory", 
     relations: [{ from: "checkout-api", to: "billing-service", relationType: "depends_on" }],
   });
 }, 60_000);
+
+test("the graph is readable as a resource, the way the reference server serves it", async () => {
+  // A client that reads memory://knowledge-graph instead of calling read_graph
+  // used to get -32601 on the switch, which is a broken drop-in however well
+  // the tool names line up.
+  const listed = (await rpc("resources/list", {})).result.resources as {
+    uri: string;
+    mimeType: string;
+  }[];
+  const graphResource = listed.find((r) => r.uri === "memory://knowledge-graph");
+  assert.ok(graphResource, "memory://knowledge-graph must be listed");
+  assert.equal(graphResource.mimeType, "application/json");
+
+  const read = (await rpc("resources/read", { uri: "memory://knowledge-graph" })).result;
+  const contents = read.contents as { uri: string; mimeType: string; text: string }[];
+  assert.equal(contents.length, 1);
+  assert.equal(contents[0]!.uri, "memory://knowledge-graph");
+
+  // Same bytes the read_graph tool returns, so the two paths cannot drift.
+  assert.deepEqual(JSON.parse(contents[0]!.text), await readGraph());
+
+  const unknown = await rpc("resources/read", { uri: "memory://nope" });
+  assert.equal(unknown.error.code, -32602, "an unknown uri is a params error, not a 404");
+});
 
 test("the nine reference tool names are served with the reference schemas", async () => {
   const listed = (await rpc("tools/list", {})).result.tools as {

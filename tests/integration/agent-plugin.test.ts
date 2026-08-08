@@ -46,6 +46,35 @@ test("the README can be tried before it is read", () => {
   assert.match(readme.slice(0, firstRun), /Bun/);
 });
 
+test("the README sells the substitution before the coordination model", () => {
+  const readme = readFileSync(join(root, "README.md"), "utf8");
+  const wedge = readme.indexOf("## Already running `@modelcontextprotocol/server-memory`?");
+  const audit = readme.indexOf("## Audit any agent memory store");
+  const benchmarks = readme.indexOf("## Measured against the field");
+  const coordination = readme.indexOf("## Memory for a team, not a chatbot");
+
+  // The reachable audience is people already running the reference server —
+  // 106,662 downloads in the week of 2026-07-31 — and the two sections that
+  // need no migration are what they can act on. Both come before the benchmark.
+  assert.ok(wedge > 0 && audit > 0, "the substitution and audit sections must exist");
+  assert.ok(wedge < audit, "substitution leads, the audit tool follows it");
+  assert.ok(audit < benchmarks, "what needs no migration comes before the numbers");
+
+  // Checkpoints, leases and handoffs are orchestration, not memory, and they
+  // are the least externally validated surface in the repo. They stay in the
+  // README and out of the pitch.
+  assert.ok(
+    coordination > benchmarks,
+    "the Level 6 coordination model must not sit on the third screen",
+  );
+
+  // The substitution claim is only honest while all nine names really match.
+  for (const tool of [
+    "create_entities", "create_relations", "add_observations", "delete_entities",
+    "delete_observations", "delete_relations", "read_graph", "search_nodes", "open_nodes",
+  ]) assert.ok(readme.includes(tool) || readme.includes("nine reference"), `${tool} unmentioned`);
+});
+
 function json(path: string) {
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, any>;
 }

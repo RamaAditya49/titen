@@ -1,0 +1,472 @@
+{
+  "gates": {
+    "AC-INT-001": {
+      "requirement": "rank-1 score differs by >= 0.05 between a strong-match and a weak-match query on the anchor store",
+      "unit_probe_before_spread": 0,
+      "unit_probe_after_spread": 0.292773,
+      "served_anchor_rank1_spread_before": 0.0,
+      "served_anchor_rank1_spread_after": 0.175656,
+      "pass": true
+    },
+    "AC-INT-002": {
+      "requirement": "on the anchor store, the rate of exact rank-1 score ties across the 500 questions falls below the current rate",
+      "readings": {
+        "across_query": {
+          "before": 1.0,
+          "after": 0.0,
+          "distinct_rank1_before": 1,
+          "distinct_rank1_after": 498,
+          "pass": true
+        },
+        "within_pack": {
+          "before": 0.002,
+          "after": 0.002,
+          "pack_collision_rate_before": 0.0558,
+          "pack_collision_rate_after": 0.056,
+          "pass": false
+        }
+      },
+      "pass": false,
+      "split": true
+    },
+    "AC-INT-003": {
+      "requirement": "no regression on both conditions against the published baselines",
+      "baseline_reproduced": {
+        "anchor": true,
+        "pooled": true
+      },
+      "clauses": {
+        "anchor recall@1 >= 0.875": {
+          "value": 0.88,
+          "pass": true
+        },
+        "anchor recall@10 drop <= 1.0 pt": {
+          "value": 0.0,
+          "pass": true
+        },
+        "anchor sign test not significant against the change": {
+          "value": {
+            "a_wins": 0,
+            "b_wins": 0,
+            "ties": 500,
+            "p_value": 1.0
+          },
+          "pass": true
+        },
+        "pooled recall@1 >= 0.241": {
+          "value": 0.246,
+          "pass": true
+        },
+        "pooled recall@10 drop <= 1.0 pt": {
+          "value": 0.0,
+          "pass": true
+        },
+        "pooled sign test not significant against the change": {
+          "value": {
+            "a_wins": 0,
+            "b_wins": 0,
+            "ties": 500,
+            "p_value": 1.0
+          },
+          "pass": true
+        }
+      },
+      "pass": true
+    },
+    "AC-INT-004": {
+      "requirement": "compile p95 does not rise more than 5%",
+      "note": "warm-pass comparison; the cold pass over a freshly copied store is page-cache bound and not comparable across builds",
+      "conditions": {
+        "anchor": {
+          "warm_p95_before": 33.94,
+          "warm_p95_after": 34.35,
+          "delta_pct": 1.21,
+          "pass": true
+        },
+        "pooled": {
+          "warm_p95_before": 838.05,
+          "warm_p95_after": 843.64,
+          "delta_pct": 0.67,
+          "pass": true
+        }
+      },
+      "pass": true
+    }
+  },
+  "conditions": {
+    "anchor": {
+      "before": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0
+      },
+      "after": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0
+      },
+      "by_type_before": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.9,
+          "recall_at_5": 0.9714,
+          "recall_at_10": 1.0
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.4,
+          "recall_at_5": 0.8,
+          "recall_at_10": 0.9
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.9023,
+          "recall_at_5": 0.985,
+          "recall_at_10": 1.0
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.8496,
+          "recall_at_5": 0.9248,
+          "recall_at_10": 0.9549
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.9744,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        }
+      },
+      "by_type_after": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.9,
+          "recall_at_5": 0.9714,
+          "recall_at_10": 1.0
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.4,
+          "recall_at_5": 0.8,
+          "recall_at_10": 0.9
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.9023,
+          "recall_at_5": 0.985,
+          "recall_at_10": 1.0
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.8496,
+          "recall_at_5": 0.9248,
+          "recall_at_10": 0.9549
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.9744,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        }
+      },
+      "compile_ms_before": [
+        {
+          "pass": 1,
+          "query_seconds": 36.6,
+          "compile_ms": {
+            "p50": 68.12,
+            "p95": 137.56,
+            "p99": 183.77
+          }
+        },
+        {
+          "pass": 2,
+          "query_seconds": 11.0,
+          "compile_ms": {
+            "p50": 20.57,
+            "p95": 33.94,
+            "p99": 41.27
+          },
+          "identical_to_pass_1": true
+        }
+      ],
+      "compile_ms_after": [
+        {
+          "pass": 1,
+          "query_seconds": 11.1,
+          "compile_ms": {
+            "p50": 21.0,
+            "p95": 33.88,
+            "p99": 40.11
+          }
+        },
+        {
+          "pass": 2,
+          "query_seconds": 11.1,
+          "compile_ms": {
+            "p50": 20.76,
+            "p95": 34.35,
+            "p99": 42.48
+          },
+          "identical_to_pass_1": true
+        }
+      ],
+      "ranked_lists_changed": 8,
+      "top10_changed": 0,
+      "rank1_changed": 0
+    },
+    "pooled": {
+      "before": {
+        "n": 500,
+        "recall_at_1": 0.246,
+        "recall_at_5": 0.444,
+        "recall_at_10": 0.508,
+        "mrr_at_10": 0.3259,
+        "failures": 0
+      },
+      "after": {
+        "n": 500,
+        "recall_at_1": 0.246,
+        "recall_at_5": 0.444,
+        "recall_at_10": 0.508,
+        "mrr_at_10": 0.3259,
+        "failures": 0
+      },
+      "by_type_before": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.1143,
+          "recall_at_5": 0.3,
+          "recall_at_10": 0.3857
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 0.7143,
+          "recall_at_5": 0.8929,
+          "recall_at_10": 0.9286
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.0,
+          "recall_at_5": 0.1,
+          "recall_at_10": 0.1
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.1203,
+          "recall_at_5": 0.3459,
+          "recall_at_10": 0.3985
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.1579,
+          "recall_at_5": 0.3609,
+          "recall_at_10": 0.4361
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.4872,
+          "recall_at_5": 0.6923,
+          "recall_at_10": 0.7821
+        }
+      },
+      "by_type_after": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.1143,
+          "recall_at_5": 0.3,
+          "recall_at_10": 0.3857
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 0.7143,
+          "recall_at_5": 0.8929,
+          "recall_at_10": 0.9286
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.0,
+          "recall_at_5": 0.1,
+          "recall_at_10": 0.1
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.1203,
+          "recall_at_5": 0.3459,
+          "recall_at_10": 0.3985
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.1579,
+          "recall_at_5": 0.3609,
+          "recall_at_10": 0.4361
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.4872,
+          "recall_at_5": 0.6923,
+          "recall_at_10": 0.7821
+        }
+      },
+      "compile_ms_before": [
+        {
+          "pass": 1,
+          "query_seconds": 235.2,
+          "compile_ms": {
+            "p50": 418.44,
+            "p95": 864.32,
+            "p99": 1075.4
+          }
+        },
+        {
+          "pass": 2,
+          "query_seconds": 223.0,
+          "compile_ms": {
+            "p50": 411.82,
+            "p95": 838.05,
+            "p99": 973.71
+          },
+          "identical_to_pass_1": true
+        }
+      ],
+      "compile_ms_after": [
+        {
+          "pass": 1,
+          "query_seconds": 223.0,
+          "compile_ms": {
+            "p50": 409.08,
+            "p95": 835.97,
+            "p99": 973.73
+          }
+        },
+        {
+          "pass": 2,
+          "query_seconds": 223.4,
+          "compile_ms": {
+            "p50": 411.71,
+            "p95": 843.64,
+            "p99": 976.77
+          },
+          "identical_to_pass_1": true
+        }
+      ],
+      "ranked_lists_changed": 43,
+      "top10_changed": 0,
+      "rank1_changed": 0
+    }
+  },
+  "sign_tests": {
+    "anchor@1": {
+      "a_wins": 0,
+      "b_wins": 0,
+      "ties": 500,
+      "p_value": 1.0
+    },
+    "anchor@10": {
+      "a_wins": 0,
+      "b_wins": 0,
+      "ties": 500,
+      "p_value": 1.0
+    },
+    "pooled@1": {
+      "a_wins": 0,
+      "b_wins": 0,
+      "ties": 500,
+      "p_value": 1.0
+    },
+    "pooled@10": {
+      "a_wins": 0,
+      "b_wins": 0,
+      "ties": 500,
+      "p_value": 1.0
+    }
+  },
+  "ties": {
+    "anchor": {
+      "before": {
+        "n": 500,
+        "within_pack_ties": 1,
+        "within_pack_tie_rate": 0.002,
+        "pack_items": 43389,
+        "pack_score_collisions": 2419,
+        "pack_score_collision_rate": 0.0558,
+        "distinct_rank1": 1,
+        "modal_rank1": 0.794374,
+        "rank1_min": 0.794374,
+        "rank1_max": 0.794374,
+        "rank1_spread": 0.0,
+        "across_query_ceiling_ties": 500,
+        "across_query_ceiling_tie_rate": 1.0
+      },
+      "after": {
+        "n": 500,
+        "within_pack_ties": 1,
+        "within_pack_tie_rate": 0.002,
+        "pack_items": 43385,
+        "pack_score_collisions": 2428,
+        "pack_score_collision_rate": 0.056,
+        "distinct_rank1": 498,
+        "modal_rank1": 0.626173,
+        "rank1_min": 0.487504,
+        "rank1_max": 0.66316,
+        "rank1_spread": 0.175656,
+        "across_query_ceiling_ties": 0,
+        "across_query_ceiling_tie_rate": 0.0
+      }
+    },
+    "pooled": {
+      "before": {
+        "n": 500,
+        "within_pack_ties": 0,
+        "within_pack_tie_rate": 0.0,
+        "pack_items": 46088,
+        "pack_score_collisions": 935,
+        "pack_score_collision_rate": 0.0203,
+        "distinct_rank1": 1,
+        "modal_rank1": 0.796667,
+        "rank1_min": 0.796667,
+        "rank1_max": 0.796667,
+        "rank1_spread": 0.0,
+        "across_query_ceiling_ties": 500,
+        "across_query_ceiling_tie_rate": 1.0
+      },
+      "after": {
+        "n": 500,
+        "within_pack_ties": 0,
+        "within_pack_tie_rate": 0.0,
+        "pack_items": 46082,
+        "pack_score_collisions": 974,
+        "pack_score_collision_rate": 0.0211,
+        "distinct_rank1": 497,
+        "modal_rank1": 0.624465,
+        "rank1_min": 0.529623,
+        "rank1_max": 0.699941,
+        "rank1_spread": 0.170318,
+        "across_query_ceiling_ties": 0,
+        "across_query_ceiling_tie_rate": 0.0
+      }
+    }
+  },
+  "verdict": {
+    "AC-INT-003_ships": true,
+    "all_gates_pass": false
+  }
+}

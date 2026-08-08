@@ -1,0 +1,34 @@
+{
+  "build": "22944bb",
+  "worktree": "/home/ramaaditya/score227/before",
+  "rows": [
+    {
+      "set": "strong lexical match",
+      "bm25": [
+        -18,
+        -2
+      ],
+      "rank1_score": 0.796667,
+      "rank1_relevance": 1
+    },
+    {
+      "set": "weak lexical match",
+      "bm25": [
+        -0.4,
+        -0.1
+      ],
+      "rank1_score": 0.796667,
+      "rank1_relevance": 1
+    },
+    {
+      "set": "single candidate",
+      "bm25": [
+        -0.02
+      ],
+      "rank1_score": 0.796667,
+      "rank1_relevance": 1
+    }
+  ],
+  "spread_strong_minus_weak": 0,
+  "spread_max_minus_min": 0
+}

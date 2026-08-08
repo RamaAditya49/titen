@@ -2,7 +2,7 @@ import { assertTrustCeiling, hasScope, requestedScopes, requireScope, SCOPES } f
 import { auditStatement } from "./audit";
 import { authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import { purgedEvidenceGuardStatement } from "./claims";
-import { MAX_BOUND_PARAMS, chunk, type Stmt } from "./db";
+import { MAX_BOUND_PARAMS, chunk, type Param, type Stmt } from "./db";
 import { conflict, unresolvedReference, validationError } from "./errors";
 import { eventStatement } from "./events";
 import {
@@ -720,7 +720,13 @@ async function exportPage(
 }
 
 type Source = { observation_id: string; relation: string; created_at: string };
-type Prepared = Record<string, unknown>;
+/**
+ * A prepared row is columns only, and every value in it has already been through
+ * validation, so `Param` is the honest type: `Record<string, unknown>` erased
+ * that at the most hostile input boundary in the repo and made 63 assignments
+ * to SQL parameters unprovable.
+ */
+type Prepared = Record<string, Param>;
 type EnrichmentLink = {
   id: string;
   source_claim_id: string;
@@ -735,13 +741,69 @@ type EnrichmentCommit = {
   result_kind: "add" | "link" | "reuse";
   committed_at: string;
 };
-type PreparedEnrichment = Prepared & {
-  input_ids: Array<{ id: string; content_hash?: string; version?: number }>;
+type EnrichmentInput = { id: string; content_hash?: string; version?: number };
+/**
+ * Claims and enrichment jobs carry structure that is never a SQL parameter: the
+ * commit and its links, and the id arrays that reach SQL only as JSON text. So
+ * they cannot be `Prepared & {...}` — intersecting an array with an index
+ * signature of `Param` collapses that property to `never`. They name their
+ * columns instead, which is also what makes the INSERT parameter lists provable.
+ */
+type PreparedEnrichmentColumns = {
+  id: string;
+  lane: "derivation" | "reflection";
+  derivation_key: string | null;
+  input_ids: EnrichmentInput[];
+  input_hash: string;
+  subject_id: string;
+  project_id: string | null;
+  workspace_id: string | null;
+  actor_id: string;
+  model_id: string;
+  model_fingerprint: string;
+  prompt_fingerprint: string;
+  schema_fingerprint: string;
+  policy_fingerprint: string;
+  state: "done";
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: string;
+  error_class: null;
+  output_hash: string | null;
   result_ids: string[];
+  created_at: string;
+  updated_at: string;
+};
+type PreparedEnrichment = PreparedEnrichmentColumns & {
   commit: EnrichmentCommit;
   links: EnrichmentLink[];
 };
-type PreparedClaim = Prepared & { sources: Source[]; enrichments: PreparedEnrichment[] };
+type PreparedClaimColumns = {
+  id: string;
+  subject_id: string;
+  project_id: string | null;
+  workspace_id: string | null;
+  observer_id: string | null;
+  actor_id: string;
+  kind: (typeof CLAIM_KINDS)[number];
+  statement: string;
+  confidence: number;
+  trust: Trust;
+  visibility: Visibility;
+  status: string;
+  version: number;
+  valid_from: string;
+  valid_to: string | null;
+  created_at: string | null;
+  superseded_by: string | null;
+  enrichment_job_id: string | null;
+  enrichment_key: string | null;
+  enrichment_key_archived: number;
+};
+type PreparedClaim = PreparedClaimColumns & {
+  sources: Source[];
+  enrichments: PreparedEnrichment[];
+};
 type VersionedRow = { row: Record<string, unknown>; formatVersion: 1 | 2 | 3 | 4; sourceOrgId: string };
 
 const optionalText = (row: Record<string, unknown>, field: string, max: number): string | null => {
@@ -805,7 +867,7 @@ async function prepareEnrichmentBundle(
     throw validationError("Imported enrichment max_attempts is invalid.");
   if (!Array.isArray(job.input_ids) || job.input_ids.length < 1 || job.input_ids.length > 8)
     throw validationError("Imported enrichment input_ids must contain 1 to 8 entries.");
-  const inputIds = job.input_ids.map((input): PreparedEnrichment["input_ids"][number] => {
+  const inputIds = job.input_ids.map((input): EnrichmentInput => {
     if (!isRecord(input)) throw validationError("Each enrichment input must be an object.");
     const inputId = requireString(input, "id", LIMITS.identifier);
     if (lane === "derivation") {
@@ -1187,12 +1249,13 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
     enrichments.set(enrichment.id as string, enrichment);
   }
 
-  const byType = {
-    workspace: [...workspaces.values()], membership: [...memberships.values()], project: [...projects.values()],
-    observation: [...observations.values()], claim: [...claims.values()],
-    enrichment: [...enrichments.values()],
-  };
-  await assertNoForeignIds(ctx, principal.orgId, byType);
+  // Every map above is keyed by the prepared row's own id, so its keys are that
+  // record type's ids, in insertion order and already deduplicated.
+  await assertNoForeignIds(ctx, principal.orgId, {
+    workspace: [...workspaces.keys()], membership: [...memberships.keys()], project: [...projects.keys()],
+    observation: [...observations.keys()], claim: [...claims.keys()],
+    enrichment: [...enrichments.keys()], api_key: [...keys.keys()],
+  });
   await assertWorkspaceReferences(ctx, workspaces, memberships, observations, claims);
   await assertProjectReferences(ctx, principal.orgId, projects, observations, claims);
   await assertSupersessionReferences(ctx, claims);
@@ -1226,7 +1289,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
 
   for (const row of keys.values()) {
     const existing = existingKeys.get(row.id as string);
-    const shape = (value: Record<string, unknown>): Prepared => ({
+    const shape = (value: Record<string, unknown>) => ({
       id: value.id,
       principal_id: value.principal_id,
       principal_kind: value.principal_kind,
@@ -1662,7 +1725,7 @@ async function assertSupersessionReferences(
     if (replacementId === claim.id)
       throw validationError("A claim cannot supersede itself.");
     const replacement = claims.get(replacementId) ?? claimShape(stored.get(replacementId)!);
-    for (const field of ["subject_id", "project_id", "workspace_id", "kind", "visibility"])
+    for (const field of ["subject_id", "project_id", "workspace_id", "kind", "visibility"] as const)
       if (replacement[field] !== claim[field])
         throw validationError("A replacement claim must match the original claim domain and visibility.");
   }
@@ -1705,7 +1768,7 @@ async function loadEvidence(
   const refs = [...claims.values()].flatMap((claim) => claim.sources.map((source) => source.observation_id)).filter((id) => !result.has(id));
   for (const group of chunk([...new Set(refs)], MAX_BOUND_PARAMS - 2)) {
     if (!group.length) continue;
-    const rows = await ctx.app.db.all<Record<string, unknown>>(
+    const rows = await ctx.app.db.all<Prepared>(
       `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.content, o.content_hash, o.trust, o.visibility
          FROM observations o WHERE o.org_id = ? AND o.id IN (${group.map(() => "?").join(", ")})
           AND ${administrative ? "1 = 1" : recordAccessSql("o")}`,
@@ -1713,7 +1776,7 @@ async function loadEvidence(
         ? [ctx.principal!.orgId, ...group]
         : [ctx.principal!.orgId, ...group, ...recordAccessParams(ctx.principal!.principalId)],
     );
-    for (const row of rows) result.set(String(row.id), row as Prepared);
+    for (const row of rows) result.set(String(row.id), row);
   }
   if (refs.some((id) => !result.has(id)))
     throw unresolvedReference({ record_type: "claim", field: "sources.observation_id", dependency_type: "observation" });
@@ -1751,7 +1814,7 @@ async function loadAuthorizedPortableRecords(
   const alias = table === "observations" ? "o" : "c";
   for (const group of chunk([...new Set(ids)], MAX_BOUND_PARAMS - 3)) {
     if (!group.length) continue;
-    const rows = await ctx.app.db.all<Record<string, unknown>>(
+    const rows = await ctx.app.db.all<Prepared>(
       `SELECT ${alias}.* FROM ${table} ${alias}
         WHERE ${alias}.org_id = ? AND ${alias}.id IN (${group.map(() => "?").join(", ")})
           AND ${administrative ? "1 = 1" : recordAccessSql(alias)}`,
@@ -1878,9 +1941,19 @@ async function assertEnrichmentGraph(
       if (!writer.length)
         throw unresolvedReference({ record_type: "enrichment", field: "actor_id", dependency_type: "writer_membership" });
     }
-    const inputs = job.lane === "derivation"
-      ? [observation(job.input_ids[0]!.id)!]
+    // Observation columns (content, occurred_at, ingested_at) exist only on a
+    // derivation job's single input; a reflection job's inputs are claims. The
+    // unresolved-reference check above already proved this lookup resolves.
+    const derivationInput = job.lane === "derivation"
+      ? observation(job.input_ids[0]!.id)
+      : undefined;
+    const inputs: Array<Prepared | PreparedClaim> = derivationInput
+      ? [derivationInput]
       : job.input_ids.map(({ id }) => claim(id)!);
+    const derivationInputRedacted = derivationInput !== undefined
+      && typeof derivationInput.content === "string"
+      && typeof derivationInput.content_hash === "string"
+      && isRedactedObservation(derivationInput.content, derivationInput.content_hash);
     const result = job.commit.result_kind === "link"
       ? undefined
       : claim(job.result_ids[0]!)!;
@@ -1894,10 +1967,10 @@ async function assertEnrichmentGraph(
       || input.project_id !== job.project_id
       || input.workspace_id !== job.workspace_id
     ) throw validationError("Imported enrichment inputs must match the job domain.");
-    if (job.lane === "derivation") {
+    if (derivationInput) {
       if (
-        inputs[0]!.content_hash !== job.input_ids[0]!.content_hash
-        || inputs[0]!.actor_id !== job.actor_id
+        derivationInput.content_hash !== job.input_ids[0]!.content_hash
+        || derivationInput.actor_id !== job.actor_id
       ) throw validationError("Imported derivation input does not match its immutable snapshot.");
     } else {
       for (let index = 0; index < inputs.length; index += 1) {
@@ -2007,40 +2080,39 @@ async function assertEnrichmentGraph(
         || portableResult.sources.some((source) => source.relation !== "supports"
           || expectedSources.get(source.observation_id) !== source.created_at))
         throw validationError("Imported ADD sources do not match cited enrichment evidence.");
-      const supportedBounds = job.lane === "derivation"
+      const supportedBounds = derivationInput
         ? supportedObservationTemporalBounds(
-            String(inputs[0]!.content),
-            inputs[0]!.occurred_at as string | null,
-            String(inputs[0]!.ingested_at),
+            String(derivationInput.content),
+            derivationInput.occurred_at as string | null,
+            String(derivationInput.ingested_at),
           )
         : new Set(job.links.flatMap(({ target_claim_id }) => {
             const premise = claim(target_claim_id)!;
             return [String(premise.valid_from), premise.valid_to as string | null]
               .filter((value): value is string => typeof value === "string");
           }));
-      const purgedDerivationInput = job.lane === "derivation"
-        && typeof inputs[0]!.content === "string"
-        && typeof inputs[0]!.content_hash === "string"
-        && isRedactedObservation(String(inputs[0]!.content), String(inputs[0]!.content_hash));
-      if (!purgedDerivationInput && !historicalReflectionSnapshot && (
+      if (!derivationInputRedacted && !historicalReflectionSnapshot && (
         !supportedBounds.has(String(semanticResult.valid_from))
         || (semanticResult.status !== "expired" && semanticResult.valid_to !== null
           && !supportedBounds.has(String(semanticResult.valid_to)))
       ))
         throw validationError("Imported ADD temporal bounds are not supported by cited evidence.");
     } else {
-      const sources = (semanticResult.sources as Source[] | undefined) ?? [];
+      // Only an imported claim carries `sources`; a claim already in the store
+      // is a bare column row, and a REUSE that names one has no appended source
+      // to check, exactly as before.
+      const sources = claims.get(String(semanticResult.id))?.sources ?? [];
       if (
         semanticResult.enrichment_job_id === job.id
         || !sources.some((source) =>
           source.observation_id === job.input_ids[0]!.id && source.relation === "supports")
       ) throw validationError("Imported REUSE provenance does not match the appended source.");
     }
-    if ((semanticResult.status === "active" || semanticResult.status === "disputed") && inputs.some((input) =>
+    if ((semanticResult.status === "active" || semanticResult.status === "disputed") && (
       job.lane === "reflection"
-        ? !["active", "disputed"].includes(String(input.status))
-        : typeof input.content === "string" && typeof input.content_hash === "string"
-          && isRedactedObservation(input.content, input.content_hash)))
+        ? inputs.some((input) => !["active", "disputed"].includes(String(input.status)))
+        : derivationInputRedacted
+    ))
       throw validationError("A current generated claim cannot depend on non-current evidence.");
   }
 
@@ -2095,10 +2167,11 @@ const claimShape = (row: Record<string, unknown>): Prepared => ({
   enrichment_key: row.enrichment_key as string | null,
   enrichment_key_archived: Number(row.enrichment_key_archived),
 });
-const withoutSources = (row: PreparedClaim): Prepared => Object.fromEntries(
+/** Both feed `assertSame`, which compares canonical JSON, not SQL parameters. */
+const withoutSources = (row: PreparedClaim) => Object.fromEntries(
   Object.entries(row).filter(([key]) => key !== "sources" && key !== "enrichments"),
 );
-const withoutEnrichmentGraph = (row: PreparedEnrichment): Prepared => Object.fromEntries(
+const withoutEnrichmentGraph = (row: PreparedEnrichment) => Object.fromEntries(
   Object.entries(row).filter(([key]) => key !== "commit" && key !== "links"),
 );
 const enrichmentShape = (row: Record<string, unknown>): Prepared => ({
@@ -2132,13 +2205,26 @@ const claimValues = (orgId: string, row: PreparedClaim) => [row.id, orgId, row.s
 async function assertNoForeignIds(
   ctx: RequestContext,
   orgId: string,
-  byType: Record<string, Prepared[]>,
+  idsByType: Record<string, string[]>,
 ): Promise<void> {
+  // `api_key` belongs here for the same reason as every other row: `api_keys.id`
+  // is a global TEXT PRIMARY KEY, while the only other credential lookup —
+  // `loadExisting(ctx, "api_keys", ...)` — is scoped `WHERE org_id = ?` and so
+  // cannot see a collision in another organization.
+  //
+  // Without it the import still failed atomically, so nothing was written, and
+  // it still answered 409 — but with the wrong 409: the constraint surfaced
+  // through the concurrent-write handler as "Import collided with a concurrent
+  // write; retry after exporting current state." That diagnosis is not merely
+  // imprecise, it is advice that cannot work. The collision is with a row in
+  // another organization, so re-exporting and retrying reproduces it forever.
+  // Every other record type reports what actually happened.
   const tables: [string, string][] = [
     ["workspace", "workspaces"], ["membership", "memberships"], ["project", "projects"],
     ["observation", "observations"], ["claim", "claims"], ["enrichment", "enrichment_jobs"],
+    ["api_key", "api_keys"],
   ];
-  for (const [recordType, table] of tables) for (const group of chunk(byType[recordType]!.map((row) => row.id as string), MAX_BOUND_PARAMS - 1)) {
+  for (const [recordType, table] of tables) for (const group of chunk(idsByType[recordType]!, MAX_BOUND_PARAMS - 1)) {
     if (!group.length) continue;
     const rows = await ctx.app.db.all<{ id: string }>(
       `SELECT id FROM ${table} WHERE org_id <> ? AND id IN (${group.map(() => "?").join(", ")})`, [orgId, ...group],

@@ -2,7 +2,7 @@ import { first } from "./db";
 import { recordAccessParams, recordAccessSql } from "./authorization";
 import { auditStatement } from "./audit";
 import type { Principal } from "./auth";
-import type { Db } from "./db";
+import type { Db, Stmt } from "./db";
 import { notFound, validationError, conflict, forbidden } from "./errors";
 import { eventStatement } from "./events";
 import { newId } from "./ids";
@@ -207,7 +207,7 @@ export async function acquireLeaseForPrincipal(
     throw conflict(`Resource is leased by another principal until ${existing.expires_at}.`);
 
   const id = newId("lease");
-  const statements = existing
+  const statements: Stmt[] = existing
     ? [{
         sql: `UPDATE leases SET released_at = ?
               WHERE id = ? AND org_id = ? AND released_at IS NULL AND expires_at <= ?`,

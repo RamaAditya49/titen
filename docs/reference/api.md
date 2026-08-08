@@ -448,11 +448,19 @@ explicit weighted factor, not a hidden multiplier. The conflict component is
 evidence lowers relative rank by `0.05` while remaining visible in the item
 status and `conflicts`.
 
-Because both signals are rescaled inside the candidate set, `score` is
-comparable **within one response only**. It is not a cross-query confidence and
-a threshold set on one query does not transfer to the next: on a uniformly
-ingested corpus rank 1 returns the same number on every query. Issue 227 tracks
-that limitation and is open.
+`score` is comparable **across queries**. The relevance term is
+`strength / (strength + 3.7)` where `strength` is the FTS `bm25` magnitude
+divided by the number of query terms, and the semantic term is raw cosine, so
+neither is rescaled against the rest of the candidate set. Measured on the
+424,168-claim anchor store: rank 1 returned **one** distinct value over 500
+questions before this change and **498** after, spanning 0.4875–0.6632. A
+confidence floor is therefore possible; #227 is closed.
+
+Two limits are worth stating plainly. `3.7` is calibrated on LongMemEval-S and
+BM25 is not portable across corpora, so the absolute band shifts with the
+corpus — the ordering does not. And relevance saturates, so between two
+candidates that both match well the remaining components carry relatively more
+weight than they used to.
 
 Equal scores are ordered by the stronger vector similarity, then by `claim_id`.
 Within-set normalization scores each signal's own best at exactly `1`, so when
@@ -1009,13 +1017,24 @@ line needs Bun on `PATH`: the published bin is a Bun program, so on a Node-only
 machine it exits with `titen: error: bun was not found on PATH.` rather than
 starting. `curl -fsSL https://titen.dev/install.sh | bash` installs Bun when it
 is missing. No
-`outputSchema` is published for these tools, and the reference server's
-`memory://knowledge-graph` resource and its resource subscriptions are not
-served; tool calls are.
+`outputSchema` is published for these tools. The reference server's
+`memory://knowledge-graph` resource **is** served, through `resources/list` and
+`resources/read`, returning the same JSON body `read_graph` returns. Resource
+*subscriptions* are not: `initialize` advertises `resources` with
+`subscribe: false`, so a client is told up front that it will get no change
+notifications.
 
 **Adopting an existing store.** On the first local-mode start, `titen mcp`
-imports `MEMORY_FILE_PATH` if set, otherwise `./memory.jsonl`, otherwise
-`./memory.json`, in the reference server's newline-delimited JSON format.
+imports the reference server's newline-delimited JSON graph. `MEMORY_FILE_PATH`
+wins outright when set. With it unset the search covers the working directory,
+`node_modules/@modelcontextprotocol/server-memory/dist` beneath it, and every
+`@modelcontextprotocol/server-memory` install in npm's `_npx` cache — because
+that server writes beside its own module, not in the directory it was launched
+from, so the cwd alone found nothing for anyone who ran it the documented way.
+Both names are tried at each location: `memory.jsonl` since 2025.11.25 and
+`memory.json` before it. When `MEMORY_FILE_PATH` is set and no file is there,
+and on a first run that finds no graph at all, `titen mcp` says so on stderr
+instead of starting empty in silence.
 Import runs through these same MCP tools, reports its counts on stderr, and
 records the source path in `~/.titen/memory.db.imported` so a later start does
 not resurrect entities deleted since. A failed import leaves that marker

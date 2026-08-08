@@ -496,18 +496,25 @@ test("the absolute cosine floor rejects a best bad neighbor before hydration", a
   assert.equal(vectorHydrations, 1, "an eligible vector id is hydrated once");
 });
 
-test("narrow-band vector similarity is normalized before ranking", () => {
+test("narrow-band vector similarity passes through and still orders the set", () => {
+  // Cosine used to be min-max normalized inside the set, which stretched a
+  // 0.002 gap to the full 0..1 and pinned the best to exactly 1 however poor it
+  // was. #227: it is an absolute 0..1 already, so it is used as it stands.
   const candidates = [rankInput("near", 0.8, 0.991), rankInput("exact", 0.8, 0.993)];
   const normalized = normalizeVectorSimilarity(candidates);
-  assert.equal(normalized.get("near"), 0);
-  assert.equal(normalized.get("exact"), 1);
+  assert.equal(normalized.get("near"), 0.991);
+  assert.equal(normalized.get("exact"), 0.993);
+
+  // The narrow band still decides the order — that was the property worth
+  // keeping, and it never needed the stretch to hold.
   const ranked = rankCandidates(candidates, new Date("2026-07-30T00:00:00.000Z"));
   assert.equal(ranked[0]!.candidate.id, "exact");
-  assert.equal(ranked[0]!.components.relevance, 1);
+  assert.equal(ranked[0]!.components.relevance, 0.993);
+  assert.ok(ranked[0]!.score > ranked[1]!.score, "the best no longer ties the rest at a ceiling");
 
   const tied = normalizeVectorSimilarity([rankInput("a", 1, 0.99), rankInput("b", 1, 0.99)]);
-  assert.equal(tied.get("a"), 1);
-  assert.equal(tied.get("b"), 1);
+  assert.equal(tied.get("a"), 0.99);
+  assert.equal(tied.get("b"), 0.99);
 
   const absent = normalizeVectorSimilarity([rankInput("none", 1, 0)]);
   assert.equal(absent.has("none"), false);
@@ -515,12 +522,14 @@ test("narrow-band vector similarity is normalized before ranking", () => {
 
 test("a score tie between the lexical best and the semantic best breaks on cosine", () => {
   const now = new Date("2026-07-30T00:00:00.000Z");
-  // Each arm is min-max normalized inside the set, so each arm's own best scores
-  // relevance exactly 1 and the two claims tie on the whole weighted score. This
-  // is the ordinary hybrid case, not a corner: on the release fixture it decided
-  // rank 1 of `id_temporal_endpoint` and `jv_in_id_preference` with a uuid, and
-  // the measured recall@1 flipped between repeats because of it.
-  const lexicalBest = { ...rankInput("aaa", 1), bm25: -9.082 };
+  // Both arms used to be min-max normalized, so each arm's own best scored
+  // relevance exactly 1 and any hybrid pair tied by construction. After #227
+  // both are absolute, so a tie has to be built rather than assumed: -9.5474
+  // per term saturates to 0.7207, the cosine the other candidate carries.
+  // The case is still the ordinary hybrid one — on the release fixture it
+  // decided rank 1 of `id_temporal_endpoint` and `jv_in_id_preference` with a
+  // uuid, and measured recall@1 flipped between repeats because of it.
+  const lexicalBest = { ...rankInput("aaa", 1), bm25: -9.547404 };
   const semanticBest = { ...rankInput("zzz", 1, 0.7207) };
   const ranked = rankCandidates([lexicalBest, semanticBest], now);
   assert.equal(ranked[0]!.score, ranked[1]!.score, "the fixture must actually tie on score");
@@ -531,8 +540,8 @@ test("a score tie between the lexical best and the semantic best breaks on cosin
   // Two cosines are compared only against each other, so no constant and no
   // cross-scale comparison enters: the larger raw cosine wins a tied score even
   // when within-set normalization has already flattened both to relevance 1.
-  const near = { ...rankInput("aaa", 1, 0.7026), bm25: -4 };
-  const nearer = { ...rankInput("zzz", 1, 0.7207), bm25: -4 };
+  const near = { ...rankInput("aaa", 1, 0.7026), bm25: -9.547404 };
+  const nearer = { ...rankInput("zzz", 1, 0.7207), bm25: -9.547404 };
   const bothSemantic = rankCandidates([near, nearer], now);
   assert.equal(bothSemantic[0]!.score, bothSemantic[1]!.score);
   assert.equal(bothSemantic[0]!.candidate.id, "zzz");
@@ -636,7 +645,9 @@ test("corroboration decides a dead heat and never overrides score or cosine", ()
   const semantic = rankCandidates(
     [
       { ...rankInput("cosine", 0.8, 0.91), bm25: -4 },
-      { ...rankInput("corroborated", 0.8, 0.72), bm25: -4, evidence_depth: 9 },
+      // -37.4111 per term saturates to 0.91, so both reach relevance 0.91 —
+      // one through cosine, one through lexical — and genuinely tie on score.
+      { ...rankInput("corroborated", 0.8, 0.72), bm25: -37.411111, evidence_depth: 9 },
     ],
     now,
   );
@@ -670,12 +681,59 @@ test("a dead heat is detected only inside the window that is returned", () => {
   const semantic = rankCandidates(
     [
       { ...rankInput("x", 0.8, 0.91), bm25: -4 },
-      { ...rankInput("y", 0.8, 0.72), bm25: -4 },
+      { ...rankInput("y", 0.8, 0.72), bm25: -37.411111 },
     ],
     now,
   );
   assert.equal(semantic[0]!.score, semantic[1]!.score);
   assert.equal(hasDeadHeat(semantic), false);
+});
+
+test("compressing relevance lets the other components decide between two strong matches", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+  // The one behavioural consequence of #227 that the benchmark could not
+  // measure. Both bench stores were ingested in a single pass, so trust,
+  // confidence, recency, conflict and feedback are constant across every
+  // candidate -- exactly one distinct non-relevance tuple across 89,467 packed
+  // items. With those held constant, score is monotone in relevance and both
+  // the old and the new transform are monotone in -bm25, so the order is
+  // identical by arithmetic and recall could not have moved. It did not.
+  //
+  // Here they are not constant, which is the case the corpus never contained.
+  // The old transform was s / best -- proportional, so a 25% gap in bm25 stayed
+  // a 25% gap in relevance and outweighed a full trust level. The new one
+  // saturates: at this strength both matches are already near the ceiling, the
+  // gap compresses from 0.250 to 0.018, and a verified claim beats a marginally
+  // better-matching asserted one.
+  //
+  // That is the intended direction. When two candidates both match well, which
+  // of them matches 25% better is a weaker signal than which of them a human
+  // verified. Asserting it here is what keeps it from being silent.
+  const candidates = [
+    { ...rankInput("asserted-better", 0.8), bm25: -60, trust: "asserted" as const },
+    { ...rankInput("verified-worse", 0.8), bm25: -45, trust: "verified" as const },
+  ];
+  const ranked = rankCandidates(candidates, now);
+  assert.equal(ranked[0]!.candidate.id, "verified-worse");
+  assert.ok(
+    ranked[0]!.components.relevance < ranked[1]!.components.relevance,
+    "the winner is the worse lexical match; trust is what carried it",
+  );
+  assert.ok(
+    ranked[1]!.components.relevance - ranked[0]!.components.relevance < 0.05,
+    "and it only carries because saturation compressed the relevance gap",
+  );
+
+  // The compression is bounded, not unlimited: a genuinely weak match still
+  // loses to a strong one however trusted it is.
+  const wide = rankCandidates(
+    [
+      { ...rankInput("strong-asserted", 0.8), bm25: -60, trust: "asserted" as const },
+      { ...rankInput("weak-verified", 0.8), bm25: -0.5, trust: "verified" as const },
+    ],
+    now,
+  );
+  assert.equal(wide[0]!.candidate.id, "strong-asserted", "trust cannot rescue a poor match");
 });
 
 test("identical corpus content ranks identically across ingests that mint fresh ids", () => {

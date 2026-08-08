@@ -1,0 +1,96 @@
+{
+  "lane": "titen",
+  "embedding_arm": "fts-anchor",
+  "generated_at": "2026-08-08T13:42:40Z",
+  "n": 500,
+  "recall_at_1": 0.88,
+  "recall_at_5": 0.96,
+  "recall_at_10": 0.982,
+  "mrr_at_10": 0.9147,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.9,
+      "recall_at_5": 0.9714,
+      "recall_at_10": 1.0
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.4,
+      "recall_at_5": 0.8,
+      "recall_at_10": 0.9
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.9023,
+      "recall_at_5": 0.985,
+      "recall_at_10": 1.0
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.8496,
+      "recall_at_5": 0.9248,
+      "recall_at_10": 0.9549
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.9744,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0
+    }
+  },
+  "meta": {
+    "condition": "anchor",
+    "build": "d3bd8c9",
+    "served_from": "source checkout (bun src/runtime/bun/cli.ts serve)",
+    "at_pinned": "2026-08-07T11:40:15Z",
+    "compile": {
+      "max_tokens": 32000,
+      "max_candidates": 1000,
+      "top_k": 1000
+    },
+    "query_concurrency": 1,
+    "llm_calls": 0,
+    "embed_calls": 0,
+    "passes": [
+      {
+        "pass": 1,
+        "query_seconds": 11.1,
+        "compile_ms": {
+          "p50": 21.0,
+          "p95": 33.88,
+          "p99": 40.11
+        }
+      },
+      {
+        "pass": 2,
+        "query_seconds": 11.1,
+        "compile_ms": {
+          "p50": 20.76,
+          "p95": 34.35,
+          "p99": 42.48
+        },
+        "identical_to_pass_1": true
+      }
+    ],
+    "compile_ms": {
+      "p50": 21.0,
+      "p95": 33.88,
+      "p99": 40.11
+    },
+    "compile_ms_warm": {
+      "p50": 20.76,
+      "p95": 34.35,
+      "p99": 42.48
+    },
+    "failures_detail": {}
+  }
+}

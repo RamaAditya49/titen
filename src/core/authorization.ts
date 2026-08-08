@@ -98,18 +98,3 @@ export async function authorizeRecordWorkspace(
   );
   if (!membership || membership.role === "reader") throw notFound();
 }
-
-export async function canReadRecord(
-  db: Db,
-  principal: Principal,
-  table: "claims" | "observations",
-  id: string,
-): Promise<boolean> {
-  const alias: RecordAlias = table === "claims" ? "c" : "o";
-  return Boolean(await first<{ id: string }>(
-    db,
-    `SELECT ${alias}.id FROM ${table} ${alias}
-      WHERE ${alias}.id = ? AND ${alias}.org_id = ? AND ${recordAccessSql(alias)}`,
-    [id, principal.orgId, ...recordAccessParams(principal.principalId)],
-  ));
-}
