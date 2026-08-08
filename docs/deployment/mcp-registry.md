@@ -5,14 +5,15 @@ Status: **published and current.** Titen was first listed on
 and is active:
 
 ```console
-$ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=titen" \
-  | jq '.servers[0].server | {name, version, websiteUrl}'
-{
-  "name": "io.github.RamaAditya49/titen-memory",
-  "version": "0.7.2",
-  "websiteUrl": "https://titen.dev"
-}
+$ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=titen-memory" \
+  | jq -r '.servers[] | "\(.server.version) isLatest=\(._meta["io.modelcontextprotocol.registry/official"].isLatest)"'
+0.7.0 isLatest=false
+0.7.2 isLatest=true
 ```
+
+The bare `?search=titen` query returns the entries in publication order, so
+`.servers[0]` is the **oldest** version, not the current one. Select on
+`isLatest` or query the version endpoint; do not read index 0.
 
 [`server.json`](../../server.json) in the repository root is the manifest behind
 that entry. Both prerequisites below are satisfied — they are kept because a

@@ -1,7 +1,7 @@
 # Pre-registration — pooled compile latency, the `contradictedSql` join order
 
 Date: 2026-08-08. Committed before the first scored A/B run, per
-[the spec](../specs/active/2026-08-08-pooled-compile-latency.md) AC-PCL-001 and
+[the spec](../specs/done/2026-08-08-pooled-compile-latency.md) AC-PCL-001 and
 the standing rule that a protocol written after a number is not a protocol.
 
 ## What H0 already established, before this prereg

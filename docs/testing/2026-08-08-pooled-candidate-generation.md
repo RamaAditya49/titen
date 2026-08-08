@@ -1,7 +1,7 @@
 # The pooled misses are not a candidate-generation problem
 
 Date: 2026-08-08. This is the C1 deliverable of
-[`2026-08-08-pooled-candidate-generation`](../specs/active/2026-08-08-pooled-candidate-generation.md),
+[`2026-08-08-pooled-candidate-generation`](../specs/done/2026-08-08-pooled-candidate-generation.md),
 and it fires that spec's **falsifier 0** before any experiment ran, which is
 what falsifier 0 is for.
 

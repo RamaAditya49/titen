@@ -186,7 +186,7 @@ documented for scoped stores only. Full report:
 Same corpus, same tarball, same 500 questions — one arm scoped to its subject,
 one not:
 
-| Store shape | recall@1 | compile p95 |
+| Store shape, `titen-memory` 0.7.0 | recall@1 | compile p95 |
 | --- | ---: | ---: |
 | Subject-scoped anchor, 424,168 claims | **0.880** | **138.1 ms** |
 | Unscoped pooled, 342,129 claims | 0.246 | 864.9 ms |

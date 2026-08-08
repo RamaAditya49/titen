@@ -3,7 +3,7 @@
 Date: 2026-08-08. Protocol
 [pre-registered](./2026-08-08-pooled-compile-latency-prereg.md) before the
 scored A/B; spec and plan are
-[`2026-08-08-pooled-compile-latency`](../specs/active/2026-08-08-pooled-compile-latency.md).
+[`2026-08-08-pooled-compile-latency`](../specs/done/2026-08-08-pooled-compile-latency.md).
 
 Verdict up front. **`titen-memory@0.7.1`, the current npm `latest`, takes a
 median 74.5 seconds to compile one context** on a 342,129-claim single-subject

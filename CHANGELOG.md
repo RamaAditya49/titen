@@ -34,7 +34,7 @@ An urgent fix: 0.7.1 cannot serve a large single-subject store. Upgrade from
 ### Fixed
 
 - **`titen-memory@0.7.1` cannot serve a large single-subject store: one context
-  compile takes ~76 seconds where 0.7.0 takes under half a second.** The 0.7.1
+  compile takes a median 74.5 seconds where 0.7.0 takes under half a second.** The 0.7.1
   fix for [#291](https://github.com/RamaAditya49/titen/issues/291) wrote the
   `disputed` predicate as a join inside `EXISTS` while its own comment claimed
   the nested form, and a join inside `EXISTS` is still a join the planner may
@@ -48,15 +48,22 @@ An urgent fix: 0.7.1 cannot serve a large single-subject store. Upgrade from
   and who compiles with a large `max_candidates`. The cost is the product of
   candidates and organization-wide observations, so small and per-subject stores
   are unaffected — which is why no test and no published benchmark caught it.
-  Every published pooled figure was measured on 0.7.0.
+  Every published pooled *quality* figure was measured on 0.7.0; every published
+  pooled or scoped-anchor *latency* figure was measured on 0.7.0 or on this
+  release, never on 0.7.1.
 
   **Measured**, 342,129-claim / 19,829-observation store, one subject, real
   statement, `EXPLAIN` captured from `bun:sqlite` rather than a pasted copy:
 
   | | candidate query | served compile |
   | --- | ---: | ---: |
-  | 0.7.1 as published | 73,439 ms | **75,894 ms** |
+  | 0.7.1 as published | 73,439 ms | **74,474 ms** |
   | this release | 232 ms | **417 ms p50 / 864 ms p95** |
+
+  This restores 0.7.0's behaviour; it does **not** make compile fast. **864 ms
+  p95 still fails the pre-registered 250 ms gate**, so the 2026-08-07 latency
+  falsifier stands — the pre-registration predicted exactly that outcome in
+  writing before the run.
 
   The ranked output is **byte-identical** to the published 0.7.0 pooled run —
   equal sha256 over all 500 instances — so this restores the shipped answer
@@ -81,6 +88,10 @@ An urgent fix: 0.7.1 cannot serve a large single-subject store. Upgrade from
 
 
 ## [0.7.1] — 2026-08-07
+
+> **Superseded by [0.7.2](#072--2026-08-08). Do not run 0.7.1 on a store with
+> many claims under one subject: one context compile takes a median 74.5
+> seconds.**
 
 The measurement release: the pooled-store condition on LongMemEval-S, with
 two pre-registered falsifiers fired against Titen and published, plus the
@@ -148,6 +159,11 @@ two pre-registered falsifiers fired against Titen and published, plus the
   candidate. On a 424,168-claim store that is **79 s per compile against 17.8
   ms**. The shared predicate added above uses a nested `EXISTS` so
   `claim_sources` seeks its own primary key, and the review queue now uses it.
+
+  **Corrected in [0.7.2](#072--2026-08-08):** what shipped here was a join
+  *inside* the `EXISTS`, not the nested form this entry describes, and SQLite
+  3.53.0 reordered it straight back into the 79-second shape — a median 74.5 s
+  per compile on a large single-subject store.
   Found by benchmarking the change above; the dual-runtime contract suite passed
   on both query shapes, because its stores hold tens of rows.
 
