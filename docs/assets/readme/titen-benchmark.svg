@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 815" width="1280" height="815" role="img" aria-labelledby="bmTitle bmDesc">
+  <title id="bmTitle">LongMemEval-S recall@1, n=500, in two store conditions</title>
+  <desc id="bmDesc">Two panels. Condition A, per-instance scoped haystacks: Titen 0.6.0 FTS+vector 0.900, Titen 0.6.0 FTS-only 0.880, verbatim-RAG router control 0.854, MemPalace 3.6.0 0.804 — only one pairing in this panel is significant, and the vector arm is not proven. Condition B, all 19,829 sessions pooled into one store: Titen 0.7.0 FTS-only 0.246, Titen 0.7.0 FTS+vector 0.212, Mem0 2.0.15 infer=False 0.182, verbatim-RAG router control 0.174, MemPalace 3.6.0 0.164, verbatim-RAG fastembed control 0.124 — these separations are significant. Two of Titen's pre-registered falsifiers fired producing this chart.</desc>
+
+  <style>
+    .f { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .m { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+    .grid { stroke: #E5DBCB; stroke-width: 1; }
+    .axis { stroke: #C6B9A6; stroke-width: 1; }
+    .rule { fill: #E5DBCB; }
+    /* No element in this file animates. The guard is here so it stays true. */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+
+  <rect width="1280" height="815" fill="#FBF7EF"/>
+
+  <!-- ── header ─────────────────────────────────────────────────────────── -->
+  <text class="m" x="40" y="38" font-size="13.5" letter-spacing="2.4" fill="#74685D">LONGMEMEVAL-S · RECALL@1 · N=500 · OUR SCORER · FAILURES IN THE DENOMINATOR</text>
+  <text class="f" x="40" y="72" font-size="21" font-weight="700" fill="#191512">One corpus, two store conditions — and the condition moves recall@1 by 63 points.</text>
+
+  <!-- ── panel A · per-instance (scoped) ────────────────────────────────── -->
+  <text class="m" x="40" y="108" font-size="11" letter-spacing="1.9" fill="#A9552A">CONDITION A · PER-INSTANCE (SCOPED) · ~50-SESSION HAYSTACK PER QUESTION · titen-memory 0.6.0</text>
+
+  <g class="grid">
+    <path d="M300 118V278M470 118V278M640 118V278M810 118V278M980 118V278M1150 118V278"/>
+  </g>
+  <path class="axis" d="M300 118V278"/>
+
+  <g class="f" font-size="14.5" fill="#191512">
+    <text x="40" y="143">Titen 0.6.0 · FTS + vector</text>
+    <text x="40" y="183">Titen 0.6.0 · FTS-only</text>
+    <text x="40" y="223">verbatim-RAG control · router</text>
+    <text x="40" y="263">MemPalace 3.6.0 · MiniLM</text>
+  </g>
+
+  <!-- width = (score - 0.75) x 3400, from x=300 -->
+  <g>
+    <rect x="300" y="126" width="510.0" height="24" fill="#A9552A"/>
+    <rect x="300" y="166" width="442.0" height="24" fill="#3D352E"/>
+    <rect x="300" y="206" width="353.6" height="24" fill="#8A7F72"/>
+    <rect x="300" y="246" width="183.6" height="24" fill="#CFC4B3"/>
+  </g>
+
+  <g class="m" font-size="14.5" font-weight="600">
+    <text x="820" y="143" fill="#A9552A">0.900</text>
+    <text x="752" y="183" fill="#3D352E">0.880</text>
+    <text x="664" y="223" fill="#74685D">0.854</text>
+    <text x="494" y="263" fill="#74685D">0.804</text>
+  </g>
+
+  <g class="m" font-size="10.5" fill="#8A7F72" text-anchor="middle">
+    <text x="300" y="296">0.75</text><text x="470" y="296">0.80</text><text x="640" y="296">0.85</text>
+    <text x="810" y="296">0.90</text><text x="980" y="296">0.95</text><text x="1150" y="296">1.00</text>
+  </g>
+  <text class="f" x="40" y="322" font-size="12" fill="#74685D">Axis truncated at 0.75 — at full scale these four bars are visually one bar, which is the finding. recall@10 here is 0.982 and saturated.</text>
+
+  <rect class="rule" x="40" y="344" width="1200" height="1"/>
+
+  <!-- ── panel B · pooled 19,829 sessions ───────────────────────────────── -->
+  <text class="m" x="40" y="376" font-size="11" letter-spacing="1.9" fill="#A9552A">CONDITION B · POOLED · ALL 19,829 SESSIONS IN ONE STORE · SAME 500 QUESTIONS · titen-memory 0.7.0</text>
+
+  <g class="grid">
+    <path d="M300 390V594M441.67 390V594M583.33 390V594M725 390V594M866.67 390V594M1008.33 390V594M1150 390V594"/>
+  </g>
+  <path class="axis" d="M300 390V594"/>
+
+  <g class="f" font-size="13.5" fill="#191512">
+    <text x="40" y="410">Titen 0.7.0 · FTS-only</text>
+    <text x="40" y="444">Titen 0.7.0 · FTS + vector</text>
+    <text x="40" y="478">Mem0 2.0.15 · infer=False</text>
+    <text x="40" y="512">verbatim-RAG control · router</text>
+    <text x="40" y="546">MemPalace 3.6.0 · raw shape</text>
+    <text x="40" y="580">verbatim-RAG control · fastembed</text>
+  </g>
+
+  <!-- width = score x 2833.333, from x=300 (axis 0.00 to 0.30) -->
+  <g>
+    <rect x="300" y="394" width="697.00" height="22" fill="#3D352E"/>
+    <rect x="300" y="428" width="600.67" height="22" fill="#A9552A"/>
+    <rect x="300" y="462" width="515.67" height="22" fill="#9C9184"/>
+    <rect x="300" y="496" width="493.00" height="22" fill="#8A7F72"/>
+    <rect x="300" y="530" width="464.67" height="22" fill="#C0B4A2"/>
+    <rect x="300" y="564" width="351.33" height="22" fill="#CFC4B3"/>
+  </g>
+
+  <g class="m" font-size="14" font-weight="600">
+    <text x="1007" y="410" fill="#3D352E">0.246</text>
+    <text x="911" y="444" fill="#A9552A">0.212</text>
+    <text x="826" y="478" fill="#74685D">0.182</text>
+    <text x="803" y="512" fill="#74685D">0.174</text>
+    <text x="775" y="546" fill="#74685D">0.164</text>
+    <text x="661" y="580" fill="#74685D">0.124</text>
+  </g>
+
+  <g class="m" font-size="10.5" fill="#8A7F72" text-anchor="middle">
+    <text x="300" y="612">0.00</text><text x="441.67" y="612">0.05</text><text x="583.33" y="612">0.10</text>
+    <text x="725" y="612">0.15</text><text x="866.67" y="612">0.20</text><text x="1008.33" y="612">0.25</text>
+    <text x="1150" y="612">0.30</text>
+  </g>
+  <text class="f" x="40" y="638" font-size="12" fill="#74685D">Axis runs from zero and tops out at 0.30. Every bar in this panel would fall off the left edge of panel A's axis — the two panels do not share a scale.</text>
+
+  <rect class="rule" x="40" y="658" width="1200" height="1"/>
+
+  <!-- ── caveats, printed so the chart cannot be quoted without them ─────── -->
+  <g class="f" font-size="13.5" fill="#3D352E">
+    <text x="40" y="682"><tspan font-weight="700">Panel A, all three paired sign tests at k=1:</tspan> FTS+vector vs FTS-only 27 W / 17 L / 456 T, p = 0.174 — the vector arm is unproven. FTS-only vs the router control 44/31/425, p = 0.165 — not significant.</text>
+    <text x="40" y="702">FTS+vector vs that same control 35/12/453, p = 0.0011 — the one significant separation in this panel, and it does not establish the vector arm as its cause.</text>
+    <text x="40" y="722"><tspan font-weight="700">Panel B, pooled:</tspan> Titen FTS-only vs the fastembed control 86 W / 25 L / 389 T, p &lt; 0.0001; vs MemPalace 76/35/389, p = 0.0001 — the first significant lane-vs-lane separations this programme has produced.</text>
+    <text x="40" y="742"><tspan font-weight="700">The vector arm reverses between the panels.</tspan> +2.0 points per-instance (unproven, p = 0.174) and −3.4 pooled (0.212 vs 0.246, p = 0.082). Three embedding families land 7.2–16.8 below FTS-only.</text>
+    <text x="40" y="762"><tspan font-weight="700">Two of Titen's own pre-registered falsifiers fired producing panel B:</tspan> the scale axis exists (FTS-only 0.880 → 0.246, −63.4 points) and compile p95 is 864.9 ms against a pre-registered 250 ms kill line.</text>
+    <text x="40" y="782"><tspan font-weight="700">Retrieval significance does not transfer to answers.</tspan> Answer accuracy is a flat null: eight pre-registered comparisons against the dense control, none significant, best p = 0.41.</text>
+  </g>
+
+  <text class="m" x="40" y="806" font-size="10" fill="#8A7F72">SOURCES · docs/testing/EVALS.md (panel A, 2026-08-04/06) · docs/testing/2026-08-07-pooled-store.md (panel B) · docs/testing/2026-08-08-pooled-improvements.md (re-verified, no headline changes)</text>
+</svg>

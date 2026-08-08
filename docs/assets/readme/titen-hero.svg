@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360" role="img" aria-labelledby="htitle hdesc">
+  <title id="htitle">Titen — the Level 6 collaborative memory fabric for AI agents</title>
+  <desc id="hdesc">Ink banner with the Titen Kawung mark. Stat chips describe one lane only, the zero-provider FTS-only lane: 0 LLM calls, 0 embedding calls, recall@1 0.880 per-instance (scoped), dependencies empty. The footnote carries the pooled degradation curve for the same lane: 0.524, 0.364, 0.308, 0.246 at 1,000, 5,000, 10,000 and 19,829 sessions on LongMemEval-S, n=500.</desc>
+
+  <!-- Fonts: GitHub renders this inside <img>, so @font-face and web fonts never
+       load. System stacks only, matching docs/assets/brand/titen-readme-hero.svg.
+       Motion is additive and lives entirely inside the no-preference query, so a
+       renderer that ignores CSS animation still shows the finished frame. -->
+  <style>
+    .f  { font-family: Arial, Helvetica, sans-serif; }
+    .m  { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+    .wm { font-family: Arial, Helvetica, sans-serif; font-weight: 700; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .rise    { animation: rise .62s cubic-bezier(.2,.7,.3,1) both; }
+      .d1 { animation-delay: .05s } .d2 { animation-delay: .14s }
+      .d3 { animation-delay: .26s } .d4 { animation-delay: .38s }
+      .d5 { animation-delay: .50s } .d6 { animation-delay: .62s }
+      .breathe { animation: breathe 4.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      .trace   { stroke-dasharray: 1132; animation: trace 1.6s ease-out .5s both; }
+      .spin    { animation: spin 44s linear infinite; transform-box: fill-box; transform-origin: center; }
+    }
+    @keyframes rise    { from { opacity: 0; transform: translateY(9px) } to { opacity: 1; transform: none } }
+    @keyframes breathe { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .72; transform: scale(1.22) } }
+    @keyframes trace   { from { stroke-dashoffset: 1132 } to { stroke-dashoffset: 0 } }
+    @keyframes spin    { to { transform: rotate(360deg) } }
+  </style>
+
+  <defs>
+    <radialGradient id="hglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#C97A44" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#C97A44" stop-opacity="0"/>
+    </radialGradient>
+    <!-- userSpaceOnUse: the divider is a perfectly horizontal path, so its
+         object bounding box has zero height and an objectBoundingBox gradient
+         degenerates to nothing painted at all. -->
+    <linearGradient id="hfade" gradientUnits="userSpaceOnUse" x1="74" y1="0" x2="1206" y2="0">
+      <stop offset="0" stop-color="#C97A44" stop-opacity="0"/>
+      <stop offset=".35" stop-color="#C97A44" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#C97A44" stop-opacity=".18"/>
+    </linearGradient>
+    <g id="petals">
+      <ellipse cx="0" cy="-25" rx="15" ry="25"/>
+      <ellipse cx="0" cy="25" rx="15" ry="25"/>
+      <ellipse cx="-25" cy="0" rx="25" ry="15"/>
+      <ellipse cx="25" cy="0" rx="25" ry="15"/>
+    </g>
+  </defs>
+
+  <rect width="1280" height="360" fill="#0B0908"/>
+  <circle cx="1032" cy="176" r="230" fill="url(#hglow)"/>
+
+  <g stroke="#26201C" stroke-width="1" fill="none" opacity=".8">
+    <path d="M0 291.5H1280"/><path d="M0 60.5H1280"/>
+  </g>
+
+  <g transform="translate(1032 176)" fill="none">
+    <g stroke="#3E3630" stroke-width="1.4">
+      <circle r="150" stroke-dasharray="3 13" class="spin"/>
+      <circle r="118" stroke-dasharray="26 10" opacity=".7"/>
+    </g>
+    <g stroke="#C97A44" stroke-width="1.6" opacity=".55">
+      <circle r="86" stroke-dasharray="118 402" class="spin"/>
+    </g>
+    <g stroke="#171310" stroke-width="2.6">
+      <use href="#petals" fill="#F7F2E9" transform="scale(1.62)"/>
+    </g>
+    <g stroke="#171310" stroke-width="2.6">
+      <ellipse cx="-40.5" cy="0" rx="40.5" ry="24.3" fill="#C97A44"/>
+      <ellipse cx="40.5" cy="0" rx="40.5" ry="24.3" fill="#C97A44"/>
+    </g>
+    <circle r="15" fill="#0B0908"/>
+    <circle r="8" fill="#C97A44" class="breathe"/>
+    <circle r="3.4" fill="#F7F2E9"/>
+  </g>
+
+  <g class="rise d1">
+    <rect x="72" y="74" width="9" height="9" fill="#C97A44"/>
+    <text class="m" x="95" y="83" font-size="13" letter-spacing="3.1" fill="#8A7F72">LEVEL 6 · COLLABORATIVE MEMORY FABRIC</text>
+  </g>
+  <text class="wm rise d2" x="70" y="182" font-size="112" fill="#F7F2E9">titen</text>
+  <text class="f rise d3" x="74" y="222" font-size="21" fill="#C9BCA6">Evidence-grounded recall, coordinated work, and governed sharing</text>
+  <text class="f rise d3" x="74" y="251" font-size="21" fill="#C9BCA6">on infrastructure you control.</text>
+
+  <!-- One lane, four true-together facts. LongMemEval-S FTS-only, per-instance
+       (scoped): recall@1 0.880 at 0 LLM and 0 embedding calls (EVALS.md).
+       0.900 belongs to the FTS+vector lane, which spent 4,989 embedding calls,
+       so it can never sit beside a "0 embedding calls" chip. -->
+  <!-- The translate lives on an outer wrapper: a CSS `transform` from .rise
+       replaces the transform attribute rather than composing with it, which
+       would drop this whole row into the top-left corner. -->
+  <g transform="translate(74 288)">
+    <g class="m rise d5" font-size="12.5" fill="#C9BCA6">
+      <rect x="0" y="0" width="113" height="30" rx="3" fill="#171310" stroke="#26201C"/>
+      <text x="15" y="20">0 LLM calls</text>
+      <rect x="125" y="0" width="158" height="30" rx="3" fill="#171310" stroke="#26201C"/>
+      <text x="140" y="20">0 embedding calls</text>
+      <rect x="295" y="0" width="204" height="30" rx="3" fill="#171310" stroke="#26201C"/>
+      <text x="310" y="20" fill="#C97A44">recall@1 0.880 · scoped</text>
+      <rect x="511" y="0" width="151" height="30" rx="3" fill="#171310" stroke="#26201C"/>
+      <text x="526" y="20">dependencies: {}</text>
+    </g>
+  </g>
+
+  <path class="trace" d="M74 330H1206" stroke="url(#hfade)" stroke-width="1.5" fill="none"/>
+
+  <!-- Claim discipline (EVALS.md): the FTS-only operating point never travels
+       above a ~10^3-session store shape without the pooled curve beside it. -->
+  <text class="m rise d6" x="74" y="352" font-size="13" fill="#6B6055">LongMemEval-S n=500 · FTS-only · per-instance (scoped) 0.880 · pooled 0.524 / 0.364 / 0.308 / 0.246 at 1k / 5k / 10k / 19,829 sessions</text>
+</svg>

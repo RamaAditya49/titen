@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360" role="img" aria-labelledby="ltitle ldesc">
+  <title id="ltitle">Memory model, what it can do, where it stops</title>
+  <desc id="ldesc">Four rising steps restating the README table. Logs and files keep past text, but the caller must decide what is current, trusted, and relevant. Vector recall finds semantically similar passages, but similarity does not prove provenance, permission, or truth. The Titen Level 5 kernel compiles bounded context from scoped evidence, claims, time, trust, and conflicts, but does not coordinate parallel work by itself. The Titen Level 6 fabric adds task ownership, resumable state, handoffs, policy, audit, and federation; Titen records coordination, and your agents or orchestrator still choose what runs next. Level 6 is Titen's product model, not an external certification.</desc>
+
+  <!-- Rungs are the four rows of the README "Memory model / What it can do /
+       Where it stops" table, verbatim. The mockup's six-rung L1-L6 ladder
+       ("Routing", "Merge & decay") is documented nowhere in this repo, and its
+       L4 also borrowed the Level 5 kernel's real boundary, so it is not shipped.
+       Levels 1-4 carry no numbers here because the README gives them none. -->
+  <style>
+    .f { font-family: Arial, Helvetica, sans-serif; }
+    .m { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+    .t { font-family: Arial, Helvetica, sans-serif; font-weight: 700; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .rise { animation: rise .6s cubic-bezier(.2,.7,.3,1) both; }
+      .grow { animation: grow .7s cubic-bezier(.2,.7,.3,1) both; transform-box: fill-box; transform-origin: bottom; }
+      .d1 { animation-delay: .06s } .d2 { animation-delay: .18s }
+      .d3 { animation-delay: .30s } .d4 { animation-delay: .42s }
+      .d5 { animation-delay: .56s }
+    }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+    @keyframes grow { from { opacity: 0; transform: scaleY(.04) } to { opacity: 1; transform: none } }
+  </style>
+
+  <rect width="1280" height="360" fill="#0B0908"/>
+
+  <g class="m" font-size="11" letter-spacing="2.2">
+    <text x="40" y="38" fill="#8A7F72">MEMORY MODEL · WHAT IT CAN DO · WHERE IT STOPS</text>
+    <text x="1240" y="38" fill="#6B6055" text-anchor="end">LEVEL 6 IS TITEN'S PRODUCT MODEL, NOT AN EXTERNAL CERTIFICATION</text>
+  </g>
+
+  <rect y="300" width="1280" height="1" fill="#26201C"/>
+
+  <g>
+    <rect class="grow d1" x="40"  y="238" width="285" height="62"  fill="#26201C"/>
+    <rect class="grow d2" x="345" y="196" width="285" height="104" fill="#2E2721"/>
+    <rect class="grow d3" x="650" y="144" width="285" height="156" fill="#8A5A34"/>
+    <rect class="grow d4" x="955" y="92"  width="285" height="208" fill="#A9552A"/>
+  </g>
+
+  <g class="t" font-size="15" fill="#F7F2E9">
+    <text class="rise d1" x="40"  y="226">Logs and files</text>
+    <text class="rise d2" x="345" y="184">Vector recall</text>
+    <text class="rise d3" x="650" y="132">Titen · Level 5 kernel</text>
+    <text class="rise d4" x="955" y="80">Titen · Level 6 fabric</text>
+  </g>
+
+  <g class="f" font-size="12.5">
+    <g fill="#C9BCA6">
+      <text class="rise d1" x="56"  y="282">Keep past text</text>
+      <text class="rise d2" x="361" y="282">Find semantically similar passages</text>
+    </g>
+    <g fill="#F7F2E9">
+      <text class="rise d3" x="666" y="248">Compile bounded context from scoped</text>
+      <text class="rise d3" x="666" y="265">evidence, claims, time, trust, and</text>
+      <text class="rise d3" x="666" y="282">conflicts</text>
+      <text class="rise d4" x="971" y="248">Add task ownership, resumable state,</text>
+      <text class="rise d4" x="971" y="265">handoffs, policy, audit, and</text>
+      <text class="rise d4" x="971" y="282">federation</text>
+    </g>
+  </g>
+
+  <g class="f" font-size="11.5" fill="#8A7F72">
+    <text class="rise d5" x="40"  y="326">The caller must decide what is</text>
+    <text class="rise d5" x="40"  y="342">current, trusted, and relevant</text>
+    <text class="rise d5" x="345" y="326">Similarity does not prove provenance,</text>
+    <text class="rise d5" x="345" y="342">permission, or truth</text>
+    <text class="rise d5" x="650" y="326">It remembers well, but does not</text>
+    <text class="rise d5" x="650" y="342">coordinate parallel work by itself</text>
+    <text class="rise d5" x="955" y="326">Titen records coordination; your agents</text>
+    <text class="rise d5" x="955" y="342">or orchestrator still choose what runs next</text>
+  </g>
+</svg>

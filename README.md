@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://titen.dev"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/brand/titen-readme-hero.svg" alt="Titen, the Level 6 collaborative memory fabric for AI agents" width="100%"></a>
+  <a href="https://titen.dev"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-hero.svg" alt="Titen, the Level 6 collaborative memory fabric for AI agents. Zero LLM calls, zero embedding calls, dependencies empty, and recall@1 0.880 on LongMemEval-S in the per-instance scoped condition, which falls to 0.524, 0.364, 0.308 and 0.246 as the store pools to 1k, 5k, 10k and 19,829 sessions" width="100%"></a>
 </p>
 
 <p align="center">
@@ -41,6 +41,8 @@ federation.
   <code>Level 6 = evidence-grounded context + coordinated work + governance</code>
 </p>
 
+<p align="center"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-levels.svg" alt="Four memory models as rising steps: logs and files, vector recall, Titen's Level 5 kernel, and Titen's Level 6 fabric, each labelled with what it can do and where it stops. Level 6 is Titen's product model, not an external certification" width="100%"></p>
+
 | Memory model | What it can do | Where it stops |
 | --- | --- | --- |
 | Logs and files | Keep past text | The caller must decide what is current, trusted, and relevant |
@@ -71,6 +73,8 @@ Treat them as unfinished work with a public gate, not as a feature you can
 simply switch on. The [roadmap](https://github.com/RamaAditya49/titen/blob/main/docs/ROADMAP.md#maturity-matrix)
 carries the current evidence.
 
+<p align="center"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-flow.svg" alt="The kernel loop in four steps under one authorization and evidence boundary: observe posts an observation with a required source ref, consolidate posts caller-authored claims linked to those observations, compile returns a bounded context pack with scope applied before retrieval and every item marked untrusted, and evidence walks a claim back to its supporting, contradicting and qualifying observations" width="100%"></p>
+
 ## The questions Titen answers
 
 | Question | Titen's answer |
@@ -80,7 +84,7 @@ carries the current evidence.
 | What if two sources disagree? | Contradictions remain visible until an explicit lifecycle action resolves them. |
 | Who is doing the work? | Leases prevent silent double ownership; checkpoints and handoffs make work resumable. |
 | Can we audit or move it? | Canonical records live in SQL, with authenticated audit trails and versioned JSONL export/import. |
-| Do we need an LLM or vector database? | No. FTS-only Titen is useful on day one; embeddings and model enrichment are opt-in projections. |
+| Do we need an LLM or vector database? | No. The default install is FTS-only with no provider at all; embeddings and model enrichment are opt-in projections. Whether the vector arm helps depends on the store shape — [see below](#measured-against-the-field). |
 
 Agents connect through authenticated REST, Streamable HTTP MCP, the `titen mcp`
 stdio bridge, or the TypeScript SDK. Titen never treats retrieved memory as an
@@ -89,40 +93,146 @@ instruction, and it does not run agent loops.
 ## Measured against the field
 
 On [LongMemEval-S](https://github.com/xiaowu0162/LongMemEval) (MIT, externally
-authored, 500 instances), our own scorer, failures kept in the denominator,
-protocol pre-registered before each run. Full table and method at
+authored, 500 instances, 246,930 turns), our own scorer, failures kept in the
+denominator, protocol pre-registered before each run. Full table and method at
 [titen.dev/benchmark](https://titen.dev/benchmark).
 
-| Lane, n=500 | recall@1 | LLM calls | embedding calls |
+**Every figure below names its condition, because the condition moves recall@1
+by 63 points on the same corpus.** *Per-instance (scoped)* gives each question
+its own ~50-session haystack — the single-subject shape a product actually
+serves. *Pooled* puts all 19,829 sessions in one unscoped store and asks the
+same 500 questions. These are two conditions of one corpus, not two
+measurements of one thing, and a number quoted without its condition is
+meaningless.
+
+<p align="center"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-benchmark.svg" alt="LongMemEval-S recall@1, n=500, in two store conditions on separate axes. Per-instance scoped: Titen FTS+vector 0.900, Titen FTS-only 0.880, verbatim-RAG router control 0.854, MemPalace 0.804. Pooled across all 19,829 sessions: Titen FTS-only 0.246, Titen FTS+vector 0.212, Mem0 infer=False 0.182, router control 0.174, MemPalace 0.164, fastembed control 0.124. Caveats printed on the chart cover the sign tests, the vector arm reversing sign between conditions, the two fired falsifiers, and the flat answer-accuracy null" width="100%"></p>
+
+### Condition A — per-instance (scoped)
+
+| Lane, n=500, `titen-memory` 0.6.0 | recall@1 | MRR@10 | LLM calls | embedding calls |
+| --- | ---: | ---: | ---: | ---: |
+| Titen 0.6.0, FTS + vector | **0.900** | 0.9384 | 0 | 4,989 |
+| Titen 0.6.0, FTS-only | 0.880 | 0.9147 | **0** | **0** |
+| verbatim-RAG control (~100 lines of cosine) | 0.854 | 0.9067 | 0 | 877 |
+| MemPalace 3.6.0 | 0.804 | 0.8717 | 0 | — |
+
+**This condition barely separates anything.** recall@10 is 0.982 and saturated,
+with 2.2 points of spread across the serious lanes. Exactly one of the three
+paired sign tests reaches significance, and it does not say what it looks like
+it says:
+
+- FTS+vector vs the dense control: 35/12/453, **p = 0.0011** — significant.
+- FTS+vector vs FTS-only: 27/17/456, p = 0.174 — **the vector arm is not proven
+  to be the cause of that win.**
+- FTS-only vs that control: 44/31/425, p = 0.165 — not significant.
+
+**We do not beat Mem0's LLM-free mode here.** Mem0 `infer=False` scores 0.8667
+on the shared n=60 subsample, and Titen FTS+vector against it is 3/4/53,
+**p = 1.0** — indistinguishable. Its default `infer=True` mode spends 2,981 LLM
+calls to score *lower* (0.8333), so Mem0's own extraction bought nothing
+measurable here. Any cost claim must name the configuration it measured.
+
+**Answer accuracy is a flat null.** With one reader pinned across every lane,
+eight pre-registered comparisons produce nothing significant (best p = 0.41).
+Retrieval significance does not transfer to answers.
+
+### Condition B — pooled, all 19,829 sessions in one store
+
+| Lane, pooled 19,829, `titen-memory` 0.7.0 | recall@1 | MRR@10 | tax vs its own per-instance cell |
 | --- | ---: | ---: | ---: |
-| Titen 0.6.0, FTS + vector | **0.900** | 0 | 4,989 |
-| Titen 0.6.0, FTS-only | 0.880 | **0** | **0** |
-| verbatim-RAG control (~100 lines of cosine) | 0.854 | 0 | 877 |
-| MemPalace 3.6.0 | 0.804 | 0 | — |
+| **Titen 0.7.0, FTS-only** | **0.246** | 0.3259 | −63.4 |
+| Titen 0.7.0, FTS + vector | 0.212 | 0.3153 | −68.8 |
+| Mem0 OSS 2.0.15 `infer=False` | 0.182 | 0.2716 | −68.5 ¹ |
+| verbatim-RAG control, router embeddings | 0.174 | 0.2459 | −68.0 |
+| MemPalace 3.6.0, published shape | 0.164 | 0.2152 | −64.0 |
+| verbatim-RAG control, fastembed | 0.124 | 0.1868 | −64.8 |
+| MCP reference server | 0.000 | 0.0000 | could not serve a store this size at all |
 
-The FTS+vector lane beats the dense control on a paired sign test — 35 wins, 12
-losses, 453 ties, **p = 0.0011**. Three things we will not let that number imply:
+¹ against Mem0's n=60 per-instance cell, not n=500.
 
-- **FTS-only is at parity**, not ahead (44/31/425, p = 0.165), and the vector arm
-  is not proven to be the cause of the win (27/17/456, p = 0.174).
-- **Answer accuracy is a flat null.** With one reader pinned across every lane,
-  eight pre-registered comparisons produce nothing significant (best p = 0.41).
-  Retrieval significance does not transfer to answers.
-- **We do not beat Mem0's LLM-free mode.** Mem0 `infer=False` scores 0.8667
-  against our 0.8833 on the shared subsample — 3/4/53, **p = 1.0**. Its default
-  `infer=True` mode spends 2,981 LLM calls to score *lower* (0.8333), so Mem0's
-  own extraction bought nothing measurable here. Any cost claim must name the
-  configuration it measured.
+**Titen's zero-provider lane is significantly above every measured competitor at
+this condition** — every pair below is written Titen-first, wins/losses/ties:
+86/25/389 (**p < 0.0001**) against the fastembed control, 76/35/389
+(**p = 0.0001**) against MemPalace, 59/27 (**p = 0.0007**) against Mem0
+`infer=False`, 65/29 (**p = 0.0003**) against the router control. Those are the
+first significant lane-vs-lane retrieval separations this programme has produced
+on this corpus, at 363.8 s of ingest with zero provider calls against Mem0's
+3,953 s and 205,641 embedding calls.
+
+**Two of the five pre-registered falsifiers fired against Titen, and they get the
+same prominence as that win.**
+
+- **The prediction was wrong by more than 45 points.** We pre-registered
+  full-pool recall@1 at 0.70–0.85 and measured **0.246**. LongMemEval-S personas
+  share topics by construction, so pooling makes the store *denser* in
+  cross-persona near-duplicates rather than sparser: all 377 rank-1 misses
+  retrieved a cross-instance session, and **zero** retrieved a wrong session
+  from the question's own haystack.
+- **Compile p95 is 864.9 ms against our own pre-registered 250 ms kill line**,
+  already crossed at the 10,000-session cell (430.8 ms). Published anyway, as
+  promised.
+
+Nobody's architecture escapes the pooled tax — MemPalace loses 64.0 points and
+the strongest dense control 68.0, against Titen's 63.4. And **the vector arm
+reverses sign between the conditions**: +2.0 points per-instance (unproven,
+p = 0.174) and **−3.4 points pooled** (0.212 against 0.246, p = 0.082), at 2.8x
+the compile latency after a 9,054 s index drain. Three embedding families now
+land 7.2–16.8 points below FTS-only at pooled density, so the vector arm is
+documented for scoped stores only. Full report:
+[the pooled-store condition](https://github.com/RamaAditya49/titen/blob/main/docs/testing/2026-08-07-pooled-store.md).
+
+### Scoping is the largest lever we have measured
+
+Same corpus, same tarball, same 500 questions — one arm scoped to its subject,
+one not:
+
+| Store shape | recall@1 | compile p95 |
+| --- | ---: | ---: |
+| Subject-scoped anchor, 424,168 claims | **0.880** | **138.1 ms** |
+| Unscoped pooled, 342,129 claims | 0.246 | 864.9 ms |
+
+**+63.4 points of recall@1 and 6.3x less latency.** That is the measured value
+of authorization-before-retrieval, and the measured answer to "just scope by
+`user_id`" — scoping *is* the authorization layer, and Titen's runs before
+retrieval by construction.
+
+The FTS-only curve across store shapes is 0.880 scoped, then 0.524 / 0.364 /
+0.308 / 0.246 at 1k / 5k / 10k / 19,829 pooled sessions. Do not read the 0.880
+without it.
+
+### The improvement cycle failed every gate
+
+On 2026-08-08 we pre-registered a cycle to move those numbers — a candidate cap
+for latency, six ranking variants, and a third embedding family — and **every
+gate in it failed. Nothing shipped.** All six ranking variants failed their gate:
+term coverage −2.4, proximity −14.4, chunk-sum −11.8, combined −3.6, a local
+cross-encoder −1.2 at +642 ms per compile, RRF fusion +0.2 at p = 1.0. The five
+that were run against the scoped anchor regressed that too. The candidate cap
+was worth **4.5%** of p95 against a predicted 30–60%, so the latency falsifier
+stands. The third embedding family scored 0.078. Full report:
+[the pooled-improvement cycle](https://github.com/RamaAditya49/titen/blob/main/docs/testing/2026-08-08-pooled-improvements.md).
+
+That failure bought two things, both evidence rather than features:
+
+- **The shipped ranking is now ablation-backed, not incidental.** Best-chunk
+  aggregation beats sum-of-chunks by 11.8 points, and shipped BM25 order beats
+  coverage, proximity, their combination, RRF fusion, and a local cross-encoder
+  on both conditions.
+- **The +26.2-point top-10 ceiling is real, open, and unclaimed.** Gold sits in
+  the pooled top-10 at 0.508 against 0.246 at k=1. The cheap lexical class of
+  fixes is spent; reaching it needs a signal that is not question-term overlap.
 
 What survives every configuration argument is the dependency floor: **Titen's
-FTS-only lane made zero LLM calls and zero embedding calls.** Mem0 without an LLM
-still needs an embedding provider. `dependencies: {}`, zero external imports in
-`src/core/`, and exactly two outbound calls in the whole codebase, both opt-in.
+FTS-only lane made zero LLM calls and zero embedding calls in both conditions.**
+Mem0 without an LLM still needs an embedding provider. `dependencies: {}`, zero
+external imports in `src/core/`, and exactly two outbound calls in the whole
+codebase, both opt-in.
 
-Where Titen loses is published too: FTS-only recall@1 falls from 1.00 to 0.49
-between 10³ and 10⁵ claims on a synthetic corpus, one process saturates one core
-at 10k claims, there is no reranking stage, and no external suite scores the
-governance and collaboration primitives at all.
+Other published losses: FTS-only recall@1 falls from 1.00 to 0.49 between 10³
+and 10⁵ claims on a synthetic corpus — which *understated* the real-data
+degradation above — one process saturates one core at 10k claims, there is no
+reranking stage, and no external suite scores the governance and collaboration
+primitives at all.
 
 ## Audit any agent memory store
 

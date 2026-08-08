@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 620" width="1280" height="620" role="img" aria-label="The Titen kernel loop: observe, then consolidate, then compile, then evidence, with the API route for each step">
+  <title>observe → consolidate → compile → evidence</title>
+
+  <style>
+    .f { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .m { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+
+    .card, .link { animation: rise .62s cubic-bezier(.22, 1, .36, 1) both; }
+    .link { stroke-linecap: round; stroke-linejoin: round; }
+    .c1 { animation-delay: 0s; }
+    .l1 { animation-delay: .08s; }
+    .c2 { animation-delay: .16s; }
+    .l2 { animation-delay: .24s; }
+    .c3 { animation-delay: .32s; }
+    .l3 { animation-delay: .40s; }
+    .c4 { animation-delay: .48s; }
+    .pulse { animation: breathe 3.6s ease-in-out 1.4s infinite; }
+
+    /* Nothing animates opacity up from 0, so a static rasterisation of this file
+       still shows every card and connector, just without the settle. */
+    @keyframes rise { from { transform: translateY(10px); } to { transform: none; } }
+    @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .34; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card, .link, .pulse { animation: none; }
+    }
+  </style>
+
+  <rect width="1280" height="620" fill="#FBF7EF"/>
+  <rect y="619" width="1280" height="1" fill="#E5DBCB"/>
+
+  <text class="m" x="40" y="46" font-size="15" letter-spacing="2.4" fill="#74685D">THE KERNEL LOOP · ONE AUTHORIZATION AND EVIDENCE BOUNDARY</text>
+
+  <g fill="none" stroke="#CFC4B3" stroke-width="1.6">
+    <path class="link l1" d="M604 185h56"/>
+    <path class="link l2" d="M960 290v18q0 12-12 12H332q-12 0-12 12v1"/>
+    <path class="link l3" d="M604 455h56"/>
+  </g>
+  <g fill="#A9552A">
+    <path class="link l1" d="M672 185l-11-6.5v13z"/>
+    <path class="link l2" d="M320 344l-6.5-11h13z"/>
+    <path class="link l3" d="M672 455l-11-6.5v13z"/>
+  </g>
+
+  <g transform="translate(40 80)">
+    <g class="card c1">
+      <rect width="560" height="210" rx="5" fill="#FFFDF8" stroke="#CFC4B3"/>
+      <rect width="560" height="4" fill="#3D352E"/>
+      <text class="m" x="30" y="46" font-size="13" letter-spacing="2.2" fill="#74685D">01 · SOURCE</text>
+      <text class="f" x="30" y="88" font-size="30" font-weight="600" fill="#191512">observe</text>
+      <text class="f" x="30" y="126" font-size="19" fill="#3D352E">Append evidence. A source ref back to its</text>
+      <text class="f" x="30" y="152" font-size="19" fill="#3D352E">origin is required on every write.</text>
+      <text class="m" x="30" y="188" font-size="18" fill="#A9552A">POST /v1/observations</text>
+    </g>
+  </g>
+
+  <g transform="translate(680 80)">
+    <g class="card c2">
+      <rect width="560" height="210" rx="5" fill="#FFFDF8" stroke="#CFC4B3"/>
+      <rect width="560" height="4" fill="#3D352E"/>
+      <text class="m" x="30" y="46" font-size="13" letter-spacing="2.2" fill="#74685D">02 · CLAIM</text>
+      <text class="f" x="30" y="88" font-size="30" font-weight="600" fill="#191512">consolidate</text>
+      <text class="f" x="30" y="126" font-size="19" fill="#3D352E">You author the claim. Each one links to the</text>
+      <text class="f" x="30" y="152" font-size="19" fill="#3D352E">observations that support it.</text>
+      <text class="m" x="30" y="188" font-size="18" fill="#A9552A">POST /v1/consolidations</text>
+    </g>
+  </g>
+
+  <g transform="translate(40 350)">
+    <g class="card c3">
+      <rect width="560" height="210" rx="5" fill="#FFFDF8" stroke="#CFC4B3"/>
+      <rect width="560" height="4" fill="#A9552A"/>
+      <text class="m" x="30" y="46" font-size="13" letter-spacing="2.2" fill="#74685D">03 · CONTEXT</text>
+      <text class="f" x="30" y="88" font-size="30" font-weight="600" fill="#191512">compile</text>
+      <text class="f" x="30" y="126" font-size="19" fill="#3D352E">Scope is applied before retrieval. A bounded</text>
+      <text class="f" x="30" y="152" font-size="19" fill="#3D352E">pack, every item marked untrusted.</text>
+      <text class="m" x="30" y="188" font-size="18" fill="#A9552A">POST /v1/context/compile</text>
+    </g>
+  </g>
+
+  <g transform="translate(680 350)">
+    <g class="card c4">
+      <rect width="560" height="210" rx="5" fill="#FFFDF8" stroke="#CFC4B3"/>
+      <rect width="560" height="4" fill="#3D352E"/>
+      <text class="m" x="30" y="46" font-size="13" letter-spacing="2.2" fill="#74685D">04 · PROOF</text>
+      <text class="f" x="30" y="88" font-size="30" font-weight="600" fill="#191512">evidence</text>
+      <text class="f" x="30" y="126" font-size="19" fill="#3D352E">Walk a claim back to the supporting,</text>
+      <text class="f" x="30" y="152" font-size="19" fill="#3D352E">contradicting and qualifying observations.</text>
+      <text class="m" x="30" y="188" font-size="18" fill="#A9552A">GET /v1/claims/:id/evidence</text>
+    </g>
+  </g>
+
+  <text class="m" x="40" y="600" font-size="15" fill="#74685D">FTS-only lane: zero LLM calls, zero embedding calls, canonical rows in SQL</text>
+
+  <g transform="translate(829 590)">
+    <circle class="pulse" cx="0" cy="5" r="5" fill="#4B7448"/>
+    <text class="m" x="18" y="10" font-size="15" fill="#4B7448">Bun + SQLite and Cloudflare D1, one contract</text>
+  </g>
+</svg>
