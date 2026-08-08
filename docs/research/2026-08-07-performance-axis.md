@@ -39,7 +39,12 @@ Points of recall@1 a memory system loses when the candidate pool grows from the 
 
 ## 2. Why it is open
 
-- **The condition is verified unrun.** EVALS.md documents the shape — 19,829 distinct sessions across 25,112 (instance, session) pairs, median per-instance haystack 50 (min 39, max 66) — proposes the pooled condition explicitly as "better fix, future work," and tracks it as #267. #267 was **closed 2026-08-05 without the run ever executing**; the k=1/MRR primary-metric rule was adopted instead.
+- **The condition was verified unrun when this document was written, and was
+  executed the same day.** The run is
+  [2026-08-07-pooled-store.md](../testing/2026-08-07-pooled-store.md); two of
+  its five pre-registered falsifiers fired against Titen. This bullet is kept
+  as the state of the world the axis was chosen from, not as current fact.
+  EVALS.md documents the shape — 19,829 distinct sessions across 25,112 (instance, session) pairs, median per-instance haystack 50 (min 39, max 66) — proposes the pooled condition explicitly as "better fix, future work," and tracks it as #267. #267 was **closed 2026-08-05 without the run ever executing**; the k=1/MRR primary-metric rule was adopted instead.
 - **Every public harness structurally cannot reach it.** LongMemEval's own protocol, Mem0's harness, MemDelta's controlled baselines, and this repository's controlled-comparison contract (`reset → ingest → wait_ready → search_or_context`) all bake one-fresh-store-per-instance into the ingestion loop. Pooling requires rebuilding the harness, not re-running it. VectorDBBench-class suites measure ANN latency/recall over embeddings, not memory-system quality on conversational data.
 - **The incumbents are commercially disincentivized.** Mem0's default-mode ingest measured 2,981 LLM calls and 288,021 summed seconds for 60 instances; the pooled store costs it roughly 20,000 LLM calls, and publishing any pooled number retroactively reframes its platform-only 94.4 demo-condition headline (a concession already verbatim in its README).
 - **The only scale-vs-recall curve anywhere is Titen's own synthetic one** (recall@1 1.00 → 0.49 from 10^3 to 10^5 claims), which by its own admission does not transfer in intercept — only in shape. No externally-authored number describes the de-saturated regime.

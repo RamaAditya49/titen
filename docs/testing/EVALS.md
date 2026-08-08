@@ -341,6 +341,33 @@ retuned afterwards.
 
 **Retrieval significance does not transfer to answers.**
 
+The per-lane figures, n=500 unless stated. Published here because
+[titen.dev/benchmark](https://titen.dev/benchmark) quotes them and this
+repository is the record it quotes from; they were measured 2026-08-06 and
+lived only in the run artifacts until 2026-08-08.
+
+| Lane | containment | LLM judge | recall@5 (ceiling) |
+| --- | ---: | ---: | ---: |
+| MemPalace 3.6.0, MiniLM user-only | **0.478** | 0.674 | 0.964 |
+| Titen 0.6.0, FTS + vector | 0.472 | 0.692 | 0.992 |
+| verbatim-RAG control, router | 0.470 | 0.676 | 0.974 |
+| Titen 0.6.0, FTS-only | 0.454 | 0.670 | 0.960 |
+| verbatim-RAG control, fastembed | 0.434 | 0.648 | 0.932 |
+| MCP reference server (n=60) | 0.050 | 0.133 | 0.183 |
+
+Read the ordering, not the gaps: **Titen is not first on either metric**, the
+spread across the four serious lanes is 4.4 points of containment against a
+recall@5 ceiling that is itself 0.93–0.99, and none of the eight pre-registered
+comparisons reached significance. One reader, `cx/gpt-5.6-luna`, temperature 0,
+k=5, 500 reader calls and 500 judge calls per 500-instance lane, prompt pinned
+by sha256 across every lane. Artifacts: `results/reader-*.json` on the bench
+host.
+
+The n=60 subsample tells the same story with Mem0 and MemPalace above Titen:
+Mem0 OSS 2.0.15 containment 0.450 / judge 0.767, MemPalace 0.433 / 0.767,
+Titen FTS+vector 0.400 / 0.717, the router control 0.400 / 0.733, Titen
+FTS-only 0.383 / 0.683.
+
 ### What does not depend on configuration
 
 Titen's FTS-only lane made zero LLM calls **and zero embedding calls** and scored
