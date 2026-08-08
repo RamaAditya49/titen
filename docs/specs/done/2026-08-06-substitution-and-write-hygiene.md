@@ -1,13 +1,12 @@
 ---
 work_id: substitution-and-write-hygiene
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-08-08
 owner: ramaaditya
-review_after: 2026-08-20
 ---
 
 # Stop competing on retrieval; become the substitute and the instrument
@@ -89,7 +88,7 @@ Recorded so they are refused deliberately rather than drifted into.
 - **AC-PROV-003 — Unwanted-behaviour:** If a caller submits an observation
   declaring `recalled` provenance it was not issued, then Titen shall reject the
   write, and a runnable check shall fail if such a write is accepted.
-- **AC-AUDIT-001 — Event-driven:** When `titen audit <path>` is run against a
+- **AC-AUDIT-001 — Event-driven:** When `titen audit PATH` is run against a
   `memory.json`, a Mem0 export, or a Titen store, Titen shall report
   exact-duplicate, near-duplicate, recall-loop, secret-pattern, and stale rates,
   each with per-item evidence, without any network call or upload.

@@ -319,9 +319,10 @@ variables above:
 The bridge keeps no state. It only forwards newline-delimited MCP messages to
 the authenticated HTTP endpoint.
 
-Titen is not listed in the official MCP registry yet, so no client will offer it
-from a built-in directory — configure it by hand as above. The manifest and the
-manual publishing procedure are in
+Titen is listed in the official MCP registry as
+`io.github.RamaAditya49/titen-memory`, so a client that reads that directory can
+offer it; configuring it by hand as above works everywhere else. The manifest and
+the manual publishing procedure are in
 [MCP registry listing](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/mcp-registry.md).
 
 ### 4. Prove the connection

@@ -1,17 +1,24 @@
 # Official MCP registry listing
 
-Status: **manifest authored and schema-validated, not published.** As of
-2026-08-07 the official registry returns nothing for Titen:
+Status: **published.** Titen was listed on 2026-08-07T05:33:16Z and the entry is
+active:
 
 ```console
-$ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=titen"
-{"servers":[],"metadata":{"count":0}}
+$ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=titen" \
+  | jq '.servers[0].server | {name, version, websiteUrl}'
+{
+  "name": "io.github.RamaAditya49/titen-memory",
+  "version": "0.7.0",
+  "websiteUrl": "https://titen.dev"
+}
 ```
 
-[`server.json`](../../server.json) in the repository root is the manifest that
-fixes that. It is complete and valid against today's schema, but publishing it
-is blocked on two things a maintainer must do by hand — see
-[Before you can publish](#before-you-can-publish).
+[`server.json`](../../server.json) in the repository root is the manifest behind
+that entry. Both prerequisites below are satisfied — they are kept because a
+**version bump has to satisfy them again**: the listing tracks whatever version
+`server.json` names, so it trails npm `latest` until a maintainer bumps the
+manifest and re-runs `mcp-publisher publish`. See
+[Refreshing the listing](#refreshing-the-listing).
 
 The registry stores **metadata only**. It never hosts the package; it points at
 `titen-memory` on npm and at this repository. Listing Titen adds a discovery
@@ -203,6 +210,29 @@ Publish a new version. Existing versions are immutable — the registry stores
 each version separately and marks the highest semantic version `latest`. There
 is no edit, and no way to fix a typo in a published entry other than superseding
 it.
+
+## Refreshing the listing
+
+The registry entry is a snapshot of `server.json`, not a pointer to npm, so it
+does not follow a release. After an npm publish the listing keeps naming the old
+version until a maintainer refreshes it:
+
+```bash
+# 1. bump BOTH version fields in server.json to the released version
+jq '.version, .packages[0].version' server.json      # must equal npm latest
+npm view titen-memory version
+
+# 2. the ownership check re-runs against that exact version, so it must carry mcpName
+curl -s "https://registry.npmjs.org/titen-memory/$(npm view titen-memory version)" | jq .mcpName
+
+# 3. republish
+mcp-publisher login github && mcp-publisher publish
+```
+
+A trailing listing is cosmetic — the registry stores metadata only, and `npx
+titen-memory mcp` always resolves npm `latest` regardless of what the entry
+says — so this is release hygiene, not a functional gate. Do it in the same
+session as the release, or the two drift.
 
 ## Reference
 

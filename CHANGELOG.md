@@ -135,7 +135,8 @@ two pre-registered falsifiers fired against Titen and published, plus the
 - **`recalled` provenance is server-issued.** `POST /v1/context/compile` returns
   a signed context token; an observation written while carrying it is stamped
   `source.type: "recalled"` by the server, and a caller that merely declares
-  `recalled` is refused. Stateless HMAC, so no new table and no migration.
+  `recalled` is refused. A primary-key lookup against the `context_runs` row
+  the compile already wrote, so no new table and no migration.
   Known ceiling, stated in the code: the stamp proves the write was made while
   holding a Titen-issued pack, not that its content came from that pack, so it
   is a sound lower bound on the recall loop and never an upper one. Closes #280.
