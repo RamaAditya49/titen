@@ -3,7 +3,7 @@
   "name": "io.github.RamaAditya49/titen-memory",
   "title": "Titen Memory",
   "description": "Evidence-grounded agent memory with mandatory provenance, on local SQLite or Cloudflare D1",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "websiteUrl": "https://titen.dev",
   "repository": {
     "url": "https://github.com/RamaAditya49/titen",
@@ -15,7 +15,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "titen-memory",
-      "version": "0.7.0",
+      "version": "0.7.2",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

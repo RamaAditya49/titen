@@ -1,14 +1,15 @@
 # Official MCP registry listing
 
-Status: **published.** Titen was listed on 2026-08-07T05:33:16Z and the entry is
-active:
+Status: **published and current.** Titen was first listed on
+2026-08-07T05:33:16Z; the entry was refreshed to 0.7.2 on 2026-08-08T05:28:03Z
+and is active:
 
 ```console
 $ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=titen" \
   | jq '.servers[0].server | {name, version, websiteUrl}'
 {
   "name": "io.github.RamaAditya49/titen-memory",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "websiteUrl": "https://titen.dev"
 }
 ```
