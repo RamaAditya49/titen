@@ -154,4 +154,8 @@ Artifacts on `rama-tuf` under `~/titen-bench-20260808/` (both plans, both
 timing sets, the 500-question served run) and
 `~/titen-bench-20260804/results/titen-fts-pooled-19829-20260808-headfix.json`.
 Checksummed copies under
-[`results/2026-08-08-pooled-compile-latency/`](./results/2026-08-08-pooled-compile-latency/).
+[`results/2026-08-08-pooled-compile-latency/`](./results/2026-08-08-pooled-compile-latency/),
+including the probe that produced every `h0-*.json` here —
+[`harness/h0_probe.ts`](./results/2026-08-08-pooled-compile-latency/harness/h0_probe.ts).
+It captures the shipped candidate SQL through a stubbed `Db` rather than a
+pasted copy, so it cannot drift from the query the product actually issues.
