@@ -18,7 +18,7 @@ compile. Packing is a null by arithmetic and by measurement: it admits 23 more
 gold sessions into the pack and moves recall@1 and recall@10 by exactly zero.
 The combined cell — the one the spec says decides — captures **0.8 of the 53.0
 points** its own oracle offers. The one thing this cycle did establish is
-negative and useful: #294's premise is wrong in two ways, and its remaining
+negative and useful: #294's premise is wrong in one way, and right in another, and its remaining
 lever is worth **1.4%**.
 
 ## What the baselines say before anything is compared
@@ -260,13 +260,23 @@ Three corrections fall out, and they matter more than the failed gate:
    conjunction costs **261.7 ms**, 77% of the query. That is a rowid probe into
    a 342,129-row table for every FTS-matched row, and the match reaches far more
    rows than the `LIMIT` keeps. Everything else is rounding.
-3. **bun:sqlite does not drive from observations.** The plan captured from the
-   actual runtime seeks `claim_sources` on its covering index and then probes
-   `observations` by id. `observations_workspace_scope` appears in none of the
-   nine captured plans. The 79-second join shape is not present under SQLite
-   3.53.0, so the python3 3.51.2 plan that opened #294 was a planner-version
-   divergence, which is one of the two outcomes the issue itself named as
-   acceptable.
+3. **bun:sqlite does not drive from observations — on this build.** The plan
+   captured from the actual runtime seeks `claim_sources` on its covering index
+   and then probes `observations` by id, and
+   `observations_workspace_scope` appears in none of the nine captured plans.
+
+   **That is the fix holding, not evidence the regression was imaginary.** This
+   cycle measured 0.7.2+, where `contradictedSql` is a genuinely nested
+   `EXISTS`. The shape #294 describes belongs to the **join spelling shipped in
+   0.7.1**, and it was confirmed on this exact runtime earlier the same day:
+   `EXPLAIN` from bun:sqlite (SQLite 3.53.0) on that build plans
+   `SEARCH o USING INDEX observations_workspace_scope (org_id=?)`, and the
+   published 0.7.1 tarball takes a **median 74,474 ms per served compile** on
+   this store against 417 ms after the rewrite — see
+   [the compile-latency report](./2026-08-08-pooled-compile-latency.md). So it
+   was never a planner-version divergence: 3.51.2 and 3.53.0 agree on the join
+   spelling, and both are fine on the nested one. The nine clean plans here are
+   the regression guard doing its job.
 
 This also reconciles the earlier figure rather than contradicting it. The
 2026-08-08 cycle measured a "bare FTS candidate query" at a median 65.6 ms; the
@@ -307,9 +317,12 @@ invariant under every allocation rule tried.
   pack's first ten distinct sessions are invariant under per-session allocation,
   a 32,000-token budget buys about 92 claims however they are allocated, and
   handing the wider pack to the re-ranker captured 0.8 of 53.0 available points.
-- **#294 closes**, with its premise corrected in two places and its lever priced
-  at 1.4%. The named next lead is the CTE's per-matched-row join to `claims`,
-  which is 77% of the query and has never been attacked.
+- **#294 closes**, with one premise corrected, one confirmed, and its lever
+  priced at 1.4%. Corrected: post-CTE hydration is 4.2 ms of 341.8 ms, not the
+  dominant cost. Confirmed: the join spelling really did make the planner drive
+  from `observations`, which is why 0.7.1 took a median 74.5 s per compile and
+  why the nested rewrite shipped in 0.7.2. The named next lead is the CTE's
+  per-matched-row join to `claims`, 77% of the query, never attacked.
 - **A pack's tail is not reproducible across days without pinning `at`.** Anyone
   diffing two runs must pin it or compare only the head.
 
