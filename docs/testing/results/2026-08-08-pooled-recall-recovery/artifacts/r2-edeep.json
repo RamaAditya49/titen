@@ -1,0 +1,1626 @@
+{
+  "spec": "2026-08-08-pooled-recall-recovery",
+  "phase": "R2 E-DEEP",
+  "prereg": "docs/testing/2026-08-08-pooled-recall-recovery-prereg.md#e-deep",
+  "generated_at": "2026-08-08T09:13:33Z",
+  "model": "Xenova/ms-marco-MiniLM-L-6-v2",
+  "runtime": "fastembed 0.8.0 TextCrossEncoder, ONNX CPU, control venv, default threads",
+  "definitions": {
+    "D0": "identity control through the window machinery",
+    "D1": "cross-encoder over (question, session_text[:2000]); session score = model score; sort window desc, shipped order breaks ties",
+    "D2": "V1 term coverage over session text; sort window desc, shipped order breaks ties",
+    "D3": "RRF k=60 of shipped rank and D1 rank within the window",
+    "window": "first W distinct sessions of the shipped order; positions W+1 and below unchanged"
+  },
+  "d0_identity_holds": true,
+  "gate_rule": ">=5.0 points pooled recall@1 AND p<0.05 AND anchor loss <0.5 points",
+  "gate": {
+    "D1@W10": {
+      "pooled_delta_points": -1.2,
+      "pooled_p_value": 0.5811,
+      "anchor_delta_points": -2.8,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D2@W10": {
+      "pooled_delta_points": -2.4,
+      "pooled_p_value": 0.2242,
+      "anchor_delta_points": -7.2,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D3@W10": {
+      "pooled_delta_points": 0.4,
+      "pooled_p_value": 0.8899,
+      "anchor_delta_points": -0.8,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D1@W20": {
+      "pooled_delta_points": -0.8,
+      "pooled_p_value": 0.7547,
+      "anchor_delta_points": -2.6,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D2@W20": {
+      "pooled_delta_points": -4.0,
+      "pooled_p_value": 0.0352,
+      "anchor_delta_points": -7.8,
+      "gain_ok": false,
+      "p_ok": true,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D3@W20": {
+      "pooled_delta_points": 0.2,
+      "pooled_p_value": 1.0,
+      "anchor_delta_points": -1.0,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D1@W50": {
+      "pooled_delta_points": 0.2,
+      "pooled_p_value": 1.0,
+      "anchor_delta_points": -2.6,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D2@W50": {
+      "pooled_delta_points": -4.8,
+      "pooled_p_value": 0.0127,
+      "anchor_delta_points": -7.8,
+      "gain_ok": false,
+      "p_ok": true,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    },
+    "D3@W50": {
+      "pooled_delta_points": -0.2,
+      "pooled_p_value": 1.0,
+      "anchor_delta_points": -1.2,
+      "gain_ok": false,
+      "p_ok": false,
+      "anchor_ok": false,
+      "verdict": "FAIL"
+    }
+  },
+  "pooled": {
+    "baseline": {
+      "n": 500,
+      "recall_at_1": 0.246,
+      "recall_at_5": 0.444,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.3259,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.1143,
+          "recall_at_5": 0.3,
+          "recall_at_10": 0.3857
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 0.7143,
+          "recall_at_5": 0.8929,
+          "recall_at_10": 0.9286
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.0,
+          "recall_at_5": 0.1,
+          "recall_at_10": 0.1
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.1203,
+          "recall_at_5": 0.3459,
+          "recall_at_10": 0.3985
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.1579,
+          "recall_at_5": 0.3609,
+          "recall_at_10": 0.4361
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.4872,
+          "recall_at_5": 0.6923,
+          "recall_at_10": 0.7821
+        }
+      }
+    },
+    "missing_texts": 0,
+    "windows": {
+      "10": {
+        "model_ms_per_instance": {
+          "p50": 388.5,
+          "p95": 395.0,
+          "mean": 361.7
+        },
+        "lexical_ms_per_instance": {
+          "p50": 17.1,
+          "p95": 21.9
+        },
+        "variants": {
+          "D0": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.246,
+              "recall_at_5": 0.444,
+              "recall_at_10": 0.508,
+              "mrr_at_10": 0.3259,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.1143,
+                  "recall_at_5": 0.3,
+                  "recall_at_10": 0.3857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.7143,
+                  "recall_at_5": 0.8929,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0,
+                  "recall_at_5": 0.1,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1203,
+                  "recall_at_5": 0.3459,
+                  "recall_at_10": 0.3985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1579,
+                  "recall_at_5": 0.3609,
+                  "recall_at_10": 0.4361
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4872,
+                  "recall_at_5": 0.6923,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 0,
+              "b_wins": 0,
+              "ties": 500,
+              "p_value": 1.0
+            }
+          },
+          "D1": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.234,
+              "recall_at_5": 0.414,
+              "recall_at_10": 0.508,
+              "mrr_at_10": 0.3182,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.0429,
+                  "recall_at_5": 0.1857,
+                  "recall_at_10": 0.3857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.6071,
+                  "recall_at_5": 0.8571,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0333,
+                  "recall_at_5": 0.1,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.188,
+                  "recall_at_5": 0.3609,
+                  "recall_at_10": 0.3985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.188,
+                  "recall_at_5": 0.3759,
+                  "recall_at_10": 0.4361
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.3718,
+                  "recall_at_5": 0.5769,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": -1.2,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 38,
+              "b_wins": 44,
+              "ties": 418,
+              "p_value": 0.5811
+            }
+          },
+          "D2": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.222,
+              "recall_at_5": 0.428,
+              "recall_at_10": 0.508,
+              "mrr_at_10": 0.3138,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.1429,
+                  "recall_at_5": 0.3286,
+                  "recall_at_10": 0.3857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.3214,
+                  "recall_at_5": 0.7679,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0,
+                  "recall_at_5": 0.0667,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1805,
+                  "recall_at_5": 0.3233,
+                  "recall_at_10": 0.3985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1504,
+                  "recall_at_5": 0.3308,
+                  "recall_at_10": 0.4361
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.5,
+                  "recall_at_5": 0.7564,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": -2.4,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 35,
+              "b_wins": 47,
+              "ties": 418,
+              "p_value": 0.2242
+            }
+          },
+          "D3": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.25,
+              "recall_at_5": 0.448,
+              "recall_at_10": 0.508,
+              "mrr_at_10": 0.3349,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.0714,
+                  "recall_at_5": 0.3,
+                  "recall_at_10": 0.3857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.6607,
+                  "recall_at_5": 0.8929,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0667,
+                  "recall_at_5": 0.1,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1805,
+                  "recall_at_5": 0.3383,
+                  "recall_at_10": 0.3985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1805,
+                  "recall_at_5": 0.3759,
+                  "recall_at_10": 0.4361
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4231,
+                  "recall_at_5": 0.7051,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.4,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 27,
+              "b_wins": 25,
+              "ties": 448,
+              "p_value": 0.8899
+            }
+          }
+        }
+      },
+      "20": {
+        "model_ms_per_instance": {
+          "p50": 773.6,
+          "p95": 788.6,
+          "mean": 726.2
+        },
+        "lexical_ms_per_instance": {
+          "p50": 17.1,
+          "p95": 21.9
+        },
+        "variants": {
+          "D0": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.246,
+              "recall_at_5": 0.444,
+              "recall_at_10": 0.508,
+              "mrr_at_10": 0.3259,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.1143,
+                  "recall_at_5": 0.3,
+                  "recall_at_10": 0.3857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.7143,
+                  "recall_at_5": 0.8929,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0,
+                  "recall_at_5": 0.1,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1203,
+                  "recall_at_5": 0.3459,
+                  "recall_at_10": 0.3985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1579,
+                  "recall_at_5": 0.3609,
+                  "recall_at_10": 0.4361
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4872,
+                  "recall_at_5": 0.6923,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 0,
+              "b_wins": 0,
+              "ties": 500,
+              "p_value": 1.0
+            }
+          },
+          "D1": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.238,
+              "recall_at_5": 0.436,
+              "recall_at_10": 0.524,
+              "mrr_at_10": 0.33,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.0429,
+                  "recall_at_5": 0.1571,
+                  "recall_at_10": 0.2571
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.5714,
+                  "recall_at_5": 0.8393,
+                  "recall_at_10": 0.875
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0667,
+                  "recall_at_5": 0.1333,
+                  "recall_at_10": 0.1333
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1805,
+                  "recall_at_5": 0.4361,
+                  "recall_at_10": 0.5188
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.203,
+                  "recall_at_5": 0.4211,
+                  "recall_at_10": 0.4962
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.3974,
+                  "recall_at_5": 0.5385,
+                  "recall_at_10": 0.7179
+                }
+              }
+            },
+            "delta_recall_at_1_points": -0.8,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 44,
+              "b_wins": 48,
+              "ties": 408,
+              "p_value": 0.7547
+            }
+          },
+          "D2": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.206,
+              "recall_at_5": 0.426,
+              "recall_at_10": 0.518,
+              "mrr_at_10": 0.3011,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.1429,
+                  "recall_at_5": 0.3143,
+                  "recall_at_10": 0.4143
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.2857,
+                  "recall_at_5": 0.6786,
+                  "recall_at_10": 0.7857
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0,
+                  "recall_at_5": 0.1,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1579,
+                  "recall_at_5": 0.3383,
+                  "recall_at_10": 0.4286
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1353,
+                  "recall_at_5": 0.3534,
+                  "recall_at_10": 0.4662
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4872,
+                  "recall_at_5": 0.7436,
+                  "recall_at_10": 0.8205
+                }
+              }
+            },
+            "delta_recall_at_1_points": -4.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 31,
+              "b_wins": 51,
+              "ties": 418,
+              "p_value": 0.0352
+            }
+          },
+          "D3": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.248,
+              "recall_at_5": 0.446,
+              "recall_at_10": 0.542,
+              "mrr_at_10": 0.3356,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.0571,
+                  "recall_at_5": 0.2143,
+                  "recall_at_10": 0.3571
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.6607,
+                  "recall_at_5": 0.875,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0667,
+                  "recall_at_5": 0.1333,
+                  "recall_at_10": 0.1333
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.188,
+                  "recall_at_5": 0.3759,
+                  "recall_at_10": 0.4737
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1805,
+                  "recall_at_5": 0.406,
+                  "recall_at_10": 0.4962
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4103,
+                  "recall_at_5": 0.6538,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.2,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 31,
+              "b_wins": 30,
+              "ties": 439,
+              "p_value": 1.0
+            }
+          }
+        }
+      },
+      "50": {
+        "model_ms_per_instance": {
+          "p50": 1924.1,
+          "p95": 2033.0,
+          "mean": 1819.8
+        },
+        "lexical_ms_per_instance": {
+          "p50": 17.1,
+          "p95": 21.9
+        },
+        "variants": {
+          "D0": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.246,
+              "recall_at_5": 0.444,
+              "recall_at_10": 0.508,
+              "mrr_at_10": 0.3259,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.1143,
+                  "recall_at_5": 0.3,
+                  "recall_at_10": 0.3857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.7143,
+                  "recall_at_5": 0.8929,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0,
+                  "recall_at_5": 0.1,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1203,
+                  "recall_at_5": 0.3459,
+                  "recall_at_10": 0.3985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1579,
+                  "recall_at_5": 0.3609,
+                  "recall_at_10": 0.4361
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4872,
+                  "recall_at_5": 0.6923,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 0,
+              "b_wins": 0,
+              "ties": 500,
+              "p_value": 1.0
+            }
+          },
+          "D1": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.248,
+              "recall_at_5": 0.456,
+              "recall_at_10": 0.534,
+              "mrr_at_10": 0.3404,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.0429,
+                  "recall_at_5": 0.1286,
+                  "recall_at_10": 0.1857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.5714,
+                  "recall_at_5": 0.8571,
+                  "recall_at_10": 0.875
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0667,
+                  "recall_at_5": 0.1333,
+                  "recall_at_10": 0.1667
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.2105,
+                  "recall_at_5": 0.4662,
+                  "recall_at_10": 0.5865
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.2105,
+                  "recall_at_5": 0.4662,
+                  "recall_at_10": 0.5414
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.3974,
+                  "recall_at_5": 0.5513,
+                  "recall_at_10": 0.641
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.2,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 49,
+              "b_wins": 48,
+              "ties": 403,
+              "p_value": 1.0
+            }
+          },
+          "D2": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.198,
+              "recall_at_5": 0.414,
+              "recall_at_10": 0.494,
+              "mrr_at_10": 0.2882,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.1429,
+                  "recall_at_5": 0.3143,
+                  "recall_at_10": 0.4571
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.2857,
+                  "recall_at_5": 0.625,
+                  "recall_at_10": 0.7143
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.0,
+                  "recall_at_5": 0.0667,
+                  "recall_at_10": 0.1
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.1504,
+                  "recall_at_5": 0.3233,
+                  "recall_at_10": 0.406
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1128,
+                  "recall_at_5": 0.3609,
+                  "recall_at_10": 0.4211
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.4872,
+                  "recall_at_5": 0.7308,
+                  "recall_at_10": 0.7949
+                }
+              }
+            },
+            "delta_recall_at_1_points": -4.8,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 31,
+              "b_wins": 55,
+              "ties": 414,
+              "p_value": 0.0127
+            }
+          },
+          "D3": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.244,
+              "recall_at_5": 0.454,
+              "recall_at_10": 0.55,
+              "mrr_at_10": 0.3336,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.0571,
+                  "recall_at_5": 0.1857,
+                  "recall_at_10": 0.2857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.6607,
+                  "recall_at_5": 0.8571,
+                  "recall_at_10": 0.9107
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.1,
+                  "recall_at_5": 0.1333,
+                  "recall_at_10": 0.1333
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.188,
+                  "recall_at_5": 0.406,
+                  "recall_at_10": 0.5263
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.1729,
+                  "recall_at_5": 0.4361,
+                  "recall_at_10": 0.5188
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.3846,
+                  "recall_at_5": 0.641,
+                  "recall_at_10": 0.7821
+                }
+              }
+            },
+            "delta_recall_at_1_points": -0.2,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 31,
+              "b_wins": 32,
+              "ties": 437,
+              "p_value": 1.0
+            }
+          }
+        }
+      }
+    }
+  },
+  "anchor": {
+    "baseline": {
+      "n": 500,
+      "recall_at_1": 0.88,
+      "recall_at_5": 0.96,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.9147,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.9,
+          "recall_at_5": 0.9714,
+          "recall_at_10": 1.0
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.4,
+          "recall_at_5": 0.8,
+          "recall_at_10": 0.9
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.9023,
+          "recall_at_5": 0.985,
+          "recall_at_10": 1.0
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.8496,
+          "recall_at_5": 0.9248,
+          "recall_at_10": 0.9549
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.9744,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        }
+      }
+    },
+    "missing_texts": 0,
+    "windows": {
+      "10": {
+        "model_ms_per_instance": {
+          "p50": 391.4,
+          "p95": 395.4,
+          "mean": 369.4
+        },
+        "lexical_ms_per_instance": {
+          "p50": 8.7,
+          "p95": 11.4
+        },
+        "variants": {
+          "D0": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.88,
+              "recall_at_5": 0.96,
+              "recall_at_10": 0.982,
+              "mrr_at_10": 0.9147,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.9,
+                  "recall_at_5": 0.9714,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 1.0,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.4,
+                  "recall_at_5": 0.8,
+                  "recall_at_10": 0.9
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9023,
+                  "recall_at_5": 0.985,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8496,
+                  "recall_at_5": 0.9248,
+                  "recall_at_10": 0.9549
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9744,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 0,
+              "b_wins": 0,
+              "ties": 500,
+              "p_value": 1.0
+            }
+          },
+          "D1": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.852,
+              "recall_at_5": 0.962,
+              "recall_at_10": 0.982,
+              "mrr_at_10": 0.8964,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.6286,
+                  "recall_at_5": 0.9429,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.9643,
+                  "recall_at_5": 0.9821,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.5333,
+                  "recall_at_5": 0.8,
+                  "recall_at_10": 0.9
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9474,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8722,
+                  "recall_at_5": 0.9398,
+                  "recall_at_10": 0.9549
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.8974,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -2.8,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 30,
+              "b_wins": 44,
+              "ties": 426,
+              "p_value": 0.1302
+            }
+          },
+          "D2": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.808,
+              "recall_at_5": 0.95,
+              "recall_at_10": 0.982,
+              "mrr_at_10": 0.8665,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.9,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.8214,
+                  "recall_at_5": 0.9821,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.2667,
+                  "recall_at_5": 0.6667,
+                  "recall_at_10": 0.9
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.8496,
+                  "recall_at_5": 0.9699,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.7744,
+                  "recall_at_5": 0.9248,
+                  "recall_at_10": 0.9549
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9103,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -7.2,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 13,
+              "b_wins": 49,
+              "ties": 438,
+              "p_value": 0.0
+            }
+          },
+          "D3": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.872,
+              "recall_at_5": 0.974,
+              "recall_at_10": 0.982,
+              "mrr_at_10": 0.9155,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.7429,
+                  "recall_at_5": 0.9857,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.9821,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.5,
+                  "recall_at_5": 0.8667,
+                  "recall_at_10": 0.9
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9474,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8722,
+                  "recall_at_5": 0.9398,
+                  "recall_at_10": 0.9549
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9231,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -0.8,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 19,
+              "b_wins": 23,
+              "ties": 458,
+              "p_value": 0.644
+            }
+          }
+        }
+      },
+      "20": {
+        "model_ms_per_instance": {
+          "p50": 779.7,
+          "p95": 789.3,
+          "mean": 715.0
+        },
+        "lexical_ms_per_instance": {
+          "p50": 8.7,
+          "p95": 11.4
+        },
+        "variants": {
+          "D0": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.88,
+              "recall_at_5": 0.96,
+              "recall_at_10": 0.982,
+              "mrr_at_10": 0.9147,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.9,
+                  "recall_at_5": 0.9714,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 1.0,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.4,
+                  "recall_at_5": 0.8,
+                  "recall_at_10": 0.9
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9023,
+                  "recall_at_5": 0.985,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8496,
+                  "recall_at_5": 0.9248,
+                  "recall_at_10": 0.9549
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9744,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 0,
+              "b_wins": 0,
+              "ties": 500,
+              "p_value": 1.0
+            }
+          },
+          "D1": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.854,
+              "recall_at_5": 0.954,
+              "recall_at_10": 0.976,
+              "mrr_at_10": 0.8949,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.6286,
+                  "recall_at_5": 0.8714,
+                  "recall_at_10": 0.9429
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.9643,
+                  "recall_at_5": 0.9821,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.5667,
+                  "recall_at_5": 0.8333,
+                  "recall_at_10": 0.8667
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9474,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8722,
+                  "recall_at_5": 0.9624,
+                  "recall_at_10": 0.9699
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.8974,
+                  "recall_at_5": 0.9615,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -2.6,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 32,
+              "b_wins": 45,
+              "ties": 423,
+              "p_value": 0.1711
+            }
+          },
+          "D2": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.802,
+              "recall_at_5": 0.936,
+              "recall_at_10": 0.976,
+              "mrr_at_10": 0.8604,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.9,
+                  "recall_at_5": 0.9714,
+                  "recall_at_10": 0.9857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.8214,
+                  "recall_at_5": 0.9821,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.2667,
+                  "recall_at_5": 0.5667,
+                  "recall_at_10": 0.8
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.8421,
+                  "recall_at_5": 0.9699,
+                  "recall_at_10": 0.9925
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.7594,
+                  "recall_at_5": 0.9248,
+                  "recall_at_10": 0.9699
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9103,
+                  "recall_at_5": 0.9744,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -7.8,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 12,
+              "b_wins": 51,
+              "ties": 437,
+              "p_value": 0.0
+            }
+          },
+          "D3": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.87,
+              "recall_at_5": 0.962,
+              "recall_at_10": 0.992,
+              "mrr_at_10": 0.9119,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.7429,
+                  "recall_at_5": 0.9429,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.9821,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.5,
+                  "recall_at_5": 0.7667,
+                  "recall_at_10": 0.9333
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9474,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8647,
+                  "recall_at_5": 0.9398,
+                  "recall_at_10": 0.985
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9231,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -1.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 21,
+              "b_wins": 26,
+              "ties": 453,
+              "p_value": 0.5601
+            }
+          }
+        }
+      },
+      "50": {
+        "model_ms_per_instance": {
+          "p50": 978.6,
+          "p95": 1308.2,
+          "mean": 953.2
+        },
+        "lexical_ms_per_instance": {
+          "p50": 8.7,
+          "p95": 11.4
+        },
+        "variants": {
+          "D0": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.88,
+              "recall_at_5": 0.96,
+              "recall_at_10": 0.982,
+              "mrr_at_10": 0.9147,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.9,
+                  "recall_at_5": 0.9714,
+                  "recall_at_10": 1.0
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 1.0,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.4,
+                  "recall_at_5": 0.8,
+                  "recall_at_10": 0.9
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9023,
+                  "recall_at_5": 0.985,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8496,
+                  "recall_at_5": 0.9248,
+                  "recall_at_10": 0.9549
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9744,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": 0.0,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 0,
+              "b_wins": 0,
+              "ties": 500,
+              "p_value": 1.0
+            }
+          },
+          "D1": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.854,
+              "recall_at_5": 0.944,
+              "recall_at_10": 0.968,
+              "mrr_at_10": 0.8926,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.6286,
+                  "recall_at_5": 0.8286,
+                  "recall_at_10": 0.9286
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.9643,
+                  "recall_at_5": 0.9821,
+                  "recall_at_10": 0.9821
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.5667,
+                  "recall_at_5": 0.8333,
+                  "recall_at_10": 0.8333
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9474,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8722,
+                  "recall_at_5": 0.9474,
+                  "recall_at_10": 0.9699
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.8974,
+                  "recall_at_5": 0.9615,
+                  "recall_at_10": 0.9872
+                }
+              }
+            },
+            "delta_recall_at_1_points": -2.6,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 32,
+              "b_wins": 45,
+              "ties": 423,
+              "p_value": 0.1711
+            }
+          },
+          "D2": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.802,
+              "recall_at_5": 0.934,
+              "recall_at_10": 0.97,
+              "mrr_at_10": 0.8591,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.9,
+                  "recall_at_5": 0.9714,
+                  "recall_at_10": 0.9857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.8214,
+                  "recall_at_5": 0.9821,
+                  "recall_at_10": 0.9821
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.2667,
+                  "recall_at_5": 0.5667,
+                  "recall_at_10": 0.8
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.8421,
+                  "recall_at_5": 0.9699,
+                  "recall_at_10": 0.985
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.7594,
+                  "recall_at_5": 0.9248,
+                  "recall_at_10": 0.9699
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9103,
+                  "recall_at_5": 0.9615,
+                  "recall_at_10": 0.9872
+                }
+              }
+            },
+            "delta_recall_at_1_points": -7.8,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 12,
+              "b_wins": 51,
+              "ties": 437,
+              "p_value": 0.0
+            }
+          },
+          "D3": {
+            "score": {
+              "n": 500,
+              "recall_at_1": 0.868,
+              "recall_at_5": 0.966,
+              "recall_at_10": 0.992,
+              "mrr_at_10": 0.91,
+              "failures": 0,
+              "failure_rate": 0.0,
+              "by_type": {
+                "single-session-user": {
+                  "n": 70,
+                  "recall_at_1": 0.7429,
+                  "recall_at_5": 0.9429,
+                  "recall_at_10": 0.9857
+                },
+                "single-session-assistant": {
+                  "n": 56,
+                  "recall_at_1": 0.9821,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "single-session-preference": {
+                  "n": 30,
+                  "recall_at_1": 0.5,
+                  "recall_at_5": 0.8,
+                  "recall_at_10": 0.9667
+                },
+                "multi-session": {
+                  "n": 133,
+                  "recall_at_1": 0.9474,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                },
+                "temporal-reasoning": {
+                  "n": 133,
+                  "recall_at_1": 0.8647,
+                  "recall_at_5": 0.9474,
+                  "recall_at_10": 0.985
+                },
+                "knowledge-update": {
+                  "n": 78,
+                  "recall_at_1": 0.9103,
+                  "recall_at_5": 1.0,
+                  "recall_at_10": 1.0
+                }
+              }
+            },
+            "delta_recall_at_1_points": -1.2,
+            "sign_test_vs_shipped_k1": {
+              "a_wins": 21,
+              "b_wins": 27,
+              "ties": 452,
+              "p_value": 0.4709
+            }
+          }
+        }
+      }
+    }
+  }
+}

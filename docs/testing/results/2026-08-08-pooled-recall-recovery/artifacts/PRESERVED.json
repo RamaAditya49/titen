@@ -1,0 +1,73 @@
+{
+  "spec": "2026-08-08-pooled-recall-recovery",
+  "host": "rama-tuf",
+  "note": "artifacts too large to commit, listed by checksum so a later run can verify it is reading the same bytes this report was written from",
+  "artifacts": [
+    {
+      "file": "~/titen-bench-20260808r/results/cap-pooled-32k.json",
+      "bytes": 5863575,
+      "sha256": "5575ac65a06bb57c807cff585d239fa66060365c9fa3170f06fc2f1b66772b35",
+      "rows": "500 instances, per-item [claim_id, observer_id, tokens, kind, status, dedupe_digest]"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/cap-anchor-32k.json",
+      "bytes": 5370791,
+      "sha256": "eef32d88a342a2c5d50b2770937bd11337878983b6196d499d0f0107aaf8b5f1",
+      "rows": "500 instances, per-item [claim_id, observer_id, tokens, kind, status, dedupe_digest]"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/cap-anchor-32k-atpinned.json",
+      "bytes": 5365034,
+      "sha256": "aa02ede8dccc743de7f53d3aa6c20a92fd30237902a85248db1007644891f4f0",
+      "rows": "500 instances, per-item [claim_id, observer_id, tokens, kind, status, dedupe_digest]"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/cap-pooled-full.json",
+      "bytes": 58820375,
+      "sha256": "221a2ebe5a61e5ee3a1dd5936ea08feabb2edb14f4bf7b0d57b6f13b3526b66f",
+      "rows": "500 instances, per-item [claim_id, observer_id, tokens, kind, status, dedupe_digest]"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/cap-anchor-full.json",
+      "bytes": 12046900,
+      "sha256": "10e3ceefdc2b6dbe1057e201d931a981327e92bf1adfe0577de4a235e62b06da",
+      "rows": "500 instances, per-item [claim_id, observer_id, tokens, kind, status, dedupe_digest]"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/edeep-pooled-w10.ranked.json",
+      "bytes": 1921361,
+      "sha256": "4ced859656c972536017c70693da5bb7b8c80422e1e78647dc24ac92ff7595ef",
+      "rows": "re-ranked session orders at that window"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/edeep-pooled-w20.ranked.json",
+      "bytes": 1921361,
+      "sha256": "2021fe61611dfad07bab6ddaf61191e978fd2685d7a531e4af6f5660bf8b6d1a",
+      "rows": "re-ranked session orders at that window"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/edeep-anchor-w10.ranked.json",
+      "bytes": 886917,
+      "sha256": "9150b32a0ee765f8f104f03d3ed69cc015b205462b9a086ece2c1f6714df4abb",
+      "rows": "re-ranked session orders at that window"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/edeep-anchor-w20.ranked.json",
+      "bytes": 886917,
+      "sha256": "1201db2c9d38c79398aae72b9430c938f20f11994b0eb016c6e9a48f71bc9765",
+      "rows": "re-ranked session orders at that window"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/cap-pooled-32k-repeat.json",
+      "bytes": 5863568,
+      "sha256": "45ebb7bff5651f9d9e5410f295fa813170d0ca3d8d255ed6d84ef98e8fd93e76",
+      "rows": "500 instances, quiet-box latency repeat"
+    },
+    {
+      "file": "~/titen-bench-20260808r/results/cap-anchor-32k-repeat.json",
+      "bytes": 5370720,
+      "sha256": "3c69f5d779cb4db7b73b85da0501bfcd707b417bf79cb64ba2673d57e59fadb2",
+      "rows": "500 instances, quiet-box latency repeat"
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 # Pre-registration — pooled-recall recovery cycle
 
 Date: 2026-08-08. Spec
-[`2026-08-08-pooled-recall-recovery`](../specs/active/2026-08-08-pooled-recall-recovery.md),
-plan [`2026-08-08-pooled-recall-recovery`](../plans/active/2026-08-08-pooled-recall-recovery.md).
+[`2026-08-08-pooled-recall-recovery`](../specs/done/2026-08-08-pooled-recall-recovery.md),
+plan [`2026-08-08-pooled-recall-recovery`](../plans/done/2026-08-08-pooled-recall-recovery.md).
 
 This file is committed **before any cell in this cycle is scored** (AC-PRR-001).
 Everything below — variant definitions, access paths, fusion rules, gates and
@@ -167,9 +167,9 @@ predictions, and clearing an oracle is not evidence that a real signal can.
 ### Amendment 1 — oracle bounds, 2026-08-08
 
 Computed after the commit above, before any variant ran, by
-`harness/oracle.py` over `titen-fts-pooled-19829-20260807.ranked.json` and
+[`oracle.py`](./results/2026-08-08-pooled-recall-recovery/harness/oracle.py) over `titen-fts-pooled-19829-20260807.ranked.json` and
 `titen-fts-anchor-20260807.ranked.json` through the shared scorer. No gate,
-definition or prediction changed. Artifact: `results/r1-oracle.json`.
+definition or prediction changed. Artifact: [`r1-oracle.json`](./results/2026-08-08-pooled-recall-recovery/artifacts/r1-oracle.json).
 
 Recall@1 an omniscient re-ranker could reach over the first `W` distinct
 sessions of the shipped order:

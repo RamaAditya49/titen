@@ -1050,9 +1050,49 @@ Standing consequences:
   cross-encoder on both conditions. Cite the 2026-08-08 report when a
   reranking stage is proposed again; the cheap-lexical class is spent.
 - **The +26.2-point top-10 ceiling stays open and unclaimed.** Reaching it
-  needs a signal that is not question-term overlap.
+  needs a signal that is not question-term overlap. Superseded in part on
+  2026-08-08: the follow-up cycle re-ran the same signals over a top-50 window
+  and the ceiling there is +46.2 points. See the recovery-cycle consequences
+  below before proposing that the window was the constraint.
 - The vector arm is documented for scoped/per-instance stores; at pooled
   density three embedding families land 7.2–16.8 points below FTS-only.
+
+### The pooled-recall recovery cycle: the window was not the constraint, 2026-08-08
+
+[Report](./2026-08-08-pooled-recall-recovery.md),
+[pre-registration](./2026-08-08-pooled-recall-recovery-prereg.md). Nine
+re-ranking cells over three signals and three windows, four packing rules, and a
+latency profile. Every gate failed and nothing shipped.
+
+Standing consequences:
+
+- **Deep re-ranking is measured-closed, at both depths.** Over a top-50 window
+  the local cross-encoder gains +0.2 points against a +46.2-point oracle, at
+  1,924 ms per compile, while regressing the scoped anchor by 2.6 points. The
+  same variants at a top-10 window reproduced the 2026-08-08 results exactly, so
+  the window was the only variable. Do not re-propose re-ranking as
+  window-limited; the limit is the signal, and the cross-encoder's own trend
+  converges on the baseline rather than on the oracle as the window opens.
+- **Packing is measured-closed as a standalone lever.** A pack's first ten
+  distinct sessions are invariant under per-session allocation, and a
+  32,000-token budget buys about 92 claims however they are allocated. Admitting
+  23 more gold sessions moved recall@1 and recall@10 by exactly zero.
+- **Never quote compile time as post-CTE hydration.** Measured through
+  bun:sqlite on the pooled store, the whole outer `SELECT` costs 4.2 ms of a
+  341.8 ms candidate query. The residual is the CTE's per-matched-row join to
+  `claims`, at 261.7 ms — 77% of the query. The authorization predicate is
+  1.4%.
+- **Never quote the 2026-08-08 EXPLAIN as a product-path plan.** Captured from
+  bun:sqlite (SQLite 3.53.0), the candidate query seeks `claim_sources` and
+  probes `observations` by id; `observations_workspace_scope` appears in none of
+  the nine captured plans. The python3 3.51.2 plan was a planner-version
+  divergence.
+- **A pack's tail is not reproducible across days unless `at` is pinned.**
+  Recency moves with wall-clock time, which changes how many digits the score
+  serializes to, which changes each item's budget cost, which changes the last
+  item that fits. Re-running the anchor with `at` pinned to the original run's
+  timestamp restored byte-identical output on all 500 instances. Diff two runs
+  only with `at` pinned, or compare only the head of the list.
 
 Standing consequences:
 
@@ -1135,6 +1175,18 @@ Every published result includes:
   per-instance (scoped) or pooled — and never quote the FTS-only lane above a
   ~10^3-session store shape without the pooled degradation curve beside it.
   Measured 2026-08-07: 0.880 scoped against 0.246 at the 19,829-session pool.
+- Never explain a re-ranking loss by the width of the re-ranked window without
+  re-running the same signal at a wider one. Measured 2026-08-08: the 2026-08-08
+  cycle's six losses were attributed to a top-10 window, and at top-50 the best
+  signal gains 0.2 points against a 46.2-point oracle.
+- Never attribute compile time to a stage that has not been ablated. Measured
+  2026-08-08 through bun:sqlite: post-CTE hydration is 4.2 ms of a 341.8 ms
+  candidate query, and the earlier attribution of ~85% of compile time to it was
+  an inference from a bare-FTS timing, not a measurement of the stage.
+- Never diff two Titen packs from different days without pinning `at`. Recency
+  is computed from the request's `as_of`, which defaults to wall-clock, and it
+  changes the last item that fits the budget. Measured 2026-08-08: 43 of 500
+  anchor packs differed at the tail, and all 500 matched once `at` was pinned.
 - Never let a corpus into an evidence plan without reading its `LICENSE` file.
   An SPDX lookup is not sufficient: `gh api repos/snap-research/locomo --jq
   .license.spdx_id` returns `NOASSERTION`, which means **unknown, not

@@ -1,0 +1,385 @@
+{
+  "spec": "2026-08-08-pooled-recall-recovery",
+  "phase": "R3 E-PACK",
+  "prereg": "docs/testing/2026-08-08-pooled-recall-recovery-prereg.md#e-pack",
+  "condition": "anchor",
+  "generated_at": "2026-08-08T09:27:39Z",
+  "budget_tokens": 31897,
+  "envelope_tokens": 103,
+  "simulator_licensed_by_p0": true,
+  "p0_mismatched_instances": [],
+  "p0_mismatch_count": 0,
+  "baseline": {
+    "n": 500,
+    "recall_at_1": 0.88,
+    "recall_at_5": 0.96,
+    "recall_at_10": 0.982,
+    "mrr_at_10": 0.9147,
+    "failures": 0,
+    "failure_rate": 0.0,
+    "by_type": {
+      "single-session-user": {
+        "n": 70,
+        "recall_at_1": 0.9,
+        "recall_at_5": 0.9714,
+        "recall_at_10": 1.0
+      },
+      "single-session-assistant": {
+        "n": 56,
+        "recall_at_1": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0
+      },
+      "single-session-preference": {
+        "n": 30,
+        "recall_at_1": 0.4,
+        "recall_at_5": 0.8,
+        "recall_at_10": 0.9
+      },
+      "multi-session": {
+        "n": 133,
+        "recall_at_1": 0.9023,
+        "recall_at_5": 0.985,
+        "recall_at_10": 1.0
+      },
+      "temporal-reasoning": {
+        "n": 133,
+        "recall_at_1": 0.8496,
+        "recall_at_5": 0.9248,
+        "recall_at_10": 0.9549
+      },
+      "knowledge-update": {
+        "n": 78,
+        "recall_at_1": 0.9744,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0
+      }
+    }
+  },
+  "variants": {
+    "P0": {
+      "score": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.9,
+            "recall_at_5": 0.9714,
+            "recall_at_10": 1.0
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.4,
+            "recall_at_5": 0.8,
+            "recall_at_10": 0.9
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9023,
+            "recall_at_5": 0.985,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8496,
+            "recall_at_5": 0.9248,
+            "recall_at_10": 0.9549
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.9744,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          }
+        }
+      },
+      "delta_recall_at_1_points": 0.0,
+      "delta_recall_at_10_points": 0.0,
+      "sign_test_vs_shipped_k1": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "sign_test_vs_shipped_k10": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "distinct_sessions_admitted": {
+        "min": 1,
+        "median": 27,
+        "p75": 30,
+        "max": 38
+      },
+      "items_admitted": {
+        "min": 2,
+        "median": 92,
+        "p75": 93,
+        "max": 97
+      },
+      "instances_with_gold_in_pack_by_c1_class": {
+        "in_pool_not_pack": 98,
+        "in_pack_below_10": 111,
+        "outside_pool": 37,
+        "hit_top10": 254
+      }
+    },
+    "P1": {
+      "score": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.9,
+            "recall_at_5": 0.9714,
+            "recall_at_10": 1.0
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.4,
+            "recall_at_5": 0.8,
+            "recall_at_10": 0.9
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9023,
+            "recall_at_5": 0.985,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8496,
+            "recall_at_5": 0.9248,
+            "recall_at_10": 0.9549
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.9744,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          }
+        }
+      },
+      "delta_recall_at_1_points": 0.0,
+      "delta_recall_at_10_points": 0.0,
+      "sign_test_vs_shipped_k1": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "sign_test_vs_shipped_k10": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "distinct_sessions_admitted": {
+        "min": 1,
+        "median": 37,
+        "p75": 42,
+        "max": 52
+      },
+      "items_admitted": {
+        "min": 1,
+        "median": 37,
+        "p75": 42,
+        "max": 52
+      },
+      "instances_with_gold_in_pack_by_c1_class": {
+        "in_pool_not_pack": 98,
+        "in_pack_below_10": 111,
+        "outside_pool": 37,
+        "hit_top10": 254
+      }
+    },
+    "P2": {
+      "score": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.9,
+            "recall_at_5": 0.9714,
+            "recall_at_10": 1.0
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.4,
+            "recall_at_5": 0.8,
+            "recall_at_10": 0.9
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9023,
+            "recall_at_5": 0.985,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8496,
+            "recall_at_5": 0.9248,
+            "recall_at_10": 0.9549
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.9744,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          }
+        }
+      },
+      "delta_recall_at_1_points": 0.0,
+      "delta_recall_at_10_points": 0.0,
+      "sign_test_vs_shipped_k1": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "sign_test_vs_shipped_k10": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "distinct_sessions_admitted": {
+        "min": 1,
+        "median": 37,
+        "p75": 42,
+        "max": 52
+      },
+      "items_admitted": {
+        "min": 2,
+        "median": 67,
+        "p75": 80,
+        "max": 96
+      },
+      "instances_with_gold_in_pack_by_c1_class": {
+        "in_pool_not_pack": 98,
+        "in_pack_below_10": 111,
+        "outside_pool": 37,
+        "hit_top10": 254
+      }
+    },
+    "P3": {
+      "score": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.9,
+            "recall_at_5": 0.9714,
+            "recall_at_10": 1.0
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.4,
+            "recall_at_5": 0.8,
+            "recall_at_10": 0.9
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9023,
+            "recall_at_5": 0.985,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8496,
+            "recall_at_5": 0.9248,
+            "recall_at_10": 0.9549
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.9744,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          }
+        }
+      },
+      "delta_recall_at_1_points": 0.0,
+      "delta_recall_at_10_points": 0.0,
+      "sign_test_vs_shipped_k1": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "sign_test_vs_shipped_k10": {
+        "a_wins": 0,
+        "b_wins": 0,
+        "ties": 500,
+        "p_value": 1.0
+      },
+      "distinct_sessions_admitted": {
+        "min": 1,
+        "median": 37,
+        "p75": 42,
+        "max": 52
+      },
+      "items_admitted": {
+        "min": 1,
+        "median": 92,
+        "p75": 93,
+        "max": 97
+      },
+      "instances_with_gold_in_pack_by_c1_class": {
+        "in_pool_not_pack": 98,
+        "in_pack_below_10": 111,
+        "outside_pool": 37,
+        "hit_top10": 254
+      }
+    }
+  }
+}
