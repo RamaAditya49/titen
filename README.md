@@ -1,8 +1,8 @@
 <h1 align="center">Titen</h1>
 
 <p align="center">
-  <strong>The Level 6 collaborative memory fabric for AI agents.</strong><br>
-  Evidence-grounded recall, coordinated work, and governed sharing on infrastructure you control.
+  <strong>Agent memory that runs with no API key, no LLM, and no embedding provider.</strong><br>
+  Every memory keeps its source, who may read it, and the evidence that contradicts it.
 </p>
 
 <p align="center">
@@ -25,6 +25,42 @@
 <p align="center">
   Built with <a href="https://cadis.digital/">C.A.D.I.S Agent</a>.
 </p>
+
+## Try it in 30 seconds
+
+No account, no key, no configuration — but the CLI runs on
+**[Bun](https://bun.sh/) 1.2 or newer**, and refuses to start without it:
+
+```bash
+curl -fsSL https://bun.sh/install | bash   # skip if you already have Bun
+npx titen-memory mcp
+```
+
+With no environment set, that opens or creates `~/.titen/memory.db`, writes a
+real organization, workspace, project and owner into it, and serves MCP over
+stdio in-process — no HTTP hop, no key to paste, and **no outbound network
+call**. Retrieval is FTS5, so nothing needs an embedding provider or a model.
+
+`curl -fsSL https://titen.dev/install.sh | bash` does the same in one step: it
+adds Bun when it is missing, then installs the `titen` command.
+
+Point an agent at it:
+
+```bash
+claude mcp add --transport stdio --scope user titen -- npx -y titen-memory mcp
+```
+
+Already using `@modelcontextprotocol/server-memory`? Titen serves the same nine
+tool names and imports your existing `memory.json` on first run, so the switch
+is that one line. Point `titen` at a served instance later by setting
+`TITEN_MCP_URL` and `TITEN_API_KEY` — [full setup below](#install-and-connect-an-agent).
+
+Audit what any agent memory store has accumulated, including one Titen does not
+own:
+
+```bash
+npx titen-memory audit ./memory.json
+```
 
 ## Memory for a team, not a chatbot
 
@@ -304,6 +340,12 @@ release history.
 
 ## Install and connect an agent
 
+This section is the **served** deployment: a long-running instance with its own
+API keys, reachable over HTTP by more than one agent. If you only want memory
+for the agent on this machine, [the 30-second path](#try-it-in-30-seconds)
+above is the whole setup and you can skip to
+[optional semantic retrieval](#optional-semantic-retrieval).
+
 The local server needs [Bun 1.2 or newer](https://bun.sh/). The website
 installer adds Bun when needed, then installs the `titen` command for your
 current user:
@@ -428,6 +470,12 @@ variables above:
 
 The bridge keeps no state. It only forwards newline-delimited MCP messages to
 the authenticated HTTP endpoint.
+
+`titen mcp` picks its mode from the environment: with **both** `TITEN_MCP_URL`
+and `TITEN_API_KEY` set it bridges to that instance, with **neither** set it
+serves the local store described above, and with only one of the two it fails
+rather than guessing. The served path and its authorization are unchanged by
+local mode — that is an additional entry point, not a relaxation.
 
 Titen is listed in the official MCP registry as
 `io.github.RamaAditya49/titen-memory`, so a client that reads that directory can
