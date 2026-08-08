@@ -1254,7 +1254,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
   await assertNoForeignIds(ctx, principal.orgId, {
     workspace: [...workspaces.keys()], membership: [...memberships.keys()], project: [...projects.keys()],
     observation: [...observations.keys()], claim: [...claims.keys()],
-    enrichment: [...enrichments.keys()],
+    enrichment: [...enrichments.keys()], api_key: [...keys.keys()],
   });
   await assertWorkspaceReferences(ctx, workspaces, memberships, observations, claims);
   await assertProjectReferences(ctx, principal.orgId, projects, observations, claims);
@@ -2207,9 +2207,22 @@ async function assertNoForeignIds(
   orgId: string,
   idsByType: Record<string, string[]>,
 ): Promise<void> {
+  // `api_key` belongs here for the same reason as every other row: `api_keys.id`
+  // is a global TEXT PRIMARY KEY, while the only other credential lookup —
+  // `loadExisting(ctx, "api_keys", ...)` — is scoped `WHERE org_id = ?` and so
+  // cannot see a collision in another organization.
+  //
+  // Without it the import still failed atomically, so nothing was written, and
+  // it still answered 409 — but with the wrong 409: the constraint surfaced
+  // through the concurrent-write handler as "Import collided with a concurrent
+  // write; retry after exporting current state." That diagnosis is not merely
+  // imprecise, it is advice that cannot work. The collision is with a row in
+  // another organization, so re-exporting and retrying reproduces it forever.
+  // Every other record type reports what actually happened.
   const tables: [string, string][] = [
     ["workspace", "workspaces"], ["membership", "memberships"], ["project", "projects"],
     ["observation", "observations"], ["claim", "claims"], ["enrichment", "enrichment_jobs"],
+    ["api_key", "api_keys"],
   ];
   for (const [recordType, table] of tables) for (const group of chunk(idsByType[recordType]!, MAX_BOUND_PARAMS - 1)) {
     if (!group.length) continue;

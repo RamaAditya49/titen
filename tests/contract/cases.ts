@@ -1918,6 +1918,47 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "an imported credential whose id belongs to another organization is refused with a conflict",
+    async run(fx) {
+      // api_keys.id is a global TEXT PRIMARY KEY, but the credential preflight
+      // that looks for an existing row is scoped `WHERE org_id = ?`, so it
+      // cannot see a collision in someone else's organization. Until the
+      // foreign-id preflight covered api_key, this reached db.batch and the
+      // constraint surfaced through the concurrent-write handler as "Import
+      // collided with a concurrent write; retry after exporting current
+      // state." The status was already 409, so only the message was wrong --
+      // and it was wrong in the direction that costs an operator the most:
+      // the collision is with another organization's row, so the retry it
+      // recommends can never succeed. Asserting the message, not the status,
+      // is what makes this case bite.
+      const first = await fx.provision({ scopes: ["*"] });
+      const second = await fx.provision({ scopes: ["*"] });
+      assert.notEqual(first.orgId, second.orgId, "the two fixtures must be different organizations");
+
+      const exported = await fx.call("GET", "/v1/export?type=keys&all=true", { key: first.key });
+      assert.equal(exported.status, 200); // JSONL, not a JSON envelope
+
+      const refused = await fx.callRaw("POST", "/v1/import", {
+        key: second.key,
+        body: String(exported.body),
+      });
+      expectError(refused, 409);
+      assert.match(
+        JSON.stringify(refused.body),
+        /already exists outside this organization/,
+        "the refusal must be the documented conflict, not a storage-layer error",
+      );
+
+      // Atomic: the losing import writes nothing, and the original credential
+      // in the other organization still works.
+      const landed = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM api_keys WHERE org_id = ?`, [second.orgId],
+      );
+      assert.equal(Number(landed[0]!.count), 1, "only the importer's own key may exist");
+      expectOk(await fx.call("GET", "/v1/keys", { key: first.key }));
+    },
+  },
+  {
     name: "raw key material never reaches storage",
     async run(fx) {
       const agent = await fx.provision();
