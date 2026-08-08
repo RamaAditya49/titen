@@ -1,0 +1,96 @@
+{
+  "lane": "titen",
+  "embedding_arm": "fts-pooled",
+  "generated_at": "2026-08-08T13:41:53Z",
+  "n": 500,
+  "recall_at_1": 0.246,
+  "recall_at_5": 0.444,
+  "recall_at_10": 0.508,
+  "mrr_at_10": 0.3259,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+    "single-session-user": {
+      "n": 70,
+      "recall_at_1": 0.1143,
+      "recall_at_5": 0.3,
+      "recall_at_10": 0.3857
+    },
+    "single-session-assistant": {
+      "n": 56,
+      "recall_at_1": 0.7143,
+      "recall_at_5": 0.8929,
+      "recall_at_10": 0.9286
+    },
+    "single-session-preference": {
+      "n": 30,
+      "recall_at_1": 0.0,
+      "recall_at_5": 0.1,
+      "recall_at_10": 0.1
+    },
+    "multi-session": {
+      "n": 133,
+      "recall_at_1": 0.1203,
+      "recall_at_5": 0.3459,
+      "recall_at_10": 0.3985
+    },
+    "temporal-reasoning": {
+      "n": 133,
+      "recall_at_1": 0.1579,
+      "recall_at_5": 0.3609,
+      "recall_at_10": 0.4361
+    },
+    "knowledge-update": {
+      "n": 78,
+      "recall_at_1": 0.4872,
+      "recall_at_5": 0.6923,
+      "recall_at_10": 0.7821
+    }
+  },
+  "meta": {
+    "condition": "pooled",
+    "build": "22944bb",
+    "served_from": "source checkout (bun src/runtime/bun/cli.ts serve)",
+    "at_pinned": "2026-08-07T11:58:17Z",
+    "compile": {
+      "max_tokens": 32000,
+      "max_candidates": 1000,
+      "top_k": 1000
+    },
+    "query_concurrency": 1,
+    "llm_calls": 0,
+    "embed_calls": 0,
+    "passes": [
+      {
+        "pass": 1,
+        "query_seconds": 235.2,
+        "compile_ms": {
+          "p50": 418.44,
+          "p95": 864.32,
+          "p99": 1075.4
+        }
+      },
+      {
+        "pass": 2,
+        "query_seconds": 223.0,
+        "compile_ms": {
+          "p50": 411.82,
+          "p95": 838.05,
+          "p99": 973.71
+        },
+        "identical_to_pass_1": true
+      }
+    ],
+    "compile_ms": {
+      "p50": 418.44,
+      "p95": 864.32,
+      "p99": 1075.4
+    },
+    "compile_ms_warm": {
+      "p50": 411.82,
+      "p95": 838.05,
+      "p99": 973.71
+    },
+    "failures_detail": {}
+  }
+}

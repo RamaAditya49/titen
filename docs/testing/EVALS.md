@@ -1110,6 +1110,42 @@ Standing consequences:
   ±1-point dead-heat wobble across invocations; it is a curve endpoint, never
   a headline.
 
+### An interpretable `score` shipped on a null this corpus could not have broken, 2026-08-08
+
+[Report](./2026-08-08-interpretable-score.md),
+[pre-registration](./2026-08-08-interpretable-score-prereg.md). Relevance
+stopped being min-max inside the candidate set and became
+`strength / (strength + 3.7)` over `-bm25 / termsUsed` (#227, `d3bd8c9`).
+AC-INT-003 passed on both conditions with recall identical to the last
+instance, so the change shipped.
+
+Standing consequences:
+
+- **Never cite that null as evidence the blend is robust.** Across both bench
+  stores, 500 questions and 89,467 packed items, `scoreCandidate` produced
+  exactly **one** distinct non-relevance component tuple. With trust, recency,
+  utility, conflict and confidence constant, `score` is monotone in relevance
+  and relevance is monotone in `-bm25` under both transforms, so the order is
+  identical by arithmetic. AC-INT-003 could not have failed here. On a store
+  where those components vary, reordering is still possible and unmeasured.
+- **The vector arm is unmeasured by this cycle.** `normalizeVectorSimilarity`
+  went from min-max to raw cosine and both lanes ran `vector: disabled`,
+  `embed_calls` 0. Do not describe the cosine change as benchmarked.
+- **`score` is no longer constant, and that is the shipped claim.** Anchor
+  rank-1 `score` goes from 1 distinct value over 500 questions (0.794374) to
+  **498**, spanning 0.4875–0.6632. Pooled: 1 → 497, spanning 0.5296–0.6999.
+  Threshold abstention is now arithmetically possible; no abstention threshold
+  has been measured.
+- **3.7 is calibrated on LongMemEval-S and two stores from one fixture is not
+  corpus diversity.** Measured median rank-1 relevance: anchor 0.463, pooled
+  0.509, against the 0.50 the constant was fitted for. Quote it as a
+  documented, overridable default, never as portable.
+- **Within-pack score ties did not fall.** AC-INT-002's within-pack reading
+  failed: pack-wide score collisions went 5.58% → 5.60% (anchor) and 2.03% →
+  2.11% (pooled), because saturation compresses the range and more neighbours
+  round together at 1e-6. The across-query ceiling ties went 1.000 → 0.000.
+  Both readings are published; neither was chosen after the fact.
+
 ## Release gates
 
 | Gate | Required result                                                                                                                              |

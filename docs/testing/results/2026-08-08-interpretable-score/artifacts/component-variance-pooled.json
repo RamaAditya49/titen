@@ -1,0 +1,29 @@
+{
+  "condition": "pooled",
+  "build": "d3bd8c9",
+  "at_pinned": "2026-08-07T11:58:17Z",
+  "questions": 500,
+  "distinct_non_relevance_tuples": 1,
+  "tuples": [
+    {
+      "fields": [
+        "trust",
+        "recency",
+        "utility",
+        "conflict",
+        "confidence"
+      ],
+      "value": [
+        0.333333,
+        1,
+        0.5,
+        1,
+        0.8
+      ],
+      "items": 46082
+    }
+  ],
+  "packs_with_internal_variance": 0,
+  "packs_with_internal_variance_qids": [],
+  "packs_where_relevance_is_not_monotone_down_the_pack": 25
+}
