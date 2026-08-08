@@ -1,0 +1,76 @@
+{
+ "spec": "2026-08-08-pooled-recall-recovery",
+ "condition": "anchor",
+ "max_tokens": 4000000,
+ "instrument": true,
+ "generated_at": "2026-08-08T09:23:34Z",
+ "compile": {
+  "max_tokens": 4000000,
+  "max_candidates": 1000,
+  "top_k": 1000
+ },
+ "query_concurrency": 1,
+ "compile_ms": {
+  "p50": 22.87,
+  "p95": 38.36,
+  "p99": 49.27
+ },
+ "score": {
+  "n": 500,
+  "recall_at_1": 0.88,
+  "recall_at_5": 0.96,
+  "recall_at_10": 0.982,
+  "mrr_at_10": 0.9147,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "by_type": {
+   "single-session-user": {
+    "n": 70,
+    "recall_at_1": 0.9,
+    "recall_at_5": 0.9714,
+    "recall_at_10": 1.0
+   },
+   "single-session-assistant": {
+    "n": 56,
+    "recall_at_1": 1.0,
+    "recall_at_5": 1.0,
+    "recall_at_10": 1.0
+   },
+   "single-session-preference": {
+    "n": 30,
+    "recall_at_1": 0.4,
+    "recall_at_5": 0.8,
+    "recall_at_10": 0.9
+   },
+   "multi-session": {
+    "n": 133,
+    "recall_at_1": 0.9023,
+    "recall_at_5": 0.985,
+    "recall_at_10": 1.0
+   },
+   "temporal-reasoning": {
+    "n": 133,
+    "recall_at_1": 0.8496,
+    "recall_at_5": 0.9248,
+    "recall_at_10": 0.9549
+   },
+   "knowledge-update": {
+    "n": 78,
+    "recall_at_1": 0.9744,
+    "recall_at_5": 1.0,
+    "recall_at_10": 1.0
+   }
+  }
+ },
+ "failures": {},
+ "row_schema": [
+  "claim_id",
+  "observer_id",
+  "tokens",
+  "kind",
+  "status",
+  "dedupe_key"
+ ],
+ "items_note": "per-item rows omitted from the committed copy; the full capture is preserved on rama-tuf at ~/titen-bench-20260808r/results/cap-anchor-full.json",
+ "omitted_note": "ranked order and per-instance latency omitted: the pre-registration takes no recall or latency figure from the instrument runs"
+}

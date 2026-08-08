@@ -1,0 +1,338 @@
+{
+  "spec": "2026-08-08-pooled-recall-recovery",
+  "phase": "R4 combined",
+  "generated_at": "2026-08-08T09:54:45Z",
+  "model": "Xenova/ms-marco-MiniLM-L-6-v2",
+  "runtime": "fastembed 0.8.0 TextCrossEncoder, ONNX CPU, control venv, default threads",
+  "pack_variant": "P1",
+  "window": "whole pack",
+  "conditions": {
+    "pooled": {
+      "shipped_baseline": {
+        "n": 500,
+        "recall_at_1": 0.246,
+        "recall_at_5": 0.444,
+        "recall_at_10": 0.508,
+        "mrr_at_10": 0.3259,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.1143,
+            "recall_at_5": 0.3,
+            "recall_at_10": 0.3857
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 0.7143,
+            "recall_at_5": 0.8929,
+            "recall_at_10": 0.9286
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.0,
+            "recall_at_5": 0.1,
+            "recall_at_10": 0.1
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.1203,
+            "recall_at_5": 0.3459,
+            "recall_at_10": 0.3985
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.1579,
+            "recall_at_5": 0.3609,
+            "recall_at_10": 0.4361
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.4872,
+            "recall_at_5": 0.6923,
+            "recall_at_10": 0.7821
+          }
+        }
+      },
+      "pack_only": {
+        "n": 500,
+        "recall_at_1": 0.246,
+        "recall_at_5": 0.444,
+        "recall_at_10": 0.508,
+        "mrr_at_10": 0.3259,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.1143,
+            "recall_at_5": 0.3,
+            "recall_at_10": 0.3857
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 0.7143,
+            "recall_at_5": 0.8929,
+            "recall_at_10": 0.9286
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.0,
+            "recall_at_5": 0.1,
+            "recall_at_10": 0.1
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.1203,
+            "recall_at_5": 0.3459,
+            "recall_at_10": 0.3985
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.1579,
+            "recall_at_5": 0.3609,
+            "recall_at_10": 0.4361
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.4872,
+            "recall_at_5": 0.6923,
+            "recall_at_10": 0.7821
+          }
+        }
+      },
+      "pack_plus_rerank": {
+        "n": 500,
+        "recall_at_1": 0.254,
+        "recall_at_5": 0.462,
+        "recall_at_10": 0.538,
+        "mrr_at_10": 0.3441,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.0429,
+            "recall_at_5": 0.1429,
+            "recall_at_10": 0.1714
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 0.5893,
+            "recall_at_5": 0.875,
+            "recall_at_10": 0.8929
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.0667,
+            "recall_at_5": 0.1333,
+            "recall_at_10": 0.1667
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.218,
+            "recall_at_5": 0.4662,
+            "recall_at_10": 0.5865
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.2105,
+            "recall_at_5": 0.4662,
+            "recall_at_10": 0.5639
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.4103,
+            "recall_at_5": 0.5641,
+            "recall_at_10": 0.6282
+          }
+        }
+      },
+      "delta_recall_at_1_points": 0.8,
+      "sign_test_vs_shipped_k1": {
+        "a_wins": 52,
+        "b_wins": 48,
+        "ties": 400,
+        "p_value": 0.7644
+      },
+      "pack_depth_sessions": {
+        "median": 92,
+        "max": 101,
+        "min": 88
+      },
+      "model_ms_per_instance": {
+        "p50": 3766.0,
+        "p95": 3955.3,
+        "mean": 3586.9
+      }
+    },
+    "anchor": {
+      "shipped_baseline": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.9,
+            "recall_at_5": 0.9714,
+            "recall_at_10": 1.0
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.4,
+            "recall_at_5": 0.8,
+            "recall_at_10": 0.9
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9023,
+            "recall_at_5": 0.985,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8496,
+            "recall_at_5": 0.9248,
+            "recall_at_10": 0.9549
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.9744,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          }
+        }
+      },
+      "pack_only": {
+        "n": 500,
+        "recall_at_1": 0.88,
+        "recall_at_5": 0.96,
+        "recall_at_10": 0.982,
+        "mrr_at_10": 0.9147,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.9,
+            "recall_at_5": 0.9714,
+            "recall_at_10": 1.0
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.4,
+            "recall_at_5": 0.8,
+            "recall_at_10": 0.9
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9023,
+            "recall_at_5": 0.985,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8496,
+            "recall_at_5": 0.9248,
+            "recall_at_10": 0.9549
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.9744,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          }
+        }
+      },
+      "pack_plus_rerank": {
+        "n": 500,
+        "recall_at_1": 0.854,
+        "recall_at_5": 0.944,
+        "recall_at_10": 0.968,
+        "mrr_at_10": 0.8921,
+        "failures": 0,
+        "failure_rate": 0.0,
+        "by_type": {
+          "single-session-user": {
+            "n": 70,
+            "recall_at_1": 0.6286,
+            "recall_at_5": 0.8286,
+            "recall_at_10": 0.9286
+          },
+          "single-session-assistant": {
+            "n": 56,
+            "recall_at_1": 0.9643,
+            "recall_at_5": 0.9821,
+            "recall_at_10": 0.9821
+          },
+          "single-session-preference": {
+            "n": 30,
+            "recall_at_1": 0.5667,
+            "recall_at_5": 0.8333,
+            "recall_at_10": 0.8333
+          },
+          "multi-session": {
+            "n": 133,
+            "recall_at_1": 0.9474,
+            "recall_at_5": 1.0,
+            "recall_at_10": 1.0
+          },
+          "temporal-reasoning": {
+            "n": 133,
+            "recall_at_1": 0.8722,
+            "recall_at_5": 0.9474,
+            "recall_at_10": 0.9699
+          },
+          "knowledge-update": {
+            "n": 78,
+            "recall_at_1": 0.8974,
+            "recall_at_5": 0.9615,
+            "recall_at_10": 0.9872
+          }
+        }
+      },
+      "delta_recall_at_1_points": -2.6,
+      "sign_test_vs_shipped_k1": {
+        "a_wins": 32,
+        "b_wins": 45,
+        "ties": 423,
+        "p_value": 0.1711
+      },
+      "pack_depth_sessions": {
+        "median": 37,
+        "max": 52,
+        "min": 1
+      },
+      "model_ms_per_instance": {
+        "p50": 1495.2,
+        "p95": 1925.3,
+        "mean": 1413.9
+      }
+    }
+  },
+  "gate": {
+    "rule": ">=5.0 points pooled recall@1 AND p<0.05 AND anchor loss <0.5 points",
+    "pooled_delta_points": 0.8,
+    "pooled_p_value": 0.7644,
+    "anchor_delta_points": -2.6,
+    "verdict": "FAIL"
+  }
+}

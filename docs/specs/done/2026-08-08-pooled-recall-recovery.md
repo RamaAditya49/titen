@@ -1,13 +1,12 @@
 ---
 work_id: pooled-recall-recovery
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-08
 updated: 2026-08-08
 owner: ramaaditya
-review_after: 2026-08-21
 ---
 
 # Recover the pooled recall that is already inside the pool
@@ -126,8 +125,27 @@ Written before any run.
 
 ## Evidence
 
-Results in `docs/testing/2026-08-08-pooled-recall-recovery.md`; artifacts and
+Results in [`docs/testing/2026-08-08-pooled-recall-recovery.md`](../../testing/2026-08-08-pooled-recall-recovery.md); artifacts and
 checksums under `results/2026-08-08-pooled-recall-recovery/`. The stores,
 harness and lane runners are preserved on `rama-tuf` as recorded in the
 [compile-latency spec](./2026-08-08-pooled-compile-latency.md)'s Evidence
 section.
+
+## Acceptance evidence
+
+Measured 2026-08-08 on `rama-tuf`. Full results in
+[`docs/testing/2026-08-08-pooled-recall-recovery.md`](../../testing/2026-08-08-pooled-recall-recovery.md).
+
+| AC | Evidence | Met |
+| --- | --- | --- |
+| AC-PRR-001 | The pre-registration was committed as `62f07f6` and the oracle amendment as `3618d17`, both before the first scored cell. Every cell scored afterwards is named in it. | yes |
+| AC-PRR-002 | Every cell scored through `common.score` / `common.sign_test` at n=500 with 0 failures and failures kept in the denominator. Both baselines reproduced: pooled ranked lists byte-identical on 500/500, anchor 500/500 once `at` was pinned. | yes |
+| AC-PRR-003 | Applied to nine E-DEEP cells, four E-PACK variants on both stores, and the combined cell. Best pooled gain +0.8 points at p=0.7644 against a required +5.0 at p<0.05; best anchor delta −0.8 points against a 0.5-point allowance. No configuration cleared it. | yes, and no variant passed |
+| AC-PRR-004 | Pooled compile p95 863.97 / 880.32 ms over two runs; anchor p95 145.41 / 75.94 / 34.92 ms over three, spread published. No change shipped, so the gate constrained nothing; the re-rankers' measured cost (1,924 ms and 3,766 ms per compile) would have breached it by an order of magnitude. | yes |
+| AC-PRR-005 | `src/core/**` is unchanged. No dependency, migration or configuration flag was added, and no re-ranker projection was built, because none cleared AC-PRR-003. | yes |
+| AC-PRR-006 | No plan-affecting query changed, so the before/after pair is vacuous. `EXPLAIN QUERY PLAN` was still captured from `bun:sqlite` against the 342,129-claim store for nine query shapes, and `tests/integration/query-plan.test.ts` passes 3/3. | yes |
+| AC-PRR-007 | The report states every gate verdict including the all-fail outcome, carries a "what this does not show" section, and records three corrections: #294's post-CTE-hydration premise, its EXPLAIN plan under the runtime planner, and prediction 4b. | yes |
+
+**Outcome: no change ships.** Falsifiers 1, 2 and 5 all fired. The cycle is
+complete on its own terms — the spec's Approach names the all-fail result as an
+acceptable outcome and it is published with the same prominence a win would get.
