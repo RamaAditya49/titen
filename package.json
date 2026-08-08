@@ -2,7 +2,7 @@
   "name": "titen-memory",
   "version": "0.7.2",
   "mcpName": "io.github.RamaAditya49/titen-memory",
-  "description": "The Level 6 collaborative memory fabric for AI agents \u2014 evidence-grounded observe/claim/compile/feedback over Bun+SQLite or Cloudflare Workers+D1",
+  "description": "Agent memory with no API key, no LLM, and no embedding provider. Serves MCP over stdio against a local SQLite store, or Cloudflare Workers + D1. Drop-in for @modelcontextprotocol/server-memory; every memory keeps its source, its scope, and the evidence that contradicts it.",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.17.0",
@@ -20,7 +20,12 @@
     "mcp",
     "bun",
     "sqlite",
-    "cloudflare-workers"
+    "cloudflare-workers",
+    "mcp-server",
+    "model-context-protocol",
+    "provenance",
+    "self-hosted",
+    "claude"
   ],
   "bin": {
     "titen": "src/runtime/bun/cli.ts"

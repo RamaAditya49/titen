@@ -76,7 +76,7 @@
 
   <g class="rise d1">
     <rect x="72" y="74" width="9" height="9" fill="#C97A44"/>
-    <text class="m" x="95" y="83" font-size="13" letter-spacing="3.1" fill="#8A7F72">LEVEL 6 · COLLABORATIVE MEMORY FABRIC</text>
+    <text class="m" x="95" y="83" font-size="13" letter-spacing="3.1" fill="#8A7F72">SELF-HOSTED AGENT MEMORY · NO API KEY · NO LLM</text>
   </g>
   <text class="wm rise d2" x="70" y="182" font-size="112" fill="#F7F2E9">titen</text>
   <text class="f rise d3" x="74" y="222" font-size="21" fill="#C9BCA6">Evidence-grounded recall, coordinated work, and governed sharing</text>

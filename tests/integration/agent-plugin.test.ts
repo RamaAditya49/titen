@@ -19,17 +19,31 @@ const ordinaryTools = [
   "titen_remember",
 ].sort();
 
-test("the README leads with the Level 6 product contract and project identity", () => {
+test("the README leads with what Titen is, then defines the product contract", () => {
   const readme = readFileSync(join(root, "README.md"), "utf8");
-  assert.match(readme, /The Level 6 collaborative memory fabric for AI agents/);
+  // The lead is deliberately plain: "Level 6 collaborative memory fabric" is this
+  // project's own taxonomy and means nothing to a stranger, so it no longer opens
+  // the README. It still has to be *defined* further down — that is what makes the
+  // level claim checkable rather than decorative.
+  assert.match(readme, /Agent memory that runs with no API key, no LLM, and no embedding provider/);
   assert.match(readme, /Level 6 = evidence-grounded context \+ coordinated work \+ governance/);
   assert.match(readme, /Level 6 is Titen's product model, not an external certification/);
   assert.match(readme, /https:\/\/titen\.dev/);
   assert.match(readme, /Built with .*C\.A\.D\.I\.S Agent/);
-  assert.match(
-    readFileSync(join(root, "docs/assets/brand/titen-readme-hero.svg"), "utf8"),
-    /OPEN-SOURCE · LEVEL 6 AGENT MEMORY/,
+});
+
+test("the README can be tried before it is read", () => {
+  const readme = readFileSync(join(root, "README.md"), "utf8");
+  const firstRun = readme.indexOf("npx titen-memory mcp");
+  const benchmarks = readme.indexOf("## Measured against the field");
+  assert.ok(firstRun > 0, "the README never shows how to run Titen");
+  assert.ok(
+    firstRun < benchmarks,
+    "the first runnable command must come before the benchmark section: it sat at line 305, behind 144 lines of tables, until 2026-08-08",
   );
+  // The CLI refuses to start without Bun, so a quickstart that omits it is a
+  // broken first impression. Verified by running it: "bun was not found on PATH".
+  assert.match(readme.slice(0, firstRun), /Bun/);
 });
 
 function json(path: string) {

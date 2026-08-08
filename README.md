@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://titen.dev"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-hero.svg" alt="Titen, the Level 6 collaborative memory fabric for AI agents. Zero LLM calls, zero embedding calls, dependencies empty, and recall@1 0.880 on LongMemEval-S in the per-instance scoped condition, which falls to 0.524, 0.364, 0.308 and 0.246 as the store pools to 1k, 5k, 10k and 19,829 sessions" width="100%"></a>
+  <a href="https://titen.dev"><img src="https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/readme/titen-hero.svg" alt="Titen — self-hosted agent memory with no API key and no LLM. Zero LLM calls, zero embedding calls, dependencies empty, and recall@1 0.880 on LongMemEval-S in the per-instance scoped condition, which falls to 0.524, 0.364, 0.308 and 0.246 as the store pools to 1k, 5k, 10k and 19,829 sessions" width="100%"></a>
 </p>
 
 <p align="center">
@@ -61,6 +61,25 @@ own:
 ```bash
 npx titen-memory audit ./memory.json
 ```
+
+## What is different about it
+
+- **No provider, no key, no account.** FTS5 lexical retrieval is the default
+  operating point, not a fallback. Embeddings and model enrichment are opt-in
+  projections that degrade cleanly when they are absent.
+- **No runtime dependencies.** `package.json` declares none. What it needs is
+  Bun and one SQLite file; everything else is the standard library and Web APIs.
+- **Drop-in for `@modelcontextprotocol/server-memory`.** Eighteen tools — the
+  nine `titen_*` plus the nine reference-server names — with `search_nodes`
+  routed through real retrieval rather than a substring scan, and your existing
+  `memory.json` imported on first run.
+- **It audits stores it does not own.** `titen audit` reads a reference-server
+  `memory.json`, a Mem0 export, or a Titen store, and reports duplicates,
+  recall loops, secret patterns and staleness with per-item evidence you can
+  check by hand.
+- **The benchmark publishes the losses.** Two of the five pre-registered
+  falsifiers fired against Titen, and they are printed on the chart below
+  rather than left out of it.
 
 ## Memory for a team, not a chatbot
 
