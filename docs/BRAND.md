@@ -31,6 +31,17 @@ Canonical assets:
 
 - [square mark](./assets/brand/titen-mark.svg);
 - [README hero](./assets/brand/titen-readme-hero.svg).
+- [Social preview](./assets/brand/titen-social-preview.png) — the card GitHub
+  shows when the repository link is shared. GitHub has **no API for it**: upload
+  it by hand at Settings → General → Social preview. Re-render it from the hero
+  whenever that asset's copy changes, at 2x on a 1280x640 frame so the ink
+  ground fills the slot:
+
+  ```js
+  // from the repo root, with @playwright/test resolvable
+  await page.setViewportSize({ width: 1280, height: 640 });
+  // …render docs/assets/brand/titen-readme-hero.svg centred on #171310, screenshot at deviceScaleFactor 2
+  ```
 
 Rules:
 
