@@ -26,6 +26,55 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`titen-memory@0.7.1` cannot serve a large single-subject store: one context
+  compile takes ~76 seconds where 0.7.0 takes under half a second.** The 0.7.1
+  fix for [#291](https://github.com/RamaAditya49/titen/issues/291) wrote the
+  `disputed` predicate as a join inside `EXISTS` while its own comment claimed
+  the nested form, and a join inside `EXISTS` is still a join the planner may
+  reorder. SQLite 3.53.0 — the version Bun 1.3.14 links — reorders it to
+  `SEARCH o USING INDEX observations_workspace_scope (org_id=?)`, scanning every
+  observation in the organization once per candidate row: the exact shape
+  `src/core/authorization.ts` documents as the historical 79-second failure,
+  shipped in the release that believed it had prevented it.
+
+  **Who is affected:** anyone whose store holds many claims under one subject
+  and who compiles with a large `max_candidates`. The cost is the product of
+  candidates and organization-wide observations, so small and per-subject stores
+  are unaffected — which is why no test and no published benchmark caught it.
+  Every published pooled figure was measured on 0.7.0.
+
+  **Measured**, 342,129-claim / 19,829-observation store, one subject, real
+  statement, `EXPLAIN` captured from `bun:sqlite` rather than a pasted copy:
+
+  | | candidate query | served compile |
+  | --- | ---: | ---: |
+  | 0.7.1 as published | 73,439 ms | **75,894 ms** |
+  | this release | 232 ms | **417 ms p50 / 864 ms p95** |
+
+  The ranked output is **byte-identical** to the published 0.7.0 pooled run —
+  equal sha256 over all 500 instances — so this restores the shipped answer
+  rather than changing it. Full method and both plans in
+  [the report](./docs/testing/2026-08-08-pooled-compile-latency.md), protocol
+  [pre-registered](./docs/testing/2026-08-08-pooled-compile-latency-prereg.md)
+  before the A/B.
+
+### Added
+
+- **Plan-shape guards for the retrieval queries**
+  (`tests/integration/query-plan.test.ts`). The regression above was invisible
+  to every existing test because contract stores hold tens of rows and still
+  return the right answer quickly. The load-bearing discovery is that the bad
+  plan **reproduces on an empty store** — SQLite picks the join order from the
+  schema, not from row counts — so a cheap deterministic test could have caught
+  this and the 2026-08-07 occurrence before either shipped. The guards assert
+  the plan of the candidate query, the by-id hydration, and authorized-source
+  loading; reverting the fix fails two of the three. They assert the plan, never
+  a duration: a timing assertion on this hardware would be flaky, and the plan
+  is what regressed.
+
+
 ## [0.7.1] — 2026-08-07
 
 The measurement release: the pooled-store condition on LongMemEval-S, with

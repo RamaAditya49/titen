@@ -1,0 +1,13 @@
+pooled store: 19829/19829 sessions (gold-first 940)
+readyz 200 {"ready": true, "runtime": "bun-sqlite", "revision": "dev", "schema": {"applied": 22, "expected": 22, "verified": true}, "checks": {"canonical_sql": "ok", "migrations": "ok", "signing_secrets": "ok", "semantic_index": "disabled", "extraction": "disabled", "background_enrichment": "disabled", "enrichment_jobs": {"state": "disabled"}}, "capabilities": {"version": 1, "fts": "enabled", "vector": "disabled", "embedding": "disabled", "extraction": "disabled", "extraction_response_mode": "disabled", "background_enrichment": "disabled", "model": "disabled", "background_repair": "disabled", "export_imp
+{
+  "n": 500,
+  "recall_at_1": 0.246,
+  "recall_at_5": 0.444,
+  "recall_at_10": 0.508,
+  "mrr_at_10": 0.3259,
+  "failures": 0,
+  "failure_rate": 0.0
+}
+latency {'p50': 416.94, 'p95': 864.4, 'p99': 1072.41}
+wrote /home/ramaaditya/titen-bench-20260804/results/titen-fts-pooled-19829-20260808-headfix.json

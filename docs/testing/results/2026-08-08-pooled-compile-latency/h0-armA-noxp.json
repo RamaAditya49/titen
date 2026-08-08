@@ -1,0 +1,230 @@
+{
+  "spec": "2026-08-08-pooled-compile-latency",
+  "phase": "H0",
+  "runtime": {
+    "bun": "1.3.14",
+    "sqlite": "3.53.0"
+  },
+  "workload": {
+    "source": "/tmp/pooled-questions.json",
+    "timed_questions": 3,
+    "of": 500
+  },
+  "store": {
+    "path": "/home/ramaaditya/titen-bench-20260808/probe.db",
+    "claims": 342129,
+    "observations": 19829,
+    "subject": "pooled-v1",
+    "subject_claims": 342129,
+    "visibility_histogram": [
+      {
+        "visibility": "private",
+        "n": 342129
+      }
+    ],
+    "claim_sources": 342129,
+    "contradicts": 0,
+    "feedback": 0
+  },
+  "captured_sql": "WITH candidate_ids AS (\n       SELECT claims_fts.claim_id,\n              bm25(claims_fts, 1.0, 0.0, 0.0, 0.0) AS lexical_bm25\n         FROM claims_fts\n         JOIN claims c ON c.id = claims_fts.claim_id\n        WHERE claims_fts MATCH (\n                'org_scope : \"' || lower(hex(?)) || '0\" AND '\n                || 'subject_scope : \"' || lower(hex(?)) || '0\" AND '\n                || 'statement : (' || ? || ')'\n              )\n          AND c.org_id = ?\n          AND c.subject_id = ?\n          AND (? = 1 OR c.project_id IS ?)\n          AND c.status IN ('active', 'disputed')\n          AND c.valid_from <= ?\n          AND (c.valid_to IS NULL OR c.valid_to > ?)\n          AND (\n    c.visibility = 'organization'\n    OR (c.visibility = 'private' AND c.actor_id = ?)\n    OR (\n      c.visibility = 'team'\n      AND c.workspace_id IS NOT NULL\n      AND EXISTS (\n        SELECT 1 FROM memberships access_membership\n         WHERE access_membership.org_id = c.org_id\n           AND access_membership.workspace_id = c.workspace_id\n           AND access_membership.principal_id = ?\n           AND access_membership.removed_at IS NULL\n      )\n    )\n  ) AND NOT EXISTS (\n    SELECT 1 FROM retention_exclusions retention\n     WHERE retention.org_id = c.org_id\n       AND retention.resource_type = 'claim'\n       AND retention.resource_id = c.id\n  )\n        ORDER BY bm25(claims_fts, 1.0, 0.0, 0.0, 0.0)\n        LIMIT ?\n     )\n     SELECT c.id,\n            c.kind,\n            c.statement,\n            c.confidence,\n            c.trust,\n            c.status,\n            c.visibility,\n            c.observer_id,\n            c.valid_from,\n            c.valid_to,\n            c.created_at,\n            candidate_ids.lexical_bm25 AS bm25,\n            CASE\n              WHEN c.status = 'disputed' THEN 1\n              WHEN EXISTS (\n    SELECT 1 FROM claim_sources s\n    JOIN observations o ON o.id = s.observation_id\n    WHERE s.claim_id = c.id AND s.relation = 'contradicts'\n      AND o.org_id = c.org_id AND (\n    o.visibility = 'organization'\n    OR (o.visibility = 'private' AND o.actor_id = ?)\n    OR (\n      o.visibility = 'team'\n      AND o.workspace_id IS NOT NULL\n      AND EXISTS (\n        SELECT 1 FROM memberships access_membership\n         WHERE access_membership.org_id = o.org_id\n           AND access_membership.workspace_id = o.workspace_id\n           AND access_membership.principal_id = ?\n           AND access_membership.removed_at IS NULL\n      )\n    )\n  ) AND NOT EXISTS (\n    SELECT 1 FROM retention_exclusions retention\n     WHERE retention.org_id = o.org_id\n       AND retention.resource_type = 'observation'\n       AND retention.resource_id = o.id\n  )\n  ) THEN 1\n              ELSE 0\n            END AS disputed,\n            (SELECT COUNT(*) FROM context_feedback f\n              WHERE f.claim_id = c.id AND f.outcome IN ('used', 'useful')) AS feedback_positive,\n            (SELECT COUNT(*) FROM context_feedback f\n              WHERE f.claim_id = c.id AND f.outcome IN ('irrelevant', 'incorrect', 'harmful')) AS feedback_negative,\n            (SELECT COUNT(*) FROM context_feedback f WHERE f.claim_id = c.id) AS feedback_total\n       FROM candidate_ids\n       JOIN claims c ON c.id = candidate_ids.claim_id\n      ORDER BY candidate_ids.lexical_bm25",
+  "captured_param_count": 14,
+  "cte_param_count": 12,
+  "explain_full": [
+    {
+      "id": 2,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CO-ROUTINE candidate_ids"
+    },
+    {
+      "id": 8,
+      "parent": 2,
+      "notused": 156,
+      "detail": "SCAN claims_fts VIRTUAL TABLE INDEX 0:M4"
+    },
+    {
+      "id": 33,
+      "parent": 2,
+      "notused": 46,
+      "detail": "SEARCH c USING INDEX claims_org_identity (id=? AND org_id=?)"
+    },
+    {
+      "id": 67,
+      "parent": 2,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 1"
+    },
+    {
+      "id": 72,
+      "parent": 67,
+      "notused": 39,
+      "detail": "SEARCH access_membership USING INDEX sqlite_autoindex_memberships_2 (org_id=? AND workspace_id=? AND principal_id=?)"
+    },
+    {
+      "id": 90,
+      "parent": 2,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 2"
+    },
+    {
+      "id": 94,
+      "parent": 90,
+      "notused": 39,
+      "detail": "SEARCH retention USING COVERING INDEX sqlite_autoindex_retention_exclusions_2 (org_id=? AND resource_type=? AND resource_id=?)"
+    },
+    {
+      "id": 118,
+      "parent": 2,
+      "notused": 0,
+      "detail": "USE TEMP B-TREE FOR ORDER BY"
+    },
+    {
+      "id": 128,
+      "parent": 0,
+      "notused": 111,
+      "detail": "SCAN candidate_ids"
+    },
+    {
+      "id": 131,
+      "parent": 0,
+      "notused": 46,
+      "detail": "SEARCH c USING INDEX sqlite_autoindex_claims_1 (id=?)"
+    },
+    {
+      "id": 155,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 6"
+    },
+    {
+      "id": 161,
+      "parent": 155,
+      "notused": 62,
+      "detail": "SEARCH o USING INDEX observations_workspace_scope (org_id=?)"
+    },
+    {
+      "id": 177,
+      "parent": 155,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 4"
+    },
+    {
+      "id": 182,
+      "parent": 177,
+      "notused": 39,
+      "detail": "SEARCH access_membership USING INDEX sqlite_autoindex_memberships_2 (org_id=? AND workspace_id=? AND principal_id=?)"
+    },
+    {
+      "id": 199,
+      "parent": 155,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 5"
+    },
+    {
+      "id": 203,
+      "parent": 199,
+      "notused": 39,
+      "detail": "SEARCH retention USING COVERING INDEX sqlite_autoindex_retention_exclusions_2 (org_id=? AND resource_type=? AND resource_id=?)"
+    },
+    {
+      "id": 214,
+      "parent": 155,
+      "notused": 45,
+      "detail": "SEARCH s USING COVERING INDEX sqlite_autoindex_claim_sources_1 (claim_id=? AND observation_id=? AND relation=?)"
+    },
+    {
+      "id": 231,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 7"
+    },
+    {
+      "id": 236,
+      "parent": 231,
+      "notused": 54,
+      "detail": "SEARCH f USING COVERING INDEX context_feedback_claim (claim_id=? AND outcome=?)"
+    },
+    {
+      "id": 268,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 8"
+    },
+    {
+      "id": 273,
+      "parent": 268,
+      "notused": 54,
+      "detail": "SEARCH f USING COVERING INDEX context_feedback_claim (claim_id=? AND outcome=?)"
+    },
+    {
+      "id": 308,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 9"
+    },
+    {
+      "id": 313,
+      "parent": 308,
+      "notused": 54,
+      "detail": "SEARCH f USING COVERING INDEX context_feedback_claim (claim_id=?)"
+    }
+  ],
+  "explain_cte": [
+    {
+      "id": 6,
+      "parent": 0,
+      "notused": 156,
+      "detail": "SCAN claims_fts VIRTUAL TABLE INDEX 0:M4"
+    },
+    {
+      "id": 31,
+      "parent": 0,
+      "notused": 46,
+      "detail": "SEARCH c USING INDEX claims_org_identity (id=? AND org_id=?)"
+    },
+    {
+      "id": 65,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 1"
+    },
+    {
+      "id": 70,
+      "parent": 65,
+      "notused": 39,
+      "detail": "SEARCH access_membership USING INDEX sqlite_autoindex_memberships_2 (org_id=? AND workspace_id=? AND principal_id=?)"
+    },
+    {
+      "id": 88,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 2"
+    },
+    {
+      "id": 92,
+      "parent": 88,
+      "notused": 39,
+      "detail": "SEARCH retention USING COVERING INDEX sqlite_autoindex_retention_exclusions_2 (org_id=? AND resource_type=? AND resource_id=?)"
+    },
+    {
+      "id": 119,
+      "parent": 0,
+      "notused": 0,
+      "detail": "USE TEMP B-TREE FOR ORDER BY"
+    }
+  ],
+  "spans": [
+    {
+      "label": "cte_only",
+      "median_ms": 61.55,
+      "samples": 3,
+      "rows": 1000
+    },
+    {
+      "label": "full_query",
+      "median_ms": 73439.7,
+      "samples": 3,
+      "rows": 1000
+    }
+  ]
+}

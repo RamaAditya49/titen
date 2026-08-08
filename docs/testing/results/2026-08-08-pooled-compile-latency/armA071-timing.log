@@ -1,0 +1,6 @@
+  compile 1/5: 75894 ms items=94
+  compile 2/5: 73822 ms items=92
+  compile 3/5: 73566 ms items=92
+  compile 4/5: 75636 ms items=93
+  compile 5/5: 74474 ms items=90
+{"samples_ms": [75893.9, 73821.9, 73565.6, 75635.7, 74474.3], "median_ms": 74474.3}

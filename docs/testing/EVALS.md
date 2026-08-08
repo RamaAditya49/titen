@@ -971,6 +971,32 @@ cannot serve the store at all) — the first significant lane-vs-lane
 separations this corpus has yielded. The per-instance condition remains a
 statistical tie for everyone; both sentences travel together.
 
+### The published 0.7.1 could not serve this store at all, 2026-08-08
+
+[Full report](./2026-08-08-pooled-compile-latency.md),
+[pre-registered](./2026-08-08-pooled-compile-latency-prereg.md) before the A/B.
+
+Every pooled and anchor latency figure in this file was measured on the
+**0.7.0** tarball. The #291 fix shipped in 0.7.1 wrote the `disputed`
+predicate as a join inside `EXISTS` while its comment claimed the nested form,
+and SQLite 3.53.0 reorders that to scan the organization's observations once
+per candidate. Measured on the same 342,129-claim pooled store: **0.7.1 takes
+a median 74.5 s per served compile**; the nested rewrite returns it to
+**417 ms p50 / 864 ms p95** with ranked output byte-identical to the published
+run (equal sha256, 500/500).
+
+Two standing consequences:
+
+- **A quoted latency figure must name the version it was measured on**, not
+  only the store condition. 864.9 ms is a 0.7.0/0.7.2 number and was never a
+  0.7.1 number.
+- **The plan is now guarded, because the result never was.**
+  `tests/integration/query-plan.test.ts` asserts the join order of the
+  candidate query, the by-id hydration, and authorized-source loading. The bad
+  plan reproduces on an **empty** store — SQLite picks it from the schema, not
+  from row counts — so both occurrences of this regression were catchable in
+  milliseconds by a test that looked at the plan instead of the answer.
+
 ### The improvement cycle failed every gate, and that is the evidence, 2026-08-08
 
 [Full report](./2026-08-08-pooled-improvements.md), protocol
