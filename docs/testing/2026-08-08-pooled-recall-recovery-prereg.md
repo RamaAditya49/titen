@@ -164,6 +164,37 @@ shipped top-10, top-20, top-50, and the whole returned pack; and the same with
 each E-PACK variant's admitted set. These bound reachability. They are not
 predictions, and clearing an oracle is not evidence that a real signal can.
 
+### Amendment 1 — oracle bounds, 2026-08-08
+
+Computed after the commit above, before any variant ran, by
+`harness/oracle.py` over `titen-fts-pooled-19829-20260807.ranked.json` and
+`titen-fts-anchor-20260807.ranked.json` through the shared scorer. No gate,
+definition or prediction changed. Artifact: `results/r1-oracle.json`.
+
+Recall@1 an omniscient re-ranker could reach over the first `W` distinct
+sessions of the shipped order:
+
+| `W` | 1 (baseline) | 5 | 10 | 20 | 50 | 100 | whole pack |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Pooled, 19,829** | 0.246 | 0.444 | 0.508 | 0.614 | **0.708** | 0.730 | **0.730** |
+| **Anchor, scoped** | 0.880 | 0.960 | 0.982 | 0.996 | 1.000 | 1.000 | 1.000 |
+
+The pooled figures reproduce the spec's arithmetic exactly: 0.708 is
+(254 + 100) / 500 and 0.730 is (254 + 111) / 500, so the C1 depth split and the
+stored ranked lists agree on where the 111 in-pack misses sit. Distinct sessions
+per pooled pack: min 20, p25 53, **median 62**, p75 71, max 90 — so `W = 50`
+covers most of the pack and `W = 100` is already `W = pack`.
+
+Two consequences fixed here rather than discovered later:
+
+- **The window's remaining headroom above 50 is 2.2 points.** Everything else
+  the pack could give is already inside `W = 50`, so a wider re-ranking window
+  is not a lever; only a better signal is.
+- **The anchor arm has no room to gain and every room to lose.** Its oracle at
+  `W = 50` is 1.000 against a 0.880 baseline, but the gate that matters there is
+  the 0.5-point loss guard, and every D-variant re-orders the anchor's top-50
+  too.
+
 ## Predictions
 
 Written before the first cell. The honest prior is that most of this is

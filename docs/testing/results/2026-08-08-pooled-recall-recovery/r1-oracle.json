@@ -1,0 +1,136 @@
+{
+  "spec": "2026-08-08-pooled-recall-recovery",
+  "phase": "R1 oracle",
+  "note": "recall@1 an omniscient re-ranker could reach over the first W distinct sessions of the shipped order; reachability bound, not an outcome",
+  "n": 500,
+  "pooled": {
+    "baseline": {
+      "n": 500,
+      "recall_at_1": 0.246,
+      "recall_at_5": 0.444,
+      "recall_at_10": 0.508,
+      "mrr_at_10": 0.3259,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.1143,
+          "recall_at_5": 0.3,
+          "recall_at_10": 0.3857
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 0.7143,
+          "recall_at_5": 0.8929,
+          "recall_at_10": 0.9286
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.0,
+          "recall_at_5": 0.1,
+          "recall_at_10": 0.1
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.1203,
+          "recall_at_5": 0.3459,
+          "recall_at_10": 0.3985
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.1579,
+          "recall_at_5": 0.3609,
+          "recall_at_10": 0.4361
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.4872,
+          "recall_at_5": 0.6923,
+          "recall_at_10": 0.7821
+        }
+      }
+    },
+    "windows": {
+      "1": 0.246,
+      "5": 0.444,
+      "10": 0.508,
+      "20": 0.614,
+      "50": 0.708,
+      "100": 0.73,
+      "pack": 0.73
+    },
+    "pack_sessions": {
+      "min": 20,
+      "p25": 53,
+      "median": 62,
+      "p75": 71,
+      "max": 90
+    }
+  },
+  "anchor": {
+    "baseline": {
+      "n": 500,
+      "recall_at_1": 0.88,
+      "recall_at_5": 0.96,
+      "recall_at_10": 0.982,
+      "mrr_at_10": 0.9147,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "by_type": {
+        "single-session-user": {
+          "n": 70,
+          "recall_at_1": 0.9,
+          "recall_at_5": 0.9714,
+          "recall_at_10": 1.0
+        },
+        "single-session-assistant": {
+          "n": 56,
+          "recall_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        },
+        "single-session-preference": {
+          "n": 30,
+          "recall_at_1": 0.4,
+          "recall_at_5": 0.8,
+          "recall_at_10": 0.9
+        },
+        "multi-session": {
+          "n": 133,
+          "recall_at_1": 0.9023,
+          "recall_at_5": 0.985,
+          "recall_at_10": 1.0
+        },
+        "temporal-reasoning": {
+          "n": 133,
+          "recall_at_1": 0.8496,
+          "recall_at_5": 0.9248,
+          "recall_at_10": 0.9549
+        },
+        "knowledge-update": {
+          "n": 78,
+          "recall_at_1": 0.9744,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0
+        }
+      }
+    },
+    "windows": {
+      "1": 0.88,
+      "5": 0.96,
+      "10": 0.982,
+      "20": 0.996,
+      "50": 1.0,
+      "100": 1.0,
+      "pack": 1.0
+    },
+    "pack_sessions": {
+      "min": 1,
+      "p25": 22,
+      "median": 27,
+      "p75": 30,
+      "max": 38
+    }
+  }
+}
