@@ -166,7 +166,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   // `top_k` omitted, the default, both branches ask for the same ids, because
   // every candidate is returned and therefore already needs citations; there the
   // gate saves the second `rankCandidates` pass and no database work whatsoever.
-  const preliminary = rankCandidates(candidates, new Date(at));
+  const preliminary = rankCandidates(candidates, new Date(at), lexical.termsUsed);
   const contested = hasDeadHeat(preliminary, topK);
   const sources = await loadAuthorizedSources(
     ctx.app.db,
@@ -179,7 +179,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
     for (const candidate of candidates)
       candidate.evidence_depth = supportingDepth(sources.get(candidate.id));
 
-  const allRanked = contested ? rankCandidates(candidates, new Date(at)) : preliminary;
+  const allRanked = contested ? rankCandidates(candidates, new Date(at), lexical.termsUsed) : preliminary;
   // `top_k` is applied after ranking and before the budget, so the token budget
   // is spent on the items the caller asked for. What the bound discarded is
   // still counted into `budget.omitted_items`: a caller who cannot tell a

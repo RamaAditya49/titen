@@ -496,18 +496,25 @@ test("the absolute cosine floor rejects a best bad neighbor before hydration", a
   assert.equal(vectorHydrations, 1, "an eligible vector id is hydrated once");
 });
 
-test("narrow-band vector similarity is normalized before ranking", () => {
+test("narrow-band vector similarity passes through and still orders the set", () => {
+  // Cosine used to be min-max normalized inside the set, which stretched a
+  // 0.002 gap to the full 0..1 and pinned the best to exactly 1 however poor it
+  // was. #227: it is an absolute 0..1 already, so it is used as it stands.
   const candidates = [rankInput("near", 0.8, 0.991), rankInput("exact", 0.8, 0.993)];
   const normalized = normalizeVectorSimilarity(candidates);
-  assert.equal(normalized.get("near"), 0);
-  assert.equal(normalized.get("exact"), 1);
+  assert.equal(normalized.get("near"), 0.991);
+  assert.equal(normalized.get("exact"), 0.993);
+
+  // The narrow band still decides the order — that was the property worth
+  // keeping, and it never needed the stretch to hold.
   const ranked = rankCandidates(candidates, new Date("2026-07-30T00:00:00.000Z"));
   assert.equal(ranked[0]!.candidate.id, "exact");
-  assert.equal(ranked[0]!.components.relevance, 1);
+  assert.equal(ranked[0]!.components.relevance, 0.993);
+  assert.ok(ranked[0]!.score > ranked[1]!.score, "the best no longer ties the rest at a ceiling");
 
   const tied = normalizeVectorSimilarity([rankInput("a", 1, 0.99), rankInput("b", 1, 0.99)]);
-  assert.equal(tied.get("a"), 1);
-  assert.equal(tied.get("b"), 1);
+  assert.equal(tied.get("a"), 0.99);
+  assert.equal(tied.get("b"), 0.99);
 
   const absent = normalizeVectorSimilarity([rankInput("none", 1, 0)]);
   assert.equal(absent.has("none"), false);
@@ -515,12 +522,14 @@ test("narrow-band vector similarity is normalized before ranking", () => {
 
 test("a score tie between the lexical best and the semantic best breaks on cosine", () => {
   const now = new Date("2026-07-30T00:00:00.000Z");
-  // Each arm is min-max normalized inside the set, so each arm's own best scores
-  // relevance exactly 1 and the two claims tie on the whole weighted score. This
-  // is the ordinary hybrid case, not a corner: on the release fixture it decided
-  // rank 1 of `id_temporal_endpoint` and `jv_in_id_preference` with a uuid, and
-  // the measured recall@1 flipped between repeats because of it.
-  const lexicalBest = { ...rankInput("aaa", 1), bm25: -9.082 };
+  // Both arms used to be min-max normalized, so each arm's own best scored
+  // relevance exactly 1 and any hybrid pair tied by construction. After #227
+  // both are absolute, so a tie has to be built rather than assumed: -9.5474
+  // per term saturates to 0.7207, the cosine the other candidate carries.
+  // The case is still the ordinary hybrid one — on the release fixture it
+  // decided rank 1 of `id_temporal_endpoint` and `jv_in_id_preference` with a
+  // uuid, and measured recall@1 flipped between repeats because of it.
+  const lexicalBest = { ...rankInput("aaa", 1), bm25: -9.547404 };
   const semanticBest = { ...rankInput("zzz", 1, 0.7207) };
   const ranked = rankCandidates([lexicalBest, semanticBest], now);
   assert.equal(ranked[0]!.score, ranked[1]!.score, "the fixture must actually tie on score");
@@ -531,8 +540,8 @@ test("a score tie between the lexical best and the semantic best breaks on cosin
   // Two cosines are compared only against each other, so no constant and no
   // cross-scale comparison enters: the larger raw cosine wins a tied score even
   // when within-set normalization has already flattened both to relevance 1.
-  const near = { ...rankInput("aaa", 1, 0.7026), bm25: -4 };
-  const nearer = { ...rankInput("zzz", 1, 0.7207), bm25: -4 };
+  const near = { ...rankInput("aaa", 1, 0.7026), bm25: -9.547404 };
+  const nearer = { ...rankInput("zzz", 1, 0.7207), bm25: -9.547404 };
   const bothSemantic = rankCandidates([near, nearer], now);
   assert.equal(bothSemantic[0]!.score, bothSemantic[1]!.score);
   assert.equal(bothSemantic[0]!.candidate.id, "zzz");
@@ -636,7 +645,9 @@ test("corroboration decides a dead heat and never overrides score or cosine", ()
   const semantic = rankCandidates(
     [
       { ...rankInput("cosine", 0.8, 0.91), bm25: -4 },
-      { ...rankInput("corroborated", 0.8, 0.72), bm25: -4, evidence_depth: 9 },
+      // -37.4111 per term saturates to 0.91, so both reach relevance 0.91 —
+      // one through cosine, one through lexical — and genuinely tie on score.
+      { ...rankInput("corroborated", 0.8, 0.72), bm25: -37.411111, evidence_depth: 9 },
     ],
     now,
   );
@@ -670,7 +681,7 @@ test("a dead heat is detected only inside the window that is returned", () => {
   const semantic = rankCandidates(
     [
       { ...rankInput("x", 0.8, 0.91), bm25: -4 },
-      { ...rankInput("y", 0.8, 0.72), bm25: -4 },
+      { ...rankInput("y", 0.8, 0.72), bm25: -37.411111 },
     ],
     now,
   );
