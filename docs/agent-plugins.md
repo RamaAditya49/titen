@@ -1,22 +1,21 @@
 # Agent plugins and host kits
 
-Titen has one memory implementation: the authenticated Streamable HTTP MCP
-endpoint at `/mcp`. The files in this repository only package its portable
-Agent Skill and connection settings for different hosts.
+Titen has two memory entry points, and the files in this repository package
+its portable Agent Skill and connection settings for both across hosts.
 
-Set these outside source control before installing a host artifact:
+- **Local stdio.** `titen mcp` with neither `TITEN_MCP_URL` nor
+  `TITEN_API_KEY` set opens or creates `~/.titen/memory.db`, provisions its own
+  org, workspace, project, and owner as real rows, and serves MCP over stdio
+  in-process: no HTTP hop, no key, no outbound call, lexical FTS retrieval only.
+- **Served HTTP.** The authenticated Streamable HTTP MCP endpoint at `/mcp`, for
+  one instance that several agents and people share.
 
-```bash
-export TITEN_MCP_URL='http://127.0.0.1:8787/mcp'
-export TITEN_API_KEY='replace-with-an-agent-specific-key'
-```
+`titen` is a Bun program. Without Bun on `PATH` it exits with
+`titen: error: bun was not found on PATH.`;
+`curl -fsSL https://titen.dev/install.sh | bash` installs Bun when it is
+missing.
 
-`TITEN_MCP_URL` is the complete MCP endpoint, including `/mcp`. Give every
-agent its own narrow, revocable key. Never paste a key into a repository file.
-
-Hosts with native Streamable HTTP support should connect to that URL directly.
-For a host that can launch only a local stdio MCP server, install the CLI and
-register this inherited-environment command instead:
+Every host artifact below registers the same command:
 
 ```json
 {
@@ -25,6 +24,28 @@ register this inherited-environment command instead:
 }
 ```
 
+Which entry point that command uses is decided entirely by the environment it
+inherits.
+
+## Connecting to a served instance
+
+Set these outside source control before installing a host artifact:
+
+```bash
+export TITEN_MCP_URL='http://127.0.0.1:8787/mcp'
+export TITEN_API_KEY='replace-with-an-agent-specific-key'
+```
+
+Set **both or neither**. With exactly one of the two set, `titen mcp` throws
+rather than guessing which store you meant.
+
+`TITEN_MCP_URL` is the complete MCP endpoint, including `/mcp`. Give every
+agent its own narrow, revocable key. Never paste a key into a repository file.
+
+Hosts with native Streamable HTTP support should connect to that URL directly.
+For a host that can launch only a local stdio MCP server, install the CLI and
+register the inherited-environment command above instead.
+
 The bridge stores no state, opens no local socket, and writes only MCP messages
 to stdout. Keep both environment variables in the host's secret-aware process
 environment; do not copy their values into the command arguments or project
@@ -32,9 +53,10 @@ configuration.
 
 ## Fast path
 
-Install and start Titen first, then choose one connection command. Native HTTP
-avoids an extra process; `titen mcp` is the fallback for hosts that only launch
-stdio servers.
+Install the CLI first. For local stdio there is nothing else to start; for a
+served instance, start it and export both variables before connecting. Native
+HTTP avoids an extra process; `titen mcp` is both the local entry point and the
+fallback for hosts that only launch stdio servers.
 
 | Host | Connection | Check |
 | --- | --- | --- |
@@ -42,11 +64,13 @@ stdio servers.
 | Claude Code | `claude mcp add --transport stdio --scope user titen -- titen mcp` | `claude mcp get titen` and `/mcp` |
 | OpenClaw | merge `integrations/openclaw/openclaw.json` or install the ClawHub bundle | `openclaw mcp doctor titen --probe` |
 | Hermes | stdio bridge with explicit environment-name mapping below | `hermes mcp test titen` |
-| Generic stdio host | command `titen`, args `mcp` | confirm all nine tools appear |
+| Generic stdio host | command `titen`, args `mcp` | confirm all eighteen tools appear |
 
 After connecting, ask the host to resolve the current Git origin and compile
-Titen context for one concrete task. A correct connection lists nine tools and
-uses `titen_project_resolve` before the first project-scoped compile.
+Titen context for one concrete task. A correct connection lists eighteen tools —
+the nine `titen_*` tools plus the nine `@modelcontextprotocol/server-memory`
+compatibility names — and uses `titen_project_resolve` before the first
+project-scoped compile.
 
 ## What ships
 
@@ -64,9 +88,12 @@ uses `titen_project_resolve` before the first project-scoped compile.
 | TRAE | Native MCP UI recipe + Agent Skill | `.agents/skills/titen-memory` |
 
 The plugin names differ, but current repository artifacts target the same nine
-server tools: `titen_project_resolve`, `titen_compile`, `titen_remember`,
-`titen_consolidate`, `titen_feedback`, `titen_checkpoint_save`,
-`titen_checkpoint_get`, `titen_lease_acquire`, and `titen_handoff`.
+`titen_*` server tools: `titen_project_resolve`, `titen_compile`,
+`titen_remember`, `titen_consolidate`, `titen_feedback`,
+`titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`, and
+`titen_handoff`. The server also answers the nine
+`@modelcontextprotocol/server-memory` compatibility names, so a host that lists
+tools sees eighteen.
 
 ## Check and update
 
@@ -108,7 +135,8 @@ in user configuration, not in the plugin. See the [Codex MCP details](./agent-gu
 ## Claude Code
 
 The shortest connection path uses Claude Code's user-scoped stdio MCP config.
-Start Claude from a process that has both Titen environment variables:
+With no Titen environment variables set this is the local store; to bridge to a
+served instance, start Claude from a process that has both of them:
 
 ```bash
 claude mcp add --transport stdio --scope user titen -- titen mcp
@@ -267,7 +295,7 @@ Merge the `titen` entry from `integrations/windsurf/mcp_config.json` into
 `~/.codeium/windsurf/mcp_config.json`, then copy
 `integrations/windsurf/titen-memory.md` to
 `.windsurf/rules/titen-memory.md` in the target workspace. Restart Cascade and
-verify that the nine tools appear. Windsurf expands `${env:NAME}` in remote MCP
+verify that the eighteen tools appear. Windsurf expands `${env:NAME}` in remote MCP
 URLs and headers; see [Cascade MCP](https://docs.windsurf.com/windsurf/cascade/mcp)
 and [Rules](https://docs.windsurf.com/windsurf/cascade/memories).
 

@@ -79,7 +79,8 @@ flowchart TB
 
 | Capability | Cloudflare | VPS | Local computer |
 | --- | --- | --- | --- |
-| HTTP | Worker `fetch` | `Bun.serve` | `Bun.serve` on loopback |
+| HTTP | Worker `fetch` | `Bun.serve` | `Bun.serve` on loopback, or none in local stdio mode |
+| MCP transport | Streamable HTTP `/mcp` | Streamable HTTP `/mcp` | in-process stdio (`titen mcp`, no HTTP hop), or Streamable HTTP `/mcp` |
 | SQL | D1 | `bun:sqlite` | `bun:sqlite` |
 | FTS | D1 SQLite FTS5 | SQLite FTS5 | SQLite FTS5 |
 | Vector | optional Vectorize | optional `sqlite-vec` | optional `sqlite-vec` |
@@ -90,6 +91,13 @@ flowchart TB
 | Crypto | Web Crypto | Web Crypto | Web Crypto |
 
 The core does not require `nodejs_compat` on Workers.
+
+On a local computer HTTP is optional, not the only path. `titen mcp` with
+neither `TITEN_MCP_URL` nor `TITEN_API_KEY` set runs the same kernel in-process
+against `~/.titen/memory.db` and speaks MCP over stdio: no listener, no key, no
+outbound call. Setting both variables makes the same command a stdio-to-HTTP
+bridge to a served instance; setting exactly one is an error rather than a
+guess.
 
 The base VPS does not require Postgres. A future `pgvector` adapter is justified
 only when measured scale, concurrency, or an existing enterprise Postgres

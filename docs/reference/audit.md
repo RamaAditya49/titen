@@ -196,6 +196,11 @@ npx titen-memory audit ~/.titen/memory.db
 npx titen-memory audit ./memory.jsonl --json > audit.json
 ```
 
+The published bin is a Bun program, so these need Bun on `PATH`; without it the
+command exits with `titen: error: bun was not found on PATH.` and audits
+nothing. `curl -fsSL https://titen.dev/install.sh | bash` installs Bun when it
+is missing.
+
 ## If you publish a result
 
 Publish the rule alongside the number, publish the counterexamples, and publish

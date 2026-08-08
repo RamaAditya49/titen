@@ -1,7 +1,7 @@
 {
   "name": "titen-memory",
   "version": "0.2.0",
-  "description": "Use Titen's evidence-grounded collaborative memory through its existing authenticated MCP server.",
+  "description": "Use Titen's evidence-grounded collaborative memory. The local stdio mode needs no configuration; a served Titen endpoint is the alternative for a shared store.",
   "author": {
     "name": "Titen contributors",
     "url": "https://github.com/RamaAditya49/titen"
@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "Titen Memory",
     "shortDescription": "Evidence-grounded memory for agent teams",
-    "longDescription": "Recall bounded project context, record verified durable signals, and coordinate checkpoints, leases, and handoffs through a configured Titen MCP server.",
+    "longDescription": "Recall bounded project context, record verified durable signals, and coordinate checkpoints, leases, and handoffs through the Titen MCP server. The local stdio mode needs no configuration; a served Titen endpoint is the alternative for a shared store.",
     "developerName": "Titen contributors",
     "category": "Productivity",
     "capabilities": ["Instructions"],

@@ -1,4 +1,4 @@
 name: titen-memory
 version: 0.1.0
-description: Evidence-grounded collaborative memory instructions for a configured Titen MCP server
+description: Evidence-grounded collaborative memory instructions for the Titen MCP server; the local stdio mode needs no configuration, a served endpoint is the alternative for a shared store
 author: Titen contributors

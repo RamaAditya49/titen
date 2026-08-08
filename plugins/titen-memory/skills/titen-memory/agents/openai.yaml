@@ -7,4 +7,4 @@ dependencies:
   tools:
     - type: "mcp"
       value: "titen"
-      description: "Operator-configured Titen MCP server"
+      description: "Titen MCP server: local stdio needs no configuration, a served endpoint is the alternative for a shared store"

@@ -293,12 +293,26 @@ endpoint uses the stable `INVALID_RESPONSE` code.
 
 ## MCP integration
 
-Titen speaks MCP over HTTP at `/mcp`, so an agent host can use it without the
-SDK. The endpoint is authenticated: pass the API key as a bearer token.
+Titen speaks MCP two ways, so an agent host can use it without the SDK.
+
+**Local stdio, no key.** `titen mcp` with neither `TITEN_MCP_URL` nor
+`TITEN_API_KEY` set opens or creates `~/.titen/memory.db`, provisions its own
+org, workspace, project, and owner, and serves MCP over stdio in-process. There
+is no HTTP hop, no key, and no outbound call; retrieval is lexical FTS only.
+`titen` is a Bun program and needs Bun on `PATH`
+(`curl -fsSL https://titen.dev/install.sh | bash` installs it).
+
+**Streamable HTTP at `/mcp`.** The served endpoint is authenticated: pass the
+API key as a bearer token. `titen mcp` bridges stdio to it when both
+`TITEN_MCP_URL` and `TITEN_API_KEY` are set. Set both or neither — with exactly
+one set the command throws rather than guessing which store you meant.
 
 The [host distribution guide](./agent-plugins.md) covers the shipped Codex,
 Claude Code/ZCode/OpenClaw, Cursor, Hermes, Pi, OpenCode, Windsurf, and TRAE
-artifacts. Current repository artifacts reuse this endpoint and nine-tool boundary.
+artifacts. Current repository artifacts reuse these entry points and the same
+nine-tool `titen_*` boundary; the server additionally answers the nine
+`@modelcontextprotocol/server-memory` compatibility names, so `tools/list`
+returns eighteen.
 
 ### Codex reference plugin
 

@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.RamaAditya49/titen-memory",
   "title": "Titen Memory",
-  "description": "Evidence-grounded agent memory with mandatory provenance, on local SQLite or Cloudflare D1",
+  "description": "Agent memory with no API key, no LLM, no embedding provider. Every memory keeps its source.",
   "version": "0.7.2",
   "websiteUrl": "https://titen.dev",
   "repository": {

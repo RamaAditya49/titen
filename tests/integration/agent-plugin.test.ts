@@ -84,7 +84,10 @@ test("the repo marketplace installs one valid skills-only Titen plugin", () => {
     {
       type: "mcp",
       value: "titen",
-      description: "Operator-configured Titen MCP server",
+      // Local stdio mode has shipped since 0.7.0, so a configured server is not a
+      // precondition and no packaged manifest may say it is.
+      description:
+        "Titen MCP server: local stdio needs no configuration, a served endpoint is the alternative for a shared store",
     },
   ]);
 

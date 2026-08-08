@@ -1004,7 +1004,11 @@ that server returns and the same object as `structuredContent`. The `titen_*`
 tools are unchanged; this is an addition, not a mode.
 
 Switching is one line of MCP configuration — replace the reference server's
-command with `npx -y titen-memory mcp` and keep the same tool vocabulary. No
+command with `npx -y titen-memory mcp` and keep the same tool vocabulary. That
+line needs Bun on `PATH`: the published bin is a Bun program, so on a Node-only
+machine it exits with `titen: error: bun was not found on PATH.` rather than
+starting. `curl -fsSL https://titen.dev/install.sh | bash` installs Bun when it
+is missing. No
 `outputSchema` is published for these tools, and the reference server's
 `memory://knowledge-graph` resource and its resource subscriptions are not
 served; tool calls are.

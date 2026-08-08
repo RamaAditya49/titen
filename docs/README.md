@@ -17,6 +17,7 @@ context without a documentation-site dependency.
 | [Architecture](./architecture/overview.md)                         | Current repository state, target components, and runtime boundaries           |
 | [Memory lifecycle](./architecture/memory-lifecycle.md)             | End-to-end Level 5/6 flow, adaptation loop, and embedding/vector architecture |
 | [Memory Atlas](./architecture/memory-atlas.md)                     | Authorized visual evidence, conflict, scope, and release projections          |
+| [Agent plugins](./agent-plugins.md)                                | The two entry points — keyless local stdio and served HTTP `/mcp` — and the per-host install kits |
 | [Agent integration](./architecture/agent-integration.md)           | MCP/REST install, hooks, attribution, tags, events, and orchestration         |
 | [Memory model](./architecture/memory-model.md)                     | Evidence, claims, temporal state, context, and feedback                       |
 | [Collaboration](./architecture/collaboration.md)                   | Identity, visibility, parallel work, governance, and federation               |

@@ -102,7 +102,15 @@ same.
 | Windsurf | model-decision rule + config kit | native remote MCP | deferred |
 | TRAE | Agent Skill + UI recipe | native remote MCP UI | deferred |
 | Generic MCP client | Agent Skill | Streamable HTTP `/mcp` | host-specific |
+| Any stdio host, no service | CLI only | `titen mcp` in-process over stdio; no HTTP, no key | host-specific |
 | Agent without MCP | short instructions | `TitenClient`/REST | explicit calls |
+
+Every "remote MCP" row above can also be reached through `titen mcp`, which is
+the single command for both entry points: with `TITEN_MCP_URL` and
+`TITEN_API_KEY` both set it bridges stdio to that served instance, with neither
+set it serves the local `~/.titen/memory.db` store in-process, and with exactly
+one set it throws rather than guessing. The CLI is a Bun program and requires
+Bun on `PATH`.
 
 ## Verified host matrix and packaging decision
 
