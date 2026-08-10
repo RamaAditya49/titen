@@ -26,6 +26,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-08-10
+
+Three fixes found while wiring a live Titen into Claude Code as a memory
+server, and every one of them cost hours before it was understood.
+
 ### Fixed
 
 - **A bridge started without its environment answered every lookup from the
