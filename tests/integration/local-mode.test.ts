@@ -89,12 +89,28 @@ test("with no environment set, the stdio entry point serves memory from ~/.titen
     }),
   ]);
   assert.equal(first.exitCode, 0, first.stderr);
-  assert.equal(first.stderr, "", "stdio transport keeps stdout and stderr clean");
+  // Which store answered is exactly what a silent fallback hides. A client
+  // config that shadows the bridge entry with an env-less one sends `titen mcp`
+  // here instead of to the served instance; every lookup then truthfully
+  // returns nothing, and without this line neither stream says why.
+  assert.equal(
+    first.stderr,
+    "titen: no TITEN_MCP_URL/TITEN_API_KEY set; serving the local store "
+      + `${join(home, ".titen", "memory.db")}\n`,
+    "local mode names the store it opened, and says nothing else",
+  );
   assert.equal(first.replies.length, 4, "the notification gets no reply");
 
   const [handshake, tools, project, remembered] = first.replies;
   assert.equal(handshake.result.serverInfo.name, "titen");
   assert.equal(handshake.result.protocolVersion, "2025-06-18");
+  // stderr reaches a host log file; `instructions` reaches the model, which is
+  // the reader who would otherwise take an empty pack for an empty memory.
+  assert.ok(
+    handshake.result.instructions.includes(join(home, ".titen", "memory.db")),
+    "the handshake names the store, in band",
+  );
+  assert.match(handshake.result.instructions, /neither TITEN_MCP_URL nor TITEN_API_KEY was set/);
   assert.ok(
     tools.result.tools.some((tool: { name: string }) => tool.name === "titen_remember"),
     "the same MCP tool surface is served locally",

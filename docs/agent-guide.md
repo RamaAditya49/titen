@@ -298,7 +298,14 @@ Titen speaks MCP two ways, so an agent host can use it without the SDK.
 **Local stdio, no key.** `titen mcp` with neither `TITEN_MCP_URL` nor
 `TITEN_API_KEY` set opens or creates `~/.titen/memory.db`, provisions its own
 org, workspace, project, and owner, and serves MCP over stdio in-process. There
-is no HTTP hop, no key, and no outbound call; retrieval is lexical FTS only.
+is no HTTP hop, no key, and no outbound call; retrieval is lexical FTS only. It
+says so on stderr — `titen: no TITEN_MCP_URL/TITEN_API_KEY set; serving the
+local store …` — and says it again in the `instructions` of the `initialize`
+result, because a host config that drops the two variables reaches this mode
+looking exactly like a healthy bridge, then answers every lookup from a store
+you did not mean. stderr goes to the host's log file; `instructions` goes to
+the model, which is the one that has to tell an empty store from an empty
+memory.
 `titen` is a Bun program and needs Bun on `PATH`
 (`curl -fsSL https://titen.dev/install.sh | bash` installs it).
 

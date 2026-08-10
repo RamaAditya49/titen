@@ -1033,8 +1033,9 @@ that server writes beside its own module, not in the directory it was launched
 from, so the cwd alone found nothing for anyone who ran it the documented way.
 Both names are tried at each location: `memory.jsonl` since 2025.11.25 and
 `memory.json` before it. When `MEMORY_FILE_PATH` is set and no file is there,
-and on a first run that finds no graph at all, `titen mcp` says so on stderr
-instead of starting empty in silence.
+`titen mcp` says so on stderr instead of starting empty in silence. A first run
+that simply finds no graph says nothing about the import, because most first
+runs are not migrations; what it always prints is the store line below.
 Import runs through these same MCP tools, reports its counts on stderr, and
 records the source path in `~/.titen/memory.db.imported` so a later start does
 not resurrect entities deleted since. A failed import leaves that marker
@@ -1098,7 +1099,11 @@ restart reuses one owner instead of minting a credential per process.
 Nothing listens on a socket, no request leaves the process, and no embedding
 provider is configured, so retrieval is lexical FTS only and
 `meta.degraded.vector` reports `disabled`. Setting exactly one of the two
-variables remains an error rather than a silent downgrade to the local store.
+variables remains an error rather than a silent downgrade to the local store,
+and reaching local mode is announced twice: one line on stderr naming the store
+and the two unset variables, and the same fact appended to the `instructions`
+string in the `initialize` result, where the model reading an empty context
+pack can see it. A served deployment appends nothing.
 
 The Streamable HTTP endpoint accepts JSON responses without server-side SSE.
 `GET /mcp` therefore returns `405`. A present `Origin` must match the request URL

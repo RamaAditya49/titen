@@ -7,6 +7,14 @@ playwright-report/
 .dev.vars
 .env
 .env.*
+# `titen bootstrap` prints an org id, an API key, and a dashboard password;
+# `titen key create` prints a key; local mode writes `<store>.key` beside the
+# database. The default `--db` is relative to the working directory, so the
+# repository root is a place all three get run.
+*.key
+*.pem
+*.p12
+secrets/
 *.db
 *.db-shm
 *.db-wal

@@ -26,6 +26,33 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A bridge started without its environment answered every lookup from the
+  wrong store and said so nowhere.** With neither `TITEN_MCP_URL` nor
+  `TITEN_API_KEY` set, `titen mcp` falls back to `~/.titen/memory.db`. That is
+  correct, and a host configuration can reach it by accident: on the machine
+  where this was found, a project-scoped MCP registration with an empty `env`
+  shadowed the user-scoped one that carried both variables. The session looked
+  healthy — connected, eighteen tools — while `titen_compile` returned zero
+  items for a subject whose claim the served instance returned over HTTP in the
+  same minute. Local mode now names the store it opened and both unset
+  variables twice: once on stderr, and once appended to the `instructions` in
+  the `initialize` result, which is the copy the model reading an empty context
+  pack can actually see. A served deployment appends nothing.
+- **A failed bridged request was one sentence for every cause.** A revoked key,
+  a wrong port and a restarted server all produced exit 0, empty stderr, and
+  the same `-32000 Titen MCP request failed.`; a notification produced no reply
+  and no trace at all. The endpoint and the caught reason now go to stderr for
+  requests and notifications alike, with the API key redacted as it already was
+  in a response body, and an upstream answer that is not JSON-RPC reports its
+  HTTP status. The body is still never printed, because it carries memory.
+- **`.gitignore` covered databases and no key material.** `titen.key`,
+  `keys/owner.key` and `secrets/x.pem` were all committable in the repository
+  whose CLI prints an API key and a dashboard password, and whose default
+  `--db` is relative to the working directory. `*.key`, `*.pem`, `*.p12` and
+  `secrets/` are now ignored.
+
 ## [0.7.3] — 2026-08-08
 
 Prompted by an external audit of `b2d2fba`. 61 of its claims were verified

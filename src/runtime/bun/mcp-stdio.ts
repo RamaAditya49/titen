@@ -234,6 +234,11 @@ export async function openLocalStore(dbPath = localStorePath()): Promise<{
         revision: TITEN_VERSION,
         runtime: "bun-sqlite",
         secretStorageReady: await prepareSigningSecrets(db, undefined),
+        // Said in-band because stderr is not where the caller looks. An agent
+        // that gets an empty pack reads it as "no memory recorded"; this is
+        // the one place the answer "wrong database" can reach it.
+        mcpInstructionsNote:
+          ` This session is Titen local mode: every answer comes from the store at ${dbPath}, because neither TITEN_MCP_URL nor TITEN_API_KEY was set. A served instance's memory is not what you are reading.`,
       }),
       apiKey,
       close: () => database.close(),
@@ -397,6 +402,15 @@ async function runLocalMcpStdio(options: StdioOptions): Promise<void> {
   const dbPath = localStorePath();
   const local = await openLocalStore(dbPath);
   try {
+    // Falling back is correct; falling back in silence is not. A client config
+    // whose entry for Titen carries no environment reaches this branch looking
+    // identical to a healthy bridge — connected, full tool list — while every
+    // lookup answers from an unrelated store and truthfully returns nothing.
+    // One line on the transport's own log stream names the store and the
+    // missing variables, so that mode is readable instead of inferred.
+    console.error(
+      `titen: no TITEN_MCP_URL/TITEN_API_KEY set; serving the local store ${dbPath}`,
+    );
     const source = referenceMemoryPath();
     // stdout is the MCP transport, so every word about the import goes to
     // stderr. A failure leaves the marker unwritten and the next start retries;
@@ -414,11 +428,11 @@ async function runLocalMcpStdio(options: StdioOptions): Promise<void> {
       // The user said where their graph is and it is not there. Silence here
       // reads as "Titen lost my memories", so name the path actually tried.
       //
-      // Only this case warns. A first run that simply finds no graph says
-      // nothing: most first runs are not migrations, some clients surface
-      // stderr as an error, and `local-mode.test.ts` holds the stdio entry
-      // point to a clean stderr on a normal start. Finding the graph is what
-      // fixes the silent-empty-store failure — see referenceMemoryCandidates.
+      // Only this case warns about the import. A first run that simply finds
+      // no graph says nothing, because most first runs are not migrations;
+      // `local-mode.test.ts` pins stderr on a normal start to the store line
+      // above and nothing else. Finding the graph is what fixes the
+      // silent-empty-store failure — see referenceMemoryCandidates.
       console.error(
         `titen: MEMORY_FILE_PATH is set to ${referenceMemoryCandidates()[0]} but no file is there; starting empty.`,
       );
@@ -482,13 +496,26 @@ export async function runMcpStdio(options: StdioOptions = {}): Promise<void> {
         jsonrpc?: unknown;
         result?: { protocolVersion?: unknown };
       };
-      if (parsed.jsonrpc !== "2.0") throw new Error("invalid upstream response");
+      // The status is in the message because a revoked key (401) and a wrong
+      // path (404) are otherwise the same sentence. The body is not, because
+      // it can carry memory content.
+      if (parsed.jsonrpc !== "2.0")
+        throw new Error(`HTTP ${response.status} was not a JSON-RPC response`);
       if (
         (message as { method?: unknown }).method === "initialize" &&
         typeof parsed.result?.protocolVersion === "string"
       ) protocolVersion = parsed.result.protocolVersion;
       write(body);
-    } catch {
+    } catch (error) {
+      // A revoked key, a restarted server and a wrong port all produced the
+      // same opaque -32000 with an empty stderr, and a notification produced
+      // no reply at all. Name the endpoint and the reason; the key is redacted
+      // here the same way it is redacted out of a response body.
+      console.error(
+        `titen: ${endpoint} failed: ${
+          (error instanceof Error ? error.message : String(error)).replaceAll(apiKey, "[redacted]")
+        }`,
+      );
       if (id !== undefined) write(failure(id, -32000, "Titen MCP request failed."));
     }
   };

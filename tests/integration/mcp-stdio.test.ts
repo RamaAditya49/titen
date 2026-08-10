@@ -79,19 +79,31 @@ test("parse and network failures are sanitized without ending the bridge", async
     ].join("\n"));
   }
   const output: string[] = [];
+  const logged: string[] = [];
   const secret = "never-print-this-key";
-  await runMcpStdio({
-    endpoint: "http://127.0.0.1:9/mcp",
-    apiKey: secret,
-    input: input(),
-    write: (line) => output.push(line),
-  });
+  const realError = console.error;
+  console.error = (line: string) => void logged.push(line);
+  try {
+    await runMcpStdio({
+      endpoint: "http://127.0.0.1:9/mcp",
+      apiKey: secret,
+      input: input(),
+      write: (line) => output.push(line),
+    });
+  } finally {
+    console.error = realError;
+  }
   assert.deepEqual(output.map((line) => JSON.parse(line)), [
     { jsonrpc: "2.0", id: 7, error: { code: -32000, message: "Titen MCP request failed." } },
     { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error." } },
     { jsonrpc: "2.0", id: 8, error: { code: -32000, message: "Titen MCP request failed." } },
   ]);
-  assert.doesNotMatch(output.join(""), new RegExp(secret));
+  // -32000 says only that something failed. A revoked key and a dead port were
+  // the same sentence until the reason went somewhere readable. Three lines for
+  // two replies: the notification fails too, and used to vanish entirely.
+  assert.equal(logged.length, 3, logged.join("\n"));
+  for (const line of logged) assert.match(line, /^titen: http:\/\/127\.0\.0\.1:9\/mcp failed: ./);
+  assert.doesNotMatch(`${output.join("")}${logged.join("")}`, new RegExp(secret));
 });
 
 test("the API key reaches only the authorization header and is redacted upstream", async () => {

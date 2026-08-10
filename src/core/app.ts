@@ -96,6 +96,11 @@ export interface AppContext {
   secretCipher?: SecretCipher;
   /** Optional public-edge defense in depth; account throttling remains canonical. */
   loginRateLimit?: { limit(key: string): Promise<{ success: boolean }> };
+  /**
+   * Appended to the MCP `initialize` instructions. Local stdio mode sets it so
+   * the model is told which store answered; a served deployment leaves it unset.
+   */
+  mcpInstructionsNote?: string;
 }
 
 /** Capabilities are reported honestly based on what's configured. */
@@ -437,6 +442,7 @@ export function createApp(context: {
   secretCipher?: SecretCipher;
   mcpOrigin?: string;
   loginRateLimit?: AppContext["loginRateLimit"];
+  mcpInstructionsNote?: string;
 }): (request: Request) => Promise<Response> {
   const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
   const configuredVectors = context.vectors;
@@ -481,6 +487,7 @@ export function createApp(context: {
     webhookSecurity: context.webhookSecurity,
     secretCipher: context.secretCipher,
     loginRateLimit: context.loginRateLimit,
+    mcpInstructionsNote: context.mcpInstructionsNote,
   };
   let semanticPreparation: Promise<SemanticReadiness> | undefined;
 
