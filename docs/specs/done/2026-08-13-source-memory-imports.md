@@ -1,12 +1,11 @@
 ---
 work_id: source-memory-imports
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-13
 updated: 2026-08-13
-review_after: 2026-08-27
 owner: ramaaditya
 ---
 
@@ -39,10 +38,10 @@ automatically durable memory.
 The command surface is:
 
 ```text
-titen import-source <path> --from <profile> --subject <id>
-  [--project <stable-reference>] [--workspace-id <id>]
+titen import-source {path} --from {profile} --subject {subject-id}
+  [--project {stable-reference}] [--workspace-id {workspace-id}]
   [--visibility private|team|organization]
-  [--trust unverified|asserted] [--db <path>] [--apply]
+  [--trust unverified|asserted] [--db {path}] [--apply]
 ```
 
 Without `--apply`, the command is a local-only preview: it reads no target,
@@ -190,7 +189,7 @@ shape, or safer exclusion boundary.
 
 - `mem0-json@1` accepts one explicitly named UTF-8 JSON file.
 - `openclaw-memory@1` accepts root `USER.md`, root `MEMORY.md`, and
-  `memory/YYYY-MM-DD.md` or `memory/YYYY-MM-DD-<slug>.md`; it does not recurse
+  `memory/YYYY-MM-DD.md` or `memory/YYYY-MM-DD-{slug}.md`; it does not recurse
   into `memory/imports/` or `.dreams/`.
 - `hermes-memory@1` accepts only `MEMORY.md` and `USER.md` from one explicitly
   selected Hermes memory directory.
@@ -366,7 +365,7 @@ repeating the same file produces the same identities.
 Each normalized entry is written with:
 
 - observation kind `imported_source`;
-- source type `import:<profile>` where the profile already includes its version;
+- source type `import:{profile}` where the profile already includes its version;
 - a bounded source reference built from the root-relative locator and source
   record/chunk identity. The readable upstream ID is retained when it fits;
   overflow becomes a `sha256:` reference, while the deterministic source ID
@@ -544,7 +543,7 @@ replacement gates above.
   mutation and name the legacy path plus the exact `--db` compatibility action.
 - **AC-SMI-022 — Event-driven:** When the Unix installer verifies the package by
   absolute path but `titen` does not resolve to that same binary, its default
-  mode shall print a predictable `TITEN_BIN=<absolute path>` line and exit
+  mode shall print a predictable `TITEN_BIN=/absolute/path` line and exit
   non-zero; `--print-path` shall print only that absolute path and exit zero.
 - **AC-SMI-023 — Event-driven:** When the release gates pass, npm `latest`, the
   annotated Git tag, the non-draft GitHub Release, the Titen package version,
@@ -555,6 +554,17 @@ replacement gates above.
   importer documentation, and installer bytes; the default installer failure
   and `--print-path` success paths shall be verified without GitHub Actions or
   another automated release gate.
+
+## Outcome
+
+Completed in `titen-memory@0.8.0` and the corresponding `titen-web` release.
+All 16 profiles share the four bounded parser families and existing kernel write
+paths. The three release usability issues are fixed and closed, the exact npm
+artifact and annotated GitHub release agree, a clean registry install passed
+local and served importer recall, and both production hostnames passed manifest,
+release, documentation, header, byte, and installer-behavior smoke. Source import
+remains explicitly a snapshot bootstrap; no ordered-delta or production-cutover
+claim was added.
 
 ## Done conditions
 

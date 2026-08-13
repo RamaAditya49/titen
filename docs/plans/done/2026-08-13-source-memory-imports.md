@@ -1,14 +1,13 @@
 ---
 work_id: source-memory-imports
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-13
 updated: 2026-08-13
-review_after: 2026-08-27
 owner: ramaaditya
-spec: docs/specs/active/2026-08-13-source-memory-imports.md
+spec: docs/specs/done/2026-08-13-source-memory-imports.md
 ---
 
 # Source-memory import and release usability plan
@@ -66,18 +65,18 @@ Rama authorized implementation, publication, and website synchronization on
       limits, preview/apply/backup flow, deferred-source gates, and the snapshot-
       versus-cutover boundary in the API reference and agent/operator guides.
       (AC-SMI-013 through AC-SMI-017)
-- [ ] Update the `titen-web` Unix installer and its local contract checks for
+- [x] Update the `titen-web` Unix installer and its local contract checks for
       non-resolvable PATH failure, the `TITEN_BIN` line, and `--print-path`; update
       install/import docs without adding a JSON protocol or shell-profile edits.
       (AC-SMI-022, AC-SMI-024)
 - [x] Run the focused and full applicable manual gates, inspect the npm tarball,
       scan retained fixtures/artifacts for secrets, compare the final diff with this
       spec, and record pre-release evidence. (all)
-- [ ] Bump the next minor version, commit and push Titen, publish the exact packed
+- [x] Bump the next minor version, commit and push Titen, publish the exact packed
       artifact to npm, create the annotated tag and non-draft GitHub Release, and
       verify a clean registry install plus importer/local/served smoke.
       (AC-SMI-023)
-- [ ] Synchronize the verified release into `titen-web`, generate required assets,
+- [x] Synchronize the verified release into `titen-web`, generate required assets,
       run checks/build and installer probes, commit and push, deploy manually,
       smoke both hostnames, close issues #297 through #299 with release evidence,
       then move this pair to `done/` and push the terminal evidence. (AC-SMI-019
@@ -111,6 +110,48 @@ final focused hardening edit was resynchronized and retested before packing:
 - The tarball contains 56 allowlisted package entries, identifies itself as
   `titen-memory@0.8.0`, and a high-signal credential scan of every packed byte
   found no retained secret pattern.
+
+## Release and production evidence — 2026-08-13
+
+- Titen release commit `43c2c4ea15e045cd6b0e3130309b1d7d0357def7`
+  was pushed to `origin/main`. npm accepted the exact preserved tarball at
+  `2026-08-13T13:21:13.988Z`; `latest` resolves to `0.8.0`, registry SHA-1 is
+  `6a3c000dead8c2f164a46db6aa82cfe1353f7871`, and registry integrity is
+  `sha512-X02XwrdmpJg2taW2sBntYZ03/kEuvSYh47o+qPiTEX/7s4iHIgnMZdTGIY25ch4zkoQEu6dbRzO/nY7f2K7IHg==`.
+- Annotated tag `v0.8.0` peels to that exact commit. The published, non-draft,
+  non-prerelease GitHub Release is
+  `https://github.com/RamaAditya49/titen/releases/tag/v0.8.0`.
+- A fresh `npm install titen-memory@0.8.0` on `rama-tuf` passed version,
+  target-free preview, local apply, exact replay, served apply, and claim/evidence
+  compile recall. Disposable evidence remains at
+  `/tmp/titen-registry-smoke-0.8.0-final.ThGS43` on that host.
+- `titen-web` commit `989aca2e1e39aeb6d1bb371bfd7252e0c9d4ed15`
+  was pushed after a clean candidate checkout on `rama-tuf` passed its frozen
+  install, 55-page build, 84-route and 9-MCP-tool documentation checks,
+  installer probes, release-sync check, and `git diff --check`. The two existing
+  prose warnings remained non-errors.
+- The verified pre-deploy bundle is
+  `/tmp/titen-web-predeploy-v0.8.0-989aca2.bundle`, SHA-256
+  `73456ef1932ddbe43eece4a7640519b19f400cb179ea58d279b2216f701a98be`.
+  Manual deployment from the clean pushed commit produced Cloudflare Worker
+  Version ID `d7aae794-94f6-40b6-bcf5-dadda8f6eb48`.
+- Production smoke from `rama-tuf` passed on both `https://titen.dev` and
+  `https://www.titen.dev`: stable manifest `0.8.0`, release page, importer HTML
+  and Markdown, CSP and nosniff headers, and exact installer bytes. Live
+  `install.sh` SHA-256 is
+  `e08df94c66ea4d66ba7dca2edb06724343e5e3a290a2aceabd8464f663235f05`;
+  its synthetic missing-PATH probe exited 1 and `--print-path` emitted only the
+  verified absolute path.
+- Issues #297, #298, and #299 were closed with release and production evidence.
+  A final open-issue query returned an empty list.
+
+## Verification
+
+All focused, dual-runtime, integration, workflow, route, build, audit, package,
+registry-install, website, installer, deployment, and production-smoke evidence
+listed above passed on `rama-tuf`. The only non-passing repository command is the
+unchanged typecheck baseline: both clean `0.7.4` and `0.8.0` report the same 106
+historical errors, with zero errors in changed source files.
 
 ## Acceptance evidence mapping
 
@@ -165,7 +206,7 @@ git diff --check
 # in titen-web after the npm/tag/GitHub release exists
 pnpm check
 pnpm build
-pnpm release:sync <version> --check
+pnpm release:sync {version} --check
 ```
 
 The dashboard and browser suites are not required unless implementation touches
