@@ -263,6 +263,17 @@ The server enforces the immutable UTC window on every request and updates the
 nullable `last_used_at` monotonically. Key listings distinguish pending,
 active, expired, and revoked credentials.
 
+## Import existing curated memory
+
+Use `titen import-source` for a reviewed Mem0 export or curated memory/rule files
+from supported agent hosts. Preview is the default and never contacts a target;
+`--apply` requires `TITEN_API_KEY` plus either explicit local `--db` or
+`TITEN_URL`. Every accepted chunk becomes an `imported_source` observation and
+an evidence-linked direct claim, so it is recallable without a model or vector
+provider. See the [source-memory import reference](./reference/source-import.md)
+for the 16 profile allowlists, security checks, limits, and snapshot-only
+replacement boundary.
+
 ## Error handling
 
 ```typescript

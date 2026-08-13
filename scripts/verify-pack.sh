@@ -308,6 +308,7 @@ trap 'rm -rf "$work"' EXIT
 # Follow the public vector install command in this same clean consumer tree.
 # Readiness is local and must not contact the deliberately unreachable embedder.
 npm install sqlite-vec@0.1.9 >/dev/null
+./node_modules/.bin/titen bootstrap --db "$work/vector-ready.db" --org 'Pack Vector' >/dev/null
 vector_port="$(node --input-type=module -e '
   import { createServer } from "node:net";
   const server = createServer();
@@ -376,5 +377,9 @@ PATH="$work/bun-only-path" "$prefix/bin/titen" --version >"$work/bun-version"
 [ "$(cat "$work/bun-version")" = "$version" ] \
   || { echo "FAIL: packed global titen needs Node or reports the wrong version" >&2; exit 1; }
 
+if [ -n "${TITEN_PACK_OUTPUT:-}" ]; then
+  cp "$tarball" "$TITEN_PACK_OUTPUT"
+  echo "artifact: $TITEN_PACK_OUTPUT"
+fi
 echo
 echo "OK — $(basename "$tarball") is publishable."

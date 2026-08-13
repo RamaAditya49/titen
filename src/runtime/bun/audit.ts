@@ -261,17 +261,20 @@ const stringField = (row: Record<string, unknown>, ...names: string[]): string |
 };
 
 /** Mem0 exports appear as a bare array, `{results}`, `{memories}`, or `{data:{results}}`. */
-function mem0Records(value: unknown): Record<string, unknown>[] {
+export function mem0Envelope(value: unknown): unknown[] | undefined {
   const candidates: unknown[] = [value];
   const root = value as Record<string, unknown> | null;
   if (root && typeof root === "object")
     candidates.push(root.results, root.memories, root.data,
       (root.data as Record<string, unknown> | undefined)?.results);
   for (const candidate of candidates)
-    if (Array.isArray(candidate))
-      return candidate.filter((row): row is Record<string, unknown> =>
-        Boolean(row) && typeof row === "object" && !Array.isArray(row));
-  return [];
+    if (Array.isArray(candidate)) return candidate;
+  return undefined;
+}
+
+export function mem0Records(value: unknown): Record<string, unknown>[] {
+  return (mem0Envelope(value) ?? []).filter((row): row is Record<string, unknown> =>
+    Boolean(row) && typeof row === "object" && !Array.isArray(row));
 }
 
 function readMem0Store(path: string): Store {

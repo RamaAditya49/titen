@@ -501,9 +501,14 @@ Packing preserves deterministic rank order when every deduplicated candidate
 fits. Under actual token pressure it selects one fitting claim per available
 kind before filling the remaining budget in rank order. `budget` reports
 `selected_items`, authorized `omitted_items`, `deduplicated_items`, and the
-explicit `budget_exhausted` boolean, so an empty corpus is distinguishable from
+explicit `budget_exhausted` boolean. It also reports
+`unconsolidated_observations`: the authorized observations in the effective
+subject/project scope that no claim cites yet. Context items remain claims, not
+raw observations; a successful `POST /v1/observations` is durable evidence and
+becomes recallable only after `POST /v1/consolidations` materializes a claim that
+cites it. These fields distinguish an empty corpus, pending evidence, and
 authorized candidates that could not fit. Hidden records never contribute to
-these counts. Byte-identical active claim statements appear at most once in a
+the counts. Byte-identical active claim statements appear at most once in a
 context pack; canonical claims and their evidence remain unchanged.
 
 ### `POST /v1/context/:id/feedback`

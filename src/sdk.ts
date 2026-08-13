@@ -312,6 +312,7 @@ export interface ContextPack {
     selected_items: number;
     omitted_items: number;
     deduplicated_items: number;
+    unconsolidated_observations: number;
     budget_exhausted: boolean;
   };
   items: Array<{

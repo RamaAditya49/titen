@@ -24,7 +24,7 @@ globalThis.fetch = (input, init) => {
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-function run(name: string, args: string[], release?: unknown) {
+function run(name: string, args: string[], release?: unknown, env?: Record<string, string>) {
   const cwd = join(root, name);
   mkdirSync(cwd, { recursive: true });
   const result = Bun.spawnSync({
@@ -32,9 +32,11 @@ function run(name: string, args: string[], release?: unknown) {
       ? ["bun", cli, ...args]
       : ["bun", "--preload", releasePreload, cli, ...args],
     cwd,
-    env: release === undefined
-      ? undefined
-      : { ...process.env, TITEN_TEST_RELEASE: JSON.stringify(release) },
+    env: {
+      ...process.env,
+      ...env,
+      ...(release === undefined ? {} : { TITEN_TEST_RELEASE: JSON.stringify(release) }),
+    },
   });
   return {
     exitCode: result.exitCode,
@@ -47,6 +49,7 @@ test("help is side-effect free for every documented command", () => {
   const cases = [
     ["top", ["--help"]],
     ["version", ["version", "--help"]],
+    ["import-source", ["import-source", "--help"]],
     ["mcp", ["mcp", "--help"]],
     ["serve", ["serve", "--help"]],
     ["migrate", ["migrate", "--help"]],
@@ -174,6 +177,7 @@ test("the bin names Bun and its install page when Bun is missing from PATH", () 
 test("malformed flags fail before side effects for every command", () => {
   const cases = [
     ["serve", ["serve", "--port", "nope"]],
+    ["import-source", ["import-source", "memory.md", "--from"]],
     ["mcp", ["mcp", "--api-key", "must-not-be-accepted"]],
     ["migrate", ["migrate", "--db"]],
     ["bootstrap", ["bootstrap", "--org"]],
@@ -297,7 +301,7 @@ test("local key administration fails closed for missing organizations and keys",
   for (const [name, args] of missingCases) {
     const result = run(`key-missing-${name}`, [...args]);
     assert.notEqual(result.exitCode, 0);
-    assert.match(result.output, /error: database does not exist: missing\.db/);
+    assert.match(result.output, /error: database does not exist: .*missing\.db/);
     assert.doesNotMatch(result.output, /SQLiteError|node_modules|src\/runtime|\n\s+at /);
     assert.deepEqual(result.files, []);
   }
@@ -446,7 +450,9 @@ test("serve reports a port collision without a stack trace", async () => {
     fetch: () => new Response("busy"),
   });
   try {
-    const result = run("busy-port", ["serve", "--port", String(blocker.port)]);
+    const boot = run("busy-port", ["bootstrap", "--db", "titen.db"]);
+    assert.equal(boot.exitCode, 0, boot.output);
+    const result = run("busy-port", ["serve", "--db", "titen.db", "--port", String(blocker.port)]);
     assert.notEqual(result.exitCode, 0);
     assert.equal(result.output, `error: port ${blocker.port} is already in use\n`);
     assert.doesNotMatch(result.output, /node_modules|src\/runtime|\bat\s/);
@@ -466,8 +472,10 @@ test("serve --quiet accepts requests without startup or access output", async ()
 
   const cwd = join(root, "quiet-serve");
   mkdirSync(cwd);
+  const boot = run("quiet-serve", ["bootstrap", "--db", "titen.db"]);
+  assert.equal(boot.exitCode, 0, boot.output);
   const process = Bun.spawn({
-    cmd: ["bun", cli, "serve", "--port", String(port), "--quiet"],
+    cmd: ["bun", cli, "serve", "--db", "titen.db", "--port", String(port), "--quiet"],
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -490,4 +498,72 @@ test("serve --quiet accepts requests without startup or access output", async ()
   }
   const output = `${await new Response(process.stdout).text()}${await new Response(process.stderr).text()}`;
   assert.equal(output, "");
+});
+
+test("bootstrap and serve share one stable per-user database across directories", async () => {
+  const home = join(root, "stable-home");
+  const first = run("stable-cwd-a", ["bootstrap", "--org", "Stable Org"], undefined, { HOME: home });
+  assert.equal(first.exitCode, 0, first.output);
+  const dbPath = join(home, ".titen", "service.db");
+  assert.match(first.output, new RegExp(`^database: ${dbPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
+  assert.ok(statSync(dbPath).isFile());
+  assert.equal(statSync(join(home, ".titen")).mode & 0o777, 0o700);
+  const key = /^api_key: (titen_sk_[A-Za-z0-9_-]+)$/m.exec(first.output)?.[1];
+  assert.ok(key);
+
+  const reservation = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("reserved") });
+  const port = reservation.port;
+  await reservation.stop(true);
+  const cwd = join(root, "stable-cwd-b");
+  mkdirSync(cwd, { recursive: true });
+  const serverProcess = Bun.spawn({
+    cmd: ["bun", cli, "serve", "--port", String(port), "--quiet"],
+    cwd,
+    env: { ...process.env, HOME: home },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  try {
+    let response: Response | undefined;
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      try {
+        response = await fetch(`http://127.0.0.1:${port}/v1/observations`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+          body: JSON.stringify({
+            subject_id: "stable-default-store",
+            kind: "system_event",
+            content: "Bootstrap and serve resolved the same per-user store.",
+            source: { type: "contract", ref: "stable-store#1" },
+          }),
+        });
+        if (response.status !== 503) break;
+      } catch {
+        await Bun.sleep(25);
+      }
+    }
+    assert.equal(response?.status, 201, await response?.text());
+  } finally {
+    serverProcess.kill("SIGTERM");
+    await serverProcess.exited;
+  }
+});
+
+test("serve refuses a missing store and unflagged commands do not bypass a legacy cwd store", () => {
+  const home = join(root, "missing-home");
+  const missing = run("missing-default-store", ["serve", "--quiet"], undefined, { HOME: home });
+  assert.notEqual(missing.exitCode, 0);
+  assert.match(missing.output, /database does not exist: .*\.titen\/service\.db/);
+  assert.match(missing.output, /titen bootstrap/);
+  assert.deepEqual(missing.files, []);
+
+  const legacyCwd = join(root, "legacy-default-store");
+  mkdirSync(legacyCwd, { recursive: true });
+  writeFileSync(join(legacyCwd, "titen.db"), "legacy-placeholder");
+  const legacy = run("legacy-default-store", ["bootstrap"], undefined, { HOME: join(root, "legacy-home") });
+  assert.notEqual(legacy.exitCode, 0);
+  assert.match(legacy.output, /legacy database found at .*titen\.db/);
+  assert.match(legacy.output, /rerun with --db .*titen\.db/);
+  assert.deepEqual(readdirSync(legacyCwd), ["titen.db"]);
 });

@@ -20,8 +20,13 @@ import { createBunWebhookSecurity } from "./webhooks";
 import { fetchStableRelease, stableVersionStatus } from "./release";
 import { localStorePath, provisionOwner, runMcpStdio } from "./mcp-stdio";
 import { auditStore, renderReport } from "./audit";
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import {
+  SOURCE_IMPORT_PROFILE_IDS,
+  applySourceImport,
+  prepareSourceImport,
+} from "./source-import";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
 const USAGE = `titen — self-hosted memory service
@@ -31,19 +36,23 @@ Usage:
   titen version    [--check]
   titen mcp        serve MCP over stdio: the local store when no environment is
                    set, otherwise a bridge to inherited TITEN_MCP_URL/TITEN_API_KEY
-  titen serve      [--db titen.db] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
-  titen migrate    [--db titen.db] [--dry-run]
-  titen bootstrap  [--db titen.db] [--org "My Org"] [--username owner] [--label owner] [--print-sql]
-  titen key create [--db titen.db] --org-id <id> [--principal <id>] [--kind agent]
+  titen serve      [--db <path>] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
+  titen migrate    [--db <path>] [--dry-run]
+  titen bootstrap  [--db <path>] [--org "My Org"] [--username owner] [--label owner] [--print-sql]
+  titen key create [--db <path>] --org-id <id> [--principal <id>] [--kind agent]
                    [--scopes "a,b"] [--trust asserted] [--label name]
                    [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
-  titen key list   [--db titen.db]
-  titen key revoke [--db titen.db] --id <key id>
-  titen backup     [--db titen.db] --out <file>   verified online copy
+  titen key list   [--db <path>]
+  titen key revoke [--db <path>] --id <key id>
+  titen backup     [--db <path>] --out <file>   verified online copy
   titen schema     print every migration statement (for "wrangler d1 execute --file")
   titen audit      <path> [--json]   offline write-hygiene report for a Titen
                    store, a @modelcontextprotocol/server-memory memory.json(l),
                    or a Mem0 export
+  titen import-source <path> --from <profile> --subject <id>
+                   [--project <reference>] [--workspace-id <id>]
+                   [--visibility private|team|organization]
+                   [--trust unverified|asserted] [--db <path>] [--apply]
 
 Notes:
   With neither TITEN_MCP_URL nor TITEN_API_KEY set, "titen mcp" serves
@@ -51,6 +60,11 @@ Notes:
   workspace, project, and owner on first run.
   "audit" opens its path read-only and makes no network call of any kind. It
   prints a report; sharing it is the reader's decision.
+  "import-source" previews locally unless --apply is present. Apply uses either
+  an explicit --db plus TITEN_API_KEY, or TITEN_URL plus TITEN_API_KEY.
+  Source profiles: ${SOURCE_IMPORT_PROFILE_IDS.join(", ")}.
+  Bun service commands default to ${join(homedir(), ".titen", "service.db")}.
+  "serve" never creates a missing database; run "titen bootstrap" first.
   --print-sql emits SQL for a remote database (Cloudflare D1) instead of writing
   locally. A raw key and temporary dashboard password are printed once and are
   never recoverable afterwards.
@@ -68,6 +82,11 @@ const COMMAND_FLAGS: Record<
 > = {
   version: { values: [], booleans: ["check"] },
   audit: { values: [], booleans: ["json"], positional: "path" },
+  "import-source": {
+    values: ["from", "subject", "project", "workspace-id", "visibility", "trust", "db"],
+    booleans: ["apply"],
+    positional: "path",
+  },
   mcp: { values: [] },
   serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
@@ -178,6 +197,8 @@ async function withDb<T>(
   run: (db: ReturnType<typeof createSqliteDb>) => Promise<T>,
   options?: Parameters<typeof openDatabase>[1],
 ) {
+  if (options?.create !== false && options?.readonly !== true && path !== ":memory:")
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const sidecars = [`${path}-wal`, `${path}-shm`, `${path}-journal`];
   const snapshotDirectory = options?.readonly && !sidecars.some(existsSync)
     ? mkdtempSync(join(tmpdir(), "titen-readonly-"))
@@ -230,7 +251,25 @@ async function existingDatabase<T>(
 }
 
 const { flags, command, action, positional } = parseArgs(process.argv.slice(2));
-const dbPath = text(flags.db, "titen.db");
+const explicitDb = typeof flags.db === "string";
+const requestedDbPath = text(flags.db, join(homedir(), ".titen", "service.db"));
+const dbPath = requestedDbPath === ":memory:" || requestedDbPath.startsWith("file::memory:")
+  ? requestedDbPath
+  : resolve(requestedDbPath);
+const legacyDbPath = resolve("titen.db");
+const localDatabaseCommand = ["serve", "migrate", "bootstrap", "key", "backup"].includes(command ?? "")
+  && !(flags["print-sql"] === true && (command === "bootstrap" || action === "create"));
+if (
+  !explicitDb
+  && localDatabaseCommand
+  && dbPath !== legacyDbPath
+  && !existsSync(dbPath)
+  && existsSync(legacyDbPath)
+) {
+  fail(
+    `legacy database found at ${legacyDbPath}; rerun with --db ${legacyDbPath} to keep using it, or move it to ${dbPath}`,
+  );
+}
 
 switch (command) {
   case "audit": {
@@ -243,6 +282,46 @@ switch (command) {
       fail(error instanceof Error ? error.message : "audit failed");
     }
     console.log(flags.json ? JSON.stringify(audit, null, 2) : renderReport(audit));
+    break;
+  }
+
+  case "import-source": {
+    const profile = text(flags.from, "");
+    if (!profile) fail("--from is required");
+    const subject = text(flags.subject, "");
+    if (!subject) fail("--subject is required");
+    let prepared: Awaited<ReturnType<typeof prepareSourceImport>>;
+    try {
+      prepared = await prepareSourceImport({
+        path: positional!,
+        profile,
+        subject,
+        project: typeof flags.project === "string" ? flags.project : undefined,
+        workspaceId: typeof flags["workspace-id"] === "string" ? flags["workspace-id"] : undefined,
+        visibility: typeof flags.visibility === "string" ? flags.visibility : undefined,
+        trust: typeof flags.trust === "string" ? flags.trust : undefined,
+      });
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "source preview failed");
+    }
+    if (flags.apply !== true) {
+      console.log(JSON.stringify({ data: prepared.preview, meta: { applied: false } }, null, 2));
+      break;
+    }
+    const apiKey = process.env.TITEN_API_KEY ?? "";
+    const url = process.env.TITEN_URL;
+    if (explicitDb && url) fail("--db and TITEN_URL are mutually exclusive");
+    if (!explicitDb && !url) fail("--apply requires either --db <path> or TITEN_URL");
+    let applied: Awaited<ReturnType<typeof applySourceImport>>;
+    try {
+      applied = await applySourceImport(prepared, {
+        apiKey,
+        ...(explicitDb ? { dbPath } : { url }),
+      });
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "source apply failed");
+    }
+    console.log(JSON.stringify({ data: { preview: prepared.preview, apply: applied }, meta: { applied: true } }, null, 2));
     break;
   }
 
@@ -289,6 +368,8 @@ switch (command) {
     // of them the service serves lexical retrieval and says so in readiness.
     const servePort = port(flags.port);
     const quiet = flags.quiet === true;
+    if (!existsSync(dbPath))
+      fail(`database does not exist: ${dbPath}; run "titen bootstrap" first or pass --db <path>`);
     const extraction = configureHttpExtraction({
       baseUrl: process.env.TITEN_EXTRACT_BASE_URL,
       model: process.env.TITEN_EXTRACT_MODEL,
@@ -381,6 +462,7 @@ switch (command) {
       await migrate(db);
       await db.batch(statements);
     });
+    console.log(`database: ${dbPath}`);
     console.log(`organization: ${orgId} (${orgName})`);
     printKey(key.key, key.id);
     console.log(`dashboard_username: ${owner.username}`);

@@ -79,8 +79,15 @@ Docker is not required.
 
 ## Defaults
 
-- CLI defaults: database `./titen.db`, bind `127.0.0.1:8787`, and revision
-  `dev`.
+- Bun service CLI defaults: database `~/.titen/service.db`, bind
+  `127.0.0.1:8787`, and revision `dev`. `bootstrap` creates the owner-only
+  parent directory; `serve` refuses a missing store rather than creating an
+  empty database that cannot authenticate any request. Both commands identify
+  the resolved absolute path.
+- Releases before 0.8.0 defaulted to `./titen.db`. When that legacy file exists
+  and the user-scoped store does not, an unflagged database command stops and
+  tells the operator to pass its absolute `--db` path; Titen never moves it
+  automatically.
 - The checked-in systemd, container, and Quadlet profiles pass an explicit
   `--db /var/lib/titen/titen.db`; their bind address and port are also explicit
   CLI flags.

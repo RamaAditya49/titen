@@ -1345,8 +1345,81 @@ export const CASES: Case[] = [
         selected_items: 0,
         omitted_items: 0,
         deduplicated_items: 0,
+        unconsolidated_observations: 0,
         budget_exhausted: false,
       });
+    },
+  },
+  {
+    name: "compile reports only authorized unconsolidated observations",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "agent_observation_owner" });
+      const intruder = await fx.provision({ principalId: "agent_observation_intruder" });
+      const observation = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: {
+          subject_id: "subject_pending_observation",
+          kind: "imported_source",
+          content: "A durable observation still needs a claim before recall.",
+          source: { type: "import:markdown@1", ref: "pending-observation#1" },
+          trust: "asserted",
+          visibility: "private",
+        },
+      });
+      expectOk(observation, 201);
+
+      const pending = await fx.call("POST", "/v1/context/compile", {
+        key: owner.key,
+        body: {
+          subject_id: "subject_pending_observation",
+          task: "durable observation claim recall",
+          max_tokens: 900,
+        },
+      });
+      expectOk(pending);
+      assert.deepEqual(pending.body.data.items, []);
+      assert.equal(pending.body.data.budget.unconsolidated_observations, 1);
+
+      const hidden = await fx.call("POST", "/v1/context/compile", {
+        key: intruder.key,
+        body: {
+          subject_id: "subject_pending_observation",
+          task: "durable observation claim recall",
+          max_tokens: 900,
+        },
+      });
+      expectOk(hidden);
+      assert.deepEqual(hidden.body.data.items, []);
+      assert.equal(hidden.body.data.budget.unconsolidated_observations, 0);
+
+      const consolidation = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "subject_pending_observation",
+          claims: [{
+            kind: "semantic_fact",
+            statement: "A durable observation becomes recallable after a claim cites it.",
+            confidence: 1,
+            sources: [{
+              observation_id: observation.body.data.observation_id,
+              relation: "supports",
+            }],
+          }],
+        },
+      });
+      expectOk(consolidation, 201);
+
+      const consolidated = await fx.call("POST", "/v1/context/compile", {
+        key: owner.key,
+        body: {
+          subject_id: "subject_pending_observation",
+          task: "durable observation becomes recallable claim",
+          max_tokens: 900,
+        },
+      });
+      expectOk(consolidated);
+      assert.equal(consolidated.body.data.budget.unconsolidated_observations, 0);
+      assert.equal(consolidated.body.data.items.length, 1);
     },
   },
   {

@@ -26,6 +26,59 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-13
+
+Titen can now bootstrap curated memory from sixteen agent and memory-system
+exports through one bounded, deterministic importer. This release also closes
+the three usability gaps that could make accepted evidence look missing, split
+one service across working directories, or leave an apparently successful
+installer without a runnable command.
+
+### Upgrade notes
+
+- **Breaking:** service commands without `--db` now use the absolute per-user
+  store `~/.titen/service.db`, not `./titen.db`. Existing deployments should
+  keep passing their current absolute `--db` path or move the database once.
+  When a legacy cwd `titen.db` exists and the user store does not, Titen refuses
+  to mutate either store and prints the explicit compatibility command.
+- The website installer now exits non-zero when `titen` is installed but still
+  cannot be resolved by name. Automation that intentionally consumes the
+  verified absolute binary path should call `install.sh --print-path`; its
+  stdout contains that path only.
+
+### Added
+
+- `titen import-source` previews by default and applies only with an explicit
+  local database or exact served origin. Versioned profiles cover Mem0,
+  OpenClaw, Hermes, Claude Code, Codex, Gemini CLI, Qwen Code, ByteRover,
+  Amazon Q, Replit, Honcho, Letta AgentFile, MemoMind, agent rule files, Basic
+  Memory, and explicit Markdown. Imports use the existing observation and
+  consolidation contracts, deterministic source and idempotency identities,
+  private/unverified defaults, and exact replay accounting.
+- Context-pack budgets now report `unconsolidated_observations`: the count of
+  readable evidence in the requested subject/project scope that has not yet
+  produced a claim. Returned context items remain claim-only.
+
+### Fixed
+
+- An accepted observation no longer looks silently lost: both Bun/SQLite and
+  Cloudflare/D1 expose the scoped pending-evidence count without leaking hidden
+  organizations, projects, workspaces, or private principals (#297).
+- `bootstrap` and `serve` no longer choose different databases when launched
+  from different directories, and `serve` refuses to create an empty store by
+  accident (#298).
+- The installer no longer reports success when the verified binary is outside
+  `PATH`; it prints a predictable `TITEN_BIN=...` recovery value and exits 1,
+  while `--print-path` provides a scripting-safe mode (#299).
+
+### Security
+
+- Source import rejects secrets before target access, symlinks, non-UTF-8 and
+  unsafe-control text, unknown or incomplete structured exports, populated
+  AgentFile environment values, dangling block references, more than 10,000
+  entries, or more than 64 MiB of selected input. Rule links and vendor
+  frontmatter remain inert evidence and are never dereferenced or executed.
+
 ## [0.7.4] — 2026-08-10
 
 Three fixes found while wiring a live Titen into Claude Code as a memory
@@ -1168,7 +1221,9 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.0
+[0.7.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.4
 [0.7.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.3
 [0.7.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.2
 [0.7.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.1

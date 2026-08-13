@@ -22,6 +22,7 @@ context without a documentation-site dependency.
 | [Memory model](./architecture/memory-model.md)                     | Evidence, claims, temporal state, context, and feedback                       |
 | [Collaboration](./architecture/collaboration.md)                   | Identity, visibility, parallel work, governance, and federation               |
 | [API](./reference/api.md)                                          | Versioned HTTP/MCP and channel-serving contracts                              |
+| [Source-memory import](./reference/source-import.md)                | Offline preview and bounded snapshot import for 16 curated memory profiles    |
 | [Data model](./reference/data-model.md)                            | Logical SQL entities, state transitions, and transaction boundaries           |
 | [Evaluation](./testing/EVALS.md)                                   | Quality, performance, safety, parity, and release-gate measurements           |
 | [Threat model](./security/threat-model.md)                         | Assets, trust boundaries, threats, controls, and residual risks               |

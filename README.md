@@ -431,7 +431,8 @@ installs work when Bun is already on `PATH`.
 
 ### 1. Create the store
 
-Run this once in the directory where you want `titen.db` to live:
+Run this once. Without `--db`, Bun service commands use the stable per-user
+store at `~/.titen/service.db` regardless of the current directory:
 
 ```bash
 titen bootstrap --org "My Org"
@@ -440,6 +441,10 @@ titen bootstrap --org "My Org"
 Save the organization ID, API key, and temporary dashboard password from the
 output. Titen stores only their hashes. The dashboard user is `owner` and must
 change its password at first login.
+
+An existing release that used `./titen.db` is never moved automatically. Keep
+using it explicitly with `--db /absolute/path/to/titen.db`, then use the same
+flag for `serve`, key administration, migration, and backup.
 
 Create a separate revocable key for each agent host. Replace the organization
 ID and choose a stable principal name:
@@ -775,6 +780,7 @@ for private Tailscale Serve access or Cloudflare Tunnel protected by Access.
 | --- | --- |
 | [Golden path](https://github.com/RamaAditya49/titen/blob/main/docs/guides/golden-path.md) | A complete small-team example |
 | [API reference](https://github.com/RamaAditya49/titen/blob/main/docs/reference/api.md) | REST, MCP, errors, and compatibility |
+| [Source-memory import](https://github.com/RamaAditya49/titen/blob/main/docs/reference/source-import.md) | Preview and import curated memory from 16 explicit source profiles |
 | [Architecture](https://github.com/RamaAditya49/titen/blob/main/docs/architecture/overview.md) | Core, runtime, storage, and policy boundaries |
 | [Agent integrations](https://github.com/RamaAditya49/titen/blob/main/docs/agent-plugins.md) | Host-specific MCP and skill setup |
 | [VPS deployment](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/vps.md) | Bun, containers, persistence, and hardening |
