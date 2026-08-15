@@ -1,12 +1,11 @@
 ---
 work_id: atlas-admin-and-semantic-readiness
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
 ---
 
@@ -125,3 +124,30 @@ readiness on both supported runtimes.
   updated, production smoke passes or a verified rollback is completed, and
   GitHub issues #300, #301, and #302 are closed with evidence.
 - The paired artifacts are moved to `done/` with no unchecked work.
+
+## Verification evidence
+
+- Commit `a9a1339` implements the shared authorization and readiness changes;
+  tag `v0.8.3` and GitHub Release are public, and npm `latest` resolves to
+  `titen-memory@0.8.3` (tarball shasum verified locally).
+- `pnpm test:all` passed: D1 125, Bun/vector/SDK 153, integration 228,
+  dashboard live verification, browser 8 passed with 2 expected screenshot
+  skips, workflow self-test, and Ponytail debt checks. Route and workflow
+  checks also passed; package pack/install/disclosure smoke passed with 70
+  files and no credential, mockup, database, backup, or private-state paths.
+- `pnpm typecheck` still reports the repository's pre-existing docs/test/Bun
+  baseline errors; the changed core, Astro build, SDK build, and all required
+  release gates passed.
+- titen-web commit `fbc9919` synced the 0.8.3 release page and manifest;
+  Cloudflare Worker version `6a6e349c-4806-4d09-8ccd-9b3641c181dc` serves
+  `titen.dev` and `www.titen.dev` with HTTP 200, `/version.json` reports 0.8.3,
+  and `/releases/0.8.3` contains the release highlights.
+- server-wulan was backed up before upgrade, then installed from npm 0.8.3;
+  both systemd units are active, `/healthz` and `/readyz` return 200 with
+  revision `npm-0.8.3`, the packaged dashboard returns 200, and an unauthenticated
+  dashboard session returns 401. The rollback backup remains under the
+  versioned `/opt/titen/backups/npm-dashboard-0.8.3-*` directory.
+- GitHub issues #300, #301, and #302 were commented with evidence and closed;
+  the repository has no open issues or pull requests. No credential, private
+  memory content, mockup source, or server secret entered source control,
+  npm, the public website, or release notes.

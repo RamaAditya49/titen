@@ -1,37 +1,36 @@
 ---
 work_id: atlas-admin-and-semantic-readiness
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
-spec: docs/specs/active/2026-08-15-atlas-admin-and-semantic-readiness.md
+spec: docs/specs/done/2026-08-15-atlas-admin-and-semantic-readiness.md
 ---
 
 # Plan: Atlas administrator access and semantic readiness
 
-- [ ] Add the explicit scope, request mode, same-organization record predicate,
+- [x] Add the explicit scope, request mode, same-organization record predicate,
   root/owner gate, bounded reasons, metadata-only audit, response metadata, and
   SDK contract.
-- [ ] Add dual-runtime contract fixtures for ordinary denial, privileged
+- [x] Add dual-runtime contract fixtures for ordinary denial, privileged
   success, missing authority, audit detail hygiene, retention, and
   cross-organization denial.
-- [ ] Change only pending-projection readiness semantics; preserve 503 for
+- [x] Change only pending-projection readiness semantics; preserve 503 for
   dependency/configuration/startup failures and cover write/drain recovery on
   Bun/SQLite and Cloudflare/D1.
-- [ ] Update the dashboard and adapter to show principal scope, conditionally
+- [x] Update the dashboard and adapter to show principal scope, conditionally
   request audited administrator mode, and render semantic syncing accurately.
-- [ ] Align PRD, architecture, API, changelog, and public release documentation
+- [x] Align PRD, architecture, API, changelog, and public release documentation
   with the observable contract.
-- [ ] Run workflow/route, focused security, dual-runtime, SDK, integration,
+- [x] Run workflow/route, focused security, dual-runtime, SDK, integration,
   dashboard/browser, package, and disclosure verification.
-- [ ] Commit and push with required attribution, publish the patch release,
+- [x] Commit and push with required attribution, publish the patch release,
   update titen-web and server-wulan, smoke production, and close #300–#302 with
   evidence.
-- [ ] Record terminal evidence and move the paired artifacts to `done/`.
+- [x] Record terminal evidence and move the paired artifacts to `done/`.
 
 ## Acceptance evidence map
 
@@ -65,4 +64,9 @@ spec: docs/specs/active/2026-08-15-atlas-admin-and-semantic-readiness.md
 
 ## Verification
 
-Pending implementation and release evidence.
+Commit `a9a1339`, npm `0.8.3`, GitHub tag/release `v0.8.3`, titen-web commit
+`fbc9919`, Cloudflare Worker `6a6e349c-4806-4d09-8ccd-9b3641c181dc`, and the
+server-wulan `npm-0.8.3` health/readiness/dashboard/session smoke provide the
+terminal evidence. `pnpm test:all`, route/workflow checks, package disclosure
+smoke, and website build/deploy checks passed. Issues #300–#302 are closed and
+no open issue or pull request remains.
