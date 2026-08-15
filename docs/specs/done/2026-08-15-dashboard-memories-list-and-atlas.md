@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-memories-list-and-atlas
-status: active
-stage: plan
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
 ---
 
@@ -76,3 +75,10 @@ unsupported placeholder routes.
 - changelog and API/dashboard/architecture docs describe only shipped behavior;
 - npm latest, web deployment, and configured server are smoke-verified;
 - this spec and its paired plan move to `docs/specs/done/` and `docs/plans/done/`.
+
+## Delivered evidence
+
+- `GET /v1/memories` is implemented in the shared core and protected by the existing `views:compile` scope; Bun and D1 authorization, retention, FTS, validation, and keyset contracts pass.
+- The dashboard now has separate Memories and Atlas destinations. Memories loads real rows with search, filters, empty/error/loading states, and keyset pagination; Atlas remains the visual graph/inspector handoff.
+- Adapter, API, integration, and browser suites pass; route, workflow, package, and dashboard build checks pass.
+- npm `titen-memory@0.8.4`, GitHub release `v0.8.4`, `titen.dev`/`www.titen.dev`, and server-wulan all identify `0.8.4`. Server health/readiness and protected-route smoke passed after restart.
