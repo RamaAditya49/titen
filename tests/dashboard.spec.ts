@@ -21,7 +21,7 @@ async function mockServerMode(page: Page) {
     ? route.fulfill({ json: { mode: "live", endpoint: "titen.internal", authentication: "server", authenticated: true } })
     : route.fulfill({ status: 503, json: { error: { code: "DASHBOARD_DISCONNECTED", message: "disconnected" } } }));
   await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun", revision: "stable-42" } } }));
-  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true, revision: "stable-42" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true }, meta: { revision: "stable-42" } } }));
   return { disconnect: () => { connected = false; } };
 }
 
@@ -49,8 +49,9 @@ test("renders live Memories and clears stale private data on disconnect", async 
     await route.fulfill({ json: { data: view } });
   });
   await page.goto("/dashboard/");
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
-  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(6);
+  await expect(page.locator("[data-connection-label]")).toHaveText("Connected");
+  await expect(page.locator("[data-system-revision]")).toHaveText("stable-42");
+  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(10);
   await page.locator('[data-memory-form] input[name="subject_id"]').fill("platform-team");
   await page.getByRole("button", { name: "Compile memory view" }).click();
   await expect(page.getByText("Production retry budget is 400 ms").first()).toBeVisible();
@@ -61,6 +62,22 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.locator("[data-atlas-nodes] .atlas-node")).toHaveCount(2);
   await expect(page.locator("[data-atlas-edges] path")).toHaveCount(1);
   await expect(page.locator("[data-compile-trace]")).toBeVisible();
+  await page.getByRole("button", { name: "Memories query" }).click();
+  await expect(page.locator(".nav-alias")).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-area="memories"]').first()).toHaveAttribute("aria-current", "false");
+  await page.getByRole("button", { name: "Atlas live" }).click();
+  await expect(page.locator('[data-area="memories"]').first()).toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: "System" }).click();
+  await expect(page.locator('[data-area-panel="system"] h2')).toHaveText("System status");
+  await page.getByRole("button", { name: "Access" }).click();
+  await expect(page.locator('[data-area-panel="access"] h2')).toHaveText("Access policy");
+  await page.getByRole("button", { name: "Releases" }).click();
+  await expect(page.locator('[data-area-panel="releases"] h2')).toHaveText("Release policy");
+  await page.getByRole("button", { name: "Atlas" }).click();
+  await expect(page.locator('[data-area-panel="memories"] h2').first()).toHaveText("Memory Atlas");
+  await page.locator("[data-profile-open]").click();
+  await expect(page.locator('[data-area-panel="profile"] h2')).toHaveText("Profile");
+  await expect(page.locator("[data-profile-password-form]")).toBeVisible();
   service.disconnect();
   await page.getByRole("button", { name: "Refresh service" }).click();
   await expect(page.getByText("Disconnected", { exact: true })).toBeVisible();
@@ -154,7 +171,7 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
   await expect(page.locator(".sidebar")).toBeVisible();
   await expect(page.locator(".topbar")).toBeVisible();
-  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(6);
+  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(10);
   await expect(page.locator("[data-principal]")).toHaveText("user_admin");
 
   await page.locator('[data-area="context"]').click();
@@ -250,7 +267,13 @@ test("forces a temporary-password login to replace its password before showing t
   await page.locator('[data-login-form] input[name="password"]').fill("permanent horse battery staple");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
-  await expect(page.locator('[data-area="memories"]')).toBeVisible();
+  await expect(page.locator('[data-area="memories"]:not([hidden])').first()).toBeVisible();
+  await page.locator("[data-profile-open]").click();
+  await expect(page.locator('[data-area-panel="profile"] h2')).toHaveText("Profile");
+  await page.locator('[data-profile-password-form] input[name="password"]').fill("permanent horse battery staple");
+  await page.locator('[data-profile-password-form] input[name="confirm_password"]').fill("permanent horse battery staple");
+  await page.getByRole("button", { name: "Update password" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 });
 
 test("capability discovery exposes only authorized areas and clears denial state", async ({ page }) => {
@@ -269,9 +292,11 @@ test("capability discovery exposes only authorized areas and clears denial state
   await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
   await page.route("**/dashboard-api/audit/log**", (route) => route.fulfill({ status: 403, json: { error: { code: "UPSTREAM_403", message: "denied" } } }));
   await page.goto("/dashboard/");
-  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(1);
+  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(2);
   await expect(page.locator('[data-area="audit"]')).toBeVisible();
-  await expect(page.locator('[data-area="memories"]')).toBeHidden();
+  await expect(page.locator('[data-area="memories"]').first()).toBeHidden();
+  await expect(page.locator('[data-area="system"]')).toBeVisible();
+  await expect(page.locator('[data-area="access"]')).toBeHidden();
   await expect(page.locator("[data-user-admin]")).toBeHidden();
   await page.getByRole("button", { name: "Refresh activity" }).click();
   await expect(page.locator("[data-audit-output]")).toContainText("not authorized");

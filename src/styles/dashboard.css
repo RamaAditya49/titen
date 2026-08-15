@@ -59,7 +59,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sidebar nav button small, .nav-orientation small { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; text-transform: uppercase; }
 .sidebar nav button[aria-current="page"] small { color: #c97a44; }
 .nav-orientation { color: var(--ink-soft); }
+.nav-alias { color: var(--ink-soft); }
 .credential-note { display: grid; gap: 7px; margin-top: auto; padding: 14px 20px; border-top: 1px solid var(--rule-soft); }
+.profile-button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 0 0 9px; color: var(--ink-soft); background: transparent; border: 0; border-bottom: 1px solid var(--rule-soft); cursor: pointer; text-align: left; }
+.profile-button:hover, .profile-button[aria-current="page"] { color: var(--accent); }
+.profile-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: 0 0 auto; color: var(--paper); background: var(--ink); border-radius: 3px; font: 9.5px/1 "JetBrains Mono Variable", monospace; font-weight: 700; }
+.profile-button > span:last-child { display: grid; gap: 1px; min-width: 0; }
+.profile-button strong { overflow: hidden; font-size: 12px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.profile-button small { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; }
 .credential-note p, .eyebrow { margin: 0; color: var(--muted); font: 9px/1.3 "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
 .credential-note strong { font: 11px "JetBrains Mono Variable", monospace; }
 .credential-note span { color: var(--muted); font-size: 11px; line-height: 1.45; }
@@ -156,6 +163,24 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .live-output > p { margin: 0; padding: 22px 0 0; color: var(--muted); font-size: 12px; }
 .live-output > p.output-error { color: var(--danger); }
 .live-output > section { padding-top: 20px; }
+.status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin-top: 20px; background: var(--rule); border: 1px solid var(--rule); }
+.status-grid article { display: grid; gap: 7px; min-height: 106px; padding: 16px; background: var(--paper-strong); }
+.status-grid article span { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
+.status-grid article strong { font: 600 18px "Bricolage Grotesque Variable", sans-serif; }
+.status-grid article small { color: var(--muted); font: 10px "JetBrains Mono Variable", monospace; overflow-wrap: anywhere; }
+.panel-note { margin: 16px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.policy-details { display: grid; grid-template-columns: 150px minmax(0, 1fr); margin: 20px 0 0; border-top: 1px solid var(--rule-soft); }
+.policy-details dt, .policy-details dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--rule-soft); overflow-wrap: anywhere; }
+.policy-details dt { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.policy-details dd { font-size: 12px; }
+.profile-password-form { display: grid; grid-template-columns: minmax(180px, .8fr) repeat(2, minmax(150px, 1fr)) auto; gap: 12px; align-items: end; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--rule-soft); }
+.profile-password-form > div { align-self: start; }
+.profile-password-form h3 { margin: 5px 0 4px; }
+.profile-password-form p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.profile-password-form label { display: grid; gap: 6px; }
+.profile-password-form label span { font-size: 11px; font-weight: 600; }
+.profile-password-form input { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
+.profile-password-form > span { grid-column: 1 / -1; min-height: 1.4em; color: var(--danger); font-size: 11px; }
 .live-output details { border-top: 1px solid var(--rule-soft); }
 .live-output summary { padding: 10px 2px; cursor: pointer; font-size: 12px; overflow-wrap: anywhere; }
 .live-output pre { max-height: 320px; margin: 0; padding: 14px; overflow: auto; color: var(--ink-soft); background: var(--paper-strong); border-top: 1px solid var(--rule-soft); font: 10px/1.55 "JetBrains Mono Variable", monospace; }
@@ -282,6 +307,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .record-list strong { white-space: normal; }
   .result-header { align-items: flex-start; flex-direction: column; gap: 8px; }
   .inline-form, .user-admin form { grid-template-columns: 1fr; }
+  .status-grid { grid-template-columns: 1fr; }
+  .policy-details { grid-template-columns: 1fr; }
+  .policy-details dt { padding-bottom: 4px; border-bottom: 0; }
+  .policy-details dd { padding-top: 0; }
+  .profile-password-form { grid-template-columns: 1fr; align-items: stretch; }
+  .profile-password-form > span { grid-column: auto; }
   .credential-note { width: 130px; }
   .credential-note strong { display: none; }
   .atlas-graph { min-height: 250px; }

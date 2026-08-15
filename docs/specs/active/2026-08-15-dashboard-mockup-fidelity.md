@@ -29,6 +29,11 @@ controls are oversized forms, and Memory Atlas has no topology/trace surface.
   accessible textual record list and canonical inspector fallback.
 - Keep all six authorized product areas, session/authentication flow, loading,
   empty, error, responsive, reduced-motion, and forced-colors behavior.
+- Make every visible rail item actionable: Memories aliases Atlas, System opens
+  live service status, Access opens the authorized principal policy view, and
+  Releases opens the live release-policy view.
+- Keep one selected rail control at a time, and expose the authenticated
+  principal's Profile and password-change flow from the private shell.
 - Add private local visual comparison evidence; no mockup source or secrets
   enter the public artifact.
 
@@ -61,6 +66,13 @@ controls are oversized forms, and Memory Atlas has no topology/trace surface.
 - **AC-DMF-007 — Event-driven:** When a lens, navigation area, or record is
   activated, Titen shall update the selected state and heading while preserving
   keyboard focus semantics and the existing API request behavior.
+- **AC-DMF-008 — Event-driven:** When an authenticated operator activates a
+  visible rail item, Titen shall open an authorized destination or live status
+  view; no visible item shall be a dead navigation affordance.
+- **AC-DMF-009 — Event-driven:** When an authenticated operator opens Profile,
+  Titen shall show the current principal and allow a deliberate password update
+  through the existing same-origin password endpoint; activating an alias shall
+  not mark another alias active.
 
 ## Done conditions
 

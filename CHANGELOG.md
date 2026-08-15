@@ -40,6 +40,12 @@ while keeping the authenticated adapter and six-area contracts unchanged.
   nodes and edges, with a synchronized accessible record list and inspector.
 - Added a native search dialog that fills the authorized Atlas query without
   moving credentials or memory data into browser storage.
+- Wired every visible rail item to a real destination: Memories aliases Atlas,
+  System shows live health/readiness, Access shows the effective principal
+  policy, and Releases loads authorized release data.
+- Added a private Profile view with session-backed password rotation, and fixed
+  the readiness revision display when the upstream reports it in response
+  metadata.
 
 ### Fixed
 

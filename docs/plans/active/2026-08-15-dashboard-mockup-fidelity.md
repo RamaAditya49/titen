@@ -19,6 +19,10 @@ spec: docs/specs/active/2026-08-15-dashboard-mockup-fidelity.md
   CSS composition that matches the mockup while keeping existing data selectors.
 - [ ] Add live Atlas topology rendering and accessible graph/list/inspector
   synchronization without adding dependencies or API routes.
+- [ ] Wire every visible rail item to an existing live destination or
+  authenticated status/policy view without adding API routes.
+- [ ] Add a private Profile/password-change destination and make alias
+  selection exclusive.
 - [ ] Verify desktop, mobile, disconnected, empty, error, lens, login, and all
   six area flows through the existing browser/adapter tests.
 - [ ] Run build, bundle, type/workflow checks, and inspect local screenshots.
@@ -36,6 +40,8 @@ spec: docs/specs/active/2026-08-15-dashboard-mockup-fidelity.md
 | AC-DMF-005 | Existing disconnected/error/empty tests and stale-state clearing |
 | AC-DMF-006 | Build bundle gate, local asset inspection, no external request assertion |
 | AC-DMF-007 | Existing lens/navigation/record interaction tests and focus assertions |
+| AC-DMF-008 | Browser assertions for Memories, System, Access, and Releases destinations |
+| AC-DMF-009 | Browser assertions for exclusive selection and profile/password flow |
 
 ## Rollback
 

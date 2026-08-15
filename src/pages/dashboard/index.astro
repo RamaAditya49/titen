@@ -67,7 +67,9 @@ const lenses = [
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-atlas"></use></svg>Atlas</span>
             <small>live</small>
           </button>
-          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-observation"></use></svg>Memories</span><small>query</small></span>
+          <button type="button" class="nav-alias" data-area="memories" data-label="Memory Atlas" data-scopes={productAreas[0].scopes}>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-observation"></use></svg>Memories</span><small>query</small>
+          </button>
           <button type="button" data-area="context" data-label="Context" data-scopes={productAreas[1].scopes} hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-context"></use></svg>Context</span>
             <small>live</small>
@@ -84,24 +86,34 @@ const lenses = [
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-audit"></use></svg>Audit &amp; Events</span>
             <small>live</small>
           </button>
-          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-system"></use></svg>System</span><small>status</small></span>
+          <button type="button" data-area="system" data-label="System status" data-scopes="">
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-system"></use></svg>System</span><small>status</small>
+          </button>
           <button type="button" data-area="federation" data-label="Federation" data-scopes={productAreas[5].scopes} hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-federation"></use></svg>Federation</span>
             <small>live</small>
           </button>
 
           <p class="nav-group-label">Administration</p>
-          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-access"></use></svg>Access</span><small>policy</small></span>
+          <button type="button" data-area="access" data-label="Access policy" data-scopes="identity:read">
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-access"></use></svg>Access</span><small>policy</small>
+          </button>
 
           <p class="nav-group-label">Governance</p>
           <button type="button" data-area="governance" data-label="Governance" data-scopes={productAreas[4].scopes} hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-governance"></use></svg>Approvals</span>
             <small>live</small>
           </button>
-          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-release"></use></svg>Releases</span><small>policy</small></span>
+          <button type="button" data-area="releases" data-label="Release policy" data-scopes="releases:read">
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-release"></use></svg>Releases</span><small>policy</small>
+          </button>
         </nav>
 
         <section class="credential-note" aria-label="Credential handling">
+          <button type="button" class="profile-button" data-profile-open hidden>
+            <span class="profile-avatar" data-profile-avatar>OP</span>
+            <span><strong data-profile-name>operator</strong><small data-profile-role>profile · principal</small></span>
+          </button>
           <p>Credential boundary</p>
           <strong data-credential-mode>Server-only</strong>
           <span data-credential-copy>Passwords and session keys never enter browser storage.</span>
@@ -188,6 +200,52 @@ const lenses = [
         </section>
 
         <div class="notice" data-service-notice role="alert" hidden></div>
+
+        <section class="area-panel query-panel status-panel" data-area-panel="system" hidden aria-labelledby="system-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Operations / live process</p><h2 id="system-heading">System status</h2></div>
+            <button class="secondary-button" type="button" data-system-refresh>Refresh status</button>
+          </div>
+          <div class="status-grid" data-system-status>
+            <article><span>Process</span><strong data-system-health>Checking</strong><small data-system-runtime>healthz</small></article>
+            <article><span>Readiness</span><strong data-system-readiness>Checking</strong><small data-system-revision>revision pending</small></article>
+            <article><span>Connection</span><strong data-system-connection>Checking</strong><small data-system-endpoint>same-origin adapter</small></article>
+          </div>
+          <p class="panel-note">Readiness is an honest upstream signal. A 503 means the process is reachable but a configured capability still needs repair; it is not an authorization failure.</p>
+        </section>
+
+        <section class="area-panel query-panel policy-panel" data-area-panel="access" hidden aria-labelledby="access-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Administration / effective authority</p><h2 id="access-heading">Access policy</h2></div>
+            <span>resolved from the authenticated principal</span>
+          </div>
+          <dl class="policy-details" data-access-details></dl>
+          <p class="panel-note">Scopes are evaluated by the same-origin adapter before every live request. No browser-held API key is used.</p>
+        </section>
+
+        <section class="area-panel query-panel policy-panel" data-area-panel="profile" hidden aria-labelledby="profile-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Operator / private identity</p><h2 id="profile-heading">Profile</h2></div>
+            <span>session-scoped, never stored in browser storage</span>
+          </div>
+          <dl class="policy-details" data-profile-details></dl>
+          <form class="profile-password-form" data-profile-password-form>
+            <div><p class="eyebrow">Credential rotation</p><h3>Change password</h3><p>Use a new password of at least 15 characters. All existing dashboard sessions will be revoked.</p></div>
+            <label><span>New password</span><input name="password" type="password" minlength="15" maxlength="128" autocomplete="new-password" required /></label>
+            <label><span>Confirm new password</span><input name="confirm_password" type="password" minlength="15" maxlength="128" autocomplete="new-password" required /></label>
+            <button class="primary-button" type="submit">Update password</button>
+            <span data-profile-password-status role="status"></span>
+          </form>
+          <p class="panel-note" data-profile-password-note hidden>Password changes are available only for session-authenticated operator accounts.</p>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="releases" hidden aria-labelledby="releases-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Governance / release controls</p><h2 id="releases-heading">Release policy</h2></div>
+            <button class="secondary-button" type="button" data-releases-refresh>Refresh releases</button>
+          </div>
+          <div class="live-output" data-releases-output><p>Refresh to load releases authorized for this principal.</p></div>
+        </section>
 
         <section class="area-panel memories-panel" data-area-panel="memories" hidden>
           <section class="query-panel memory-controls" aria-labelledby="memory-query-heading">
@@ -409,7 +467,31 @@ const lenses = [
       }
       function serviceDetail(payload: Record<string, unknown>, key: string): string | undefined {
         const value = payloadData(payload)[key];
-        return typeof value === "string" ? value : undefined;
+        if (typeof value === "string") return value;
+        const meta = payload.meta;
+        const metaValue = meta && typeof meta === "object" && !Array.isArray(meta)
+          ? (meta as Record<string, unknown>)[key] : undefined;
+        return typeof metaValue === "string" ? metaValue : undefined;
+      }
+      function renderPrincipalDetails(selector: string) {
+        const target = one<HTMLDListElement>(selector);
+        target.replaceChildren();
+        if (!principal) return;
+        for (const [label, value] of [
+          ["Principal", principal.principal_id], ["Type", principal.principal_kind],
+          ["Organization", principal.organization_id], ["Role", principal.organization_role ?? "none"],
+          ["Trust ceiling", principal.max_trust], ["Scopes", principal.scopes.join(", ") || "none"],
+        ] as const) {
+          const term = document.createElement("dt");
+          const description = document.createElement("dd");
+          term.textContent = label;
+          description.textContent = value;
+          target.append(term, description);
+        }
+      }
+      function renderAccessPolicy() {
+        renderPrincipalDetails("[data-access-details]");
+        renderPrincipalDetails("[data-profile-details]");
       }
       function setNotice(element: HTMLElement, message?: string) {
         element.hidden = !message;
@@ -522,6 +604,10 @@ const lenses = [
       }
       function clearPrivateState() {
         clearMemory();
+        one<HTMLDListElement>("[data-access-details]").replaceChildren();
+        one<HTMLDListElement>("[data-profile-details]").replaceChildren();
+        one<HTMLFormElement>("[data-profile-password-form]").reset();
+        text("[data-profile-password-status]", "");
         one<HTMLElement>("[data-user-credential]").hidden = true;
         text("[data-user-temporary-password]", "");
         for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]"])
@@ -656,14 +742,16 @@ const lenses = [
       }
 
       function accessible(button: HTMLButtonElement): boolean {
+        if (button.dataset.area === "system") return true;
         const scopes = button.dataset.scopes?.split(" ") ?? [];
         return scopes.some(has);
       }
       function activateArea(id: string) {
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = panel.dataset.areaPanel !== id;
-        for (const button of all<HTMLButtonElement>("[data-area]")) button.setAttribute("aria-current", button.dataset.area === id ? "page" : "false");
-        const selected = all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id);
-        const label = selected?.dataset.label ?? "Dashboard";
+        const selected = all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id && !button.hidden);
+        for (const button of all<HTMLButtonElement>("[data-area]")) button.setAttribute("aria-current", button === selected ? "page" : "false");
+        one<HTMLButtonElement>("[data-profile-open]").setAttribute("aria-current", id === "profile" ? "page" : "false");
+        const label = selected?.dataset.label ?? (id === "profile" ? "Profile" : "Dashboard");
         text("[data-page-title]", label);
         text("[data-breadcrumb-area]", id === "memories" ? "Memory" : "Operator");
         text("[data-breadcrumb-page]", label);
@@ -674,6 +762,7 @@ const lenses = [
         one<HTMLElement>("[data-login-panel]").hidden = true;
         one<HTMLElement>("[data-service-strip]").hidden = false;
         one<HTMLElement>("[data-product-nav]").hidden = false;
+        one<HTMLButtonElement>("[data-profile-open]").hidden = false;
         const buttons = all<HTMLButtonElement>("[data-area]");
         for (const button of buttons) button.hidden = !accessible(button);
         for (const input of all<HTMLInputElement>('[data-memory-form] input[name="lens"]')) {
@@ -688,6 +777,12 @@ const lenses = [
           ?? buttons.find((button) => !button.hidden);
         if (first) activateArea(first.dataset.area!);
         one<HTMLButtonElement>("[data-logout]").hidden = dashboardStatus?.authentication !== "session";
+        const profileName = principal?.principal_id ?? "server-key";
+        text("[data-profile-name]", profileName);
+        text("[data-profile-role]", principal ? `${principal.organization_role ?? "no org role"} · ${principal.principal_kind}` : "adapter authority");
+        text("[data-profile-avatar]", profileName.slice(0, 2).toUpperCase());
+        one<HTMLFormElement>("[data-profile-password-form]").hidden = dashboardStatus?.authentication !== "session";
+        one<HTMLElement>("[data-profile-password-note]").hidden = dashboardStatus?.authentication === "session";
         one<HTMLElement>("[data-user-admin]").hidden = !(dashboardStatus?.authentication === "session"
           && has("keys:manage") && has("memberships:write")
           && ["root", "owner", "admin"].includes(String(principal?.organization_role)));
@@ -700,6 +795,7 @@ const lenses = [
         for (const button of all<HTMLButtonElement>("[data-area]")) button.hidden = true;
         one<HTMLElement>("[data-product-nav]").hidden = true;
         one<HTMLElement>("[data-service-strip]").hidden = true;
+        one<HTMLButtonElement>("[data-profile-open]").hidden = true;
         one<HTMLButtonElement>("[data-logout]").hidden = true;
         one<HTMLElement>("[data-login-panel]").hidden = false;
         text("[data-page-title]", "Sign in");
@@ -743,14 +839,26 @@ const lenses = [
           principal = await getSession();
           if (principal.password_change_required) return showPasswordChange();
           showPrivateSurface();
+          renderAccessPolicy();
           text("[data-principal]", principal?.principal_id ?? "Server key");
           text("[data-role]", principal ? `${principal.organization_role ?? "no org role"} · ${principal.principal_kind}` : "adapter authority");
           const [health, readiness] = await Promise.all([checkService("health"), checkService("readiness")]);
-          text("[data-health]", health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`);
-          text("[data-runtime]", serviceDetail(health.payload, "runtime") ?? "healthz");
-          text("[data-readiness]", readiness.ok ? "Ready" : `Not ready · ${readiness.status}`);
-          text("[data-revision]", serviceDetail(readiness.payload, "revision") ?? "revision unavailable");
-          text("[data-connection-label]", health.ok ? "Connected" : "Degraded");
+          const healthLabel = health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`;
+          const runtimeLabel = serviceDetail(health.payload, "runtime") ?? "healthz";
+          const readinessLabel = readiness.ok ? "Ready" : `Not ready · ${readiness.status}`;
+          const revisionLabel = serviceDetail(readiness.payload, "revision") ?? serviceDetail(health.payload, "revision") ?? "revision unavailable";
+          const connectionLabel = health.ok ? "Connected" : "Degraded";
+          text("[data-health]", healthLabel);
+          text("[data-runtime]", runtimeLabel);
+          text("[data-readiness]", readinessLabel);
+          text("[data-revision]", revisionLabel);
+          text("[data-connection-label]", connectionLabel);
+          text("[data-system-health]", healthLabel);
+          text("[data-system-runtime]", runtimeLabel);
+          text("[data-system-readiness]", readinessLabel);
+          text("[data-system-revision]", revisionLabel);
+          text("[data-system-connection]", connectionLabel);
+          text("[data-system-endpoint]", dashboardStatus.endpoint ?? "same-origin adapter");
           one<HTMLElement>("[data-connection-dot]").className = health.ok && readiness.ok ? "ok" : "warn";
           setNotice(notice, readiness.ok ? undefined : "The process is reachable but not ready. Product requests may fail until readiness recovers.");
         } catch (error) {
@@ -809,7 +917,26 @@ const lenses = [
           signedOut("Signed out. The adapter discarded this browser session.");
         } catch (error) { handleError(error); }
       });
+      one<HTMLButtonElement>("[data-profile-open]").addEventListener("click", () => activateArea("profile"));
+      one<HTMLFormElement>("[data-profile-password-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        if (!form.reportValidity()) return;
+        const password = form.elements.namedItem("password") as HTMLInputElement;
+        const confirm = form.elements.namedItem("confirm_password") as HTMLInputElement;
+        if (password.value !== confirm.value) return text("[data-profile-password-status]", "Passwords do not match.");
+        text("[data-profile-password-status]", "Updating password…");
+        try {
+          await changePassword(password.value);
+          signedOut("Password updated. Sign in with your new password.");
+        } catch (error) {
+          password.value = "";
+          confirm.value = "";
+          text("[data-profile-password-status]", errorMessage(error));
+        }
+      });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);
+      one<HTMLButtonElement>("[data-system-refresh]").addEventListener("click", refreshService);
       one<HTMLButtonElement>("[data-search-open]").addEventListener("click", () => {
         searchDialog.showModal();
         (searchForm.elements.namedItem("query") as HTMLInputElement).focus();
@@ -952,6 +1079,11 @@ const lenses = [
         const query = new URLSearchParams({ peer_id: String(values.get("peer_id")).trim(), limit: String(values.get("limit")) });
         const target = one<HTMLElement>("[data-federation-output]");
         try { renderPayload(target, await getArea("federation/log", query)); } catch (error) { handleError(error, target); }
+      });
+      one<HTMLButtonElement>("[data-releases-refresh]").addEventListener("click", async () => {
+        const target = one<HTMLElement>("[data-releases-output]");
+        try { renderPayload(target, await getArea("governance/releases")); }
+        catch (error) { handleError(error, target); }
       });
 
       updateMemoryRequirements();
