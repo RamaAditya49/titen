@@ -57,6 +57,10 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.locator("[data-inspector-title]")).toHaveText("Production retry budget is 400 ms");
   await expect(page.locator("[data-relationships]")).toContainText("supports");
   await expect(page.locator("[data-metadata]")).toContainText("platform-team");
+  await expect(page.locator("[data-atlas-graph]")).toBeVisible();
+  await expect(page.locator("[data-atlas-nodes] .atlas-node")).toHaveCount(2);
+  await expect(page.locator("[data-atlas-edges] path")).toHaveCount(1);
+  await expect(page.locator("[data-compile-trace]")).toBeVisible();
   service.disconnect();
   await page.getByRole("button", { name: "Refresh service" }).click();
   await expect(page.getByText("Disconnected", { exact: true })).toBeVisible();

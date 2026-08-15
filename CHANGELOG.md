@@ -26,6 +26,26 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-08-15
+
+The live operator dashboard now follows the approved Memory Atlas visual system
+while keeping the authenticated adapter and six-area contracts unchanged.
+
+### Changed
+
+- Reworked the Astro dashboard rail, header, lens controls, status metadata,
+  topology workspace, compile trace, and inspector with local Titen icons and
+  the approved warm paper palette.
+- Added a live, bounded SVG topology that is derived only from authorized Atlas
+  nodes and edges, with a synchronized accessible record list and inspector.
+- Added a native search dialog that fills the authorized Atlas query without
+  moving credentials or memory data into browser storage.
+
+### Fixed
+
+- Dashboard mobile layout now keeps the Atlas graph inside an internal scroll
+  region and preserves a single-column reading path.
+
 ## [0.8.0] — 2026-08-13
 
 Titen can now bootstrap curated memory from sixteen agent and memory-system

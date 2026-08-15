@@ -35,6 +35,23 @@ const lenses = [
     <title>Titen · Operator dashboard</title>
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <defs>
+        <symbol id="icon-observation" viewBox="0 0 100 100"><rect x="24" y="16" width="52" height="68" rx="3" fill="none" stroke="currentColor" stroke-width="6"/><path d="M36 38h28M36 52h28" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><path d="M36 66h16" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/></symbol>
+        <symbol id="icon-claim" viewBox="0 0 100 100"><circle cx="26" cy="42" r="12" fill="currentColor"/><path d="M44 42h40M26 68h44" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><path d="M26 68h44" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"/></symbol>
+        <symbol id="icon-context" viewBox="0 0 100 100"><circle cx="50" cy="50" r="11" fill="currentColor"/><path d="M14 34l12 12-12 12M86 34L74 46l12 12M36 84l12-12 12 12" fill="none" stroke="currentColor" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 84l12-12" fill="none" stroke="var(--accent)" stroke-width="6.4" stroke-linecap="round"/></symbol>
+        <symbol id="icon-atlas" viewBox="0 0 100 100"><circle cx="50" cy="50" r="10" fill="var(--accent)"/><g fill="currentColor"><circle cx="20" cy="24" r="7"/><circle cx="80" cy="24" r="7"/><circle cx="20" cy="76" r="7"/><circle cx="80" cy="76" r="7"/></g><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".5"><path d="M27 29l16 15M73 29L57 44M27 71l16-15M73 71L57 56"/></g></symbol>
+        <symbol id="icon-work" viewBox="0 0 100 100"><path d="M28 16v68M28 22h48L64 40l12 18H28" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="28" cy="76" r="8" fill="var(--accent)"/></symbol>
+        <symbol id="icon-audit" viewBox="0 0 100 100"><g fill="currentColor"><circle cx="24" cy="30" r="5"/><circle cx="24" cy="50" r="5"/><circle cx="24" cy="70" r="5"/></g><path d="M42 30h42M42 50h42M42 70h26" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><path d="M42 70h26" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/></symbol>
+        <symbol id="icon-system" viewBox="0 0 100 100"><path d="M10 54h20l8-22 12 42 10-20h30" fill="none" stroke="currentColor" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-access" viewBox="0 0 100 100"><circle cx="34" cy="50" r="16" fill="none" stroke="currentColor" stroke-width="6.4"/><path d="M50 50h38M70 50v14M84 50v12" fill="none" stroke="var(--accent)" stroke-width="6.4" stroke-linecap="round"/></symbol>
+        <symbol id="icon-governance" viewBox="0 0 100 100"><path d="M50 12l30 12v28c0 18-14 30-30 36-16-6-30-18-30-36V24z" fill="none" stroke="currentColor" stroke-width="6.4"/><path d="M36 50l11 11 19-21" fill="none" stroke="var(--accent)" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-release" viewBox="0 0 100 100"><rect x="16" y="26" width="46" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="6"/><path d="M62 38h26M78 28l10 10-10 10" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-federation" viewBox="0 0 100 100"><ellipse cx="50" cy="25" rx="15" ry="25" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="50" cy="75" rx="15" ry="25" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="25" cy="50" rx="25" ry="15" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="75" cy="50" rx="25" ry="15" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="50" cy="50" r="8" fill="var(--accent)"/></symbol>
+        <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+        <symbol id="icon-disconnect" viewBox="0 0 24 24"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M13 12h8M17 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      </defs>
+    </svg>
     <a class="skip-link" href="#workspace">Skip to workspace</a>
     <div class="app-shell" data-shell="loading">
       <aside class="sidebar" aria-label="Product areas">
@@ -45,32 +62,67 @@ const lenses = [
         </header>
 
         <nav data-product-nav hidden>
-          <p>Product map</p>
-          {productAreas.map((area) => (
-            <button type="button" data-area={area.id} data-scopes={area.scopes} hidden>
-              {area.label}<small>live</small>
-            </button>
-          ))}
+          <p class="nav-group-label">Memory</p>
+          <button type="button" data-area="memories" data-label="Memory Atlas" data-scopes={productAreas[0].scopes} hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-atlas"></use></svg>Atlas</span>
+            <small>live</small>
+          </button>
+          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-observation"></use></svg>Memories</span><small>query</small></span>
+          <button type="button" data-area="context" data-label="Context" data-scopes={productAreas[1].scopes} hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-context"></use></svg>Context</span>
+            <small>live</small>
+          </button>
+
+          <p class="nav-group-label">Collaboration</p>
+          <button type="button" data-area="work" data-label="Work" data-scopes={productAreas[2].scopes} hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-work"></use></svg>Work</span>
+            <small>live</small>
+          </button>
+
+          <p class="nav-group-label">Operations</p>
+          <button type="button" data-area="audit" data-label="Audit & Events" data-scopes={productAreas[3].scopes} hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-audit"></use></svg>Audit &amp; Events</span>
+            <small>live</small>
+          </button>
+          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-system"></use></svg>System</span><small>status</small></span>
+          <button type="button" data-area="federation" data-label="Federation" data-scopes={productAreas[5].scopes} hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-federation"></use></svg>Federation</span>
+            <small>live</small>
+          </button>
+
+          <p class="nav-group-label">Administration</p>
+          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-access"></use></svg>Access</span><small>policy</small></span>
+
+          <p class="nav-group-label">Governance</p>
+          <button type="button" data-area="governance" data-label="Governance" data-scopes={productAreas[4].scopes} hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-governance"></use></svg>Approvals</span>
+            <small>live</small>
+          </button>
+          <span class="nav-orientation"><span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-release"></use></svg>Releases</span><small>policy</small></span>
         </nav>
 
         <section class="credential-note" aria-label="Credential handling">
           <p>Credential boundary</p>
           <strong data-credential-mode>Server-only</strong>
           <span data-credential-copy>Passwords and session keys never enter browser storage.</span>
-          <button type="button" class="text-button" data-logout hidden>Sign out</button>
+          <button type="button" class="text-button" data-logout aria-label="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-disconnect"></use></svg>Disconnect</button>
         </section>
       </aside>
 
       <main id="workspace" class="main-shell" tabindex="-1">
         <header class="topbar">
-          <div>
-            <p class="eyebrow">Authorized operator surface</p>
-            <h1 data-page-title>Titen dashboard</h1>
+          <div class="topbar-title">
+            <div class="breadcrumb"><span data-breadcrumb-area>Authorized operator surface</span><span>/</span><span data-breadcrumb-page>Dashboard</span></div>
+            <div class="topbar-heading"><h1 data-page-title>Titen dashboard</h1><span class="read-only-badge">read-only</span><span class="javanese" title="titen">ꦠꦶꦠꦺꦤ꧀</span></div>
           </div>
-          <div class="connection" role="status" aria-live="polite">
-            <i data-connection-dot></i>
-            <span data-connection-label>Connecting</span>
-            <small data-endpoint>same-origin adapter</small>
+          <div class="topbar-actions">
+            <button type="button" class="search-button" data-search-open aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search or jump to…</span><kbd>⌘K</kbd></button>
+            <span class="topbar-rule" aria-hidden="true"></span>
+            <div class="connection" role="status" aria-live="polite">
+              <i data-connection-dot></i>
+              <span data-connection-label>Connecting</span>
+              <small data-endpoint>same-origin adapter</small>
+            </div>
           </div>
         </header>
 
@@ -137,14 +189,14 @@ const lenses = [
 
         <div class="notice" data-service-notice role="alert" hidden></div>
 
-        <section class="area-panel" data-area-panel="memories" hidden>
-          <section class="query-panel" aria-labelledby="memory-query-heading">
+        <section class="area-panel memories-panel" data-area-panel="memories" hidden>
+          <section class="query-panel memory-controls" aria-labelledby="memory-query-heading">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Memories / authorized projection</p>
-                <h2 id="memory-query-heading">Inspect canonical memory</h2>
+                <p class="eyebrow">Memory / authorized projection</p>
+                <h2 id="memory-query-heading">Memory Atlas</h2>
               </div>
-              <span>No fixture fallback</span>
+              <span>read-only · live API</span>
             </div>
             <form data-memory-form>
               <fieldset class="lens-picker">
@@ -156,7 +208,7 @@ const lenses = [
                   </label>
                 ))}
               </fieldset>
-              <div class="input-grid">
+              <div class="memory-input-grid">
                 <label>
                   <span>Subject ID</span>
                   <input name="subject_id" autocomplete="off" maxlength="200" placeholder="subject identity" required />
@@ -173,7 +225,7 @@ const lenses = [
                   <small>Server limit: 1–100.</small>
                 </label>
               </div>
-              <div class="form-actions">
+              <div class="form-actions memory-actions">
                 <button class="primary-button" type="submit" data-memory-run>Compile memory view</button>
                 <span data-memory-status role="status" aria-live="polite">Enter an authorized scope to begin.</span>
               </div>
@@ -183,9 +235,13 @@ const lenses = [
           <section class="atlas-workspace" aria-label="Memory result">
             <div class="result-column">
               <header class="result-header">
-                <div><p class="eyebrow">Canonical projection</p><h2 data-view-title>Waiting for a live query</h2></div>
+                <div><p class="eyebrow">Authorized projection</p><h2 data-view-title>Waiting for a live query</h2></div>
                 <span data-result-count>0 records</span>
               </header>
+              <div class="atlas-graph" data-atlas-graph hidden aria-label="Memory topology">
+                <svg data-atlas-edges viewBox="0 0 760 280" role="img" aria-label="Authorized memory relationships"></svg>
+                <div class="atlas-graph-nodes" data-atlas-nodes></div>
+              </div>
               <div class="loading-state" data-memory-loading hidden aria-label="Loading memory records"><span></span><span></span><span></span></div>
               <div class="empty-state" data-memory-empty>
                 <strong>No live query yet.</strong>
@@ -202,6 +258,16 @@ const lenses = [
                 <section><h3>Relationships</h3><div data-relationships></div></section>
               </div>
             </aside>
+          </section>
+          <section class="compile-trace" data-compile-trace hidden aria-label="Compile trace">
+            <header><span>Compile trace</span><small>authorize before expand</small></header>
+            <ol>
+              <li><span>1</span><strong>authenticate + scope</strong><small data-trace-scope>waiting</small></li>
+              <li><span>2</span><strong>resolve focus</strong><small data-trace-focus>waiting</small></li>
+              <li><span>3</span><strong>hydrate + recheck</strong><small data-trace-nodes>waiting</small></li>
+              <li><span>4</span><strong>apply limits</strong><small data-trace-edges>waiting</small></li>
+            </ol>
+            <footer><code>POST /v1/memory-views/compile</code><span>live response</span></footer>
           </section>
           <details class="metadata-panel"><summary>View metadata</summary><pre data-metadata>No live view compiled.</pre></details>
         </section>
@@ -286,6 +352,15 @@ const lenses = [
           </form>
           <div class="live-output" data-federation-output><p>Refresh to load peers registered by this principal.</p></div>
         </section>
+
+        <dialog class="search-dialog" data-search-dialog aria-labelledby="search-heading">
+          <form method="dialog" data-search-form>
+            <header><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><h2 id="search-heading">Search memory</h2><button class="dialog-close" value="cancel" aria-label="Close search">Esc</button></header>
+            <label><span>Subject or focus ID</span><input name="query" autocomplete="off" placeholder="platform-team or claim ID" /></label>
+            <p>Search stays inside the authorized compile flow. Submitting fills the Atlas scope field; the server remains the source of truth.</p>
+            <footer><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="default">Use in Atlas</button></footer>
+          </form>
+        </dialog>
       </main>
     </div>
 
@@ -315,6 +390,12 @@ const lenses = [
       const memoryEmpty = one<HTMLElement>("[data-memory-empty]");
       const memoryLoading = one<HTMLElement>("[data-memory-loading]");
       const memoryError = one<HTMLElement>("[data-memory-error]");
+      const atlasGraph = one<HTMLElement>("[data-atlas-graph]");
+      const atlasEdges = one<SVGElement>("[data-atlas-edges]");
+      const atlasNodes = one<HTMLElement>("[data-atlas-nodes]");
+      const compileTrace = one<HTMLElement>("[data-compile-trace]");
+      const searchDialog = one<HTMLDialogElement>("[data-search-dialog]");
+      const searchForm = one<HTMLFormElement>("[data-search-form]");
       let view: AtlasView | null = null;
       let principal: DashboardPrincipal | null = null;
       let dashboardStatus: DashboardStatus | null = null;
@@ -420,6 +501,10 @@ const lenses = [
         view = null;
         memoryRecords.replaceChildren();
         memoryRecords.hidden = true;
+        atlasGraph.hidden = true;
+        atlasEdges.replaceChildren();
+        atlasNodes.replaceChildren();
+        compileTrace.hidden = true;
         memoryLoading.hidden = true;
         memoryEmpty.hidden = false;
         memoryEmpty.querySelector("strong")!.textContent = "No live query yet.";
@@ -493,12 +578,58 @@ const lenses = [
           relationships.append(row);
         }
       }
+      function renderGraph(next: AtlasView) {
+        atlasEdges.replaceChildren();
+        atlasNodes.replaceChildren();
+        if (!next.nodes.length) { atlasGraph.hidden = true; return; }
+        atlasGraph.hidden = false;
+        const positions = next.nodes.map((_, index) => ({
+          x: 126 + (index % 3) * 254,
+          y: 58 + Math.floor(index / 3) * 104,
+        }));
+        const byId = new Map(next.nodes.map((node, index) => [node.id, positions[index]]));
+        for (const edge of next.edges) {
+          const from = byId.get(edge.from);
+          const to = byId.get(edge.to);
+          if (!from || !to) continue;
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          line.setAttribute("d", `M ${from.x} ${from.y} C ${(from.x + to.x) / 2} ${from.y}, ${(from.x + to.x) / 2} ${to.y}, ${to.x} ${to.y}`);
+          line.setAttribute("fill", "none");
+          line.setAttribute("stroke", "#171310");
+          line.setAttribute("stroke-width", "1.5");
+          line.setAttribute("stroke-opacity", ".45");
+          atlasEdges.append(line);
+        }
+        for (const node of next.nodes) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "atlas-node";
+          button.dataset.id = node.id;
+          button.setAttribute("aria-pressed", "false");
+          const kind = document.createElement("span");
+          kind.className = "node-kind";
+          kind.textContent = node.type;
+          const label = document.createElement("strong");
+          label.textContent = node.label;
+          const detail = document.createElement("small");
+          detail.textContent = [node.trust, node.status, formatDate(node.created_at)].filter(Boolean).join(" · ");
+          button.append(kind, label, detail);
+          button.addEventListener("click", () => inspect(node));
+          atlasNodes.append(button);
+        }
+      }
       function renderMemory(next: AtlasView) {
         view = next;
+        renderGraph(next);
         memoryRecords.replaceChildren();
         text("[data-view-title]", next.lens.replaceAll("_", " "));
         text("[data-result-count]", `${next.nodes.length} records · ${next.edges.length} edges`);
         text("[data-metadata]", JSON.stringify(next.metadata, null, 2));
+        compileTrace.hidden = false;
+        text("[data-trace-scope]", typeof next.metadata.subject_id === "string" ? next.metadata.subject_id : "authorized");
+        text("[data-trace-focus]", next.focus_id ?? "lens root");
+        text("[data-trace-nodes]", `${next.nodes.length} current`);
+        text("[data-trace-edges]", `${next.edges.length} returned`);
         memoryEmpty.hidden = next.nodes.length > 0;
         if (!next.nodes.length) {
           memoryEmpty.querySelector("strong")!.textContent = "No authorized records found.";
@@ -531,8 +662,11 @@ const lenses = [
       function activateArea(id: string) {
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = panel.dataset.areaPanel !== id;
         for (const button of all<HTMLButtonElement>("[data-area]")) button.setAttribute("aria-current", button.dataset.area === id ? "page" : "false");
-        const label = all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id)?.textContent?.replace("live", "").trim() ?? "Dashboard";
+        const selected = all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id);
+        const label = selected?.dataset.label ?? "Dashboard";
         text("[data-page-title]", label);
+        text("[data-breadcrumb-area]", id === "memories" ? "Memory" : "Operator");
+        text("[data-breadcrumb-page]", label);
         history.replaceState(null, "", `#${id}`);
       }
       function showPrivateSurface() {
@@ -676,6 +810,27 @@ const lenses = [
         } catch (error) { handleError(error); }
       });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);
+      one<HTMLButtonElement>("[data-search-open]").addEventListener("click", () => {
+        searchDialog.showModal();
+        (searchForm.elements.namedItem("query") as HTMLInputElement).focus();
+      });
+      searchForm.addEventListener("submit", (event) => {
+        const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
+        if (submitter?.value !== "default") return;
+        event.preventDefault();
+        const query = String(new FormData(searchForm).get("query") ?? "").trim();
+        const subject = memoryForm.elements.namedItem("subject_id") as HTMLInputElement;
+        if (query) subject.value = query;
+        searchDialog.close();
+        activateArea("memories");
+        subject.focus();
+      });
+      document.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+          event.preventDefault();
+          if (!searchDialog.open) one<HTMLButtonElement>("[data-search-open]").click();
+        }
+      });
 
       memoryForm.addEventListener("change", (event) => {
         if ((event.target as HTMLInputElement).name === "lens") updateMemoryRequirements();
