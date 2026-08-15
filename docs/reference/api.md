@@ -650,6 +650,14 @@ graph edges, and never includes source evidence.
 The example limits are caller requests, not normative server maxima; the server
 clamps them to measured deployment limits.
 
+`evidence_trace` returns the authorized focus claim, its readable source
+observations, and typed `supports`, `contradicts`, or `qualifies` edges. It may
+also return a `context` node with a `selected-in` edge when the caller owns or
+has an accepted handoff for the complete context pack, and an active `release`
+node with a `released-as` edge when the current channel snapshot is still
+eligible. A hidden context item or stale release is omitted as a whole; the
+response never represents a partial pack or hidden topology.
+
 `review_queue` accepts optional `subject_id`, canonical `owner_id`,
 `review_reason` (`all`, `disputed`, `contradiction`, `low_confidence`, or
 `negative_feedback`), `cursor`, and `limit`. It returns claim nodes with

@@ -1,7 +1,7 @@
 /** Browser-safe client for the same-origin dashboard adapter. */
 export interface AtlasNode {
   id: string;
-  type: "claim" | "observation" | "principal" | "release";
+  type: "claim" | "observation" | "context" | "principal" | "release";
   label: string;
   trust: string;
   status: string;

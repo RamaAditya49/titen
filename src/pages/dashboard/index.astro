@@ -331,11 +331,11 @@ const lenses = [
           <section class="atlas-workspace" aria-label="Memory result">
             <div class="result-column">
               <header class="result-header">
-                <div><p class="eyebrow">Authorized projection</p><h2 data-view-title>Waiting for a live query</h2></div>
-                <span data-result-count>0 records</span>
+                <div><p class="eyebrow">Authorized projection</p><h2 data-view-title>Evidence Trace</h2></div>
+                <span data-result-count>select a node to inspect it</span>
               </header>
               <div class="atlas-graph" data-atlas-graph hidden aria-label="Memory topology">
-                <svg data-atlas-edges viewBox="0 0 760 280" role="img" aria-label="Authorized memory relationships"></svg>
+                <svg data-atlas-edges viewBox="0 0 900 500" role="img" aria-label="Authorized memory relationships"></svg>
                 <div class="atlas-graph-nodes" data-atlas-nodes></div>
               </div>
               <div class="loading-state" data-memory-loading hidden aria-label="Loading memory records"><span></span><span></span><span></span></div>
@@ -712,8 +712,8 @@ const lenses = [
         memoryEmpty.hidden = false;
         memoryEmpty.querySelector("strong")!.textContent = "No live query yet.";
         memoryEmpty.querySelector("p")!.textContent = "Run a bounded query to inspect records authorized for this principal.";
-        text("[data-view-title]", "Waiting for a live query");
-        text("[data-result-count]", "0 records");
+        text("[data-view-title]", "Evidence Trace");
+        text("[data-result-count]", "select a node to inspect it");
         text("[data-metadata]", "No live view compiled.");
         text("[data-memory-status]", "Enter an authorized scope to begin.");
         setNotice(memoryError);
@@ -770,7 +770,7 @@ const lenses = [
         list.append(term, description);
       }
       function inspect(node: AtlasNode) {
-        memoryRecords.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.id === node.id)));
+        document.querySelectorAll("[data-memory-records] button, [data-atlas-nodes] button").forEach((button) => button.setAttribute("aria-pressed", String((button as HTMLElement).dataset.id === node.id)));
         text("[data-inspector-title]", node.label);
         one<HTMLElement>("[data-inspector-empty]").hidden = true;
         one<HTMLElement>("[data-inspector-body]").hidden = false;
@@ -797,32 +797,86 @@ const lenses = [
         atlasNodes.replaceChildren();
         if (!next.nodes.length) { atlasGraph.hidden = true; return; }
         atlasGraph.hidden = false;
-        const positions = next.nodes.map((_, index) => ({
-          x: 126 + (index % 3) * 254,
-          y: 58 + Math.floor(index / 3) * 104,
-        }));
-        const byId = new Map(next.nodes.map((node, index) => [node.id, positions[index]]));
+        const claim = next.nodes.find((node) => node.type === "claim" && node.id === next.focus_id)
+          ?? next.nodes.find((node) => node.type === "claim")
+          ?? next.nodes[0];
+        const observations = next.nodes.filter((node) => node.id !== claim.id && node.type === "observation");
+        const decorations = next.nodes.filter((node) => node.id !== claim.id && node.type !== "observation");
+        const positions = new Map<string, { x: number; y: number; width: number; height: number }>();
+        const canvasHeight = next.lens === "evidence_trace"
+          ? Math.max(500, 52 + Math.max(observations.length * 112, decorations.length * 132))
+          : Math.max(500, 72 + Math.ceil(next.nodes.length / 3) * 112);
+        atlasGraph.style.minHeight = `${canvasHeight}px`;
+        atlasEdges.setAttribute("viewBox", `0 0 900 ${canvasHeight}`);
+        atlasEdges.style.height = `${canvasHeight}px`;
+        atlasNodes.style.height = `${canvasHeight}px`;
+        if (next.lens === "evidence_trace") {
+          const observationStart = Math.max(26, (canvasHeight - (Math.max(1, observations.length) - 1) * 112 - 86) / 2);
+          const decorationStart = Math.max(52, (canvasHeight - (Math.max(1, decorations.length) - 1) * 132 - 86) / 2);
+          positions.set(claim.id, { x: 316, y: (canvasHeight - 108) / 2, width: 268, height: 176 });
+          observations.forEach((node, index) => positions.set(node.id, { x: 26, y: observationStart + index * 112, width: 248, height: 86 }));
+          decorations.forEach((node, index) => positions.set(node.id, { x: 626, y: decorationStart + index * 132, width: 248, height: 86 }));
+        } else {
+          next.nodes.forEach((node, index) => positions.set(node.id, {
+            x: 26 + (index % 3) * 294,
+            y: 48 + Math.floor(index / 3) * 112,
+            width: node.type === "claim" ? 268 : 248,
+            height: node.type === "claim" ? 104 : 86,
+          }));
+        }
+        const edgePoint = (fromId: string, toId: string, from: boolean) => {
+          const source = positions.get(fromId)!;
+          const target = positions.get(toId)!;
+          const rightward = target.x >= source.x;
+          if (fromId === claim.id && next.lens === "evidence_trace") return {
+            x: source.x + source.width / 2 + (rightward ? 54 : -54),
+            y: source.y + 54,
+          };
+          return {
+            x: (from ? rightward : !rightward) ? source.x + source.width : source.x,
+            y: source.y + source.height / 2,
+          };
+        };
         for (const edge of next.edges) {
-          const from = byId.get(edge.from);
-          const to = byId.get(edge.to);
-          if (!from || !to) continue;
+          const fromBox = positions.get(edge.from);
+          const toBox = positions.get(edge.to);
+          if (!fromBox || !toBox) continue;
+          const from = edgePoint(edge.from, edge.to, true);
+          const to = edgePoint(edge.to, edge.from, false);
+          const control = Math.max(48, Math.abs(to.x - from.x) * .42);
           const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          line.setAttribute("d", `M ${from.x} ${from.y} C ${(from.x + to.x) / 2} ${from.y}, ${(from.x + to.x) / 2} ${to.y}, ${to.x} ${to.y}`);
+          line.setAttribute("d", `M ${from.x} ${from.y} C ${from.x + control} ${from.y}, ${to.x - control} ${to.y}, ${to.x} ${to.y}`);
+          line.setAttribute("class", `atlas-edge atlas-edge--${edge.relation}`);
           line.setAttribute("fill", "none");
-          line.setAttribute("stroke", "#171310");
           line.setAttribute("stroke-width", "1.5");
-          line.setAttribute("stroke-opacity", ".45");
+          line.setAttribute("stroke-opacity", ".82");
           atlasEdges.append(line);
+          const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          label.setAttribute("x", String((from.x + to.x) / 2));
+          label.setAttribute("y", String((from.y + to.y) / 2 - 9));
+          label.setAttribute("text-anchor", "middle");
+          label.setAttribute("class", `atlas-edge-label atlas-edge-label--${edge.relation}`);
+          label.textContent = edge.relation;
+          atlasEdges.append(label);
         }
         for (const node of next.nodes) {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = "atlas-node";
+          button.className = `atlas-node atlas-node--${node.type}${node.id === claim.id ? " atlas-node--focus" : ""}`;
           button.dataset.id = node.id;
+          button.dataset.status = node.status;
+          const relation = next.edges.find((edge) => edge.from === node.id || edge.to === node.id)?.relation;
+          if (relation) button.dataset.relation = relation;
           button.setAttribute("aria-pressed", "false");
+          button.setAttribute("aria-label", `${node.type}: ${node.label}`);
+          const position = positions.get(node.id)!;
+          button.style.left = `${position.x}px`;
+          button.style.top = `${position.y}px`;
           const kind = document.createElement("span");
           kind.className = "node-kind";
-          kind.textContent = node.type;
+          kind.textContent = node.id === claim.id && next.lens === "evidence_trace"
+            ? `focus claim · ${node.status}`
+            : `${node.type} · ${node.status}`;
           const label = document.createElement("strong");
           label.textContent = node.label;
           const detail = document.createElement("small");
@@ -843,8 +897,9 @@ const lenses = [
           ? "organization administrator" : "principal-scoped";
         renderGraph(next);
         memoryRecords.replaceChildren();
-        text("[data-view-title]", next.lens.replaceAll("_", " "));
-        text("[data-result-count]", `${next.nodes.length} records · ${next.edges.length} edges`);
+        const title = next.lens === "evidence_trace" ? "Evidence Trace" : next.lens.replaceAll("_", " ");
+        text("[data-view-title]", title);
+        text("[data-result-count]", next.lens === "evidence_trace" ? "select a node to inspect it" : `${next.nodes.length} records · ${next.edges.length} edges`);
         text("[data-metadata]", JSON.stringify(next.metadata, null, 2));
         compileTrace.hidden = false;
         text("[data-trace-scope]", `${accessMode} · ${activePrincipal}`);
@@ -873,7 +928,8 @@ const lenses = [
           button.addEventListener("click", () => inspect(node));
           memoryRecords.append(button);
         }
-        if (next.nodes[0]) inspect(next.nodes[0]);
+        const initial = next.nodes.find((node) => node.id === next.focus_id) ?? next.nodes[0];
+        if (initial) inspect(initial);
       }
 
       function accessible(button: HTMLButtonElement): boolean {

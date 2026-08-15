@@ -30,9 +30,16 @@ function accessParams(principalId: string, mode: AccessMode) {
   return mode === "organization_admin" ? [] : recordAccessParams(principalId);
 }
 
+function claimAccessSql(alias: "hc" | "rc", mode: AccessMode): string {
+  const sql = mode === "organization_admin"
+    ? organizationRecordAccessSql("c")
+    : recordAccessSql("c");
+  return sql.replaceAll("c.", `${alias}.`);
+}
+
 interface Node {
   id: string;
-  type: "claim" | "observation" | "principal" | "release";
+  type: "claim" | "observation" | "context" | "principal" | "release";
   label: string;
   trust: string;
   status: string;
@@ -111,7 +118,7 @@ function decodeCursor(value: string | null): ReviewCursor | null {
 
 // --- Lens handlers ---
 
-async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string, principalId: string, mode: AccessMode): Promise<ViewResult> {
+async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string, principalId: string, mode: AccessMode, limit: number): Promise<ViewResult> {
   const claim = await first<{ id: string; statement: string; trust: string; status: string; visibility: string; actor_id: string; created_at: string }>(
     ctx.app.db,
     `SELECT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
@@ -126,8 +133,9 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
        FROM claim_sources s
        JOIN observations o ON o.id = s.observation_id
       WHERE s.claim_id = ? AND o.org_id = ? AND ${accessSql("o", mode)}
-      ORDER BY o.ingested_at`,
-    [focusId, orgId, ...accessParams(principalId, mode)],
+      ORDER BY o.ingested_at, o.id
+      LIMIT ?`,
+    [focusId, orgId, ...accessParams(principalId, mode), Math.max(0, limit - 1)],
   );
 
   const nodes: Node[] = [
@@ -140,7 +148,85 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
     edges.push({ from: s.obs_id, to: claim.id, relation: s.relation });
   }
 
-  return { lens: "evidence_trace", focus_id: focusId, nodes, edges, metadata: { observation_count: edges.length } };
+  // A context is a readable projection only when the caller can read the
+  // complete pack. Returning a partial context would disclose its hidden shape.
+  const contexts = await ctx.app.db.all<{
+    id: string; created_at: string; degraded: string;
+  }>(
+    `SELECT DISTINCT r.id, r.created_at, r.degraded
+       FROM context_run_items i
+       JOIN context_runs r ON r.id = i.context_id AND r.org_id = ?
+      WHERE i.claim_id = ?
+        AND (r.actor_id = ? OR EXISTS (
+          SELECT 1 FROM handoffs h
+           WHERE h.org_id = r.org_id AND h.context_id = r.id
+             AND h.to_principal = ? AND h.status IN ('pending', 'accepted')
+        ))
+        AND NOT EXISTS (
+          SELECT 1
+            FROM context_run_items hidden
+            LEFT JOIN claims hc ON hc.id = hidden.claim_id AND hc.org_id = r.org_id
+           WHERE hidden.context_id = r.id
+             AND (hc.id IS NULL OR NOT (${claimAccessSql("hc", mode)}))
+        )
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT ?`,
+    [orgId, focusId, principalId, principalId, ...accessParams(principalId, mode), Math.min(20, Math.max(0, limit - nodes.length))],
+  );
+  for (const context of contexts) {
+    nodes.push({
+      id: context.id,
+      type: "context",
+      label: context.id,
+      trust: context.degraded === "none" ? "compiled" : "degraded",
+      status: "active",
+      created_at: context.created_at,
+    });
+    edges.push({ from: claim.id, to: context.id, relation: "selected-in" });
+  }
+
+  const now = ctx.app.now().toISOString();
+  const releases = await ctx.app.db.all<{
+    id: string; label: string; audience: string; lifecycle_status: string;
+    created_at: string; activated_at: string | null;
+  }>(
+    `SELECT r.id, ch.label, r.audience, r.lifecycle_status, r.created_at, r.activated_at
+       FROM channel_releases r
+       JOIN channels ch ON ch.id = r.channel_id AND ch.org_id = r.org_id
+       JOIN claims rc ON rc.id = r.claim_id AND rc.org_id = r.org_id
+      WHERE r.org_id = ? AND r.claim_id = ?
+        AND r.lifecycle_status = 'active' AND ch.status = 'active'
+        AND rc.status = 'active' AND rc.version = r.claim_version
+        AND (r.valid_from IS NULL OR r.valid_from <= ?)
+        AND (r.valid_to IS NULL OR r.valid_to > ?)
+        AND ${claimAccessSql("rc", mode)}
+      ORDER BY COALESCE(r.activated_at, r.created_at) DESC, r.id DESC
+      LIMIT ?`,
+    [orgId, focusId, now, now, ...accessParams(principalId, mode), Math.min(20, Math.max(0, limit - nodes.length))],
+  );
+  for (const release of releases) {
+    nodes.push({
+      id: release.id,
+      type: "release",
+      label: `${release.label} · ${release.audience}`,
+      trust: "reviewed_snapshot",
+      status: release.lifecycle_status,
+      created_at: release.activated_at ?? release.created_at,
+    });
+    edges.push({ from: claim.id, to: release.id, relation: "released-as" });
+  }
+
+  return {
+    lens: "evidence_trace",
+    focus_id: focusId,
+    nodes,
+    edges,
+    metadata: {
+      observation_count: sources.length,
+      context_count: contexts.length,
+      release_count: releases.length,
+    },
+  };
 }
 
 async function neighborhood(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number, mode: AccessMode): Promise<ViewResult> {
@@ -492,7 +578,7 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
   switch (lens) {
     case "evidence_trace": {
       if (!focusId) throw validationError('Field "focus_id" is required for evidence_trace lens.');
-      view = await evidenceTrace(ctx, focusId, orgId, principalId, accessMode);
+      view = await evidenceTrace(ctx, focusId, orgId, principalId, accessMode, limit);
       break;
     }
     case "neighborhood": {

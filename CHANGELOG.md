@@ -26,6 +26,34 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.5] — 2026-08-15
+
+Atlas Evidence Trace now matches the approved relationship-graph direction:
+the focus claim is centered, relationship paths are labeled, and only live
+authorized relationships are drawn.
+
+### Added
+
+- Evidence Trace may include complete caller-readable context runs through
+  `selected-in` edges and current eligible channel releases through
+  `released-as` edges.
+- The dashboard renders distinct observation, claim, context, and release nodes
+  with `supports`, `contradicts`, `qualifies`, `selected-in`, and `released-as`
+  path styles.
+
+### Changed
+
+- The generic Atlas card grid is replaced by a deterministic claim-centered
+  Evidence Trace canvas with labeled SVG paths and an accessible node inspector.
+- Opening a memory in Atlas immediately compiles and renders that claim's live
+  Evidence Trace; it does not show mock records when no trace exists.
+
+### Security
+
+- A context node is returned only when the caller owns or receives the context
+  and can still read every item in the pack. Active release nodes are rechecked
+  against claim authorization, lifecycle, version, channel status, and validity.
+
 ## [0.8.4] — 2026-08-15
 
 The dashboard now separates the actionable Memories inventory from the

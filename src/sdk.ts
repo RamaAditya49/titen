@@ -469,7 +469,7 @@ export interface ViewResult {
   focus_id: string | null;
   nodes: Array<{
     id: string;
-    type: "claim" | "observation" | "principal" | "release";
+    type: "claim" | "observation" | "context" | "principal" | "release";
     label: string;
     trust: string;
     status: string;

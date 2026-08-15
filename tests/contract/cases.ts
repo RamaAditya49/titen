@@ -4623,6 +4623,73 @@ export const CASES: Case[] = [
       );
       assert.ok(trace.body.data.edges.length >= 1, "the supports edge must be present");
 
+      const traceContextId = `ctx_atlas_trace_${fx.runtime}_${Date.now()}`;
+      const traceChannelId = `chn_atlas_trace_${fx.runtime}_${Date.now()}`;
+      const traceReleaseId = `rel_atlas_trace_${fx.runtime}_${Date.now()}`;
+      const traceNow = "2026-08-01T00:00:00.000Z";
+      await fx.query(
+        `INSERT INTO context_runs
+           (id, org_id, actor_id, subject_id, project_id, task_hash, max_tokens,
+            used_tokens, policy_snapshot, degraded, created_at)
+         VALUES (?, ?, ?, 'user_rama', NULL, 'atlas-trace', 256, 32, 'policy', 'none', ?)`,
+        [traceContextId, owner.orgId, owner.principalId, traceNow],
+      );
+      await fx.query(
+        `INSERT INTO context_run_items (context_id, claim_id, position, score, score_components)
+         VALUES (?, ?, 0, 1, '{}')`,
+        [traceContextId, seeded.claimId],
+      );
+      await fx.query(
+        `INSERT INTO channels
+           (id, org_id, label, gateway_principal_id, allowed_audiences,
+            minimum_trust, status, version, created_by, created_at, updated_at)
+         VALUES (?, ?, 'crm-web', ?, '["anonymous"]', 'asserted', 'active', 1, ?, ?, ?)`,
+        [traceChannelId, owner.orgId, owner.principalId, owner.principalId, traceNow, traceNow],
+      );
+      await fx.query(
+        `INSERT INTO channel_releases
+           (id, org_id, channel, audience, version, status, created_at,
+            channel_id, claim_id, claim_version, released_content, lifecycle_status,
+            valid_from, valid_to, activated_at, updated_at)
+         VALUES (?, ?, 'crm-web', 'anonymous', 1, 'active', ?, ?, ?, 1,
+                 'Production deploy smoke returned 200.', 'active', ?, NULL, ?, ?)`,
+        [traceReleaseId, owner.orgId, traceNow, traceChannelId, seeded.claimId, traceNow, traceNow, traceNow],
+      );
+      const decoratedTrace = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: { lens: "evidence_trace", focus_id: seeded.claimId },
+      });
+      expectOk(decoratedTrace);
+      assert.ok(decoratedTrace.body.data.nodes.some((n: any) => n.id === traceContextId && n.type === "context"), "readable context must be a node");
+      assert.ok(decoratedTrace.body.data.nodes.some((n: any) => n.id === traceReleaseId && n.type === "release"), "active release must be a node");
+      assert.ok(decoratedTrace.body.data.edges.some((e: any) => e.from === seeded.claimId && e.to === traceContextId && e.relation === "selected-in"));
+      assert.ok(decoratedTrace.body.data.edges.some((e: any) => e.from === seeded.claimId && e.to === traceReleaseId && e.relation === "released-as"));
+
+      const privateActor = await fx.provision({ orgId: owner.orgId });
+      const hidden = await seedClaim(fx, privateActor.key, {
+        observation: { subject_id: "user_rama", content: "Private context item.", visibility: "private" },
+        claim: { statement: "Private context claim.", visibility: "private" },
+      });
+      const partialContextId = `ctx_atlas_partial_${fx.runtime}_${Date.now()}`;
+      await fx.query(
+        `INSERT INTO context_runs
+           (id, org_id, actor_id, subject_id, project_id, task_hash, max_tokens,
+            used_tokens, policy_snapshot, degraded, created_at)
+         VALUES (?, ?, ?, 'user_rama', NULL, 'atlas-partial', 256, 32, 'policy', 'none', ?)`,
+        [partialContextId, owner.orgId, owner.principalId, traceNow],
+      );
+      await fx.query(
+        `INSERT INTO context_run_items (context_id, claim_id, position, score, score_components)
+         VALUES (?, ?, 0, 1, '{}'), (?, ?, 1, 0.5, '{}')`,
+        [partialContextId, seeded.claimId, partialContextId, hidden.claimId],
+      );
+      const nonDisclosingTrace = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: { lens: "evidence_trace", focus_id: seeded.claimId },
+      });
+      expectOk(nonDisclosingTrace);
+      assert.ok(!nonDisclosingTrace.body.data.nodes.some((n: any) => n.id === partialContextId), "a partial context must not be disclosed");
+
       for (const lens of ["neighborhood", "conflict_freshness"]) {
         const res = await fx.call("POST", "/v1/memory-views/compile", {
           key: owner.key,

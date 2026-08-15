@@ -81,7 +81,9 @@ Atlas is a separate read-only graph/inspector area inside the Astro dashboard
 at `/dashboard/`. Memories is the primary canonical-record inventory: it lists
 authorized claims through `GET /v1/memories` with lexical search and keyset
 pagination, and it does not compile a view. Selecting a memory may open its
-Evidence Trace in Atlas. Context, Work, Audit, Governance, and Federation use
+Evidence Trace in Atlas. Evidence Trace centers the focus claim, labels each
+relationship path, and decorates it only with authorized complete context packs
+and current eligible releases. Context, Work, Audit, Governance, and Federation use
 their existing bounded REST contracts through the same fixed-route adapter.
 Displayed records and runtime state come only from live same-origin health,
 readiness, and authorized API responses; disconnected or failed integration

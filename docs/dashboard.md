@@ -10,7 +10,7 @@ The product map has six live, capability-gated areas:
 | Area | Live job | Required read capability |
 | --- | --- | --- |
 | Memories | list, search, and paginate authorized canonical memories; open a selected record in Atlas | `views:compile` |
-| Atlas | compile the six bounded read-only visual lenses for an explicit subject/focus | `views:compile` |
+| Atlas | compile six bounded read-only lenses; Evidence Trace centers the selected claim and labels authorized evidence, context, and release relationships | `views:compile` |
 | Context | compile a task-specific context pack | `context:compile` |
 | Work | list leases and pending handoffs; find an exact checkpoint | `leases:read`, `handoffs:read`, or `checkpoints:read` |
 | Audit | list bounded audit records and domain events | `audit:read` or `events:read` |

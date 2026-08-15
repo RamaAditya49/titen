@@ -66,7 +66,21 @@ test("loads Memories as a searchable list and opens one record in Atlas", async 
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
     compileCalls += 1;
     expect(route.request().postDataJSON()).toEqual({ lens: "evidence_trace", limit: 50, subject_id: "platform-team", focus_id: "clm_memory" });
-    await route.fulfill({ json: { data: view } });
+    await route.fulfill({ json: { data: {
+      lens: "evidence_trace", focus_id: "clm_memory",
+      nodes: [
+        { id: "obs_live", type: "observation", label: "Measured runtime result", trust: "verified", status: "active", created_at: "2026-08-01T00:01:00Z" },
+        { id: "clm_memory", type: "claim", label: "Production release keeps evidence.", trust: "verified", status: "disputed", created_at: "2026-08-01T00:00:00Z" },
+        { id: "ctx_live", type: "context", label: "ctx_01J8Q7MB", trust: "compiled", status: "active", created_at: "2026-08-01T00:02:00Z" },
+        { id: "rel_live", type: "release", label: "crm-web · anonymous", trust: "reviewed_snapshot", status: "active", created_at: "2026-08-01T00:03:00Z" },
+      ],
+      edges: [
+        { from: "obs_live", to: "clm_memory", relation: "supports" },
+        { from: "clm_memory", to: "ctx_live", relation: "selected-in" },
+        { from: "clm_memory", to: "rel_live", relation: "released-as" },
+      ],
+      metadata: { authorization: { principal_id: "server_operator", access_mode: "principal" } },
+    } } });
   });
   await page.goto("/dashboard/");
   await expect(page.locator("[data-memory-list-table]")).toBeVisible();
@@ -78,6 +92,10 @@ test("loads Memories as a searchable list and opens one record in Atlas", async 
   await expect(page.locator('[data-area="atlas"]')).toHaveAttribute("aria-current", "page");
   await expect(page.locator('[data-area="memories"]')).toHaveAttribute("aria-current", "false");
   await expect(page.locator("[data-atlas-graph]")).toBeVisible();
+  await expect(page.locator("[data-atlas-nodes] .atlas-node--claim")).toHaveCount(1);
+  await expect(page.locator("[data-atlas-nodes] .atlas-node--context")).toHaveCount(1);
+  await expect(page.locator("[data-atlas-nodes] .atlas-node--release")).toHaveCount(1);
+  await expect(page.locator("[data-atlas-edges] .atlas-edge-label")).toHaveText(["supports", "selected-in", "released-as"]);
   expect(compileCalls).toBe(1);
 });
 
