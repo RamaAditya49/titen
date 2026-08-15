@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-mockup-fidelity-live
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
 ---
 
@@ -83,3 +82,29 @@ controls are oversized forms, and Memory Atlas has no topology/trace surface.
 - npm release and server-wulan update complete with rollback evidence.
 - This spec and its paired plan move to `docs/specs/done/` and
   `docs/plans/done/` with all evidence recorded.
+
+## Verification evidence
+
+- Mockup and current dashboard were compared in a private temporary workspace;
+  no mockup source, credentials, memory content, or private identifiers entered
+  the repository, npm package, public release notes, or deployment artifacts.
+- `pnpm test:all` passed: D1 124, Bun/SDK 152, integration 228, live adapter
+  verification, browser 6 passed plus 2 expected screenshot skips, workflow
+  self-test, and ponytail debt check.
+- `pnpm build` passed with dashboard assets at 15.4 KiB gzip under the 80 KiB
+  budget. `pnpm typecheck` remains a pre-existing repository-wide failure in
+  docs/testing harnesses and Bun/DOM typings; the dashboard build and runtime
+  suites pass independently.
+- Source commits `138076b`, `1199e0d`, and `718bb29` were pushed to `main`.
+  npm registry reports `titen-memory@0.8.1`; tag `v0.8.1` and the public GitHub
+  release were created.
+- `titen-web` was synced to CLI `0.8.1`, built, pushed, and deployed to
+  `titen.dev` and `www.titen.dev`; `/version.json`, `/releases/0.8.1`, and
+  `/changelog` returned 200 in production.
+- server-wulan runs package `0.8.1` with revision `npm-0.8.1`; health is 200,
+  dashboard HTML is served, unauthenticated dashboard API is 401, and both
+  Titen services are active. Rollback backups are retained under
+  `/opt/titen/backups/`.
+- Readiness is truthfully 503 with verified schema 22/22, FTS enabled, and
+  semantic projection/enrichment errors exposed in diagnostics. No data or
+  provider configuration was mutated as part of this UI release.
