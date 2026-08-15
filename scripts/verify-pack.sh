@@ -53,6 +53,17 @@ done
 version="$(node -p 'require("./node_modules/titen-memory/package.json").version')"
 [ "$(./node_modules/.bin/titen --version)" = "$version" ] \
   || { echo "FAIL: installed CLI version differs from package.json" >&2; exit 1; }
+[ -f node_modules/titen-memory/dist/dashboard/index.html ] \
+  || { echo "FAIL: packaged dashboard HTML is missing" >&2; exit 1; }
+[ -f node_modules/titen-memory/scripts/dashboard-adapter.ts ] \
+  || { echo "FAIL: packaged dashboard adapter is missing" >&2; exit 1; }
+grep -q 'data-profile-password-form' node_modules/titen-memory/dist/dashboard/index.html \
+  || { echo "FAIL: packaged dashboard is not the current release" >&2; exit 1; }
+grep -oE '/_astro/[^" ]+' node_modules/titen-memory/dist/dashboard/index.html | sort -u \
+  | while read -r asset; do
+      [ -f "node_modules/titen-memory/dist$asset" ] \
+        || { echo "FAIL: packaged dashboard asset is missing: $asset" >&2; exit 1; }
+    done
 
 echo "==> 4/9 packed TypeScript declarations"
 manifest_types="$(node -p 'require("./node_modules/titen-memory/package.json").exports["."].types')"
@@ -270,6 +281,40 @@ printf '%s' "$stdio" | node --input-type=module -e '
 case "$stdio" in
   *"$api_key"*) echo "FAIL: installed stdio MCP bridge exposed its API key" >&2; exit 1 ;;
 esac
+
+dashboard_port="$(node --input-type=module -e '
+  import { createServer } from "node:net";
+  const server = createServer();
+  server.listen(0, "127.0.0.1", () => {
+    console.log(server.address().port);
+    server.close();
+  });
+')"
+TITEN_DASHBOARD_LIVE=true \
+TITEN_API_URL="http://127.0.0.1:$port" \
+TITEN_API_KEY="$api_key" \
+./node_modules/.bin/titen dashboard --port "$dashboard_port" \
+  >"$work/dashboard.log" 2>&1 &
+dashboard_server=$!
+trap 'kill "$dashboard_server" 2>/dev/null || true; kill "$server" 2>/dev/null || true; rm -rf "$work"' EXIT
+for _ in $(seq 1 60); do
+  curl --max-time 2 -sf "http://127.0.0.1:$dashboard_port/dashboard/" >"$work/dashboard.html" 2>/dev/null && break
+  kill -0 "$dashboard_server" 2>/dev/null \
+    || { echo "FAIL: packaged dashboard exited" >&2; cat "$work/dashboard.log" >&2; exit 1; }
+  sleep 0.25
+done
+grep -q 'data-profile-password-form' "$work/dashboard.html" \
+  || { echo "FAIL: packaged dashboard served stale HTML" >&2; exit 1; }
+dashboard_status="$(curl --max-time 5 -sf "http://127.0.0.1:$dashboard_port/dashboard-api/status")"
+case "$dashboard_status" in
+  *'"mode":"live"'*'"authentication":"server"'*) : ;;
+  *) echo "FAIL: packaged dashboard adapter status is invalid" >&2; exit 1 ;;
+esac
+case "$(cat "$work/dashboard.html")" in
+  *"$api_key"*) echo "FAIL: packaged dashboard exposed its API key" >&2; exit 1 ;;
+esac
+kill "$dashboard_server" 2>/dev/null || true
+trap 'kill "$server" 2>/dev/null || true; rm -rf "$work"' EXIT
 kill "$server" 2>/dev/null || true
 
 # A production install intentionally omits sqlite-vec. Once semantic retrieval

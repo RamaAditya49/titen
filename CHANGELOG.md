@@ -26,6 +26,24 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-08-15
+
+The npm package now carries the same production dashboard that is checked into
+the repository, so a fresh install cannot silently fall back to an older static
+dashboard bundle.
+
+### Added
+
+- `titen dashboard [--port 4322]` serves the packaged Astro dashboard through
+  the existing same-origin adapter. Live mode remains opt-in and requires the
+  documented private service configuration.
+- `prepack` rebuilds the dashboard and SDK before creating the npm tarball.
+
+### Security
+
+- The package includes only built dashboard assets and the adapter entrypoint;
+  credentials, mockup source, memory content, and runtime state remain excluded.
+
 ## [0.8.1] — 2026-08-15
 
 The live operator dashboard now follows the approved Memory Atlas visual system

@@ -37,6 +37,7 @@ Usage:
   titen mcp        serve MCP over stdio: the local store when no environment is
                    set, otherwise a bridge to inherited TITEN_MCP_URL/TITEN_API_KEY
   titen serve      [--db <path>] [--port 8787] [--host 127.0.0.1] [--revision dev] [--quiet]
+  titen dashboard  [--port 4322]  serve the packaged live operator dashboard
   titen migrate    [--db <path>] [--dry-run]
   titen bootstrap  [--db <path>] [--org "My Org"] [--username owner] [--label owner] [--print-sql]
   titen key create [--db <path>] --org-id <id> [--principal <id>] [--kind agent]
@@ -65,6 +66,8 @@ Notes:
   Source profiles: ${SOURCE_IMPORT_PROFILE_IDS.join(", ")}.
   Bun service commands default to ${join(homedir(), ".titen", "service.db")}.
   "serve" never creates a missing database; run "titen bootstrap" first.
+  "dashboard" serves the dashboard bundled with this npm release. Set
+  TITEN_DASHBOARD_LIVE=true and the documented adapter variables for live data.
   --print-sql emits SQL for a remote database (Cloudflare D1) instead of writing
   locally. A raw key and temporary dashboard password are printed once and are
   never recoverable afterwards.
@@ -88,6 +91,7 @@ const COMMAND_FLAGS: Record<
     positional: "path",
   },
   mcp: { values: [] },
+  dashboard: { values: ["port"] },
   serve: { values: ["db", "port", "host", "revision"], booleans: ["quiet"] },
   migrate: { values: ["db"], booleans: ["dry-run"] },
   bootstrap: { values: ["db", "org", "username", "label"], booleans: ["print-sql"] },
@@ -331,6 +335,12 @@ switch (command) {
     } catch (error) {
       fail(error instanceof Error ? error.message : "MCP bridge failed");
     }
+    break;
+  }
+
+  case "dashboard": {
+    if (flags.port !== undefined) process.env.TITEN_DASHBOARD_PORT = String(port(flags.port));
+    await import("../../../scripts/dashboard-adapter.ts");
     break;
   }
 

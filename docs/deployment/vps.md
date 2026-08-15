@@ -72,8 +72,8 @@ pnpm titen key create --org-id <org_id> --label 'my agent'
 - REST under `/v1`; Streamable HTTP MCP at `/mcp`.
 - An external CRM/chatbot gateway may call protected channel-context operations;
   the Titen process itself does not expose anonymous memory search.
-- Optional Memory Atlas static client behind the same reverse proxy or a
-  separate static host; calls authenticated REST only (planned).
+- Optional packaged Memory Atlas dashboard through `titen dashboard`, bound to
+  loopback behind the same reverse proxy or a separate private ingress.
 
 Docker is not required.
 

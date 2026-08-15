@@ -1,6 +1,6 @@
 {
   "name": "titen-memory",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "mcpName": "io.github.RamaAditya49/titen-memory",
   "description": "Agent memory with no API key, no LLM, and no embedding provider. Serves MCP over stdio against a local SQLite store, or Cloudflare Workers + D1. Drop-in for @modelcontextprotocol/server-memory; every memory keeps its source, its scope, and the evidence that contradicts it.",
   "license": "Apache-2.0",
@@ -51,7 +51,10 @@
     "src/core",
     "src/runtime/bun",
     "src/sdk.ts",
-    "dist/npm"
+    "dist/npm",
+    "dist/dashboard",
+    "dist/_astro",
+    "scripts/dashboard-adapter.ts"
   ],
   "engines": {
     "node": ">=22",
@@ -77,7 +80,7 @@
     "test:all": "pnpm test:api && pnpm test:integration && pnpm verify:dashboard-live && pnpm test && pnpm check:workflow",
     "build:worker": "WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir dist/worker",
     "build:npm": "bun build src/sdk.ts --outfile dist/npm/sdk.js --target node --format esm && tsc -p tsconfig.sdk.json && tsc -p tsconfig.sdk-contract.json",
-    "prepack": "bun run build:npm",
+    "prepack": "pnpm build && bun run build:npm",
     "deploy:worker": "WRANGLER_SEND_METRICS=false wrangler deploy",
     "titen": "bun src/runtime/bun/cli.ts",
     "screenshots": "UPDATE_DASHBOARD_SCREENSHOTS=1 playwright test tests/dashboard-screenshots.spec.ts",

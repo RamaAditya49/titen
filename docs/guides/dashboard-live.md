@@ -4,12 +4,14 @@ The dashboard talks only to a same-origin adapter bound to
 `127.0.0.1:4322`. The adapter talks to the Titen API at `127.0.0.1:8787`.
 
 ```sh
-pnpm build
 TITEN_DASHBOARD_LIVE=true \
 TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
-pnpm dashboard:adapter
+titen dashboard
 ```
+
+The npm package carries the dashboard build and adapter from the same release.
+A repository checkout may instead run `pnpm build && pnpm dashboard:adapter`.
 
 Open `http://127.0.0.1:4322/dashboard/`, then sign in with the operator username
 and password printed by `titen bootstrap`. The temporary password must be

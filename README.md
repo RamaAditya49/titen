@@ -429,6 +429,10 @@ titen --version
 You can also run `bun add --global titen-memory@latest`. npm and pnpm global
 installs work when Bun is already on `PATH`.
 
+The published package includes the current operator dashboard. After installing
+the CLI, run `titen dashboard` to serve that exact release's `/dashboard/`
+assets; it does not enable live data or expose a listener beyond loopback.
+
 ### 1. Create the store
 
 Run this once. Without `--db`, Bun service commands use the stable per-user
@@ -773,6 +777,15 @@ The [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashb
 covers configuration and verification. Use the
 [secure ingress guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/secure-ingress.md)
 for private Tailscale Serve access or Cloudflare Tunnel protected by Access.
+
+For a packaged install, start the adapter from the same release:
+
+```bash
+TITEN_DASHBOARD_LIVE=true \
+TITEN_DASHBOARD_AUTH=session \
+TITEN_API_URL=http://127.0.0.1:8787 \
+titen dashboard
+```
 
 ## Documentation
 

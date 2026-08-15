@@ -32,15 +32,17 @@ credential-bearing adapter, so it shows a disconnected state.
 
 ## Run with per-user login
 
-Start the Bun API first, then build and run the adapter:
+The npm package includes the current dashboard build and adapter. Start the Bun
+API first, then run the adapter from the same installed release:
 
 ```bash
-pnpm build
 TITEN_DASHBOARD_LIVE=true \
 TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
-pnpm dashboard:adapter
+titen dashboard
 ```
+
+A source checkout may use `pnpm build && pnpm dashboard:adapter` instead.
 
 Open `http://127.0.0.1:4322/dashboard/` and sign in with an operator username and
 password. The API verifies the password, issues a short-lived API key to the
@@ -66,7 +68,7 @@ TITEN_DASHBOARD_LIVE=true \
 TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
 TITEN_DASHBOARD_ORIGIN=https://memory.example.com \
-pnpm dashboard:adapter
+titen dashboard
 ```
 
 The listener remains `127.0.0.1:4322`. The origin only authorizes the reverse
