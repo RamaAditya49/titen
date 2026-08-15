@@ -1,12 +1,11 @@
 ---
 work_id: atlas-evidence-trace-fidelity
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
 ---
 
@@ -73,3 +72,16 @@ counts.
 - route/API, dashboard, architecture, changelog, build, and package checks pass;
 - live web and server smoke show the updated graph surface without secrets;
 - this spec and paired plan move to matching `done/` paths with evidence.
+
+## Delivery evidence
+
+- Commit `96cec54` and tag `v0.8.5` add the claim-centered renderer and
+  authorized context/release projection.
+- Bun/D1 contracts, integration, dashboard browser tests, package build, route
+  docs, workflow checks, and ponytail debt checks pass; browser result is 9
+  passed and 2 skipped.
+- npm `titen-memory@0.8.5` is published; server-wulan reports health 200,
+  readiness 200 with schema 22/22, dashboard 200, and unauthenticated memory
+  access 401.
+- `titen.dev` deployment `d6dbbfba-21d4-4820-afde-1551462c7598` serves
+  version `0.8.5`, the release page, and the updated Atlas API documentation.

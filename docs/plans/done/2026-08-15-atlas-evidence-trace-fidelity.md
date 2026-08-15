@@ -1,28 +1,27 @@
 ---
 work_id: atlas-evidence-trace-fidelity
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
-spec: docs/specs/active/2026-08-15-atlas-evidence-trace-fidelity.md
+spec: docs/specs/done/2026-08-15-atlas-evidence-trace-fidelity.md
 ---
 
 # Plan
 
-1. Extend the Evidence Trace SQL projection with authorized context and active
+- [x] Extend the Evidence Trace SQL projection with authorized context and active
    release decorations while preserving complete-pack and retention boundaries.
-2. Update the shared API types and adapter contract only as needed for the
+- [x] Update the shared API types and adapter contract only as needed for the
    additive node/edge fields; preserve existing lens and authorization inputs.
-3. Replace the generic Atlas grid renderer with a small deterministic layout:
+- [x] Replace the generic Atlas grid renderer with a small deterministic layout:
    central claim, observation rails, labeled SVG paths, and context/release
    side nodes, including responsive and accessible states.
-4. Verify Memories → Atlas handoff and add shared Bun/D1, adapter, and browser
+- [x] Verify Memories → Atlas handoff and add shared Bun/D1, adapter, and browser
    tests for node types, labels, hidden context, empty/error, and mobile layout.
-5. Update API/architecture/dashboard/release documentation, run all gates, and
+- [x] Update API/architecture/dashboard/release documentation, run all gates, and
    deploy the package dashboard/web/server only after smoke evidence is ready.
 
 ## Acceptance evidence mapping
@@ -44,3 +43,13 @@ an actor-owned or explicitly delegated complete context whose claims remain
 authorized; release decoration is emitted only for a current active release
 whose source claim remains authorized. Rollback is a package/dashboard revert;
 canonical evidence and claims are never rewritten.
+
+## Verification
+
+- `pnpm test:all`: Bun/D1/SDK contracts passed, 229 integration tests passed,
+  9 browser tests passed, 2 skipped; build and workflow self-checks passed.
+- `npm view titen-memory@0.8.5`: published with the expected package tarball.
+- server-wulan: `npm-0.8.5`, health/readiness/dashboard `200`, protected route
+  `401`, with a SQLite and package backup at the release backup path.
+- titen.dev: Cloudflare deployment `d6dbbfba-21d4-4820-afde-1551462c7598`,
+  `/version.json` `0.8.5`, release and API docs smoke `200`.
