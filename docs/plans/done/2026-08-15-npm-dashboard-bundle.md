@@ -1,14 +1,13 @@
 ---
 work_id: npm-dashboard-bundle
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-15
 updated: 2026-08-15
-review_after: 2026-08-29
 owner: titen-maintainers
-spec: docs/specs/active/2026-08-15-npm-dashboard-bundle.md
+spec: docs/specs/done/2026-08-15-npm-dashboard-bundle.md
 ---
 
 # Plan: npm dashboard distribution
@@ -19,9 +18,9 @@ spec: docs/specs/active/2026-08-15-npm-dashboard-bundle.md
   required dashboard/adapter files in the npm tarball.
 - [x] Update README and titen-web install/dashboard documentation.
 - [x] Run focused CLI, adapter, browser, build, pack, and workflow checks.
-- [ ] Publish the patch release, verify a clean install, and deploy the website
+- [x] Publish the patch release, verify a clean install, and deploy the website
   release metadata.
-- [ ] Close this spec/plan with registry, install, and rollback evidence.
+- [x] Close this spec/plan with registry, install, and rollback evidence.
 
 ## Acceptance evidence map
 
@@ -38,3 +37,14 @@ spec: docs/specs/active/2026-08-15-npm-dashboard-bundle.md
 Unpublish is not used. Revert the release commit and tell users to pin the
 previous npm version; restore the previous website release and dashboard bundle
 from the recorded deployment backup if needed.
+
+Source rollback is a revert of `47172bf`; npm consumers can pin `0.8.1`.
+server-wulan can restore package, dashboard environment, unit, and revision
+files from `/opt/titen/backups/npm-dashboard-0.8.2-20260815T021206Z`.
+
+## Verification
+
+`pnpm test:all`, the 70-file pack manifest inspection, `scripts/verify-pack.sh`,
+registry install, GitHub release, website build/deploy smoke, and server-wulan
+packaged-dashboard smoke passed. The paired spec records exact acceptance
+evidence and the unchanged upstream readiness condition.
