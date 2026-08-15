@@ -9,7 +9,8 @@ The product map has six live, capability-gated areas:
 
 | Area | Live job | Required read capability |
 | --- | --- | --- |
-| Memories | compile the six bounded Memory Atlas lenses | `views:compile` |
+| Memories | list, search, and paginate authorized canonical memories; open a selected record in Atlas | `views:compile` |
+| Atlas | compile the six bounded read-only visual lenses for an explicit subject/focus | `views:compile` |
 | Context | compile a task-specific context pack | `context:compile` |
 | Work | list leases and pending handoffs; find an exact checkpoint | `leases:read`, `handoffs:read`, or `checkpoints:read` |
 | Audit | list bounded audit records and domain events | `audit:read` or `events:read` |
@@ -20,13 +21,15 @@ The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
 every request again.
 
-Memories is principal-scoped by default, including for owners. A root/owner
+Memories and Atlas are principal-scoped by default, including for owners. A root/owner
 with the separate `views:compile:all` capability may explicitly enable the
 same-organization administrator view and choose a bounded incident/recovery
 reason. The adapter forwards that mode only through the fixed Atlas route, and
 the API records metadata-only audit evidence. The dashboard never probes for
 hidden counts or claims that an empty principal-scoped result means canonical
-memory is globally empty.
+memory is globally empty. Memories uses a stable keyset cursor rather than
+offset pagination, so a page can be refreshed without compiling a graph or
+waiting for semantic/vector readiness.
 
 ## Run disconnected
 

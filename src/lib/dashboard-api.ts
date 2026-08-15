@@ -26,6 +26,28 @@ export interface AtlasView {
   metadata: Record<string, unknown>;
 }
 
+export interface MemoryRecord {
+  id: string;
+  subject_id: string;
+  project_id: string | null;
+  kind: string;
+  statement: string;
+  confidence: number;
+  trust: string;
+  visibility: string;
+  status: string;
+  valid_from: string;
+  valid_to: string | null;
+  created_at: string;
+}
+
+export interface MemoryPage {
+  items: MemoryRecord[];
+  page: { limit: number; has_more: boolean; next_cursor: string | null };
+  query: Record<string, unknown>;
+  authorization: { principal_id: string; access_mode: "principal" };
+}
+
 export interface DashboardStatus {
   mode: "live" | "disconnected";
   endpoint: string | null;
@@ -158,4 +180,13 @@ export async function compileView(input: Record<string, unknown>): Promise<Atlas
     throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen returned an invalid Atlas view.");
   }
   return data as AtlasView;
+}
+
+export async function listMemories(query: URLSearchParams = new URLSearchParams()): Promise<MemoryPage> {
+  const payload = await request(`/dashboard-api/memories${query.size ? `?${query}` : ""}`);
+  const data = payload.data;
+  if (!data || typeof data !== "object" || !Array.isArray((data as MemoryPage).items)
+    || typeof (data as MemoryPage).page !== "object")
+    throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen returned an invalid memory page.");
+  return data as MemoryPage;
 }

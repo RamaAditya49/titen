@@ -222,6 +222,21 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .record-list button[aria-pressed="true"] { box-shadow: inset 3px 0 var(--accent); background: #f7eee3; }
 .record-list strong { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 520; text-overflow: ellipsis; white-space: nowrap; }
 .record-list small, .record-kind { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; }
+.memory-list-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 170px auto; gap: 10px; align-items: end; margin-top: 18px; }
+.memory-list-toolbar label { display: grid; gap: 6px; }
+.memory-list-toolbar label > span { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
+.memory-list-toolbar input, .memory-list-toolbar select { min-height: 38px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 12px "JetBrains Mono Variable", monospace; }
+.memory-list-status { margin-top: 14px; color: var(--muted); font: 10px "JetBrains Mono Variable", monospace; }
+.memory-table-wrap { overflow-x: auto; margin-top: 14px; border: 1px solid var(--rule); }
+.memory-table { width: 100%; min-width: 720px; border-collapse: collapse; text-align: left; }
+.memory-table th, .memory-table td { padding: 12px 14px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+.memory-table thead th { color: var(--muted); background: var(--paper); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .1em; text-transform: uppercase; }
+.memory-table tbody th { min-width: 280px; font-size: 13px; font-weight: 520; }
+.memory-table tbody td { color: var(--muted); font: 10px "JetBrains Mono Variable", monospace; white-space: nowrap; }
+.memory-table tbody tr:last-child th, .memory-table tbody tr:last-child td { border-bottom: 0; }
+.memory-table tbody tr:hover { background: #f7eee3; }
+.memory-pagination { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; color: var(--muted); font: 10px "JetBrains Mono Variable", monospace; }
+.memory-pagination span:last-child { display: flex; gap: 8px; }
 .record-kind { text-transform: uppercase; }
 .inspector > header h2 { overflow-wrap: anywhere; }
 .inspector [data-inspector-body] { padding: 18px 20px; }
@@ -307,12 +322,15 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .login-panel form { width: 100%; padding: 34px 22px 48px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .memory-input-grid, .input-grid, .admin-view-control { grid-template-columns: 1fr; }
+  .memory-list-toolbar { grid-template-columns: 1fr; }
   .form-actions { align-items: stretch; flex-direction: column; }
   .record-list button { grid-template-columns: 1fr; gap: 5px; }
   .record-list strong { white-space: normal; }
   .result-header { align-items: flex-start; flex-direction: column; gap: 8px; }
   .inline-form, .user-admin form { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
+  .memory-pagination { align-items: stretch; flex-direction: column; }
+  .memory-pagination span:last-child { justify-content: space-between; }
   .policy-details { grid-template-columns: 1fr; }
   .policy-details dt { padding-bottom: 4px; border-bottom: 0; }
   .policy-details dd { padding-top: 0; }

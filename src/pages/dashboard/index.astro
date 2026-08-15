@@ -63,11 +63,11 @@ const lenses = [
 
         <nav data-product-nav hidden>
           <p class="nav-group-label">Memory</p>
-          <button type="button" data-area="memories" data-label="Memory Atlas" data-scopes={productAreas[0].scopes} hidden>
+          <button type="button" data-area="atlas" data-label="Memory Atlas" data-scopes={productAreas[0].scopes}>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-atlas"></use></svg>Atlas</span>
             <small>live</small>
           </button>
-          <button type="button" class="nav-alias" data-area="memories" data-label="Memory Atlas" data-scopes={productAreas[0].scopes}>
+          <button type="button" data-area="memories" data-label="Memories" data-scopes={productAreas[0].scopes}>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-observation"></use></svg>Memories</span><small>query</small>
           </button>
           <button type="button" data-area="context" data-label="Context" data-scopes={productAreas[1].scopes} hidden>
@@ -247,12 +247,34 @@ const lenses = [
           <div class="live-output" data-releases-output><p>Refresh to load releases authorized for this principal.</p></div>
         </section>
 
-        <section class="area-panel memories-panel" data-area-panel="memories" hidden>
-          <section class="query-panel memory-controls" aria-labelledby="memory-query-heading">
+        <section class="area-panel memories-panel" data-area-panel="memories" hidden aria-labelledby="memories-heading">
+          <section class="query-panel memory-list-panel">
+            <div class="section-heading">
+              <div><p class="eyebrow">Memory / canonical records</p><h2 id="memories-heading">Memories</h2></div>
+              <span>authorized · no compile required</span>
+            </div>
+            <form class="memory-list-toolbar" data-memory-list-form>
+              <label class="memory-search-field"><span>Search memories</span><input data-memory-list-search name="q" maxlength="4000" autocomplete="off" placeholder="Search statements…" /></label>
+              <label><span>Status</span><select data-memory-list-status name="status"><option value="">Active + disputed</option><option value="active">Active</option><option value="disputed">Disputed</option><option value="superseded">Superseded</option><option value="expired">Expired</option><option value="revoked">Revoked</option></select></label>
+              <button class="primary-button" type="submit">Search</button>
+            </form>
+            <div class="memory-list-status" data-memory-list-status-text role="status" aria-live="polite">Loading authorized memories…</div>
+            <div class="loading-state" data-memory-list-loading aria-label="Loading memories"><span></span><span></span><span></span></div>
+            <div class="empty-state" data-memory-list-empty hidden><strong>No authorized memories yet.</strong><p>Try another search or clear the filter. Records outside your authority are not counted.</p></div>
+            <div class="notice" data-memory-list-error role="alert" hidden></div>
+            <div class="memory-table-wrap" data-memory-list-table hidden>
+              <table class="memory-table"><thead><tr><th scope="col">Statement</th><th scope="col">Kind</th><th scope="col">Trust</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody data-memory-list-rows></tbody></table>
+            </div>
+            <footer class="memory-pagination"><span data-memory-list-page>Showing authorized records</span><span><button type="button" class="secondary-button" data-memory-list-prev disabled>Previous</button><button type="button" class="secondary-button" data-memory-list-next disabled>Next</button></span></footer>
+          </section>
+        </section>
+
+        <section class="area-panel atlas-panel" data-area-panel="atlas" hidden aria-labelledby="atlas-heading">
+          <section class="query-panel memory-controls" aria-labelledby="atlas-heading">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Memory / authorized projection</p>
-                <h2 id="memory-query-heading">Memory Atlas</h2>
+                <h2 id="atlas-heading">Memory Atlas</h2>
               </div>
               <span>read-only · live API</span>
             </div>
@@ -300,8 +322,8 @@ const lenses = [
                 <small>Explicit, read-only, same-organization access. Every query is audited without memory content.</small>
               </fieldset>
               <div class="form-actions memory-actions">
-                <button class="primary-button" type="submit" data-memory-run>Compile memory view</button>
-                <span data-memory-status role="status" aria-live="polite">Enter an authorized scope to begin.</span>
+                <button class="primary-button" type="submit" data-memory-run>Compile authorized graph</button>
+                <span data-memory-status role="status" aria-live="polite">Select a memory from Memories, or enter a bounded scope.</span>
               </div>
             </form>
           </section>
@@ -341,7 +363,7 @@ const lenses = [
               <li><span>3</span><strong>hydrate + recheck</strong><small data-trace-nodes>waiting</small></li>
               <li><span>4</span><strong>apply limits</strong><small data-trace-edges>waiting</small></li>
             </ol>
-            <footer><code>POST /v1/memory-views/compile</code><span>live response</span></footer>
+            <footer><code>POST /v1/memory-views/compile</code><span>Atlas is read-only; canonical records stay in Memories.</span></footer>
           </section>
           <details class="metadata-panel"><summary>View metadata</summary><pre data-metadata>No live view compiled.</pre></details>
         </section>
@@ -429,10 +451,10 @@ const lenses = [
 
         <dialog class="search-dialog" data-search-dialog aria-labelledby="search-heading">
           <form method="dialog" data-search-form>
-            <header><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><h2 id="search-heading">Search memory</h2><button class="dialog-close" value="cancel" aria-label="Close search">Esc</button></header>
-            <label><span>Subject or focus ID</span><input name="query" autocomplete="off" placeholder="platform-team or claim ID" /></label>
-            <p>Search stays inside the authorized compile flow. Submitting fills the Atlas scope field; the server remains the source of truth.</p>
-            <footer><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="default">Use in Atlas</button></footer>
+            <header><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><h2 id="search-heading">Search memories</h2><button class="dialog-close" value="cancel" aria-label="Close search">Esc</button></header>
+            <label><span>Memory statement</span><input name="query" autocomplete="off" placeholder="rollback smoke, team preference…" /></label>
+            <p>Search is scoped by the authenticated principal. Results outside that authority are not counted or listed.</p>
+            <footer><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="default">Search memories</button></footer>
           </form>
         </dialog>
       </main>
@@ -447,6 +469,7 @@ const lenses = [
         getArea,
         getDashboardStatus,
         getSession,
+        listMemories,
         login,
         logout,
         postArea,
@@ -454,6 +477,7 @@ const lenses = [
         type AtlasView,
         type DashboardPrincipal,
         type DashboardStatus,
+        type MemoryRecord,
       } from "../../lib/dashboard-api";
 
       const one = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
@@ -464,6 +488,17 @@ const lenses = [
       const memoryEmpty = one<HTMLElement>("[data-memory-empty]");
       const memoryLoading = one<HTMLElement>("[data-memory-loading]");
       const memoryError = one<HTMLElement>("[data-memory-error]");
+      const memoryListForm = one<HTMLFormElement>("[data-memory-list-form]");
+      const memoryListSearch = one<HTMLInputElement>("[data-memory-list-search]");
+      const memoryListStatus = one<HTMLSelectElement>("[data-memory-list-status]");
+      const memoryListRows = one<HTMLElement>("[data-memory-list-rows]");
+      const memoryListLoading = one<HTMLElement>("[data-memory-list-loading]");
+      const memoryListEmpty = one<HTMLElement>("[data-memory-list-empty]");
+      const memoryListError = one<HTMLElement>("[data-memory-list-error]");
+      const memoryListTable = one<HTMLElement>("[data-memory-list-table]");
+      const memoryListNext = one<HTMLButtonElement>("[data-memory-list-next]");
+      const memoryListPrev = one<HTMLButtonElement>("[data-memory-list-prev]");
+      const memoryListPage = one<HTMLElement>("[data-memory-list-page]");
       const atlasGraph = one<HTMLElement>("[data-atlas-graph]");
       const atlasEdges = one<SVGElement>("[data-atlas-edges]");
       const atlasNodes = one<HTMLElement>("[data-atlas-nodes]");
@@ -474,6 +509,8 @@ const lenses = [
       let principal: DashboardPrincipal | null = null;
       let dashboardStatus: DashboardStatus | null = null;
       let generation = 0;
+      let memoryListCursor: string | null = null;
+      let memoryListHistory: string[] = [];
 
       const text = (selector: string, value: string) => { one<HTMLElement>(selector).textContent = value; };
       const has = (scope: string) => Boolean(principal?.scopes.includes("*") || principal?.scopes.includes(scope));
@@ -600,6 +637,68 @@ const lenses = [
         renderPayload(target, { data: merged });
       }
 
+      function memoryKindLabel(kind: string): string { return kind.replaceAll("_", " "); }
+      function openMemoryInAtlas(record: MemoryRecord) {
+        const lens = one<HTMLInputElement>('[data-memory-form] input[value="evidence_trace"]');
+        lens.checked = true;
+        updateMemoryRequirements();
+        (memoryForm.elements.namedItem("subject_id") as HTMLInputElement).value = record.subject_id;
+        (memoryForm.elements.namedItem("focus_id") as HTMLInputElement).value = record.id;
+        activateArea("atlas");
+        memoryForm.requestSubmit();
+      }
+      function renderMemoryList(records: MemoryRecord[], hasMore: boolean) {
+        memoryListRows.replaceChildren();
+        memoryListTable.hidden = records.length === 0;
+        memoryListEmpty.hidden = records.length !== 0;
+        for (const record of records) {
+          const row = document.createElement("tr");
+          const statement = document.createElement("th");
+          statement.scope = "row";
+          statement.textContent = record.statement;
+          const cells = [memoryKindLabel(record.kind), record.trust, record.status, formatDate(record.created_at) ?? record.created_at];
+          row.append(statement, ...cells.map((value) => { const cell = document.createElement("td"); cell.textContent = value; return cell; }));
+          const action = document.createElement("td");
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "text-button";
+          button.textContent = "Open in Atlas";
+          button.addEventListener("click", () => openMemoryInAtlas(record));
+          action.append(button);
+          row.append(action);
+          memoryListRows.append(row);
+        }
+        memoryListNext.disabled = !hasMore;
+        memoryListPrev.disabled = memoryListHistory.length === 0;
+        text("[data-memory-list-status-text]", records.length ? `${records.length} authorized memories shown${hasMore ? " · more available" : ""}.` : "No authorized memories match these filters.");
+        memoryListPage.textContent = hasMore ? "More authorized records available" : "End of authorized records";
+      }
+      async function loadMemoryList(after: string | null = null) {
+        memoryListLoading.hidden = false;
+        memoryListTable.hidden = true;
+        memoryListEmpty.hidden = true;
+        setNotice(memoryListError);
+        memoryListNext.disabled = true;
+        memoryListPrev.disabled = true;
+        const query = new URLSearchParams();
+        const search = memoryListSearch.value.trim();
+        const status = memoryListStatus.value;
+        if (search) query.set("q", search);
+        if (status) query.set("status", status);
+        if (after) query.set("after", after);
+        try {
+          const page = await listMemories(query);
+          memoryListCursor = page.page.next_cursor;
+          renderMemoryList(page.items, page.page.has_more);
+        } catch (error) {
+          memoryListRows.replaceChildren();
+          memoryListEmpty.hidden = true;
+          setNotice(memoryListError, errorMessage(error));
+          handleError(error);
+          text("[data-memory-list-status-text]", "Unable to load authorized memories.");
+        } finally { memoryListLoading.hidden = true; }
+      }
+
       function clearMemory() {
         generation += 1;
         view = null;
@@ -626,6 +725,13 @@ const lenses = [
       }
       function clearPrivateState() {
         clearMemory();
+        memoryListCursor = null;
+        memoryListHistory = [];
+        memoryListRows.replaceChildren();
+        memoryListTable.hidden = true;
+        memoryListEmpty.hidden = true;
+        memoryListLoading.hidden = true;
+        setNotice(memoryListError);
         one<HTMLDListElement>("[data-access-details]").replaceChildren();
         one<HTMLDListElement>("[data-profile-details]").replaceChildren();
         one<HTMLFormElement>("[data-profile-password-form]").reset();
@@ -782,9 +888,10 @@ const lenses = [
         one<HTMLButtonElement>("[data-profile-open]").setAttribute("aria-current", id === "profile" ? "page" : "false");
         const label = selected?.dataset.label ?? (id === "profile" ? "Profile" : "Dashboard");
         text("[data-page-title]", label);
-        text("[data-breadcrumb-area]", id === "memories" ? "Memory" : "Operator");
+        text("[data-breadcrumb-area]", id === "memories" || id === "atlas" ? "Memory" : "Operator");
         text("[data-breadcrumb-page]", label);
         history.replaceState(null, "", `#${id}`);
+        if (id === "memories" && principal) void loadMemoryList();
       }
       function showPrivateSurface() {
         one<HTMLElement>(".app-shell").dataset.shell = "private";
@@ -803,6 +910,7 @@ const lenses = [
         if (selectedLens.disabled) all<HTMLInputElement>('[data-memory-form] input[name="lens"]:not(:disabled)')[0]?.click();
         const preferred = location.hash.slice(1);
         const first = buttons.find((button) => !button.hidden && button.dataset.area === preferred)
+          ?? buttons.find((button) => !button.hidden && button.dataset.area === "memories")
           ?? buttons.find((button) => !button.hidden);
         if (first) activateArea(first.dataset.area!);
         one<HTMLButtonElement>("[data-logout]").hidden = dashboardStatus?.authentication !== "session";
@@ -989,17 +1097,34 @@ const lenses = [
         if (submitter?.value !== "default") return;
         event.preventDefault();
         const query = String(new FormData(searchForm).get("query") ?? "").trim();
-        const subject = memoryForm.elements.namedItem("subject_id") as HTMLInputElement;
-        if (query) subject.value = query;
+        memoryListSearch.value = query;
+        memoryListHistory = [];
+        memoryListCursor = null;
         searchDialog.close();
         activateArea("memories");
-        subject.focus();
+        memoryListSearch.focus();
       });
       document.addEventListener("keydown", (event) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
           event.preventDefault();
           if (!searchDialog.open) one<HTMLButtonElement>("[data-search-open]").click();
         }
+      });
+
+      memoryListForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        memoryListHistory = [];
+        memoryListCursor = null;
+        void loadMemoryList();
+      });
+      memoryListNext.addEventListener("click", () => {
+        if (!memoryListCursor) return;
+        memoryListHistory.push(memoryListCursor);
+        void loadMemoryList(memoryListCursor);
+      });
+      memoryListPrev.addEventListener("click", () => {
+        const cursor = memoryListHistory.pop();
+        void loadMemoryList(cursor ?? null);
       });
 
       memoryForm.addEventListener("change", (event) => {

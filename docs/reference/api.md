@@ -24,6 +24,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/checkpoints/:id`
 - `GET /v1/claim-approvals`
 - `GET /v1/claims/:id/evidence`
+- `GET /v1/memories`
 - `GET /v1/context/:id`
 - `GET /v1/events`
 - `GET /v1/events/:id`
@@ -560,6 +561,51 @@ missing, queued-repair, and next-cursor counts.
 
 Return an authorized claim and its supporting, contradicting, and qualifying
 observations.
+
+## Memories list operation
+
+### `GET /v1/memories`
+
+List canonical claims visible to the authenticated principal without compiling
+an Atlas view. The route requires `views:compile`; authorization and retention
+predicates run in SQL before search and pagination. The default lifecycle filter
+is `active,disputed`; `status`, `visibility`, and `kind` accept comma-separated
+values from their documented enums. `q` is bounded lexical FTS over claim
+statements. Semantic/vector retrieval is not required for this operation.
+
+`limit` defaults to 25 and is bounded to 1–100. `after` is an opaque keyset
+cursor over `(created_at,id)` descending order. The response never includes a
+global count; `page.has_more` and `page.next_cursor` describe only the
+authorized result set.
+
+```http
+GET /v1/memories?q=rollback%20smoke&subject_id=subject_123&limit=25
+Authorization: Bearer titen_sk_...
+```
+
+```json
+{
+  "items": [{
+    "id": "claim_...",
+    "subject_id": "subject_123",
+    "project_id": null,
+    "kind": "procedural",
+    "statement": "Rollback smoke is required before release.",
+    "confidence": 0.96,
+    "trust": "verified",
+    "visibility": "organization",
+    "status": "active",
+    "valid_from": "2026-08-01T00:00:00.000Z",
+    "valid_to": null,
+    "created_at": "2026-08-01T00:00:00.000Z"
+  }],
+  "page": { "limit": 25, "has_more": false, "next_cursor": null },
+  "authorization": { "principal_id": "principal_...", "access_mode": "principal" }
+}
+```
+
+Memories is the actionable inventory. Use `POST /v1/memory-views/compile`
+after selecting a claim when an operator needs the read-only evidence graph.
 
 ## Memory Atlas operation
 

@@ -17,6 +17,10 @@ const view = {
 
 async function mockServerMode(page: Page, readiness: Record<string, unknown> = { data: { ready: true }, meta: { revision: "stable-42" } }) {
   let connected = true;
+  await page.route("**/dashboard-api/memories**", (route) => route.fulfill({ json: { data: {
+    items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {},
+    authorization: { principal_id: "server_operator", access_mode: "principal" },
+  } } }));
   await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: {
     organization_id: "org_server", principal_id: "server_operator", principal_kind: "human", key_id: "key_server",
     scopes: ["*"], max_trust: "policy_approved", organization_role: "root",
@@ -45,6 +49,38 @@ test("starts disconnected without fixtures, secrets, storage, or external reques
   expect(requests.every((url) => new URL(url).hostname === "127.0.0.1")).toBe(true);
 });
 
+test("loads Memories as a searchable list and opens one record in Atlas", async ({ page }) => {
+  await mockServerMode(page);
+  let compileCalls = 0;
+  await page.route("**/dashboard-api/memories**", async (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const statement = query.get("q") ? "Rollback smoke is required before release." : "Production release keeps evidence.";
+    await route.fulfill({ json: { data: {
+      items: [{ id: "clm_memory", subject_id: "platform-team", project_id: null, kind: "procedural", statement,
+        confidence: 0.96, trust: "verified", visibility: "organization", status: "active",
+        valid_from: "2026-08-01T00:00:00Z", valid_to: null, created_at: "2026-08-01T00:00:00Z" }],
+      page: { limit: 25, has_more: false, next_cursor: null }, query: {},
+      authorization: { principal_id: "server_operator", access_mode: "principal" },
+    } } });
+  });
+  await page.route("**/dashboard-api/atlas/compile", async (route) => {
+    compileCalls += 1;
+    expect(route.request().postDataJSON()).toEqual({ lens: "evidence_trace", limit: 50, subject_id: "platform-team", focus_id: "clm_memory" });
+    await route.fulfill({ json: { data: view } });
+  });
+  await page.goto("/dashboard/");
+  await expect(page.locator("[data-memory-list-table]")).toBeVisible();
+  await expect(page.getByText("Production release keeps evidence.", { exact: true })).toBeVisible();
+  await page.locator("[data-memory-list-search]").fill("rollback smoke");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByText("Rollback smoke is required before release.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open in Atlas" }).click();
+  await expect(page.locator('[data-area="atlas"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-area="memories"]')).toHaveAttribute("aria-current", "false");
+  await expect(page.locator("[data-atlas-graph]")).toBeVisible();
+  expect(compileCalls).toBe(1);
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
@@ -56,8 +92,9 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.locator("[data-connection-label]")).toHaveText("Connected");
   await expect(page.locator("[data-system-revision]")).toHaveText("stable-42");
   await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(10);
+  await page.getByRole("button", { name: "Atlas live" }).click();
   await page.locator('[data-memory-form] input[name="subject_id"]').fill("platform-team");
-  await page.getByRole("button", { name: "Compile memory view" }).click();
+  await page.getByRole("button", { name: "Compile authorized graph" }).click();
   await expect(page.getByText("Production retry budget is 400 ms").first()).toBeVisible();
   await expect(page.locator("[data-inspector-title]")).toHaveText("Production retry budget is 400 ms");
   await expect(page.locator("[data-relationships]")).toContainText("supports");
@@ -67,10 +104,11 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.locator("[data-atlas-edges] path")).toHaveCount(1);
   await expect(page.locator("[data-compile-trace]")).toBeVisible();
   await page.getByRole("button", { name: "Memories query" }).click();
-  await expect(page.locator(".nav-alias")).toHaveAttribute("aria-current", "page");
-  await expect(page.locator('[data-area="memories"]').first()).toHaveAttribute("aria-current", "false");
+  await expect(page.locator('[data-area="memories"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-area="atlas"]')).toHaveAttribute("aria-current", "false");
   await page.getByRole("button", { name: "Atlas live" }).click();
-  await expect(page.locator('[data-area="memories"]').first()).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-area="atlas"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-area="memories"]')).toHaveAttribute("aria-current", "false");
   await page.getByRole("button", { name: "System" }).click();
   await expect(page.locator('[data-area-panel="system"] h2')).toHaveText("System status");
   await page.getByRole("button", { name: "Access" }).click();
@@ -78,7 +116,7 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await page.getByRole("button", { name: "Releases" }).click();
   await expect(page.locator('[data-area-panel="releases"] h2')).toHaveText("Release policy");
   await page.getByRole("button", { name: "Atlas" }).click();
-  await expect(page.locator('[data-area-panel="memories"] h2').first()).toHaveText("Memory Atlas");
+  await expect(page.locator('[data-area-panel="atlas"] h2').first()).toHaveText("Memory Atlas");
   await page.locator("[data-profile-open]").click();
   await expect(page.locator('[data-area-panel="profile"] h2')).toHaveText("Profile");
   await expect(page.locator("[data-profile-password-form]")).toBeHidden();
@@ -110,9 +148,10 @@ test("explains principal-scoped empty results and explicitly audits administrato
     } } });
   });
   await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Atlas live" }).click();
   await expect(page.locator("[data-admin-view]")).toBeVisible();
   await page.locator('[data-memory-form] input[name="subject_id"]').fill("foreign-private-subject");
-  await page.getByRole("button", { name: "Compile memory view" }).click();
+  await page.getByRole("button", { name: "Compile authorized graph" }).click();
   await expect(page.locator("[data-memory-empty] strong")).toHaveText("No records are visible to principal server_operator.");
   await expect(page.locator("[data-memory-empty] p")).toContainText("principal-scoped query succeeded");
   await expect(page.locator("[data-memory-empty]")).not.toContainText("globally empty");
@@ -120,7 +159,7 @@ test("explains principal-scoped empty results and explicitly audits administrato
 
   await page.getByLabel("Organization administrator view").check();
   await page.getByLabel("Audit reason").selectOption("recovery");
-  await page.getByRole("button", { name: "Compile memory view" }).click();
+  await page.getByRole("button", { name: "Compile authorized graph" }).click();
   expect(requests).toEqual([
     { lens: "neighborhood", limit: 50, subject_id: "foreign-private-subject" },
     {
@@ -371,11 +410,12 @@ test("remains keyboard and mobile usable with live product navigation", async ({
   await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ json: { data: view } }));
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Atlas live" }).click();
   await page.getByText("Evidence trace", { exact: true }).click();
   await expect(page.getByRole("radio", { name: "Evidence trace" })).toBeChecked();
   await expect(page.getByLabel("Focus claim ID")).toHaveAttribute("required", "");
   await page.getByLabel("Focus claim ID").fill("clm_live");
-  await page.getByRole("button", { name: "Compile memory view" }).focus();
+  await page.getByRole("button", { name: "Compile authorized graph" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Production retry budget is 400 ms").first()).toBeVisible();
   await page.locator('[data-area="context"]').focus();

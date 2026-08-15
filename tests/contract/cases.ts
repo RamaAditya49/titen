@@ -207,6 +207,44 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "memories lists authorized claims with lexical search and keyset pagination",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["observations:write", "claims:write", "views:compile"] });
+      const privateMember = await fx.provision({ orgId: owner.orgId, scopes: ["observations:write", "claims:write", "views:compile"] });
+      await seedClaim(fx, owner.key, {
+        observation: { subject_id: "memory_subject", visibility: "organization", content: "Rollback smoke is required before a production release." },
+        claim: { statement: "Rollback smoke is required before a production release." },
+      });
+      await seedClaim(fx, owner.key, {
+        observation: { subject_id: "memory_subject", visibility: "organization", content: "Release evidence remains append only." },
+        claim: { statement: "Release evidence remains append only." },
+      });
+      await seedClaim(fx, privateMember.key, {
+        observation: { subject_id: "memory_subject", content: "Private operator note must not be listed." },
+        claim: { statement: "Private operator note must not be listed." },
+      });
+      const first = await fx.call("GET", "/v1/memories?subject_id=memory_subject&limit=1", { key: owner.key });
+      expectOk(first);
+      assert.equal(first.body.data.items.length, 1);
+      assert.equal(first.body.data.page.has_more, true);
+      assert.equal(first.body.data.items[0].visibility, "organization");
+      const second = await fx.call("GET", `/v1/memories?subject_id=memory_subject&limit=1&after=${encodeURIComponent(first.body.data.page.next_cursor)}`, { key: owner.key });
+      expectOk(second);
+      assert.equal(second.body.data.items.length, 1);
+      assert.notEqual(second.body.data.items[0].id, first.body.data.items[0].id);
+      assert.equal(second.body.data.page.has_more, false);
+      const searched = await fx.call("GET", "/v1/memories?subject_id=memory_subject&q=rollback+smoke", { key: owner.key });
+      expectOk(searched);
+      assert.equal(searched.body.data.items.length, 1);
+      assert.match(searched.body.data.items[0].statement, /Rollback smoke/);
+      expectError(await fx.call("GET", "/v1/memories?limit=0", { key: owner.key }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("GET", "/v1/memories?after=not-a-cursor", { key: owner.key }), 400, "VALIDATION_ERROR");
+      const memberView = await fx.call("GET", "/v1/memories?subject_id=memory_subject", { key: privateMember.key });
+      expectOk(memberView);
+      assert.equal(memberView.body.data.items.length, 3);
+    },
+  },
+  {
     name: "unknown endpoint and wrong method fail in the documented envelope",
     async run(fx) {
       expectError(await fx.call("GET", "/v1/nope"), 404, "NOT_FOUND");

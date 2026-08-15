@@ -282,9 +282,11 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Titen MUST treat the dashboard as an optional authenticated REST client;
   disabling it MUST leave complete headless REST/MCP behavior unchanged.
 - The implemented frontend MUST expose the canonical live product map defined
-  in [DESIGN](./DESIGN.md): Memories, Context, Work, Audit, Governance, and
-  Federation. Memories uses the authorized Memory Atlas projection; every
-  other area uses its existing authenticated domain REST contract.
+  in [DESIGN](./DESIGN.md): Memories, Atlas, Context, Work, Audit, Governance,
+  and Federation. Memories MUST list authorized canonical claims with bounded
+  lexical search and keyset pagination without requiring compilation; Atlas
+  MUST remain the read-only graph/inspector projection opened from a selected
+  memory. Every other area uses its existing authenticated domain REST contract.
 - An area MUST NOT become a link, control, or route until its backend contract
   is implemented, the current build declares it available, its authorization
   and failure behavior pass, and its paired EARS UI work item is complete.

@@ -265,6 +265,7 @@ async function proxyJson(request: Request, path: string, init?: RequestInit): Pr
 }
 
 const readRoutes = new Map<string, { path: string; query: string[] }>([
+  ["/dashboard-api/memories", { path: "/v1/memories", query: ["q", "subject_id", "project_id", "status", "visibility", "kind", "limit", "after"] }],
   ["/dashboard-api/work/leases", { path: "/v1/leases", query: ["limit", "after"] }],
   ["/dashboard-api/work/handoffs", { path: "/v1/handoffs", query: [] }],
   ["/dashboard-api/work/checkpoint", { path: "/v1/checkpoints", query: ["subject_id", "agent_id", "kind"] }],

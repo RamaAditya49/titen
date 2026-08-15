@@ -12,6 +12,7 @@ import { listEvents, getEvent } from "./events";
 import { drainIndex, verifyIndex } from "./indexing";
 import { handleMcp } from "./mcp";
 import { compileView } from "./atlas";
+import { listMemories } from "./memories";
 import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
@@ -189,6 +190,12 @@ export const ROUTES: RouteDef[] = [
     path: "/v1/claims/:id/evidence",
     scope: "evidence:read",
     handler: claimEvidence,
+  },
+  {
+    method: "GET",
+    path: "/v1/memories",
+    scope: "views:compile",
+    handler: listMemories,
   },
   {
     method: "POST",

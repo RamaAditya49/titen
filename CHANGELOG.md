@@ -26,6 +26,32 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.4] — 2026-08-15
+
+The dashboard now separates the actionable Memories inventory from the
+read-only visual Atlas. Memory records are visible immediately after login,
+without a compile step.
+
+### Added
+
+- `GET /v1/memories` lists authorized canonical claims with bounded lexical
+  search, lifecycle/visibility filters, and stable keyset pagination.
+- The same-origin dashboard adapter exposes the protected Memories list route.
+- Memories now has real loading, empty, error, search, and pagination states;
+  a selected record opens its evidence graph in Atlas.
+
+### Changed
+
+- Atlas is a separate navigation destination with its existing graph, inspector,
+  compile trace, and explicit administrator boundary.
+- Global dashboard search now searches Memories instead of filling an unrelated
+  Atlas subject field.
+
+### Security
+
+- Memory list authorization and retention checks run in canonical SQL before
+  FTS or pagination. Hidden records never contribute to a count or cursor.
+
 ## [0.8.3] — 2026-08-15
 
 Memory Atlas now gives an explicitly authorized owner a safe recovery view,
