@@ -4628,6 +4628,174 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "atlas administrator view is explicit, organization-bound, and audited",
+    async run(fx) {
+      const root = await fx.provision({
+        principalId: `atlas_root_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["*"],
+      });
+      const actor = await fx.provision({
+        orgId: root.orgId,
+        principalId: `atlas_private_actor_${fx.runtime}`,
+      });
+      const owner = await fx.provision({
+        orgId: root.orgId,
+        principalId: `atlas_owner_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["views:compile", "views:compile:all"],
+      });
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: root.key,
+        body: { principal_id: owner.principalId, principal_kind: "human", role: "owner" },
+      }), 201);
+
+      const subjectId = `atlas_private_subject_${fx.runtime}`;
+      const privateClaim = await seedClaim(fx, actor.key, {
+        observation: { subject_id: subjectId, content: "Private administrator-view fixture." },
+        claim: { statement: "Private administrator-view claim." },
+      });
+      const foreign = await fx.provision({ principalId: `atlas_foreign_${fx.runtime}` });
+      const foreignClaim = await seedClaim(fx, foreign.key, {
+        observation: { subject_id: subjectId, content: "Foreign organization fixture." },
+        claim: { statement: "Foreign organization claim." },
+      });
+
+      const ordinary = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: { lens: "neighborhood", subject_id: subjectId },
+      });
+      expectOk(ordinary);
+      assert.deepEqual(ordinary.body.data.nodes, []);
+      assert.deepEqual(ordinary.body.data.metadata.authorization, {
+        principal_id: owner.principalId,
+        access_mode: "principal",
+      });
+      assert.ok(!JSON.stringify(ordinary.body).includes(privateClaim.claimId));
+
+      expectError(await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: { lens: "neighborhood", subject_id: subjectId, access_mode: "organization_admin" },
+      }), 400);
+      expectError(await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: {
+          lens: "neighborhood",
+          subject_id: subjectId,
+          access_mode: "organization_admin",
+          administrator_reason: "unbounded_free_text",
+        },
+      }), 400);
+
+      const principalScopedKey = await fx.provision({
+        orgId: root.orgId,
+        principalId: owner.principalId,
+        principalKind: "human",
+        scopes: ["views:compile"],
+      });
+      expectError(await fx.call("POST", "/v1/memory-views/compile", {
+        key: principalScopedKey.key,
+        body: {
+          lens: "neighborhood",
+          subject_id: subjectId,
+          access_mode: "organization_admin",
+          administrator_reason: "recovery",
+        },
+      }), 404);
+
+      const noRole = await fx.provision({
+        orgId: root.orgId,
+        principalId: `atlas_no_role_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["views:compile", "views:compile:all"],
+      });
+      expectError(await fx.call("POST", "/v1/memory-views/compile", {
+        key: noRole.key,
+        body: {
+          lens: "neighborhood",
+          subject_id: subjectId,
+          access_mode: "organization_admin",
+          administrator_reason: "incident_response",
+        },
+      }), 404);
+
+      const privileged = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: {
+          lens: "neighborhood",
+          subject_id: subjectId,
+          limit: 1,
+          access_mode: "organization_admin",
+          administrator_reason: "recovery",
+        },
+      });
+      expectOk(privileged);
+      assert.equal(privileged.body.data.nodes.filter((node: any) => node.type === "claim").length, 1);
+      assert.ok(privileged.body.data.nodes.some((node: any) => node.id === privateClaim.claimId));
+      assert.ok(!JSON.stringify(privileged.body).includes(foreignClaim.claimId));
+      assert.deepEqual(privileged.body.data.metadata.authorization, {
+        principal_id: owner.principalId,
+        access_mode: "organization_admin",
+      });
+
+      const retention = await fx.call("POST", "/v1/policies", {
+        key: root.key,
+        body: {
+          kind: "retention",
+          scope_type: "subject",
+          scope_id: subjectId,
+          record_type: "claim",
+          retention_days: 1,
+        },
+      });
+      expectOk(retention, 201);
+      await fx.query(
+        `INSERT INTO retention_exclusions
+           (id, org_id, policy_id, resource_type, resource_id, excluded_at, actor_id)
+         VALUES (?, ?, ?, 'claim', ?, ?, ?)`,
+        [
+          `ret_atlas_admin_${fx.runtime}`,
+          root.orgId,
+          retention.body.data.policy_id,
+          privateClaim.claimId,
+          "2026-08-15T00:00:00.000Z",
+          owner.principalId,
+        ],
+      );
+      const retained = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key,
+        body: {
+          lens: "neighborhood",
+          subject_id: subjectId,
+          access_mode: "organization_admin",
+          administrator_reason: "deletion_verification",
+        },
+      });
+      expectOk(retained);
+      assert.deepEqual(retained.body.data.nodes, []);
+
+      const audits = await fx.query<{ actor_id: string; action: string; resource_id: string; detail: string }>(
+        `SELECT actor_id, action, resource_id, detail FROM audit_log
+          WHERE org_id = ? AND action = 'memory_view.compile.admin'
+          ORDER BY created_at, id`,
+        [root.orgId],
+      );
+      assert.equal(audits.length, 2);
+      assert.equal(audits[0]!.actor_id, owner.principalId);
+      assert.equal(audits[0]!.resource_id, subjectId);
+      assert.deepEqual(JSON.parse(audits[0]!.detail), {
+        lens: "neighborhood",
+        subject_id: subjectId,
+        focus_id: null,
+        access_mode: "organization_admin",
+        reason: "recovery",
+      });
+      assert.ok(!audits[0]!.detail.includes("Private administrator-view"));
+      assert.ok(!audits[0]!.detail.includes(privateClaim.claimId));
+      assert.equal(JSON.parse(audits[1]!.detail).reason, "deletion_verification");
+    },
+  },
+  {
     name: "review queue is authorized, deterministic, filtered, and keyset-paginated",
     async run(fx) {
       const reviewer = await fx.provision({ scopes: ["*"] });

@@ -805,7 +805,7 @@ export async function observedSemanticReadiness(
   if (Number(state.projection_pending) > 0)
     return {
       embedding: "enabled",
-      vector: "configured_error",
+      vector: "enabled",
       diagnostic: "index_projection_pending",
     };
   return readiness;

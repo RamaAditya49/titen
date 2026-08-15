@@ -126,7 +126,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .login-panel form { display: grid; gap: 16px; align-content: center; width: min(100%, 390px); margin: auto; padding: clamp(30px, 6vw, 64px); }
 .login-panel label, .inline-form label, .user-admin label, .memory-input-grid label { display: grid; gap: 6px; }
 .login-panel label span, .inline-form label span, .user-admin label span, .memory-input-grid label > span { font-size: 11px; font-weight: 600; }
-.login-panel input, .inline-form input, .user-admin input, .user-admin select, .memory-input-grid input { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
+.login-panel input, .inline-form input, .user-admin input, .user-admin select, .memory-input-grid input, .admin-view-control select { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
 .login-panel form > .primary-button { width: 100%; }
 .login-boundary { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .login-boundary strong { color: var(--ink-soft); font-weight: 620; }
@@ -152,6 +152,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .memory-input-grid { display: grid; grid-template-columns: 1fr 1fr 100px; gap: 12px; margin-top: 10px; }
 .memory-input-grid input::placeholder { color: #9a8f83; }
 .memory-input-grid small { color: var(--muted); font-size: 9px; }
+.admin-view-control { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .7fr) minmax(240px, 1.4fr); gap: 12px; align-items: center; margin: 12px 0 0; padding: 12px; border: 1px solid var(--rule-soft); }
+.admin-view-control > label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 11px; }
+.admin-view-control > label:first-child { grid-template-columns: 16px 1fr; align-items: center; }
+.admin-view-control input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent); }
+.admin-view-control small { color: var(--muted); font-size: 9px; line-height: 1.45; }
 .form-actions { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .form-actions span { color: var(--muted); font-size: 11px; }
 .memory-actions { justify-content: flex-start; }
@@ -301,7 +306,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .login-intro-note { display: none; }
   .login-panel form { width: 100%; padding: 34px 22px 48px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
-  .memory-input-grid, .input-grid { grid-template-columns: 1fr; }
+  .memory-input-grid, .input-grid, .admin-view-control { grid-template-columns: 1fr; }
   .form-actions { align-items: stretch; flex-direction: column; }
   .record-list button { grid-template-columns: 1fr; gap: 5px; }
   .record-list strong { white-space: normal; }

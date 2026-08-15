@@ -26,6 +26,28 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-08-15
+
+Memory Atlas now gives an explicitly authorized owner a safe recovery view,
+while ordinary operators get clearer principal-scoped results. Normal semantic
+index catch-up no longer removes a canonically healthy service from traffic.
+
+### Added
+
+- Memory Atlas now supports an explicit, same-organization
+  `organization_admin` mode gated by `views:compile:all`, active root/owner
+  authority, a bounded audit reason, and metadata-only audit evidence.
+- Every Atlas result identifies its active principal and access mode; the
+  dashboard exposes administrator mode only to eligible operators and explains
+  empty principal-scoped results without implying global memory is empty.
+
+### Changed
+
+- Normal pending semantic projection work now keeps `/readyz` at HTTP 200 with
+  `index_projection_pending` and an enabled vector capability. Observed
+  dependency, fingerprint, metadata, migration, and signing-secret failures
+  remain fail-closed at 503.
+
 ## [0.8.2] — 2026-08-15
 
 The npm package now carries the same production dashboard that is checked into
@@ -1265,7 +1287,10 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.3
+[0.8.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.2
+[0.8.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.1
 [0.8.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.0
 [0.7.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.4
 [0.7.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.7.3

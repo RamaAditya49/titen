@@ -211,7 +211,7 @@ const lenses = [
             <article><span>Readiness</span><strong data-system-readiness>Checking</strong><small data-system-revision>revision pending</small></article>
             <article><span>Connection</span><strong data-system-connection>Checking</strong><small data-system-endpoint>same-origin adapter</small></article>
           </div>
-          <p class="panel-note">Readiness is an honest upstream signal. A 503 means the process is reachable but a configured capability still needs repair; it is not an authorization failure.</p>
+          <p class="panel-note">Readiness separates canonical traffic availability from semantic freshness. Normal projection lag stays ready and is reported as semantic syncing; a 503 still means a required capability needs repair.</p>
         </section>
 
         <section class="area-panel query-panel policy-panel" data-area-panel="access" hidden aria-labelledby="access-heading">
@@ -283,6 +283,22 @@ const lenses = [
                   <small>Server limit: 1–100.</small>
                 </label>
               </div>
+              <fieldset class="admin-view-control" data-admin-view hidden>
+                <label>
+                  <input type="checkbox" name="administrator_view" />
+                  <span>Organization administrator view</span>
+                </label>
+                <label>
+                  <span>Audit reason</span>
+                  <select name="administrator_reason" disabled>
+                    <option value="incident_response">Incident response</option>
+                    <option value="recovery">Recovery</option>
+                    <option value="deletion_verification">Deletion verification</option>
+                    <option value="export_verification">Export verification</option>
+                  </select>
+                </label>
+                <small>Explicit, read-only, same-organization access. Every query is audited without memory content.</small>
+              </fieldset>
               <div class="form-actions memory-actions">
                 <button class="primary-button" type="submit" data-memory-run>Compile memory view</button>
                 <span data-memory-status role="status" aria-live="polite">Enter an authorized scope to begin.</span>
@@ -472,6 +488,12 @@ const lenses = [
         const metaValue = meta && typeof meta === "object" && !Array.isArray(meta)
           ? (meta as Record<string, unknown>)[key] : undefined;
         return typeof metaValue === "string" ? metaValue : undefined;
+      }
+      function semanticDiagnostic(payload: Record<string, unknown>): string | undefined {
+        const checks = payloadData(payload).checks;
+        if (!checks || typeof checks !== "object" || Array.isArray(checks)) return undefined;
+        const diagnostic = (checks as Record<string, unknown>).semantic_index;
+        return typeof diagnostic === "string" ? diagnostic : undefined;
       }
       function renderPrincipalDetails(selector: string) {
         const target = one<HTMLDListElement>(selector);
@@ -706,20 +728,27 @@ const lenses = [
       }
       function renderMemory(next: AtlasView) {
         view = next;
+        const authorization = next.metadata.authorization;
+        const authorizationData = authorization && typeof authorization === "object" && !Array.isArray(authorization)
+          ? authorization as Record<string, unknown> : {};
+        const activePrincipal = typeof authorizationData.principal_id === "string"
+          ? authorizationData.principal_id : principal?.principal_id ?? "current principal";
+        const accessMode = authorizationData.access_mode === "organization_admin"
+          ? "organization administrator" : "principal-scoped";
         renderGraph(next);
         memoryRecords.replaceChildren();
         text("[data-view-title]", next.lens.replaceAll("_", " "));
         text("[data-result-count]", `${next.nodes.length} records · ${next.edges.length} edges`);
         text("[data-metadata]", JSON.stringify(next.metadata, null, 2));
         compileTrace.hidden = false;
-        text("[data-trace-scope]", typeof next.metadata.subject_id === "string" ? next.metadata.subject_id : "authorized");
+        text("[data-trace-scope]", `${accessMode} · ${activePrincipal}`);
         text("[data-trace-focus]", next.focus_id ?? "lens root");
         text("[data-trace-nodes]", `${next.nodes.length} current`);
         text("[data-trace-edges]", `${next.edges.length} returned`);
         memoryEmpty.hidden = next.nodes.length > 0;
         if (!next.nodes.length) {
-          memoryEmpty.querySelector("strong")!.textContent = "No authorized records found.";
-          memoryEmpty.querySelector("p")!.textContent = "The live query succeeded. Adjust its bounded scope if you expected data.";
+          memoryEmpty.querySelector("strong")!.textContent = `No records are visible to principal ${activePrincipal}.`;
+          memoryEmpty.querySelector("p")!.textContent = `This ${accessMode} query succeeded. It does not reveal whether other records exist.`;
         }
         memoryRecords.hidden = next.nodes.length === 0;
         for (const node of next.nodes) {
@@ -787,6 +816,15 @@ const lenses = [
           && has("keys:manage") && has("memberships:write")
           && ["root", "owner", "admin"].includes(String(principal?.organization_role)));
         one<HTMLOptionElement>("[data-owner-role]").disabled = !["root", "owner"].includes(String(principal?.organization_role));
+        const administratorView = one<HTMLFieldSetElement>("[data-admin-view]");
+        const administratorEligible = has("views:compile:all")
+          && ["root", "owner"].includes(String(principal?.organization_role));
+        administratorView.hidden = !administratorEligible;
+        if (!administratorEligible) {
+          const toggle = administratorView.elements.namedItem("administrator_view") as HTMLInputElement;
+          toggle.checked = false;
+          (administratorView.elements.namedItem("administrator_reason") as HTMLSelectElement).disabled = true;
+        }
       }
       function showLoginSurface() {
         clearPrivateState();
@@ -845,7 +883,10 @@ const lenses = [
           const [health, readiness] = await Promise.all([checkService("health"), checkService("readiness")]);
           const healthLabel = health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`;
           const runtimeLabel = serviceDetail(health.payload, "runtime") ?? "healthz";
-          const readinessLabel = readiness.ok ? "Ready" : `Not ready · ${readiness.status}`;
+          const semanticSyncing = semanticDiagnostic(readiness.payload) === "index_projection_pending";
+          const readinessLabel = readiness.ok
+            ? semanticSyncing ? "Ready · semantic syncing" : "Ready"
+            : `Not ready · ${readiness.status}`;
           const revisionLabel = serviceDetail(readiness.payload, "revision") ?? serviceDetail(health.payload, "revision") ?? "revision unavailable";
           const connectionLabel = health.ok ? "Connected" : "Degraded";
           text("[data-health]", healthLabel);
@@ -860,7 +901,9 @@ const lenses = [
           text("[data-system-connection]", connectionLabel);
           text("[data-system-endpoint]", dashboardStatus.endpoint ?? "same-origin adapter");
           one<HTMLElement>("[data-connection-dot]").className = health.ok && readiness.ok ? "ok" : "warn";
-          setNotice(notice, readiness.ok ? undefined : "The process is reachable but not ready. Product requests may fail until readiness recovers.");
+          setNotice(notice, semanticSyncing
+            ? "Canonical requests are ready while the semantic index finishes syncing."
+            : readiness.ok ? undefined : "The process is reachable but not ready. Product requests may fail until readiness recovers.");
         } catch (error) {
           if (error instanceof DashboardApiError && error.status === 401
             && dashboardStatus?.authentication === "session") return signedOut(errorMessage(error));
@@ -876,7 +919,7 @@ const lenses = [
       const profiles: Record<string, string[]> = {
         reader: readerScopes,
         operator: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "approvals:write", "releases:write"],
-        admin: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write"],
+        admin: [...readerScopes, "views:compile:all", "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write"],
       };
       for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!, button));
       one<HTMLFormElement>("[data-login-form]").addEventListener("submit", async (event) => {
@@ -961,6 +1004,10 @@ const lenses = [
 
       memoryForm.addEventListener("change", (event) => {
         if ((event.target as HTMLInputElement).name === "lens") updateMemoryRequirements();
+        if ((event.target as HTMLInputElement).name === "administrator_view") {
+          const enabled = (event.target as HTMLInputElement).checked;
+          (memoryForm.elements.namedItem("administrator_reason") as HTMLSelectElement).disabled = !enabled;
+        }
       });
       memoryForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -971,6 +1018,10 @@ const lenses = [
         const focus = String(values.get("focus_id") ?? "").trim();
         if (subject) payload.subject_id = subject;
         if (focus) payload.focus_id = focus;
+        if (values.get("administrator_view") === "on") {
+          payload.access_mode = "organization_admin";
+          payload.administrator_reason = String(values.get("administrator_reason"));
+        }
         clearMemory();
         const current = generation;
         memoryLoading.hidden = false;

@@ -5,6 +5,15 @@ import type { Visibility } from "./validate";
 
 type RecordAlias = "c" | "o";
 
+function retentionAccessSql(alias: RecordAlias): string {
+  return `NOT EXISTS (
+    SELECT 1 FROM retention_exclusions retention
+     WHERE retention.org_id = ${alias}.org_id
+       AND retention.resource_type = '${alias === "c" ? "claim" : "observation"}'
+       AND retention.resource_id = ${alias}.id
+  )`;
+}
+
 /** SQL eligibility shared by every canonical memory projection. */
 export function recordAccessSql(alias: RecordAlias, principalSql = "?"): string {
   return `(
@@ -21,16 +30,17 @@ export function recordAccessSql(alias: RecordAlias, principalSql = "?"): string 
            AND access_membership.removed_at IS NULL
       )
     )
-  ) AND NOT EXISTS (
-    SELECT 1 FROM retention_exclusions retention
-     WHERE retention.org_id = ${alias}.org_id
-       AND retention.resource_type = '${alias === "c" ? "claim" : "observation"}'
-       AND retention.resource_id = ${alias}.id
-  )`;
+  ) AND ${retentionAccessSql(alias)}`;
 }
 
 export function recordAccessParams(principalId: string): Param[] {
   return [principalId, principalId];
+}
+
+/** Explicit organization-administrator view; callers must bind org authority first. */
+export function organizationRecordAccessSql(alias: RecordAlias): string {
+  return `${alias}.visibility IN ('organization', 'team', 'private')
+    AND ${retentionAccessSql(alias)}`;
 }
 
 /**
@@ -63,7 +73,7 @@ export function recordAccessParams(principalId: string): Param[] {
  * Any future edit here needs `EXPLAIN QUERY PLAN` from `bun:sqlite` against a
  * store with a realistic row count; the contract suite cannot see this.
  */
-export function contradictedSql(claimAlias: "c"): string {
+export function contradictedSql(claimAlias: "c", organizationWide = false): string {
   return `EXISTS (
     SELECT 1 FROM claim_sources s
     WHERE s.claim_id = ${claimAlias}.id AND s.relation = 'contradicts'
@@ -71,7 +81,7 @@ export function contradictedSql(claimAlias: "c"): string {
         SELECT 1 FROM observations o
          WHERE o.id = s.observation_id
            AND o.org_id = ${claimAlias}.org_id
-           AND ${recordAccessSql("o")}
+           AND ${organizationWide ? organizationRecordAccessSql("o") : recordAccessSql("o")}
       )
   )`;
 }

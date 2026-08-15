@@ -168,15 +168,19 @@ scope, lease, checkpoint, and context rules.
 
 ## Memory Atlas path
 
-1. Authenticate an operator and resolve the requested lens, focus, and scope.
+1. Authenticate an operator and resolve the requested lens, focus, scope, and
+   principal-scoped or explicit administrator access mode.
 2. Apply policy before candidate traversal or expansion.
 3. Build a bounded projection from canonical relationships; an optional index
    may propose candidates but cannot authorize them.
 4. Hydrate canonical rows and recheck both endpoints of every edge plus current
    lifecycle/version/visibility/release eligibility.
-5. Return authorized nodes and edges with explicit truncation and degraded
-   metadata; never include hidden topology or counts.
-6. Render in an optional client. Renderer failure does not affect REST/MCP.
+5. Return authorized nodes and edges with explicit truncation, effective
+   principal/access-mode metadata, and degraded metadata; never include hidden
+   topology or counts.
+6. For an explicitly scoped same-organization root/owner administrator compile,
+   append a reason-coded metadata-only audit entry before returning the view.
+7. Render in an optional client. Renderer failure does not affect REST/MCP.
 
 The compiler is a read-only REST integration in the same repository, not an
 ordinary-agent MCP tool. Layout, clusters, summaries, and caches are

@@ -20,6 +20,14 @@ The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
 every request again.
 
+Memories is principal-scoped by default, including for owners. A root/owner
+with the separate `views:compile:all` capability may explicitly enable the
+same-organization administrator view and choose a bounded incident/recovery
+reason. The adapter forwards that mode only through the fixed Atlas route, and
+the API records metadata-only audit evidence. The dashboard never probes for
+hidden counts or claims that an empty principal-scoped result means canonical
+memory is globally empty.
+
 ## Run disconnected
 
 ```bash
@@ -109,9 +117,11 @@ pnpm check:workflow
 
 The real smoke starts temporary Bun/SQLite and proves login, forced first
 password replacement, all six areas, atomic Add User, logout, and fresh login
-through the real adapter. Integration and browser tests also cover credential isolation,
-revocation, exact origin checks, request-size limits, capability hiding, stale
-private-state clearing, keyboard use, and a 320 px viewport.
+through the real adapter. Integration and browser tests also cover credential
+isolation, revocation, exact origin checks, request-size limits, capability
+hiding, stale private-state clearing, principal-scoped empty results, audited
+administrator mode, semantic-sync readiness, keyboard use, and a 320 px
+viewport.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

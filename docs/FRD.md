@@ -170,6 +170,8 @@ Implemented P0 behavior:
   configured semantic fingerprint locally, and fails semantic readiness on
   invalid configuration, vector initialization failure, missing legacy
   fingerprint evidence, or fingerprint mismatch;
+- ordinary pending semantic projection work remains HTTP-200 traffic-ready and
+  reports `index_projection_pending`; observed dependency failure remains 503;
 - responses include a non-secret request ID and deployed revision/build value.
 - a transient optional embedding/vector/extraction outage is visible under its
   own capability while canonical FTS-only operation remains available.

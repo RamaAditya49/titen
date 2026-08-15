@@ -55,6 +55,13 @@ The logical request contains:
 - traversal depth plus node/edge limits;
 - optional display fields requested by the caller.
 
+The default projection is always principal-scoped. A separate
+`organization_admin` mode may widen private/team inspection only inside the
+authenticated organization, only when the caller explicitly holds
+`views:compile:all`, is an active root/owner, supplies a bounded operational
+reason, and accepts a metadata-only audit entry. It is not impersonation and it
+does not change the authorization of ordinary Atlas requests.
+
 The compiler follows this order:
 
 1. authenticate the principal and derive tenant/scope authority;
@@ -107,6 +114,9 @@ principals or policy snapshots.
 
 - Foreign or hidden focus IDs return the same non-disclosing response class as
   other protected by-ID operations.
+- Owner status alone never widens private-memory access. Organization
+  administrator inspection is explicit, separately scoped, reason-coded,
+  same-organization, and audited without memory content.
 - Every returned edge requires both endpoints and the relationship itself to be
   authorized.
 - Raw prompts, embeddings, credentials, and hidden content never enter the

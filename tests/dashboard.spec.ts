@@ -8,10 +8,14 @@ const view = {
     { id: "obs_live", type: "observation", label: "Measured runtime result", trust: "verified", status: "active", created_at: "2026-08-01T00:01:00Z" },
   ],
   edges: [{ from: "clm_live", to: "obs_live", relation: "supports" }],
-  metadata: { subject_id: "platform-team", claim_count: 1 },
+  metadata: {
+    subject_id: "platform-team",
+    claim_count: 1,
+    authorization: { principal_id: "server_operator", access_mode: "principal" },
+  },
 };
 
-async function mockServerMode(page: Page) {
+async function mockServerMode(page: Page, readiness: Record<string, unknown> = { data: { ready: true }, meta: { revision: "stable-42" } }) {
   let connected = true;
   await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: {
     organization_id: "org_server", principal_id: "server_operator", principal_kind: "human", key_id: "key_server",
@@ -21,7 +25,7 @@ async function mockServerMode(page: Page) {
     ? route.fulfill({ json: { mode: "live", endpoint: "titen.internal", authentication: "server", authenticated: true } })
     : route.fulfill({ status: 503, json: { error: { code: "DASHBOARD_DISCONNECTED", message: "disconnected" } } }));
   await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun", revision: "stable-42" } } }));
-  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true }, meta: { revision: "stable-42" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: readiness }));
   return { disconnect: () => { connected = false; } };
 }
 
@@ -84,6 +88,64 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.getByText("Disconnected", { exact: true })).toBeVisible();
   await expect(page.getByText("Production retry budget is 400 ms")).toHaveCount(0);
   await expect(page.locator("[data-inspector-title]")).toHaveText("Nothing selected");
+});
+
+test("explains principal-scoped empty results and explicitly audits administrator mode", async ({ page }) => {
+  await mockServerMode(page);
+  const requests: Record<string, unknown>[] = [];
+  await page.route("**/dashboard-api/atlas/compile", async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    requests.push(body);
+    const accessMode = body.access_mode === "organization_admin" ? "organization_admin" : "principal";
+    await route.fulfill({ json: { data: {
+      lens: "neighborhood",
+      focus_id: null,
+      nodes: [],
+      edges: [],
+      metadata: {
+        subject_id: body.subject_id,
+        claim_count: 0,
+        authorization: { principal_id: "server_operator", access_mode: accessMode },
+      },
+    } } });
+  });
+  await page.goto("/dashboard/");
+  await expect(page.locator("[data-admin-view]")).toBeVisible();
+  await page.locator('[data-memory-form] input[name="subject_id"]').fill("foreign-private-subject");
+  await page.getByRole("button", { name: "Compile memory view" }).click();
+  await expect(page.locator("[data-memory-empty] strong")).toHaveText("No records are visible to principal server_operator.");
+  await expect(page.locator("[data-memory-empty] p")).toContainText("principal-scoped query succeeded");
+  await expect(page.locator("[data-memory-empty]")).not.toContainText("globally empty");
+  await expect(page.locator("[data-trace-scope]")).toHaveText("principal-scoped · server_operator");
+
+  await page.getByLabel("Organization administrator view").check();
+  await page.getByLabel("Audit reason").selectOption("recovery");
+  await page.getByRole("button", { name: "Compile memory view" }).click();
+  expect(requests).toEqual([
+    { lens: "neighborhood", limit: 50, subject_id: "foreign-private-subject" },
+    {
+      lens: "neighborhood",
+      limit: 50,
+      subject_id: "foreign-private-subject",
+      access_mode: "organization_admin",
+      administrator_reason: "recovery",
+    },
+  ]);
+  await expect(page.locator("[data-trace-scope]")).toHaveText("organization administrator · server_operator");
+});
+
+test("reports normal semantic projection lag as ready and syncing", async ({ page }) => {
+  await mockServerMode(page, { data: {
+    ready: true,
+    revision: "syncing-42",
+    checks: { semantic_index: "index_projection_pending" },
+    capabilities: { vector: "enabled" },
+  } });
+  await page.goto("/dashboard/");
+  await expect(page.locator("[data-readiness]")).toHaveText("Ready · semantic syncing");
+  await expect(page.locator("[data-system-readiness]")).toHaveText("Ready · semantic syncing");
+  await expect(page.locator("[data-service-notice]")).toContainText("Canonical requests are ready");
+  await expect(page.locator("[data-service-notice]")).not.toContainText("Product requests may fail");
 });
 
 test("logs in per principal, wires all six areas, adds a user once, and logs out", async ({ page }) => {

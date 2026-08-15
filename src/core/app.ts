@@ -353,7 +353,7 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   checks.semantic_index = semanticReadiness.diagnostic ??
     (semanticReadiness.vector === "enabled" ? "ok" : "disabled");
   if (
-    semanticReadiness.diagnostic ||
+    (semanticReadiness.diagnostic && semanticReadiness.diagnostic !== "index_projection_pending") ||
     semanticReadiness.embedding === "configured_error" ||
     semanticReadiness.vector === "configured_error"
   )

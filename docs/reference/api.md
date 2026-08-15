@@ -575,13 +575,23 @@ Compile one authorized visual projection around a focus record.
 ```json
 {
   "lens": "neighborhood",
-  "focus_id": "claim_...",
-  "scope": { "project_id": "project_..." },
-  "max_depth": 2,
-  "max_nodes": 200,
-  "max_edges": 400
+  "subject_id": "subject_...",
+  "limit": 50,
+  "access_mode": "organization_admin",
+  "administrator_reason": "incident_response"
 }
 ```
+
+`access_mode` defaults to `principal`. That mode uses the ordinary
+`views:compile` capability and never reveals another principal's private
+records or whether they exist. `organization_admin` is an explicit,
+same-organization override for incident response and recovery. It additionally
+requires `views:compile:all`, an active root or owner authority, and one of
+`incident_response`, `recovery`, `deletion_verification`, or
+`export_verification`. Every successful administrator compile appends one
+metadata-only audit entry; node labels, memory content, prompts, credentials,
+and embeddings never enter that entry. Owner status without the dedicated
+capability does not widen access.
 
 The implemented lenses are `evidence_trace`, `neighborhood`,
 `conflict_freshness`, `review_queue`, `scope_preview`, and
@@ -603,6 +613,11 @@ authorized `evidence_refs` and `audit_refs`. Metadata contains authorized
 page/remaining counts and an opaque
 stable keyset `next_cursor`. The lens is not an action route or canonical queue;
 supersede, expire, and revoke remain claim lifecycle operations.
+
+Every result includes `metadata.authorization.principal_id` and
+`metadata.authorization.access_mode`. These fields describe the effective
+projection boundary; authorized totals remain totals of the returned set only
+and do not indicate that hidden records exist.
 
 ```json
 {
@@ -939,11 +954,16 @@ capability `configured_error`, and supplies one fixed
 `checks.semantic_index` diagnostic. The response does not expose the
 fingerprint, endpoint, database path, or provider error.
 
-An active/disputed claim with pending upsert or reconciliation work reports
-`index_projection_pending` and keeps readiness at `503` until the rebuildable
-projection converges. A graceful Bun shutdown releases only the active
-maintenance pass's owned semantic leases; a fresh process can reclaim them
-without waiting for the normal lease expiry.
+An active/disputed claim with ordinary pending upsert or reconciliation work
+keeps canonical traffic readiness at HTTP `200`, leaves the configured semantic
+capabilities `enabled`, and reports
+`checks.semantic_index: "index_projection_pending"`. This is a bounded syncing
+diagnostic, not `configured_error`: canonical SQL/FTS requests remain usable
+while background maintenance converges. Observed embedder/vector failures,
+invalid or incompatible fingerprints, missing metadata, and canonical startup
+failures still return `503 NOT_READY`. A graceful Bun shutdown releases only
+the active maintenance pass's owned semantic leases; a fresh process can
+reclaim them without waiting for the normal lease expiry.
 
 The cosine floor is an operator-supplied calibration policy, not a public API
 field or universal Titen default. Sub-threshold vector IDs never reach canonical

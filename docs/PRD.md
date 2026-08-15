@@ -269,6 +269,10 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   eligibility before returning a cached or indexed candidate.
 - Requests MUST have bounded depth, nodes, edges, labels, execution time, and
   response bytes, with explicit truncation or degraded metadata.
+- Ordinary views MUST remain principal-scoped. Same-organization private-memory
+  inspection MUST require an explicit administrator mode, a distinct
+  capability, active root/owner authority, a bounded reason, and metadata-only
+  audit evidence.
 - The view compiler MUST use the same authenticated REST contract on
   Cloudflare and VPS, remain outside the ordinary-agent MCP tool profile, and add
   no graph-database or renderer dependency to the core.
@@ -366,6 +370,9 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - SQL is canonical; vector and compiled indexes are recoverable projections.
 - Canonical mutations, history, and outbox entries commit atomically.
 - A vector outage degrades recall but does not lose writes.
+- Normal pending vector projection work MUST remain traffic-ready and report a
+  distinct syncing diagnostic; observed dependency/configuration failures MUST
+  remain fail-closed.
 - An extraction outage leaves canonical writes and direct claims usable and
   retains bounded retryable enrichment work.
 - Readiness fails closed on migration or embedding-dimension mismatch.

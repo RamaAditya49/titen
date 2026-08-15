@@ -126,8 +126,10 @@ test("readiness reports the vector capability only when one is configured", asyn
   assert.equal(off.body.data.capabilities.model, "disabled");
 
   const pending = await withVectors().call("GET", "/readyz");
-  assert.equal(pending.status, 503);
-  assert.equal(pending.body.meta.checks.semantic_index, "index_projection_pending");
+  assert.equal(pending.status, 200);
+  assert.equal(pending.body.data.ready, true);
+  assert.equal(pending.body.data.checks.semantic_index, "index_projection_pending");
+  assert.equal(pending.body.data.capabilities.vector, "enabled");
   const drained = await withVectors().call("POST", "/v1/index/drain?limit=100", { key });
   assert.equal(drained.status, 200);
 

@@ -99,11 +99,13 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
     "http://titen.test",
   );
   const pendingProjection = await persistent.call("GET", "/readyz");
-  assert.equal(pendingProjection.status, 503);
+  assert.equal(pendingProjection.status, 200);
+  assert.equal(pendingProjection.body.data.ready, true);
   assert.equal(
-    pendingProjection.body.meta.checks.semantic_index,
+    pendingProjection.body.data.checks.semantic_index,
     "index_projection_pending",
   );
+  assert.equal(pendingProjection.body.data.capabilities.vector, "enabled");
   await db.batch([{
     sql: `UPDATE index_outbox SET state = 'done'
            WHERE id = 'idx_semantic_backfill'`,
@@ -117,6 +119,33 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
   assert.equal(healthy.body.data.capabilities.background_enrichment, "disabled");
   assert.equal(healthy.body.data.capabilities.model, "enabled");
   assert.equal(vectors.embedCalls(), 0, "readiness must remain local");
+  await db.batch([
+    {
+      sql: `INSERT INTO claims
+              (id, org_id, subject_id, project_id, workspace_id, observer_id,
+               actor_id, kind, statement, confidence, trust, visibility, status,
+               version, valid_from, valid_to, created_at)
+            VALUES ('clm_semantic_repeated_write', 'org_semantic_backfill', 'subject',
+                    NULL, NULL, NULL, 'agent', 'semantic_fact', 'Repeated write',
+                    1, 'asserted', 'private', 'active', 1,
+                    '2026-07-31T00:00:00.000Z', NULL, '2026-07-31T00:00:00.000Z')`,
+    },
+    {
+      sql: `INSERT INTO index_outbox
+              (id, org_id, record_type, record_id, operation, state, attempts, created_at)
+            VALUES ('idx_semantic_repeated_write', 'org_semantic_backfill', 'claim',
+                    'clm_semantic_repeated_write', 'upsert', 'pending', 0,
+                    '2026-07-31T00:00:00.000Z')`,
+    },
+  ]);
+  const repeatedWrite = await persistent.call("GET", "/readyz");
+  assert.equal(repeatedWrite.status, 200);
+  assert.equal(repeatedWrite.body.data.checks.semantic_index, "index_projection_pending");
+  await db.batch([
+    { sql: `DELETE FROM index_outbox WHERE id = 'idx_semantic_repeated_write'` },
+    { sql: `DELETE FROM claims WHERE id = 'clm_semantic_repeated_write'` },
+  ]);
+  assert.equal((await persistent.call("GET", "/readyz")).status, 200);
   const persisted = await db.all<Record<string, unknown>>(
     `SELECT provider, model, revision, dimensions, metric, preprocessing, index_schema
        FROM semantic_index_metadata WHERE id = 'claims'`,
@@ -402,11 +431,12 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
     },
   ]);
   const queuedProjection = await readyWith(db, runtime, vectors);
-  assert.equal(queuedProjection.status, 503);
+  assert.equal(queuedProjection.status, 200);
   assert.equal(
-    queuedProjection.body.meta.checks.semantic_index,
+    queuedProjection.body.data.checks.semantic_index,
     "index_projection_pending",
   );
+  assert.equal(queuedProjection.body.data.capabilities.vector, "enabled");
 
   await db.batch([
     {
@@ -449,9 +479,9 @@ export async function assertSemanticReadiness(db: Db, runtime: string) {
     },
   ]);
   const recovered = await readyWith(db, runtime, changed);
-  assert.equal(recovered.status, 503);
-  assert.equal(recovered.body.meta.checks.semantic_index, "index_projection_pending");
-  assert.equal(recovered.body.meta.capabilities.vector, "configured_error");
+  assert.equal(recovered.status, 200);
+  assert.equal(recovered.body.data.checks.semantic_index, "index_projection_pending");
+  assert.equal(recovered.body.data.capabilities.vector, "enabled");
   assert.equal(changed.embedCalls(), 0);
 
   await db.batch([

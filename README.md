@@ -585,6 +585,12 @@ the service fails closed — `/readyz` returns `503` with
 `checks.semantic_index: "embedding_configuration_invalid"` and no vector query
 runs. A Bun vector deployment must also add `sqlite-vec@0.1.9`.
 
+Once semantic retrieval is valid, normal pending projection work reports
+`checks.semantic_index: "index_projection_pending"` while `/readyz` remains
+HTTP 200: canonical SQL/FTS requests are ready and the semantic index is
+syncing. An observed embedder/vector failure or incompatible fingerprint still
+returns 503.
+
 | Variable | Required | Shipped default | Absent or invalid |
 | --- | --- | --- | --- |
 | `TITEN_EMBED_BASE_URL` | yes | none | `configured_error`; must be `http:`/`https:` with no credentials, query, or fragment |

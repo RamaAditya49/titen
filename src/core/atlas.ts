@@ -1,6 +1,12 @@
 import { chunk, first, MAX_BOUND_PARAMS } from "./db";
 import { hasScope } from "./auth";
-import { contradictedSql, recordAccessParams, recordAccessSql } from "./authorization";
+import {
+  contradictedSql,
+  organizationRecordAccessSql,
+  recordAccessParams,
+  recordAccessSql,
+} from "./authorization";
+import { auditStatement } from "./audit";
 import { loadAuthorizedEvidenceIds } from "./evidence";
 import { notFound, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
@@ -10,6 +16,19 @@ import { requireOrgRole } from "./governance";
 const LENSES = ["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "knowledge_release"] as const;
 type Lens = (typeof LENSES)[number];
 const REVIEW_REASONS = ["all", "disputed", "contradiction", "low_confidence", "negative_feedback"] as const;
+const ACCESS_MODES = ["principal", "organization_admin"] as const;
+const ADMINISTRATOR_REASONS = ["incident_response", "recovery", "deletion_verification", "export_verification"] as const;
+type AccessMode = (typeof ACCESS_MODES)[number];
+
+function accessSql(alias: "c" | "o", mode: AccessMode): string {
+  return mode === "organization_admin"
+    ? organizationRecordAccessSql(alias)
+    : recordAccessSql(alias);
+}
+
+function accessParams(principalId: string, mode: AccessMode) {
+  return mode === "organization_admin" ? [] : recordAccessParams(principalId);
+}
 
 interface Node {
   id: string;
@@ -92,13 +111,13 @@ function decodeCursor(value: string | null): ReviewCursor | null {
 
 // --- Lens handlers ---
 
-async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string, principalId: string): Promise<ViewResult> {
+async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string, principalId: string, mode: AccessMode): Promise<ViewResult> {
   const claim = await first<{ id: string; statement: string; trust: string; status: string; visibility: string; actor_id: string; created_at: string }>(
     ctx.app.db,
     `SELECT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
        FROM claims c
-      WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
-    [focusId, orgId, ...recordAccessParams(principalId)],
+      WHERE c.id = ? AND c.org_id = ? AND ${accessSql("c", mode)}`,
+    [focusId, orgId, ...accessParams(principalId, mode)],
   );
   if (!claim) throw notFound();
 
@@ -106,9 +125,9 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
     `SELECT s.relation, o.id AS obs_id, o.kind, o.content, o.trust, o.visibility, o.actor_id, o.ingested_at
        FROM claim_sources s
        JOIN observations o ON o.id = s.observation_id
-      WHERE s.claim_id = ? AND o.org_id = ? AND ${recordAccessSql("o")}
+      WHERE s.claim_id = ? AND o.org_id = ? AND ${accessSql("o", mode)}
       ORDER BY o.ingested_at`,
-    [focusId, orgId, ...recordAccessParams(principalId)],
+    [focusId, orgId, ...accessParams(principalId, mode)],
   );
 
   const nodes: Node[] = [
@@ -124,13 +143,13 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
   return { lens: "evidence_trace", focus_id: focusId, nodes, edges, metadata: { observation_count: edges.length } };
 }
 
-async function neighborhood(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number): Promise<ViewResult> {
+async function neighborhood(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number, mode: AccessMode): Promise<ViewResult> {
   const claims = await ctx.app.db.all<{ id: string; statement: string; trust: string; status: string; visibility: string; actor_id: string; created_at: string }>(
     `SELECT id, statement, trust, status, visibility, actor_id, created_at
        FROM claims c WHERE c.subject_id = ? AND c.org_id = ? AND c.status != 'revoked'
-        AND ${recordAccessSql("c")}
+        AND ${accessSql("c", mode)}
       ORDER BY created_at DESC LIMIT ?`,
-    [subjectId, orgId, ...recordAccessParams(principalId), limit],
+    [subjectId, orgId, ...accessParams(principalId, mode), limit],
   );
 
   const nodes: Node[] = [];
@@ -144,8 +163,8 @@ async function neighborhood(ctx: RequestContext, subjectId: string, orgId: strin
       `SELECT o.id AS obs_id, o.content, o.trust, o.visibility, o.actor_id, o.ingested_at, s.relation
          FROM claim_sources s
          JOIN observations o ON o.id = s.observation_id
-        WHERE s.claim_id = ? AND o.org_id = ? AND ${recordAccessSql("o")}`,
-      [c.id, orgId, ...recordAccessParams(principalId)],
+        WHERE s.claim_id = ? AND o.org_id = ? AND ${accessSql("o", mode)}`,
+      [c.id, orgId, ...accessParams(principalId, mode)],
     );
 
     for (const s of sources) {
@@ -160,7 +179,7 @@ async function neighborhood(ctx: RequestContext, subjectId: string, orgId: strin
   return { lens: "neighborhood", focus_id: null, nodes, edges, metadata: { subject_id: subjectId, claim_count: claims.length } };
 }
 
-async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number): Promise<ViewResult> {
+async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number, mode: AccessMode): Promise<ViewResult> {
   const now = ctx.app.now();
 
   // Claims that have at least one contradicting source
@@ -168,14 +187,14 @@ async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: 
     `SELECT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
        FROM claims c
       WHERE c.org_id = ? AND c.subject_id = ? AND c.status != 'revoked'
-        AND ${recordAccessSql("c")}
-        AND ${contradictedSql("c")}
+        AND ${accessSql("c", mode)}
+        AND ${contradictedSql("c", mode === "organization_admin")}
       ORDER BY c.created_at DESC LIMIT ?`,
     [
       orgId,
       subjectId,
-      ...recordAccessParams(principalId),
-      ...recordAccessParams(principalId),
+      ...accessParams(principalId, mode),
+      ...accessParams(principalId, mode),
       limit,
     ],
   );
@@ -192,8 +211,8 @@ async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: 
          FROM claim_sources s
          JOIN observations o ON o.id = s.observation_id
         WHERE s.claim_id = ? AND s.relation = 'contradicts' AND o.org_id = ?
-          AND ${recordAccessSql("o")}`,
-      [c.id, orgId, ...recordAccessParams(principalId)],
+          AND ${accessSql("o", mode)}`,
+      [c.id, orgId, ...accessParams(principalId, mode)],
     );
 
     for (const o of contradictions) {
@@ -236,14 +255,14 @@ async function reviewQueue(
   reason: (typeof REVIEW_REASONS)[number],
   cursor: ReviewCursor | null,
   limit: number,
+  mode: AccessMode,
 ): Promise<ViewResult> {
   const principal = ctx.principal!;
-  const scoredConditions = ["c.org_id = ?", "c.status IN ('active', 'disputed')", recordAccessSql("c")];
+  const scoredConditions = ["c.org_id = ?", "c.status IN ('active', 'disputed')", accessSql("c", mode)];
   const params: (string | number | null)[] = [
-    principal.principalId,
-    principal.principalId,
+    ...accessParams(principal.principalId, mode),
     principal.orgId,
-    ...recordAccessParams(principal.principalId),
+    ...accessParams(principal.principalId, mode),
   ];
   if (subjectId) { scoredConditions.push("c.subject_id = ?"); params.push(subjectId); }
   if (ownerId) { scoredConditions.push("c.actor_id = ?"); params.push(ownerId); }
@@ -278,7 +297,7 @@ async function reviewQueue(
   }>(
     `WITH scored AS (
        SELECT c.id, c.statement, c.trust, c.status, c.actor_id, c.confidence, c.valid_to, c.created_at,
-              ${contradictedSql("c")} AS has_contradiction,
+              ${contradictedSql("c", mode === "organization_admin")} AS has_contradiction,
               (SELECT COUNT(*) FROM context_feedback f
                 WHERE f.org_id = c.org_id AND f.claim_id = c.id AND f.outcome = 'incorrect') AS incorrect_count,
               (SELECT COUNT(*) FROM context_feedback f
@@ -309,7 +328,7 @@ async function reviewQueue(
   const page = rows.slice(0, limit);
   const claimIds = page.map((row) => row.id);
   const [evidence, audits] = await Promise.all([
-    loadAuthorizedEvidenceIds(ctx.app.db, principal, claimIds),
+    loadAuthorizedEvidenceIds(ctx.app.db, principal, claimIds, mode === "organization_admin"),
     loadAuditRefs(ctx, claimIds),
   ]);
   const nodes: ReviewNode[] = page.map((row) => {
@@ -454,7 +473,16 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
   const ownerId = optionalString(body, "owner_id", 200);
   const cursor = decodeCursor(optionalString(body, "cursor", 1000));
   const reviewReason = requireEnum({ review_reason: body.review_reason ?? "all" }, "review_reason", REVIEW_REASONS);
+  const accessMode = requireEnum({ access_mode: body.access_mode ?? "principal" }, "access_mode", ACCESS_MODES);
+  const administratorReason = accessMode === "organization_admin"
+    ? requireEnum(body, "administrator_reason", ADMINISTRATOR_REASONS)
+    : null;
   const limit = clampLimit(body);
+
+  if (accessMode === "organization_admin") {
+    if (!hasScope(principal, "views:compile:all")) throw notFound();
+    await requireOrgRole(ctx, ["owner"], "atlas.organization_admin");
+  }
 
   const orgId = principal.orgId;
   const principalId = principal.principalId;
@@ -464,21 +492,21 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
   switch (lens) {
     case "evidence_trace": {
       if (!focusId) throw validationError('Field "focus_id" is required for evidence_trace lens.');
-      view = await evidenceTrace(ctx, focusId, orgId, principalId);
+      view = await evidenceTrace(ctx, focusId, orgId, principalId, accessMode);
       break;
     }
     case "neighborhood": {
       if (!subjectId) throw validationError('Field "subject_id" is required for neighborhood lens.');
-      view = await neighborhood(ctx, subjectId, orgId, principalId, limit);
+      view = await neighborhood(ctx, subjectId, orgId, principalId, limit, accessMode);
       break;
     }
     case "conflict_freshness": {
       if (!subjectId) throw validationError('Field "subject_id" is required for conflict_freshness lens.');
-      view = await conflictFreshness(ctx, subjectId, orgId, principalId, limit);
+      view = await conflictFreshness(ctx, subjectId, orgId, principalId, limit, accessMode);
       break;
     }
     case "review_queue": {
-      view = await reviewQueue(ctx, subjectId, ownerId, reviewReason, cursor, limit);
+      view = await reviewQueue(ctx, subjectId, ownerId, reviewReason, cursor, limit, accessMode);
       break;
     }
     case "scope_preview": {
@@ -490,6 +518,28 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
       view = await knowledgeReleaseView(ctx, focusId, limit);
       break;
     }
+  }
+
+  view.metadata.authorization = {
+    principal_id: principalId,
+    access_mode: accessMode,
+  };
+  if (accessMode === "organization_admin") {
+    await ctx.app.db.batch([auditStatement(
+      orgId,
+      principalId,
+      "memory_view.compile.admin",
+      "memory_view",
+      ctx.app.now().toISOString(),
+      focusId ?? subjectId,
+      JSON.stringify({
+        lens,
+        subject_id: subjectId,
+        focus_id: focusId,
+        access_mode: accessMode,
+        reason: administratorReason,
+      }),
+    )]);
   }
 
   return { data: view };

@@ -44,6 +44,8 @@ const error = (status: number, code: string, message: string, extra?: HeadersIni
   json({ error: { code, message } }, status, extra);
 const lenses = new Set(["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "knowledge_release"]);
 const reviewReasons = new Set(["all", "disputed", "contradiction", "low_confidence", "negative_feedback"]);
+const accessModes = new Set(["principal", "organization_admin"]);
+const administratorReasons = new Set(["incident_response", "recovery", "deletion_verification", "export_verification"]);
 
 function isLoopbackHost(host: string | null): boolean {
   return host === `127.0.0.1:${port}` || host === `localhost:${port}` || host === `[::1]:${port}`;
@@ -385,9 +387,14 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     const subjectId = text("subject_id"), focusId = text("focus_id"), ownerId = text("owner_id"), cursor = text("cursor", 1000);
     const limit = body.limit === undefined ? 50 : body.limit;
     const reviewReason = body.review_reason === undefined ? "all" : String(body.review_reason);
+    const accessMode = body.access_mode === undefined ? "principal" : String(body.access_mode);
+    const administratorReason = body.administrator_reason === undefined ? undefined : String(body.administrator_reason);
     if (!lenses.has(lens) || subjectId === null || focusId === null || ownerId === null || cursor === null
       || !Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 100
       || !reviewReasons.has(reviewReason)
+      || !accessModes.has(accessMode)
+      || (accessMode === "organization_admin" && !administratorReasons.has(administratorReason ?? ""))
+      || (accessMode === "principal" && administratorReason !== undefined)
       || ((lens === "evidence_trace" || lens === "scope_preview") && !focusId)
       || ((lens === "neighborhood" || lens === "conflict_freshness") && !subjectId))
       return error(400, "INVALID_REQUEST", "The selected lens requires bounded subject/focus input and limit 1..100.");
@@ -398,6 +405,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       ...(ownerId ? { owner_id: ownerId } : {}),
       ...(cursor ? { cursor } : {}),
       ...(lens === "review_queue" ? { review_reason: reviewReason } : {}),
+      ...(accessMode === "organization_admin" ? { access_mode: accessMode, administrator_reason: administratorReason } : {}),
       limit,
     };
     return proxyJson(request, "/v1/memory-views/compile", {

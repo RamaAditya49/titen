@@ -107,10 +107,11 @@ reaches `latest`.
 | `src/runtime/bun/**` | The `titen` CLI and `Bun.serve` runtime. |
 | `src/sdk.ts` | Source of truth for the SDK, and its `types` entry. |
 | `dist/npm/sdk.js` | Type-stripped SDK for Node/Deno/workers, built by `prepack`. |
+| `dist/dashboard/**`, `scripts/dashboard-adapter.ts` | Current packaged Astro dashboard and its same-origin adapter. |
 | `README.md`, `SECURITY.md`, `LICENSE` | npm entrypoint, disclosure policy, and license. |
 
-Not shipped: the Astro dashboard (`src/pages`, `src/styles`), the Cloudflare
-adapter (deploy that from a clone with `wrangler`), tests, and docs.
+Not shipped: Astro source (`src/pages`, `src/styles`), the Cloudflare adapter
+(deploy that from a clone with `wrangler`), tests, and repository-only docs.
 
 SDK and lexical-only server consumers install only `titen-memory`. The manifest
 declares pinned `sqlite-vec@0.1.9` as an optional peer; a vector-enabled VPS

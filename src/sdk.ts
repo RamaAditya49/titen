@@ -894,6 +894,12 @@ export class TitenClient {
         | "negative_feedback";
       cursor?: string;
       limit?: number;
+      access_mode?: "principal" | "organization_admin";
+      administrator_reason?:
+        | "incident_response"
+        | "recovery"
+        | "deletion_verification"
+        | "export_verification";
     } = {},
   ): Promise<ViewResult> {
     return this.request("POST", "/v1/memory-views/compile", {

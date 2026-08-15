@@ -1,6 +1,6 @@
 {
   "name": "titen-memory",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "mcpName": "io.github.RamaAditya49/titen-memory",
   "description": "Agent memory with no API key, no LLM, and no embedding provider. Serves MCP over stdio against a local SQLite store, or Cloudflare Workers + D1. Drop-in for @modelcontextprotocol/server-memory; every memory keeps its source, its scope, and the evidence that contradicts it.",
   "license": "Apache-2.0",

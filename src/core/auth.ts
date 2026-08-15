@@ -29,6 +29,7 @@ export const SCOPES = [
   "mcp:call",
   "events:read",
   "views:compile",
+  "views:compile:all",
   "audit:read",
   "audit:export",
   "governance:read",
