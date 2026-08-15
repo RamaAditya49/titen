@@ -77,7 +77,8 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.locator('[data-area-panel="memories"] h2').first()).toHaveText("Memory Atlas");
   await page.locator("[data-profile-open]").click();
   await expect(page.locator('[data-area-panel="profile"] h2')).toHaveText("Profile");
-  await expect(page.locator("[data-profile-password-form]")).toBeVisible();
+  await expect(page.locator("[data-profile-password-form]")).toBeHidden();
+  await expect(page.locator("[data-profile-password-note]")).toContainText("session-authenticated");
   service.disconnect();
   await page.getByRole("button", { name: "Refresh service" }).click();
   await expect(page.getByText("Disconnected", { exact: true })).toBeVisible();

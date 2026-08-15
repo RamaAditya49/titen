@@ -746,9 +746,9 @@ const lenses = [
         const scopes = button.dataset.scopes?.split(" ") ?? [];
         return scopes.some(has);
       }
-      function activateArea(id: string) {
+      function activateArea(id: string, source?: HTMLButtonElement) {
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = panel.dataset.areaPanel !== id;
-        const selected = all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id && !button.hidden);
+        const selected = source ?? all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id && !button.hidden);
         for (const button of all<HTMLButtonElement>("[data-area]")) button.setAttribute("aria-current", button === selected ? "page" : "false");
         one<HTMLButtonElement>("[data-profile-open]").setAttribute("aria-current", id === "profile" ? "page" : "false");
         const label = selected?.dataset.label ?? (id === "profile" ? "Profile" : "Dashboard");
@@ -878,7 +878,7 @@ const lenses = [
         operator: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "approvals:write", "releases:write"],
         admin: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write"],
       };
-      for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!));
+      for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!, button));
       one<HTMLFormElement>("[data-login-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget as HTMLFormElement;
