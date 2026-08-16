@@ -1,12 +1,11 @@
 ---
 work_id: level6-dashboard-release-20260816
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-16
 updated: 2026-08-16
-review_after: 2026-08-30
 owner: CADIS
 ---
 
@@ -164,3 +163,26 @@ authorized state, both runtimes and the installed tarball pass, repository
 issues have a verified terminal disposition, the paired plan has no unchecked
 item, the exact release is published and deployed, and this pair is moved to
 `done/` with the final production evidence.
+
+## Delivery evidence
+
+- Release commit `261919af3129b011d1f771ab6e722ec3c48a861b`, tag `v0.8.6`,
+  and npm `gitHead` are identical. The published registry tarball has SHA-1
+  `ec64df80d4ab252f7ec16561a598ed7ee480fab3` and is byte-identical to the
+  nine-gate package candidate.
+- `pnpm test:all` passed D1 128/128, Bun/vector/SDK 156/156, integration
+  230/230, all nine active browser cases, the 15-destination live-adapter
+  smoke, and workflow/debt checks. Desktop and 320 px screenshot references
+  passed with a 22.9 KiB gzip dashboard bundle against the 80 KiB budget.
+- Cloudflare Worker version `cc41813e-0ce3-40fb-ae97-50ffcb959dae` serves
+  release revision `261919af3129b011d1f771ab6e722ec3c48a861b`; production
+  health/readiness return 200 with schema 23/23 and automatic migration locked
+  off. The isolated administrator-mode smoke exposed two nodes only in explicit
+  administrator mode, appended one metadata-only audit entry, and its fixture
+  rows were removed afterward.
+- `titen-web` commit `214c76cc49cf4a924a765840cb2540641c073537`
+  deployed as Cloudflare version `e3ac2760-59fb-4a01-94bd-8e2ede08b4b5`.
+  Both `titen.dev` hostnames serve the 0.8.6 version metadata, release page,
+  homepage badge, and current 96-route/54-scope documentation with HTTP 200.
+- Issues #303 and #304 are closed with package and live-runtime evidence;
+  the repository has zero open issues at completion.
