@@ -212,6 +212,12 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - Tenant/organization authority MUST come from authentication, not request data.
 - Cross-tenant IDs MUST return a non-disclosing not-found response.
 - Subject-scoped credentials MUST NOT escape their subject.
+- Canonical read/write/approve eligibility MUST require visibility plus an
+  active additive organization/project/subject grant; only the organization
+  owner may bypass the grant gate.
+- Derived keys MUST remain clamped to both their declared target and the
+  issuer's current grants, and delegated grant administration MUST remain
+  bounded to the administrator's target.
 - High-trust procedural memory MUST support stronger write policy than ordinary
   episodic memory.
 
@@ -260,6 +266,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - The v0.2 surface MUST support Evidence Trace, Memory Neighborhood, and
   Conflict & Freshness lenses. Scope Preview and Knowledge Release lenses are
   v0.3 governance features.
+- Workspace Graph MUST map authorized claim/subject topology for one workspace
+  without similarity edges, stored coordinates, or hidden-derived counts.
 - Every view MUST be derived from authorized canonical SQL records; layout,
   clusters, summaries, counts, and caches MUST remain rebuildable projections.
 - Authorization MUST run before traversal and apply to both endpoints of every
@@ -281,12 +289,11 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 
 - Titen MUST treat the dashboard as an optional authenticated REST client;
   disabling it MUST leave complete headless REST/MCP behavior unchanged.
-- The implemented frontend MUST expose the canonical live product map defined
-  in [DESIGN](./DESIGN.md): Memories, Atlas, Context, Work, Audit, Governance,
-  and Federation. Memories MUST list authorized canonical claims with bounded
+- The implemented frontend MUST expose the canonical fifteen-destination live
+  product map defined in [DESIGN](./DESIGN.md). Memories MUST list authorized canonical claims with bounded
   lexical search and keyset pagination without requiring compilation; Atlas
   MUST remain the read-only graph/inspector projection opened from a selected
-  memory. Every other area uses its existing authenticated domain REST contract.
+  memory. Every other destination uses its authenticated domain REST contract.
 - An area MUST NOT become a link, control, or route until its backend contract
   is implemented, the current build declares it available, its authorization
   and failure behavior pass, and its paired EARS UI work item is complete.
@@ -295,7 +302,7 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   locks, disabled controls, paid upgrades, or shipped functionality.
 - Categories and tags MUST remain memory filters; webhooks and domain events
   MUST remain inside Audit; export and recovery remain deployment operations;
-  account settings remain absent. Where per-principal dashboard sessions are
+  bounded password rotation belongs only in Profile. Where per-principal dashboard sessions are
   enabled, session credentials MUST remain adapter-only; password verifiers and
   user provisioning MUST reuse canonical principal, organization-membership,
   scope, trust, and role authority.
@@ -325,6 +332,9 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   retryable after transient failure, and terminal after unsafe/malformed output.
 - Model, embedding, and background-enrichment readiness MUST be independently
   observable. Pending enrichment MUST NOT be represented as claim-ready memory.
+- Authorized operators MUST be able to inspect a masked immutable startup
+  snapshot and run a bounded metadata-only probe without mutating configuration
+  or canonical memory.
 - Cloudflare and Bun MUST share one job/validation contract; D1/Cron and
   SQLite/timer are runtime triggers, not different memory semantics.
 - A model name or self-reported confidence MUST NOT define capability or trust.
@@ -481,9 +491,10 @@ inferring hidden records; disabling the surface leaves headless REST/MCP
 behavior unchanged. Its v0.3 preview lenses must not impersonate another
 principal or convert verified memory into an active release.
 
-The dashboard information architecture is accepted when all six canonical
-areas use live same-origin responses, capability discovery hides unauthorized
-areas, failures clear stale private data, and no area substitutes fixtures.
+The dashboard information architecture is accepted when all fifteen canonical
+destinations use live same-origin responses, capability discovery hides
+unauthorized areas, failures clear stale private data, and no area substitutes
+fixtures.
 Session mode is accepted when each operator uses its own revocable principal,
 sealed cookies fail closed, logout/key rotation invalidates the browser session,
 an omitted shared key preserves restart invalidation, and an owner/admin can add one

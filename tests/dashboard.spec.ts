@@ -109,8 +109,9 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await page.goto("/dashboard/");
   await expect(page.locator("[data-connection-label]")).toHaveText("Connected");
   await expect(page.locator("[data-system-revision]")).toHaveText("stable-42");
-  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(10);
+  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(14);
   await page.getByRole("button", { name: "Atlas live" }).click();
+  await page.getByText("Neighborhood", { exact: true }).click();
   await page.locator('[data-memory-form] input[name="subject_id"]').fill("platform-team");
   await page.getByRole("button", { name: "Compile authorized graph" }).click();
   await expect(page.getByText("Production retry budget is 400 ms").first()).toBeVisible();
@@ -130,7 +131,7 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await page.getByRole("button", { name: "System" }).click();
   await expect(page.locator('[data-area-panel="system"] h2')).toHaveText("System status");
   await page.getByRole("button", { name: "Access" }).click();
-  await expect(page.locator('[data-area-panel="access"] h2')).toHaveText("Access policy");
+  await expect(page.locator('[data-area-panel="access"] h2')).toHaveText("Scoped access control");
   await page.getByRole("button", { name: "Releases" }).click();
   await expect(page.locator('[data-area-panel="releases"] h2')).toHaveText("Release policy");
   await page.getByRole("button", { name: "Atlas" }).click();
@@ -167,6 +168,7 @@ test("explains principal-scoped empty results and explicitly audits administrato
   });
   await page.goto("/dashboard/");
   await page.getByRole("button", { name: "Atlas live" }).click();
+  await page.getByText("Neighborhood", { exact: true }).click();
   await expect(page.locator("[data-admin-view]")).toBeVisible();
   await page.locator('[data-memory-form] input[name="subject_id"]').fill("foreign-private-subject");
   await page.getByRole("button", { name: "Compile authorized graph" }).click();
@@ -205,9 +207,12 @@ test("reports normal semantic projection lag as ready and syncing", async ({ pag
   await expect(page.locator("[data-service-notice]")).not.toContainText("Product requests may fail");
 });
 
-test("logs in per principal, wires all six areas, adds a user once, and logs out", async ({ page }) => {
+test("logs in per principal, wires all fifteen destinations, adds a user once, and logs out", async ({ page }) => {
   let loggedIn = false;
   let logoutFails = true;
+  let handoffStatus = "pending";
+  let approvalStatus = "pending";
+  let releaseStatus = "draft";
   const calls: string[] = [];
   const principal = {
     organization_id: "org_live",
@@ -245,10 +250,15 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
     return route.fulfill({ json: { data: { context_id: "ctx_live", items: [{ claim_id: "clm_live", statement: "Bounded context" }], budget: { used_tokens: 42 } } } });
   });
   await page.route("**/dashboard-api/work/**", (route) => {
-    calls.push(new URL(route.request().url()).pathname);
     const path = new URL(route.request().url()).pathname;
-    return route.fulfill({ json: path.endsWith("leases") ? { data: { leases: [{ lease_id: "lease_live", status: "active" }] } }
-      : { data: { handoffs: [{ handoff_id: "handoff_live", status: "pending" }] } } });
+    calls.push(path);
+    if (route.request().method() === "POST" && path.endsWith("/resolve")) {
+      handoffStatus = String(route.request().postDataJSON().status);
+      calls.push(`handoff:${handoffStatus}`);
+      return route.fulfill({ json: { data: { handoff_id: "handoff_live", status: handoffStatus } } });
+    }
+    return route.fulfill({ json: path.endsWith("leases") ? { data: { leases: [{ lease_id: "lease_live", resource_id: "subject_live", holder_id: "user_admin", status: "active" }] } }
+      : { data: { handoffs: handoffStatus === "pending" ? [{ handoff_id: "handoff_live", subject_id: "subject_live", to_principal: "user_admin", status: handoffStatus }] : [] } } });
   });
   await page.route("**/dashboard-api/audit/**", (route) => {
     calls.push(new URL(route.request().url()).pathname);
@@ -259,8 +269,23 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   for (const path of ["memberships", "keys", "policies", "approvals", "channels", "releases"])
     await page.route(`**/dashboard-api/governance/${path}`, (route) => {
       calls.push(`governance/${path}`);
-      return route.fulfill({ json: { data: { [path]: [{ id: `${path}_live`, status: "active" }] } } });
+      const row = path === "approvals" ? { approval_id: "approval_live", claim_id: "clm_live", status: approvalStatus, version: approvalStatus === "pending" ? 1 : 2 }
+        : path === "releases" ? { release_id: "release_live", status: releaseStatus, version: releaseStatus === "draft" ? 1 : 2 }
+        : { id: `${path}_live`, status: "active" };
+      return route.fulfill({ json: { data: { [path]: [row] } } });
     });
+  await page.route("**/dashboard-api/approvals/approval_live/decide", (route) => {
+    const body = route.request().postDataJSON();
+    approvalStatus = body.decision === "approve" ? "approved" : body.decision;
+    calls.push(`approval:${body.decision}`);
+    return route.fulfill({ json: { data: { approval_id: "approval_live", status: approvalStatus, version: 2 } } });
+  });
+  await page.route("**/dashboard-api/releases/release_live/approve", (route) => {
+    expect(route.request().postDataJSON().expected_version).toBe(1);
+    releaseStatus = "approved";
+    calls.push("release:approve");
+    return route.fulfill({ json: { data: { release_id: "release_live", status: releaseStatus, version: 2 } } });
+  });
   await page.route("**/dashboard-api/governance/users", async (route) => {
     calls.push("add-user");
     const body = route.request().postDataJSON() as Record<string, unknown>;
@@ -277,6 +302,8 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
     calls.push("federation");
     return route.fulfill({ json: { data: { peers: [{ peer_id: "peer_live", status: "active" }] } } });
   });
+  await page.route("**/dashboard-api/access/principals", (route) => route.fulfill({ json: { data: { principals: [] } } }));
+  await page.route("**/dashboard-api/access/grants**", (route) => route.fulfill({ json: { data: { grants: [] } } }));
 
   await page.goto("/dashboard/");
   await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
@@ -291,7 +318,7 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
   await expect(page.locator(".sidebar")).toBeVisible();
   await expect(page.locator(".topbar")).toBeVisible();
-  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(10);
+  await expect(page.locator("[data-area]:not([hidden])")).toHaveCount(14);
   await expect(page.locator("[data-principal]")).toHaveText("user_admin");
 
   await page.locator('[data-area="context"]').click();
@@ -304,6 +331,9 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
   await page.getByRole("button", { name: "Refresh work" }).click();
   await expect(page.getByText("lease_live", { exact: true })).toBeVisible();
   await expect(page.getByText("handoff_live", { exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Accept handoff · subject_live" }).click();
+  await expect.poll(() => calls.includes("handoff:accepted")).toBe(true);
 
   await page.locator('[data-area="audit"]').click();
   await page.getByRole("button", { name: "Refresh activity" }).click();
@@ -312,7 +342,16 @@ test("logs in per principal, wires all six areas, adds a user once, and logs out
 
   await page.locator('[data-area="governance"]').click();
   await page.getByRole("button", { name: "Refresh governance" }).click();
-  await expect(page.getByText("memberships_live", { exact: true })).toBeVisible();
+  await expect(page.getByText("policies_live", { exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept("Independent browser review passed."));
+  await page.getByRole("button", { name: "Approve · clm_live" }).click();
+  await expect.poll(() => calls.includes("approval:approve")).toBe(true);
+  await page.locator('[data-area="releases"]').click();
+  await page.getByRole("button", { name: "Refresh releases" }).click();
+  page.once("dialog", (dialog) => dialog.accept("Release wording reviewed."));
+  await page.getByRole("button", { name: "Approve · release_live" }).click();
+  await expect.poll(() => calls.includes("release:approve")).toBe(true);
+  await page.locator('[data-area="access"]').click();
   await page.locator('[data-user-form] input[name="username"]').fill("new.reader");
   await page.getByRole("button", { name: "Create user" }).click();
   await expect(page.locator("[data-user-status]")).toContainText("Created new.reader with role reader");
@@ -428,6 +467,8 @@ test("remains keyboard and mobile usable with live product navigation", async ({
   await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ json: { data: view } }));
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(page.getByRole("button", { name: "Open navigation" })).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("button", { name: "Atlas live" }).click();
   await page.getByText("Evidence trace", { exact: true }).click();
   await expect(page.getByRole("radio", { name: "Evidence trace" })).toBeChecked();
@@ -436,6 +477,7 @@ test("remains keyboard and mobile usable with live product navigation", async ({
   await page.getByRole("button", { name: "Compile authorized graph" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Production retry budget is 400 ms").first()).toBeVisible();
+  await page.getByRole("button", { name: "Open navigation" }).click();
   await page.locator('[data-area="context"]').focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Compile task-specific context" })).toBeVisible();

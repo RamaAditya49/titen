@@ -1,6 +1,7 @@
 import { first } from "./db";
-import type { Db, Stmt } from "./db";
-import { recordAccessSql } from "./authorization";
+import type { Db, Param, Stmt } from "./db";
+import { principalRecordAccessSql, recordAccessParams, recordAccessSql } from "./authorization";
+import type { Principal } from "./auth";
 import { notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import type { RequestContext, Result } from "./http";
@@ -26,14 +27,17 @@ export async function resolveEventCursor(
 
 /** Visibility for event projections follows the canonical resource, not org alone. */
 export function eventAccessSql(alias = "e", principalSql = "?"): string {
+  const access = (recordAlias: "c" | "o") => principalSql === "?"
+    ? recordAccessSql(recordAlias)
+    : principalRecordAccessSql(recordAlias, principalSql);
   return `(
     (${alias}.resource_type = 'observation' AND EXISTS (
       SELECT 1 FROM observations o WHERE o.id = ${alias}.resource_id
-        AND o.org_id = ${alias}.org_id AND ${recordAccessSql("o", principalSql)}
+        AND o.org_id = ${alias}.org_id AND ${access("o")}
     ))
     OR (${alias}.resource_type = 'claim' AND EXISTS (
       SELECT 1 FROM claims c WHERE c.id = ${alias}.resource_id
-        AND c.org_id = ${alias}.org_id AND ${recordAccessSql("c", principalSql)}
+        AND c.org_id = ${alias}.org_id AND ${access("c")}
     ))
     OR (${alias}.resource_type = 'handoff' AND EXISTS (
       SELECT 1 FROM handoffs h WHERE h.id = ${alias}.resource_id
@@ -47,8 +51,10 @@ export function eventAccessSql(alias = "e", principalSql = "?"): string {
   )`;
 }
 
-export function eventAccessParams(principalId: string): string[] {
-  return [principalId, principalId, principalId, principalId, principalId, principalId, principalId, principalId];
+export function eventAccessParams(principal: string | Principal): Param[] {
+  const principalId = typeof principal === "string" ? principal : principal.principalId;
+  return [...recordAccessParams(principal), ...recordAccessParams(principal),
+    principalId, principalId, principalId, principalId];
 }
 
 export async function canPrincipalReadEvent(db: Db, orgId: string, principalId: string, eventId: string): Promise<boolean> {
@@ -108,14 +114,14 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
       `SELECT eo.seq FROM event_order eo
         JOIN events e ON e.id = eo.event_id
        WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
-      [after, principal.orgId, ...eventAccessParams(principal.principalId)],
+      [after, principal.orgId, ...eventAccessParams(principal)],
     );
     if (!cursor) throw validationError('Query "after" references an unknown event.');
     afterSequence = Number(cursor.seq);
   }
 
   const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
-  const params: (string | number)[] = [principal.orgId, ...eventAccessParams(principal.principalId)];
+  const params: (string | number | null)[] = [principal.orgId, ...eventAccessParams(principal)];
 
   if (afterSequence !== null) {
     conditions.push("eo.seq > ?");
@@ -183,7 +189,7 @@ export async function getEvent(ctx: RequestContext): Promise<Result> {
     `SELECT id, kind, actor_id, resource_type, resource_id, payload, created_at
        FROM events e
       WHERE e.id = ? AND e.org_id = ? AND ${eventAccessSql("e")}`,
-    [eventId, principal.orgId, ...eventAccessParams(principal.principalId)],
+    [eventId, principal.orgId, ...eventAccessParams(principal)],
   );
   if (!row) throw notFound();
 

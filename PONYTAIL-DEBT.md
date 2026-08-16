@@ -13,7 +13,7 @@ is local and requires no hosted automation.
 
 ## Tracked markers
 
-- `src/runtime/bun/server.ts:262` — in-process mode still binds a listening
+- `src/runtime/bun/server.ts:281` — in-process mode still binds a listening
   socket. `serve()` now returns the handler it serves so an embedded consumer
   can call the kernel directly (#230), but the port is opened and then never
   connected to. Removing it means splitting the app, maintenance timer, and

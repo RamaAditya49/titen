@@ -5,7 +5,7 @@ import { conflict, notFound, validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject } from "./projects";
-import { authorizeRecordWorkspace } from "./authorization";
+import { authorizeRecordTarget, authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import type { RequestContext, Result } from "./http";
 import { derivationJobStatement } from "./enrichment";
 import { historyStatement, outboxStatement } from "./writes";
@@ -165,6 +165,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     principal.orgId,
     optionalString(body, "project_id", LIMITS.identifier),
   );
+  await authorizeRecordTarget(ctx.app.db, principal, subjectId, projectId);
   await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
 
   const contentHash = await sha256Hex(content);
@@ -237,6 +238,12 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         status: 201,
         data,
         statements: [
+          {
+            sql: `INSERT OR IGNORE INTO subjects
+                    (id, org_id, type, label, status, created_by, created_at, updated_at)
+                  VALUES (?, ?, 'concept', ?, 'active', ?, ?, ?)`,
+            params: [subjectId, principal.orgId, subjectId, principal.principalId, ingestedAt, ingestedAt],
+          },
           {
             sql: `INSERT INTO observations
                     (id, org_id, subject_id, project_id, workspace_id, agent_id, run_id, actor_id, kind, content,
@@ -322,8 +329,9 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
   const observationId = ctx.params.id!;
   const observation = await first<{ id: string; content_hash: string }>(
     ctx.app.db,
-    `SELECT id, content_hash FROM observations WHERE id = ? AND org_id = ?`,
-    [observationId, principal.orgId],
+    `SELECT o.id, o.content_hash FROM observations o
+      WHERE o.id = ? AND o.org_id = ? AND ${recordAccessSql("o", "?", "write")}`,
+    [observationId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!observation) throw notFound();
   const hold = await first<{ id: string }>(

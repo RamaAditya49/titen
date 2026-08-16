@@ -293,7 +293,7 @@ export async function submitClaimApproval(ctx: RequestContext): Promise<Result> 
       WHERE c.id = ? AND c.org_id = ? AND c.actor_id = ?
         AND ${recordAccessSql("c")}`,
     [claimId, principal.orgId, principal.principalId,
-      ...recordAccessParams(principal.principalId)],
+      ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
   if (claim.version !== claimVersion || claim.status !== "active")
@@ -307,7 +307,7 @@ export async function submitClaimApproval(ctx: RequestContext): Promise<Result> 
       WHERE s.claim_id = ? AND s.relation = 'supports' AND o.org_id = ?
         AND ${recordAccessSql("o")} LIMIT 1`,
     [claim.id, principal.orgId,
-      ...recordAccessParams(principal.principalId)],
+      ...recordAccessParams(principal)],
   );
   if (!source) throw validationError("Approval requires visible supporting evidence.");
   const policy = await approvalPolicy(ctx, claim);
@@ -359,7 +359,7 @@ export async function listClaimApprovals(ctx: RequestContext): Promise<Result> {
         AND (? = 1 OR a.submitted_by = ?)
        ORDER BY a.submitted_at, a.id LIMIT 200`,
     [ctx.principal!.orgId, status, status,
-      ...recordAccessParams(ctx.principal!.principalId),
+      ...recordAccessParams(ctx.principal!),
       role === "root" || role === "owner" || role === "admin" ? 1 : 0,
       ctx.principal!.principalId],
   );
@@ -390,8 +390,8 @@ export async function decideClaimApproval(ctx: RequestContext): Promise<Result> 
        FROM claim_approvals a
        JOIN policies p ON p.id = a.policy_id AND p.org_id = a.org_id
        JOIN claims c ON c.id = a.claim_id AND c.org_id = a.org_id
-      WHERE a.id = ? AND a.org_id = ? AND ${recordAccessSql("c")}`,
-    [approvalId, principal.orgId, ...recordAccessParams(principal.principalId)],
+      WHERE a.id = ? AND a.org_id = ? AND ${recordAccessSql("c", "?", "approve")}`,
+    [approvalId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!row) throw notFound();
   if (row.version !== expected) throw conflict("Approval version is stale.");
@@ -619,7 +619,7 @@ export async function createKnowledgeRelease(ctx: RequestContext): Promise<Resul
       WHERE c.id = ? AND c.org_id = ? AND c.actor_id = ?
         AND ${recordAccessSql("c")}`,
     [claimId, principal.orgId, principal.principalId,
-      ...recordAccessParams(principal.principalId)],
+      ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
   if (claim.status !== "active" || claim.version !== claimVersion)
@@ -702,7 +702,7 @@ async function releaseWithSource(ctx: RequestContext, id: string) {
        JOIN channels ch ON ch.id = r.channel_id AND ch.org_id = r.org_id
       WHERE r.id = ? AND r.org_id = ? AND ${recordAccessSql("c")}`,
     [id, ctx.principal!.orgId,
-      ...recordAccessParams(ctx.principal!.principalId)],
+      ...recordAccessParams(ctx.principal!)],
   );
 }
 

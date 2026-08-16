@@ -18,7 +18,8 @@ Its position inside the progressive operator interface is defined in
 | Conflict & Freshness       | v0.2    | Which claims are disputed, stale, superseded, expired, or recently changed?    |
 | Scope Preview              | v0.3    | What would an explicitly selected principal be eligible to inspect?            |
 | Knowledge Release          | v0.3    | Which reviewed snapshot reaches which channel/audience, and from what source?  |
-| Constellation/Time Machine | later   | Does large-scale exploration or temporal playback improve measured operations? |
+| Workspace Graph            | v0.8.6  | How do authorized claims cluster around subjects in this workspace?            |
+| Time Machine               | later   | Does temporal playback improve measured operations?                            |
 
 Evidence Trace is the priority. A visually impressive constellation without
 provenance, temporal state, or authorization is not sufficient.
@@ -83,8 +84,11 @@ authorized claims through `GET /v1/memories` with lexical search and keyset
 pagination, and it does not compile a view. Selecting a memory may open its
 Evidence Trace in Atlas. Evidence Trace centers the focus claim, labels each
 relationship path, and decorates it only with authorized complete context packs
-and current eligible releases. Context, Work, Audit, Governance, and Federation use
-their existing bounded REST contracts through the same fixed-route adapter.
+and current eligible releases. Workspace Graph renders deterministic client-side
+claim/subject coordinates from bounded canonical `about`, `related`,
+`contradicts`, and `supersedes` edges; it stores no graph layout. The other
+fourteen dashboard destinations use their bounded REST contracts through the
+same fixed-route adapter.
 Displayed records and runtime state come only from live same-origin health,
 readiness, and authorized API responses; disconnected or failed integration
 shows no fixture data.

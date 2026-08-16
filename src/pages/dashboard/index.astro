@@ -5,6 +5,7 @@ import "@fontsource-variable/jetbrains-mono";
 import "../../styles/dashboard.css";
 import titenMark from "../../../docs/assets/brand/titen-mark.svg?url";
 import packageJson from "../../../package.json";
+import { ROUTE_INVENTORY } from "../../core/app";
 
 const productAreas = [
   { id: "memories", label: "Memories", scopes: "views:compile" },
@@ -15,11 +16,12 @@ const productAreas = [
   { id: "federation", label: "Federation", scopes: "federation:read" },
 ];
 const lenses = [
-  { id: "neighborhood", label: "Neighborhood", needs: "subject", scope: "" },
   { id: "evidence_trace", label: "Evidence trace", needs: "focus", scope: "" },
+  { id: "neighborhood", label: "Neighborhood", needs: "subject", scope: "" },
   { id: "conflict_freshness", label: "Conflict & freshness", needs: "subject", scope: "" },
-  { id: "review_queue", label: "Review queue", needs: "optional", scope: "" },
   { id: "scope_preview", label: "Scope preview", needs: "focus", scope: "governance:read" },
+  { id: "workspace_graph", label: "Graph", needs: "workspace", scope: "" },
+  { id: "review_queue", label: "Review queue", needs: "optional", scope: "" },
   { id: "knowledge_release", label: "Knowledge releases", needs: "optional", scope: "releases:read" },
 ];
 ---
@@ -48,6 +50,10 @@ const lenses = [
         <symbol id="icon-governance" viewBox="0 0 100 100"><path d="M50 12l30 12v28c0 18-14 30-30 36-16-6-30-18-30-36V24z" fill="none" stroke="currentColor" stroke-width="6.4"/><path d="M36 50l11 11 19-21" fill="none" stroke="var(--accent)" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
         <symbol id="icon-release" viewBox="0 0 100 100"><rect x="16" y="26" width="46" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="6"/><path d="M62 38h26M78 28l10 10-10 10" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
         <symbol id="icon-federation" viewBox="0 0 100 100"><ellipse cx="50" cy="25" rx="15" ry="25" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="50" cy="75" rx="15" ry="25" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="25" cy="50" rx="25" ry="15" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="75" cy="50" rx="25" ry="15" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="50" cy="50" r="8" fill="var(--accent)"/></symbol>
+        <symbol id="icon-api" viewBox="0 0 100 100"><circle cx="34" cy="50" r="16" fill="none" stroke="currentColor" stroke-width="6"/><path d="M50 50h38M72 50v14M84 50v10" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="34" cy="50" r="5" fill="var(--accent)"/></symbol>
+        <symbol id="icon-model" viewBox="0 0 100 100"><rect x="26" y="26" width="48" height="48" fill="none" stroke="currentColor" stroke-width="6"/><path d="M38 14v12M62 14v12M38 74v12M62 74v12M14 38h12M14 62h12M74 38h12M74 62h12" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="50" r="9" fill="var(--accent)"/></symbol>
+        <symbol id="icon-subject" viewBox="0 0 100 100"><circle cx="50" cy="34" r="15" fill="none" stroke="currentColor" stroke-width="6"/><path d="M22 84c0-20 12-28 28-28s28 8 28 28" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="78" cy="26" r="7" fill="var(--accent)"/></symbol>
+        <symbol id="icon-project" viewBox="0 0 100 100"><path d="M14 30h26l8 12h38v36H14z" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/><path d="M24 58h50" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/></symbol>
         <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
         <symbol id="icon-disconnect" viewBox="0 0 24 24"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M13 12h8M17 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       </defs>
@@ -61,6 +67,11 @@ const lenses = [
           <span>v{packageJson.version}</span>
         </header>
 
+        <label class="workspace-picker" data-workspace-control hidden>
+          <span>Workspace</span>
+          <select data-workspace-picker aria-label="Active workspace"><option value="">Unscoped memory</option></select>
+        </label>
+
         <nav data-product-nav hidden>
           <p class="nav-group-label">Memory</p>
           <button type="button" data-area="atlas" data-label="Memory Atlas" data-scopes={productAreas[0].scopes}>
@@ -73,6 +84,9 @@ const lenses = [
           <button type="button" data-area="context" data-label="Context" data-scopes={productAreas[1].scopes} hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-context"></use></svg>Context</span>
             <small>live</small>
+          </button>
+          <button type="button" data-area="subjects" data-label="Subjects" data-scopes="subjects:read" hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-subject"></use></svg>Subjects</span><small>directory</small>
           </button>
 
           <p class="nav-group-label">Collaboration</p>
@@ -89,18 +103,27 @@ const lenses = [
           <button type="button" data-area="system" data-label="System status" data-scopes="">
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-system"></use></svg>System</span><small>status</small>
           </button>
+          <button type="button" data-area="models" data-label="Models" data-scopes="models:read" hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-model"></use></svg>Models</span><small>env</small>
+          </button>
           <button type="button" data-area="federation" data-label="Federation" data-scopes={productAreas[5].scopes} hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-federation"></use></svg>Federation</span>
             <small>live</small>
           </button>
 
           <p class="nav-group-label">Administration</p>
-          <button type="button" data-area="access" data-label="Access policy" data-scopes="identity:read">
+          <button type="button" data-area="access" data-label="Scoped access control" data-scopes="grants:read principals:read keys:manage" hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-access"></use></svg>Access</span><small>policy</small>
+          </button>
+          <button type="button" data-area="api" data-label="API & Keys" data-scopes="keys:manage" hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-api"></use></svg>API &amp; Keys</span><small>{ROUTE_INVENTORY.length}</small>
+          </button>
+          <button type="button" data-area="projects" data-label="Projects" data-scopes="projects:read" hidden>
+            <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-project"></use></svg>Projects</span><small>scope</small>
           </button>
 
           <p class="nav-group-label">Governance</p>
-          <button type="button" data-area="governance" data-label="Governance" data-scopes={productAreas[4].scopes} hidden>
+          <button type="button" data-area="governance" data-label="Approvals" data-scopes="governance:read approvals:read" hidden>
             <span class="nav-item-label"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#icon-governance"></use></svg>Approvals</span>
             <small>live</small>
           </button>
@@ -123,9 +146,10 @@ const lenses = [
 
       <main id="workspace" class="main-shell" tabindex="-1">
         <header class="topbar">
+          <button type="button" class="menu-button" data-menu-toggle aria-controls="product-navigation" aria-expanded="false" aria-label="Open navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></button>
           <div class="topbar-title">
             <div class="breadcrumb"><span data-breadcrumb-area>Authorized operator surface</span><span>/</span><span data-breadcrumb-page>Dashboard</span></div>
-            <div class="topbar-heading"><h1 data-page-title>Titen dashboard</h1><span class="read-only-badge">read-only</span><span class="javanese" title="titen">ꦠꦶꦠꦺꦤ꧀</span></div>
+            <div class="topbar-heading"><h1 data-page-title>Titen dashboard</h1><span class="read-only-badge">authorized</span><span class="javanese" title="titen">ꦠꦶꦠꦺꦤ꧀</span></div>
           </div>
           <div class="topbar-actions">
             <button type="button" class="search-button" data-search-open aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search or jump to…</span><kbd>⌘K</kbd></button>
@@ -211,16 +235,108 @@ const lenses = [
             <article><span>Readiness</span><strong data-system-readiness>Checking</strong><small data-system-revision>revision pending</small></article>
             <article><span>Connection</span><strong data-system-connection>Checking</strong><small data-system-endpoint>same-origin adapter</small></article>
           </div>
+          <div class="live-output compact-output" data-system-checks><p>Readiness checks load with service status.</p></div>
           <p class="panel-note">Readiness separates canonical traffic availability from semantic freshness. Normal projection lag stays ready and is reported as semantic syncing; a 503 still means a required capability needs repair.</p>
         </section>
 
         <section class="area-panel query-panel policy-panel" data-area-panel="access" hidden aria-labelledby="access-heading">
           <div class="section-heading">
-            <div><p class="eyebrow">Administration / effective authority</p><h2 id="access-heading">Access policy</h2></div>
-            <span>resolved from the authenticated principal</span>
+            <div><p class="eyebrow">Administration / two gates</p><h2 id="access-heading">Scoped access control</h2></div>
+            <button class="secondary-button" type="button" data-access-refresh>Refresh directory</button>
           </div>
           <dl class="policy-details" data-access-details></dl>
-          <p class="panel-note">Scopes are evaluated by the same-origin adapter before every live request. No browser-held API key is used.</p>
+          <section class="user-admin" data-user-admin hidden aria-labelledby="add-user-heading">
+            <div><h3 id="add-user-heading">Add a human user</h3><p>Creates one account and organization membership atomically. Titen generates a one-time temporary password; API keys remain for agents and services.</p></div>
+            <form data-user-form>
+              <label><span>Username</span><input name="username" maxlength="64" pattern="[a-z0-9][a-z0-9._-]{2,63}" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="new.operator" /></label>
+              <label><span>Role</span><select name="role" required><option>reader</option><option>member</option><option>admin</option><option data-owner-role>owner</option></select></label>
+              <label><span>Access profile</span><select name="profile" required><option value="reader">Read dashboard</option><option value="operator">Memory operator</option><option value="admin">Administrator</option></select></label>
+              <label><span>Trust ceiling</span><select name="max_trust" required><option>asserted</option><option>verified</option><option>policy_approved</option><option>unverified</option></select></label>
+              <button class="primary-button" type="submit">Create user</button>
+              <span data-user-status role="status"></span>
+              <section class="one-time-credential" data-user-credential hidden aria-label="Temporary password">
+                <div><strong>Temporary password</strong><span>Shown once · first login must replace it</span></div>
+                <code data-user-temporary-password></code>
+                <button class="secondary-button" type="button" data-copy-temporary-password>Copy password</button>
+              </section>
+            </form>
+          </section>
+          <div class="dashboard-split">
+            <section>
+              <h3>Principals and active grants</h3>
+              <label class="stack-field"><span>Principal</span><select data-access-principal><option value="">Select a principal</option></select></label>
+              <div class="live-output" data-access-output><p>Refresh to inspect the principal directory and active grants.</p></div>
+            </section>
+            <section data-grant-admin hidden>
+              <h3>Add an additive grant</h3>
+              <form class="stack-form" data-grant-form>
+                <label><span>Principal ID</span><input name="principal_id" maxlength="200" required /></label>
+                <label><span>Target</span><select name="target_type"><option>project</option><option>subject</option><option>organization</option></select></label>
+                <label><span>Target ID</span><input name="target_id" maxlength="200" placeholder="Project/subject ID; ~ for unscoped" /></label>
+                <fieldset class="permission-picker"><legend>Permissions</legend><label><input type="checkbox" name="permissions" value="read" checked />read</label><label><input type="checkbox" name="permissions" value="write" />write</label><label><input type="checkbox" name="permissions" value="approve" />approve</label><label><input type="checkbox" name="permissions" value="admin" />admin</label></fieldset>
+                <button class="primary-button" type="submit">Create grant</button><span data-grant-status role="status"></span>
+              </form>
+            </section>
+          </div>
+          <form class="inline-form" data-access-simulator>
+            <label><span>Principal ID</span><input name="principal_id" maxlength="200" required /></label>
+            <label><span>Resource</span><select name="resource_type"><option>claim</option><option>observation</option></select></label>
+            <label><span>Resource ID</span><input name="resource_id" maxlength="200" required /></label>
+            <label><span>Operation</span><select name="operation"><option>read</option><option>write</option><option>approve</option></select></label>
+            <button class="secondary-button" type="submit">Simulate gates</button>
+          </form>
+          <div class="live-output compact-output" data-access-simulation><p>Visibility and grant gates must both pass.</p></div>
+          <p class="panel-note">Denied memory is absent from results, counts, cursors, rank, disputes, and citations. Owner override remains explicit and audited.</p>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="subjects" hidden aria-labelledby="subjects-heading">
+          <div class="section-heading"><div><p class="eyebrow">Memory / identity directory</p><h2 id="subjects-heading">Subjects</h2></div><button class="secondary-button" type="button" data-subjects-refresh>Refresh subjects</button></div>
+          <form class="inline-form" data-subjects-form>
+            <label><span>Search subjects and aliases</span><input name="q" maxlength="120" /></label>
+            <label><span>Type</span><select name="type"><option value="">All eight types</option>{["human", "agent", "service", "organization", "repository", "artifact", "system", "concept"].map((type) => <option>{type}</option>)}</select></label>
+            <button class="secondary-button" type="submit">Filter</button>
+          </form>
+          <div class="live-output" data-subjects-output><p>Subjects appear only when this principal can read at least one canonical reference.</p></div>
+          <div class="live-output compact-output" data-subject-references><p>Select a subject to inspect its canonical references.</p></div>
+          <p class="panel-note">A subject names what memory is about across projects. Similarity may propose an alias; it never merges identities.</p>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="models" hidden aria-labelledby="models-heading">
+          <div class="section-heading"><div><p class="eyebrow">Operations / immutable startup snapshot</p><h2 id="models-heading">Extraction and embedding models</h2></div><button class="secondary-button" type="button" data-models-refresh>Refresh configuration</button></div>
+          <div class="model-grid">
+            <section><h3>Extraction model</h3><div class="live-output" data-extraction-model><p>Load the effective non-secret tuple.</p></div><button class="secondary-button" type="button" data-model-probe="extraction">Probe extraction</button></section>
+            <section><h3>Embedding model</h3><div class="live-output" data-embedding-model><p>Load the configured and stored fingerprints.</p></div><button class="secondary-button" type="button" data-model-probe="embedding">Probe embedding</button></section>
+          </div>
+          <span data-model-status role="status"></span>
+          <details class="metadata-panel"><summary>Generated restart configuration</summary><pre data-model-env>No configuration loaded.</pre></details>
+          <section class="authority-boundary"><h3>What models may do</h3><p><strong>may</strong> classify observations, propose add-only claims, reflect over authorized premises, and retrieve candidates.</p><p><strong>never</strong> delete, supersede, raise trust, resolve disputes, approve, publish, grant access, or operate leases, handoffs, and checkpoints.</p></section>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="api" hidden aria-labelledby="api-heading">
+          <div class="section-heading"><div><p class="eyebrow">Administration / fixed contract</p><h2 id="api-heading">API &amp; Keys</h2></div><button class="secondary-button" type="button" data-keys-refresh>Refresh keys</button></div>
+          <form class="inline-form" data-route-filter><label><span>Search path, scope, area</span><input name="q" /></label><label><span>Method</span><select name="method"><option value="">All methods</option><option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option></select></label></form>
+          <div class="route-table-wrap"><table class="memory-table"><thead><tr><th>Method</th><th>Path</th><th>Scope</th></tr></thead><tbody data-route-rows>{ROUTE_INVENTORY.map((route) => <tr data-method={route.method} data-search={`${route.method} ${route.path} ${route.scope ?? "authenticated"}`.toLowerCase()}><td><code>{route.method}</code></td><th scope="row"><code>{route.path}</code></th><td>{route.scope ?? "authenticated"}</td></tr>)}</tbody></table></div>
+          <p class="memory-list-status"><span data-route-count>{ROUTE_INVENTORY.length}</span> fixed routes in this build.</p>
+          <div class="dashboard-split">
+            <section><h3>Active keys</h3><div class="live-output" data-keys-output><p>Refresh to load masked key metadata.</p></div></section>
+            <section data-key-admin hidden><h3>Generate a key</h3><form class="stack-form" data-key-form>
+              <label><span>Label</span><input name="label" maxlength="120" required /></label>
+              <label><span>Principal kind</span><select name="principal_kind"><option>agent</option><option>service</option><option>human</option></select></label>
+              <label><span>Scopes, comma separated</span><textarea name="scopes" rows="4" required>views:compile</textarea></label>
+              <label><span>Trust ceiling</span><select name="max_trust"><option>asserted</option><option>verified</option><option>unverified</option></select></label>
+              <label><span>Data target</span><select name="data_target_type"><option>project</option><option>subject</option><option>organization</option></select></label>
+              <label><span>Target ID</span><input name="data_target_id" maxlength="200" placeholder="~ means unscoped project" /></label>
+              <button class="primary-button" type="submit">Generate key</button><span data-key-status role="status"></span>
+            </form><section class="one-time-credential" data-key-credential hidden><div><strong>API key</strong><span>Shown once</span></div><code data-key-secret></code></section></section>
+          </div>
+        </section>
+
+        <section class="area-panel query-panel" data-area-panel="projects" hidden aria-labelledby="projects-heading">
+          <div class="section-heading"><div><p class="eyebrow">Administration / memory scope</p><h2 id="projects-heading">Projects</h2></div><button class="secondary-button" type="button" data-projects-refresh>Refresh projects</button></div>
+          <form class="inline-form" data-projects-form><label><span>Search normalized references</span><input name="q" maxlength="120" /></label><button class="secondary-button" type="submit">Filter</button></form>
+          <div class="live-output" data-projects-output><p>Projects are listed without creating or resolving a new identity.</p></div>
+          <div class="live-output compact-output" data-project-references><p>Select a project to inspect its normalized references.</p></div>
+          <p class="panel-note"><code>(unscoped)</code> is explicit memory with <code>project_id IS NULL</code>, never an inferred catch-all.</p>
         </section>
 
         <section class="area-panel query-panel policy-panel" data-area-panel="profile" hidden aria-labelledby="profile-heading">
@@ -258,6 +374,7 @@ const lenses = [
               <label><span>Status</span><select data-memory-list-status name="status"><option value="">Active + disputed</option><option value="active">Active</option><option value="disputed">Disputed</option><option value="superseded">Superseded</option><option value="expired">Expired</option><option value="revoked">Revoked</option></select></label>
               <button class="primary-button" type="submit">Search</button>
             </form>
+            <div class="filter-chips" data-memory-facets aria-label="Authorized memory counts"></div>
             <div class="memory-list-status" data-memory-list-status-text role="status" aria-live="polite">Loading authorized memories…</div>
             <div class="loading-state" data-memory-list-loading aria-label="Loading memories"><span></span><span></span><span></span></div>
             <div class="empty-state" data-memory-list-empty hidden><strong>No authorized memories yet.</strong><p>Try another search or clear the filter. Records outside your authority are not counted.</p></div>
@@ -338,6 +455,17 @@ const lenses = [
                 <svg data-atlas-edges viewBox="0 0 900 500" role="img" aria-label="Authorized memory relationships"></svg>
                 <div class="atlas-graph-nodes" data-atlas-nodes></div>
               </div>
+              <div class="notice graph-truncation" data-graph-truncation hidden></div>
+              <div class="graph-selection" data-graph-selection hidden>
+                <span class="graph-dot" data-graph-selection-dot></span>
+                <strong data-graph-selection-label></strong>
+                <small data-graph-selection-meta></small>
+                <small data-graph-selection-degree></small>
+                <button class="primary-button" type="button" data-graph-open-evidence hidden>Open in Evidence Trace</button>
+              </div>
+              <div class="graph-legend" data-graph-legend hidden>
+                <span data-kind="decision">decision</span><span data-kind="policy">policy</span><span data-kind="procedural">procedural</span><span data-kind="preference">preference</span><span data-kind="subject">subject hub</span><span data-edge="contradicts">contradicts</span><span data-edge="supersedes">supersedes</span><small data-graph-total></small>
+              </div>
               <div class="loading-state" data-memory-loading hidden aria-label="Loading memory records"><span></span><span></span><span></span></div>
               <div class="empty-state" data-memory-empty>
                 <strong>No live query yet.</strong>
@@ -414,25 +542,9 @@ const lenses = [
 
         <section class="area-panel query-panel" data-area-panel="governance" hidden aria-labelledby="governance-heading">
           <div class="section-heading">
-            <div><p class="eyebrow">Governance / access and releases</p><h2 id="governance-heading">Policies, approvals, releases, and users</h2></div>
+            <div><p class="eyebrow">Governance / human decisions</p><h2 id="governance-heading">Policies and approvals</h2></div>
             <button class="secondary-button" type="button" data-governance-refresh>Refresh governance</button>
           </div>
-          <section class="user-admin" data-user-admin hidden aria-labelledby="add-user-heading">
-            <div><h3 id="add-user-heading">Add a human user</h3><p>Creates one account and organization membership atomically. Titen generates a one-time temporary password; API keys remain for agents and services.</p></div>
-            <form data-user-form>
-              <label><span>Username</span><input name="username" maxlength="64" pattern="[a-z0-9][a-z0-9._-]{2,63}" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="new.operator" /></label>
-              <label><span>Role</span><select name="role" required><option>reader</option><option>member</option><option>admin</option><option data-owner-role>owner</option></select></label>
-              <label><span>Access profile</span><select name="profile" required><option value="reader">Read dashboard</option><option value="operator">Memory operator</option><option value="admin">Administrator</option></select></label>
-              <label><span>Trust ceiling</span><select name="max_trust" required><option>asserted</option><option>verified</option><option>policy_approved</option><option>unverified</option></select></label>
-              <button class="primary-button" type="submit">Create user</button>
-              <span data-user-status role="status"></span>
-              <section class="one-time-credential" data-user-credential hidden aria-label="Temporary password">
-                <div><strong>Temporary password</strong><span>Shown once · first login must replace it</span></div>
-                <code data-user-temporary-password></code>
-                <button class="secondary-button" type="button" data-copy-temporary-password>Copy password</button>
-              </section>
-            </form>
-          </section>
           <div class="live-output" data-governance-output><p>Refresh to load the governance contracts available to this principal.</p></div>
         </section>
 
@@ -466,6 +578,7 @@ const lenses = [
         changePassword,
         checkService,
         compileView,
+        deleteArea,
         getArea,
         getDashboardStatus,
         getSession,
@@ -505,12 +618,16 @@ const lenses = [
       const compileTrace = one<HTMLElement>("[data-compile-trace]");
       const searchDialog = one<HTMLDialogElement>("[data-search-dialog]");
       const searchForm = one<HTMLFormElement>("[data-search-form]");
+      const workspacePicker = one<HTMLSelectElement>("[data-workspace-picker]");
       let view: AtlasView | null = null;
       let principal: DashboardPrincipal | null = null;
       let dashboardStatus: DashboardStatus | null = null;
       let generation = 0;
       let memoryListCursor: string | null = null;
+      let memoryListAfter: string | null = null;
       let memoryListHistory: string[] = [];
+      let memoryKind = "";
+      let graphSelected: AtlasNode | null = null;
 
       const text = (selector: string, value: string) => { one<HTMLElement>(selector).textContent = value; };
       const has = (scope: string) => Boolean(principal?.scopes.includes("*") || principal?.scopes.includes(scope));
@@ -580,7 +697,7 @@ const lenses = [
         target.append(paragraph);
       }
       function rowLabel(row: Record<string, unknown>, index: number): string {
-        for (const key of ["label", "statement", "name", "action", "kind", "principal_id", "peer_id", "lease_id", "handoff_id", "event_id", "membership_id", "policy_id", "release_id", "key_id", "id", "status"])
+        for (const key of ["label", "statement", "claim", "name", "action", "kind", "principal_id", "peer_id", "lease_id", "handoff_id", "event_id", "membership_id", "policy_id", "release_id", "key_id", "id", "status"])
           if (typeof row[key] === "string" && row[key]) return String(row[key]);
         return `Record ${index + 1}`;
       }
@@ -627,17 +744,282 @@ const lenses = [
           target.append(details);
         }
       }
-      async function loadAvailable(target: HTMLElement, requests: Array<[string, string]>) {
+      function appendAction(target: HTMLElement, label: string, run: () => Promise<void>) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "text-button";
+        button.textContent = label;
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try { await run(); } catch (error) { handleError(error, target); }
+          finally { button.disabled = false; }
+        });
+        target.append(button);
+      }
+      function renderContext(target: HTMLElement, payload: Record<string, unknown>) {
+        const data = payloadData(payload);
+        const budget = data.budget && typeof data.budget === "object" && !Array.isArray(data.budget)
+          ? data.budget as Record<string, unknown> : {};
+        const used = Number(budget.used_tokens ?? 0);
+        const maximum = Math.max(1, Number(budget.max_tokens ?? used));
+        target.replaceChildren();
+        const meter = document.createElement("section");
+        meter.className = "context-budget";
+        const title = document.createElement("h3");
+        title.textContent = `Token budget · ${used.toLocaleString()} / ${maximum.toLocaleString()}`;
+        const progress = document.createElement("progress");
+        progress.max = maximum;
+        progress.value = Math.min(used, maximum);
+        progress.setAttribute("aria-label", "Context token budget used");
+        const summary = document.createElement("p");
+        summary.textContent = `${budget.selected_items ?? 0} selected · ${budget.omitted_items ?? 0} omitted · ${budget.deduplicated_items ?? 0} deduplicated`;
+        meter.append(title, progress, summary);
+        target.append(meter);
+        const records = document.createElement("div");
+        target.append(records);
+        renderPayload(records, { data: { items: data.items ?? [], conflicts: data.conflicts ?? [], instructions: data.instructions, policy_snapshot: data.policy_snapshot } });
+      }
+      async function loadAvailable(target: HTMLElement, requests: Array<[string, string]>): Promise<Record<string, unknown>> {
         renderMessage(target, "Loading authorized live data…");
         const selected = requests.filter(([, scope]) => has(scope));
-        if (!selected.length) return renderMessage(target, "This principal has no read capability for this area.");
+        if (!selected.length) {
+          renderMessage(target, "This principal has no read capability for this area.");
+          return {};
+        }
         const results = await Promise.all(selected.map(async ([path]) => [path.split("/").at(-1)!, await getArea(path)] as const));
         const merged: Record<string, unknown> = {};
         for (const [name, payload] of results) Object.assign(merged, payloadData(payload));
         renderPayload(target, { data: merged });
+        return merged;
+      }
+
+      function formQuery(form: HTMLFormElement): URLSearchParams {
+        const query = new URLSearchParams();
+        for (const [key, value] of new FormData(form))
+          if (String(value).trim()) query.set(key, String(value).trim());
+        return query;
+      }
+      async function loadWorkspaces() {
+        if (!has("workspaces:read")) return;
+        try {
+          const data = payloadData(await getArea("workspaces"));
+          const current = workspacePicker.value;
+          workspacePicker.replaceChildren(new Option("Unscoped memory", ""));
+          for (const workspace of Array.isArray(data.workspaces) ? data.workspaces : []) {
+            if (!workspace || typeof workspace !== "object") continue;
+            const row = workspace as Record<string, unknown>;
+            if (typeof row.workspace_id === "string" && typeof row.name === "string")
+              workspacePicker.add(new Option(row.name, row.workspace_id));
+          }
+          workspacePicker.value = [...workspacePicker.options].some((option) => option.value === current) ? current : "";
+          one<HTMLElement>("[data-workspace-control]").hidden = false;
+        } catch (error) { handleError(error); }
+      }
+      async function loadSubjects() {
+        const target = one<HTMLElement>("[data-subjects-output]");
+        renderMessage(target, "Loading authorized subjects…");
+        try {
+          const payload = await getArea("subjects", formQuery(one<HTMLFormElement>("[data-subjects-form]")));
+          renderPayload(target, payload);
+          const subjects = payloadData(payload).subjects;
+          if (Array.isArray(subjects)) for (const value of subjects) {
+            const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+            if (typeof row.subject_id !== "string") continue;
+            appendAction(target, `References · ${row.label ?? row.subject_id}`, async () => {
+              const references = one<HTMLElement>("[data-subject-references]");
+              renderMessage(references, "Loading authorized references…");
+              renderPayload(references, await getArea(`subjects/${encodeURIComponent(row.subject_id as string)}/references`));
+            });
+          }
+        }
+        catch (error) { handleError(error, target); }
+      }
+      async function loadProjects() {
+        const target = one<HTMLElement>("[data-projects-output]");
+        renderMessage(target, "Loading authorized projects…");
+        try {
+          const payload = await getArea("projects", formQuery(one<HTMLFormElement>("[data-projects-form]")));
+          renderPayload(target, payload);
+          const projects = payloadData(payload).projects;
+          if (Array.isArray(projects)) for (const value of projects) {
+            const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+            const id = typeof row.project_id === "string" ? row.project_id : "~";
+            appendAction(target, `References · ${row.reference ?? "(unscoped)"}`, async () => {
+              const references = one<HTMLElement>("[data-project-references]");
+              renderMessage(references, "Loading authorized references…");
+              renderPayload(references, await getArea(`projects/${encodeURIComponent(id)}/references`));
+            });
+          }
+        }
+        catch (error) { handleError(error, target); }
+      }
+      async function loadWork() {
+        const target = one<HTMLElement>("[data-work-output]");
+        renderMessage(target, "Loading authorized work state…");
+        const requests = [["work/leases?limit=50", "leases:read"], ["work/handoffs", "handoffs:read"]] as Array<[string, string]>;
+        const selected = requests.filter(([, scope]) => has(scope));
+        if (!selected.length) return renderMessage(target, "This principal has no read capability for work state.");
+        const responses = await Promise.all(selected.map(async ([path]) => payloadData(await getArea(path))));
+        const data = Object.assign({}, ...responses);
+        renderPayload(target, { data });
+        if (has("leases:write") && Array.isArray(data.leases)) for (const value of data.leases) {
+          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+          if (typeof row.lease_id !== "string" || row.status !== "active") continue;
+          const own = row.holder_id === principal?.principal_id;
+          const privileged = ["root", "owner", "admin"].includes(principal?.organization_role ?? "");
+          if (!own && !privileged) continue;
+          appendAction(target, `${own ? "Release" : "Force-release"} · ${row.resource_id ?? row.lease_id}`, async () => {
+            if (!confirm(`${own ? "Release" : "Force-release"} this lease now?`)) return;
+            if (own) await deleteArea(`work/leases/${encodeURIComponent(row.lease_id as string)}`);
+            else await postArea(`work/leases/${encodeURIComponent(row.lease_id as string)}/force-release`, {});
+            await loadWork();
+          });
+        }
+        if (has("handoffs:write") && Array.isArray(data.handoffs)) for (const value of data.handoffs) {
+          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+          if (typeof row.handoff_id !== "string" || row.status !== "pending" || row.to_principal !== principal?.principal_id) continue;
+          for (const status of ["accepted", "rejected"] as const) appendAction(target, `${status === "accepted" ? "Accept" : "Reject"} handoff · ${row.subject_id}`, async () => {
+            if (!confirm(`${status === "accepted" ? "Accept" : "Reject"} this handoff?`)) return;
+            await postArea(`work/handoffs/${encodeURIComponent(row.handoff_id as string)}/resolve`, { status });
+            await loadWork();
+          });
+        }
+      }
+      async function loadGovernance() {
+        const target = one<HTMLElement>("[data-governance-output]");
+        const data = await loadAvailable(target, [["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"]]);
+        if (!has("approvals:approve")) return;
+        const approvals = data.approvals;
+        if (!Array.isArray(approvals)) return;
+        for (const value of approvals) {
+          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+          if (typeof row.approval_id !== "string" || !["pending", "approved"].includes(String(row.status))) continue;
+          const decisions = row.status === "pending" ? ["approve", "reject"] : ["revoke"];
+          for (const decision of decisions) appendAction(target, `${decision[0]!.toUpperCase()}${decision.slice(1)} · ${row.claim_id}`, async () => {
+            const reason = prompt(`Reason to ${decision} this approval:`)?.trim();
+            if (!reason) return;
+            await postArea(`approvals/${encodeURIComponent(row.approval_id as string)}/decide`, { decision, reason, expected_version: Number(row.version) });
+            await loadGovernance();
+          });
+        }
+      }
+      async function loadReleases() {
+        const target = one<HTMLElement>("[data-releases-output]");
+        const payload = await getArea("governance/releases");
+        renderPayload(target, payload);
+        if (!has("releases:approve")) return;
+        const releases = payloadData(payload).releases;
+        if (!Array.isArray(releases)) return;
+        for (const value of releases) {
+          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+          if (typeof row.release_id !== "string") continue;
+          const status = String(row.status);
+          const actions = status === "draft" || status === "suspended" ? ["approve"]
+            : status === "approved" ? ["activate", "revoke"] : status === "active" ? ["revoke"] : [];
+          for (const action of actions) appendAction(target, `${action[0]!.toUpperCase()}${action.slice(1)} · ${row.release_id}`, async () => {
+            const reason = action === "activate" ? undefined : prompt(`Reason to ${action} this release:`)?.trim();
+            if (action !== "activate" && !reason) return;
+            await postArea(`releases/${encodeURIComponent(row.release_id as string)}/${action}`, { expected_version: Number(row.version), ...(reason ? { reason } : {}) });
+            await loadReleases();
+          });
+        }
+      }
+      async function loadModels() {
+        text("[data-model-status]", "Loading immutable startup snapshot…");
+        try {
+          const payload = await getArea("models/config");
+          const data = payloadData(payload);
+          renderPayload(one("[data-extraction-model]"), { data: data.extraction as Record<string, unknown> });
+          renderPayload(one("[data-embedding-model]"), { data: data.embedding as Record<string, unknown> });
+          const extraction = data.extraction as Record<string, unknown> | undefined;
+          const embedding = data.embedding as Record<string, unknown> | undefined;
+          const lines = [
+            extraction?.base_url ? `TITEN_EXTRACT_BASE_URL=${extraction.base_url}` : "",
+            extraction?.model ? `TITEN_EXTRACT_MODEL=${extraction.model}` : "",
+            extraction?.model_fingerprint ? `TITEN_EXTRACT_MODEL_FINGERPRINT=${extraction.model_fingerprint}` : "",
+            extraction?.response_mode ? `TITEN_EXTRACT_RESPONSE_MODE=${extraction.response_mode}` : "",
+            extraction?.api_key === "set" ? "TITEN_EXTRACT_API_KEY=<set as secret>" : "",
+            embedding?.base_url ? `TITEN_EMBED_BASE_URL=${embedding.base_url}` : "",
+            embedding?.model ? `TITEN_EMBED_MODEL=${embedding.model}` : "",
+            embedding?.dimensions ? `TITEN_EMBED_DIMS=${embedding.dimensions}` : "",
+            embedding?.revision ? `TITEN_EMBED_REVISION=${embedding.revision}` : "",
+            embedding?.profile ? `TITEN_EMBED_PROFILE=${embedding.profile}` : "",
+            embedding?.minimum_cosine !== null && embedding?.minimum_cosine !== undefined ? `TITEN_EMBED_MIN_COSINE=${embedding.minimum_cosine}` : "",
+            embedding?.api_key === "set" ? "TITEN_EMBED_API_KEY=<set as secret>" : "",
+          ].filter(Boolean);
+          text("[data-model-env]", lines.length ? lines.join("\n") : "# FTS-only mode; no model tuple configured.");
+          text("[data-model-status]", "Configuration loaded. Changes are applied only by restart.");
+        } catch (error) { text("[data-model-status]", errorMessage(error)); }
+      }
+      async function loadAccess() {
+        const target = one<HTMLElement>("[data-access-output]");
+        renderMessage(target, "Loading principals and grants…");
+        try {
+          const data = has("principals:read") ? payloadData(await getArea("access/principals")) : { principals: [] };
+          const principals = Array.isArray(data.principals) ? data.principals as Record<string, unknown>[] : [];
+          const picker = one<HTMLSelectElement>("[data-access-principal]");
+          const selected = picker.value;
+          picker.replaceChildren(new Option("Select a principal", ""));
+          for (const row of principals) if (typeof row.principal_id === "string")
+            picker.add(new Option(`${row.username ?? row.principal_id} · ${row.principal_kind}`, row.principal_id));
+          picker.value = [...picker.options].some((option) => option.value === selected) ? selected : "";
+          const grants = picker.value && has("grants:read") ? await getArea("access/grants", new URLSearchParams({ principal_id: picker.value })) : { data: { grants: [] } };
+          const keyData = has("keys:manage") ? payloadData(await getArea("governance/keys")) : { keys: [] };
+          const selectedKeys = Array.isArray(keyData.keys) ? keyData.keys.filter((value) => {
+            if (!picker.value || !value || typeof value !== "object") return !picker.value;
+            const row = value as Record<string, unknown>;
+            return row.principal_id === picker.value || row.issued_by === picker.value;
+          }) : [];
+          renderPayload(target, { data: { principals, ...(payloadData(grants)), key_clamp_preview: selectedKeys } });
+          const rows = payloadData(grants).grants;
+          if (has("grants:write") && Array.isArray(rows)) for (const grant of rows) {
+            if (!grant || typeof grant !== "object" || typeof (grant as any).grant_id !== "string" || (grant as any).revoked_at) continue;
+            const button = document.createElement("button");
+            button.type = "button"; button.className = "text-button";
+            button.textContent = `Revoke ${(grant as any).grant_id}`;
+            button.addEventListener("click", async () => {
+              if (!confirm("Revoke this grant on the next request?")) return;
+              try { await deleteArea(`access/grants/${encodeURIComponent((grant as any).grant_id)}`); await loadAccess(); }
+              catch (error) { handleError(error, target); }
+            });
+            target.append(button);
+          }
+        } catch (error) { handleError(error, target); }
+      }
+      async function loadKeys() {
+        const target = one<HTMLElement>("[data-keys-output]");
+        renderMessage(target, "Loading masked key metadata…");
+        try {
+          const payload = await getArea("governance/keys");
+          renderPayload(target, payload);
+          const keys = payloadData(payload).keys;
+          if (Array.isArray(keys)) for (const key of keys) {
+            if (!key || typeof key !== "object" || typeof (key as any).key_id !== "string" || (key as any).status === "revoked") continue;
+            const button = document.createElement("button");
+            button.type = "button"; button.className = "text-button";
+            button.textContent = `Revoke ${(key as any).label ?? (key as any).key_id}`;
+            button.addEventListener("click", async () => {
+              if (!confirm("Revoke this API key immediately?")) return;
+              try { await deleteArea(`api/keys/${encodeURIComponent((key as any).key_id)}`); await loadKeys(); }
+              catch (error) { handleError(error, target); }
+            });
+            target.append(button);
+          }
+        } catch (error) { handleError(error, target); }
       }
 
       function memoryKindLabel(kind: string): string { return kind.replaceAll("_", " "); }
+      function highlighted(target: HTMLElement, value: string, query: string) {
+        target.replaceChildren();
+        const needle = query.trim();
+        if (!needle) return target.append(document.createTextNode(value));
+        const index = value.toLocaleLowerCase().indexOf(needle.toLocaleLowerCase());
+        if (index < 0) return target.append(document.createTextNode(value));
+        target.append(document.createTextNode(value.slice(0, index)));
+        const mark = document.createElement("mark");
+        mark.textContent = value.slice(index, index + needle.length);
+        target.append(mark, document.createTextNode(value.slice(index + needle.length)));
+      }
       function openMemoryInAtlas(record: MemoryRecord) {
         const lens = one<HTMLInputElement>('[data-memory-form] input[value="evidence_trace"]');
         lens.checked = true;
@@ -655,7 +1037,7 @@ const lenses = [
           const row = document.createElement("tr");
           const statement = document.createElement("th");
           statement.scope = "row";
-          statement.textContent = record.statement;
+          highlighted(statement, record.statement, memoryListSearch.value);
           const cells = [memoryKindLabel(record.kind), record.trust, record.status, formatDate(record.created_at) ?? record.created_at];
           row.append(statement, ...cells.map((value) => { const cell = document.createElement("td"); cell.textContent = value; return cell; }));
           const action = document.createElement("td");
@@ -674,6 +1056,7 @@ const lenses = [
         memoryListPage.textContent = hasMore ? "More authorized records available" : "End of authorized records";
       }
       async function loadMemoryList(after: string | null = null) {
+        memoryListAfter = after;
         memoryListLoading.hidden = false;
         memoryListTable.hidden = true;
         memoryListEmpty.hidden = true;
@@ -685,11 +1068,30 @@ const lenses = [
         const status = memoryListStatus.value;
         if (search) query.set("q", search);
         if (status) query.set("status", status);
+        if (memoryKind) query.set("kind", memoryKind);
+        if (workspacePicker.value) query.set("workspace_id", workspacePicker.value);
         if (after) query.set("after", after);
         try {
           const page = await listMemories(query);
           memoryListCursor = page.page.next_cursor;
           renderMemoryList(page.items, page.page.has_more);
+          const facets = one<HTMLElement>("[data-memory-facets]");
+          facets.replaceChildren();
+          for (const [group, values] of Object.entries(page.facets ?? {}))
+            for (const [value, count] of Object.entries(values)) {
+              const button = document.createElement("button");
+              button.type = "button";
+              button.className = "filter-chip";
+              button.textContent = `${memoryKindLabel(value)} · ${count}`;
+              button.setAttribute("aria-pressed", String(group === "kind" ? memoryKind === value : memoryListStatus.value === value));
+              button.addEventListener("click", () => {
+                if (group === "kind") memoryKind = memoryKind === value ? "" : value;
+                else memoryListStatus.value = memoryListStatus.value === value ? "" : value;
+                memoryListHistory = [];
+                void loadMemoryList();
+              });
+              facets.append(button);
+            }
         } catch (error) {
           memoryListRows.replaceChildren();
           memoryListEmpty.hidden = true;
@@ -702,11 +1104,15 @@ const lenses = [
       function clearMemory() {
         generation += 1;
         view = null;
+        graphSelected = null;
         memoryRecords.replaceChildren();
         memoryRecords.hidden = true;
         atlasGraph.hidden = true;
         atlasEdges.replaceChildren();
         atlasNodes.replaceChildren();
+        one<HTMLElement>("[data-graph-selection]").hidden = true;
+        one<HTMLElement>("[data-graph-legend]").hidden = true;
+        setNotice(one("[data-graph-truncation]"));
         compileTrace.hidden = true;
         memoryLoading.hidden = true;
         memoryEmpty.hidden = false;
@@ -726,7 +1132,9 @@ const lenses = [
       function clearPrivateState() {
         clearMemory();
         memoryListCursor = null;
+        memoryListAfter = null;
         memoryListHistory = [];
+        memoryKind = "";
         memoryListRows.replaceChildren();
         memoryListTable.hidden = true;
         memoryListEmpty.hidden = true;
@@ -738,7 +1146,7 @@ const lenses = [
         text("[data-profile-password-status]", "");
         one<HTMLElement>("[data-user-credential]").hidden = true;
         text("[data-user-temporary-password]", "");
-        for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]"])
+        for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]", "[data-subjects-output]", "[data-subject-references]", "[data-projects-output]", "[data-project-references]", "[data-keys-output]", "[data-access-output]", "[data-system-checks]"])
           renderMessage(one(selector), "No live data loaded for this principal.");
       }
       function updateMemoryRequirements() {
@@ -748,7 +1156,7 @@ const lenses = [
         const lens = selected.value;
         subject.required = selected.dataset.needs === "subject";
         focus.required = selected.dataset.needs === "focus";
-        text("[data-subject-help]", subject.required ? "Required for the selected lens." : lens === "review_queue" ? "Optional review filter." : "Not used by this lens.");
+        text("[data-subject-help]", subject.required ? "Required for the selected lens." : lens === "review_queue" ? "Optional review filter." : lens === "workspace_graph" ? "Graph follows the active workspace picker." : "Not used by this lens.");
         const copy = lens === "evidence_trace" ? ["Focus claim ID", "claim ID", "Required for Evidence trace."]
           : lens === "scope_preview" ? ["Focus principal ID", "principal ID", "Required for Scope preview."]
           : lens === "knowledge_release" ? ["Focus channel ID", "optional channel ID", "Optional channel filter."]
@@ -791,12 +1199,25 @@ const lenses = [
           row.textContent = `${edge.from} — ${edge.relation} → ${edge.to}`;
           relationships.append(row);
         }
+        const graph = view?.lens === "workspace_graph";
+        graphSelected = graph ? node : null;
+        one<HTMLElement>("[data-graph-selection]").hidden = !graph;
+        if (graph) {
+          const dot = one<HTMLElement>("[data-graph-selection-dot]");
+          dot.dataset.kind = node.type === "subject" ? "subject" : node.kind ?? "semantic_fact";
+          text("[data-graph-selection-label]", node.label);
+          text("[data-graph-selection-meta]", node.type === "subject" ? "subject hub" : [node.kind, node.project_ref ?? "unscoped", node.trust, node.status].filter(Boolean).join(" · "));
+          text("[data-graph-selection-degree]", `${node.degree ?? 0} links`);
+          one<HTMLButtonElement>("[data-graph-open-evidence]").hidden = node.type !== "claim";
+        }
       }
       function renderGraph(next: AtlasView) {
         atlasEdges.replaceChildren();
         atlasNodes.replaceChildren();
+        atlasGraph.dataset.lens = next.lens;
         if (!next.nodes.length) { atlasGraph.hidden = true; return; }
         atlasGraph.hidden = false;
+        const nodeById = new Map(next.nodes.map((node) => [node.id, node]));
         const claim = next.nodes.find((node) => node.type === "claim" && node.id === next.focus_id)
           ?? next.nodes.find((node) => node.type === "claim")
           ?? next.nodes[0];
@@ -805,6 +1226,7 @@ const lenses = [
         const positions = new Map<string, { x: number; y: number; width: number; height: number }>();
         const canvasHeight = next.lens === "evidence_trace"
           ? Math.max(500, 52 + Math.max(observations.length * 112, decorations.length * 132))
+          : next.lens === "workspace_graph" ? Math.max(560, 180 + Math.ceil(next.nodes.length / 5) * 86)
           : Math.max(500, 72 + Math.ceil(next.nodes.length / 3) * 112);
         atlasGraph.style.minHeight = `${canvasHeight}px`;
         atlasEdges.setAttribute("viewBox", `0 0 900 ${canvasHeight}`);
@@ -816,6 +1238,23 @@ const lenses = [
           positions.set(claim.id, { x: 316, y: (canvasHeight - 108) / 2, width: 268, height: 176 });
           observations.forEach((node, index) => positions.set(node.id, { x: 26, y: observationStart + index * 112, width: 248, height: 86 }));
           decorations.forEach((node, index) => positions.set(node.id, { x: 626, y: decorationStart + index * 132, width: 248, height: 86 }));
+        } else if (next.lens === "workspace_graph") {
+          const subjects = next.nodes.filter((node) => node.type === "subject");
+          const claims = next.nodes.filter((node) => node.type === "claim");
+          const hash = (value: string) => [...value].reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 17);
+          subjects.forEach((node, index) => positions.set(node.id, {
+            x: 48 + (index % 3) * 294, y: 58 + Math.floor(index / 3) * 220, width: 124, height: 66,
+          }));
+          claims.forEach((node, index) => {
+            const about = next.edges.find((edge) => edge.from === node.id && edge.relation === "about");
+            const hub = about ? positions.get(about.to) : undefined;
+            const seed = hash(node.id);
+            positions.set(node.id, {
+              x: Math.max(18, Math.min(754, (hub?.x ?? 330) + 82 + (seed % 150))),
+              y: Math.max(28, Math.min(canvasHeight - 72, (hub?.y ?? 80) + 58 + ((seed >>> 8) % 92) + (index % 2) * 28)),
+              width: 124, height: 62,
+            });
+          });
         } else {
           next.nodes.forEach((node, index) => positions.set(node.id, {
             x: 26 + (index % 3) * 294,
@@ -827,6 +1266,10 @@ const lenses = [
         const edgePoint = (fromId: string, toId: string, from: boolean) => {
           const source = positions.get(fromId)!;
           const target = positions.get(toId)!;
+          if (next.lens === "workspace_graph") return {
+            x: source.x + source.width / 2,
+            y: source.y + (nodeById.get(fromId)?.type === "subject" ? 13 : 7),
+          };
           const rightward = target.x >= source.x;
           if (fromId === claim.id && next.lens === "evidence_trace") return {
             x: source.x + source.width / 2 + (rightward ? 54 : -54),
@@ -862,9 +1305,10 @@ const lenses = [
         for (const node of next.nodes) {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = `atlas-node atlas-node--${node.type}${node.id === claim.id ? " atlas-node--focus" : ""}`;
+          button.className = `atlas-node atlas-node--${node.type}${node.id === claim.id && next.lens === "evidence_trace" ? " atlas-node--focus" : ""}`;
           button.dataset.id = node.id;
           button.dataset.status = node.status;
+          button.dataset.kind = node.type === "subject" ? "subject" : node.kind ?? "semantic_fact";
           const relation = next.edges.find((edge) => edge.from === node.id || edge.to === node.id)?.relation;
           if (relation) button.dataset.relation = relation;
           button.setAttribute("aria-pressed", "false");
@@ -876,7 +1320,7 @@ const lenses = [
           kind.className = "node-kind";
           kind.textContent = node.id === claim.id && next.lens === "evidence_trace"
             ? `focus claim · ${node.status}`
-            : `${node.type} · ${node.status}`;
+            : `${node.kind ?? node.type} · ${node.status}${node.degree === undefined ? "" : ` · ${node.degree} links`}`;
           const label = document.createElement("strong");
           label.textContent = node.label;
           const detail = document.createElement("small");
@@ -896,6 +1340,12 @@ const lenses = [
         const accessMode = authorizationData.access_mode === "organization_admin"
           ? "organization administrator" : "principal-scoped";
         renderGraph(next);
+        const graph = next.lens === "workspace_graph";
+        one<HTMLElement>("[data-graph-legend]").hidden = !graph;
+        const truncated = Boolean(next.truncated ?? next.metadata.truncated);
+        const withheld = Number(next.withheld_edges ?? next.metadata.withheld_edges ?? 0);
+        setNotice(one("[data-graph-truncation]"), graph && truncated ? `Node cap reached · ${withheld} authorized edges withheld.` : undefined);
+        if (graph) text("[data-graph-total]", `${next.nodes.length} nodes · ${next.edges.length} edges · ${String(next.metadata.workspace_id ?? "unscoped")}`);
         memoryRecords.replaceChildren();
         const title = next.lens === "evidence_trace" ? "Evidence Trace" : next.lens.replaceAll("_", " ");
         text("[data-view-title]", title);
@@ -944,10 +1394,23 @@ const lenses = [
         one<HTMLButtonElement>("[data-profile-open]").setAttribute("aria-current", id === "profile" ? "page" : "false");
         const label = selected?.dataset.label ?? (id === "profile" ? "Profile" : "Dashboard");
         text("[data-page-title]", label);
-        text("[data-breadcrumb-area]", id === "memories" || id === "atlas" ? "Memory" : "Operator");
+        const group = ["atlas", "memories", "context", "subjects"].includes(id) ? "Memory"
+          : id === "work" ? "Collaboration"
+          : ["audit", "system", "models", "federation"].includes(id) ? "Operations"
+          : ["access", "api", "projects"].includes(id) ? "Administration"
+          : ["governance", "releases"].includes(id) ? "Governance" : "Operator";
+        text("[data-breadcrumb-area]", group);
         text("[data-breadcrumb-page]", label);
         history.replaceState(null, "", `#${id}`);
-        if (id === "memories" && principal) void loadMemoryList();
+        one<HTMLElement>(".app-shell").removeAttribute("data-nav-open");
+        one<HTMLButtonElement>("[data-menu-toggle]").setAttribute("aria-expanded", "false");
+        if (!principal) return;
+        if (id === "memories") void loadMemoryList();
+        if (id === "subjects") void loadSubjects();
+        if (id === "projects") void loadProjects();
+        if (id === "models") void loadModels();
+        if (id === "access") void loadAccess();
+        if (id === "api") void loadKeys();
       }
       function showPrivateSurface() {
         one<HTMLElement>(".app-shell").dataset.shell = "private";
@@ -957,6 +1420,8 @@ const lenses = [
         one<HTMLButtonElement>("[data-profile-open]").hidden = false;
         const buttons = all<HTMLButtonElement>("[data-area]");
         for (const button of buttons) button.hidden = !accessible(button);
+        one<HTMLElement>("[data-workspace-control]").hidden = true;
+        if (has("workspaces:read")) void loadWorkspaces();
         for (const input of all<HTMLInputElement>('[data-memory-form] input[name="lens"]')) {
           const allowed = !input.dataset.scope || has(input.dataset.scope);
           input.disabled = !allowed;
@@ -980,6 +1445,8 @@ const lenses = [
           && has("keys:manage") && has("memberships:write")
           && ["root", "owner", "admin"].includes(String(principal?.organization_role)));
         one<HTMLOptionElement>("[data-owner-role]").disabled = !["root", "owner"].includes(String(principal?.organization_role));
+        one<HTMLElement>("[data-grant-admin]").hidden = !has("grants:write");
+        one<HTMLElement>("[data-key-admin]").hidden = !has("keys:manage");
         const administratorView = one<HTMLFieldSetElement>("[data-admin-view]");
         const administratorEligible = has("views:compile:all")
           && ["root", "owner"].includes(String(principal?.organization_role));
@@ -1064,6 +1531,10 @@ const lenses = [
           text("[data-system-revision]", revisionLabel);
           text("[data-system-connection]", connectionLabel);
           text("[data-system-endpoint]", dashboardStatus.endpoint ?? "same-origin adapter");
+          renderPayload(one("[data-system-checks]"), { data: {
+            checks: payloadData(readiness.payload).checks ?? {},
+            capabilities: payloadData(readiness.payload).capabilities ?? {},
+          } });
           one<HTMLElement>("[data-connection-dot]").className = health.ok && readiness.ok ? "ok" : "warn";
           setNotice(notice, semanticSyncing
             ? "Canonical requests are ready while the semantic index finishes syncing."
@@ -1079,13 +1550,29 @@ const lenses = [
         }
       }
 
-      const readerScopes = ["views:compile", "context:compile", "evidence:read", "checkpoints:read", "leases:read", "handoffs:read", "events:read", "audit:read", "governance:read", "approvals:read", "releases:read", "memberships:read", "identity:read", "federation:read", "workspaces:read"];
+      const readerScopes = ["views:compile", "context:compile", "evidence:read", "checkpoints:read", "leases:read", "handoffs:read", "events:read", "audit:read", "governance:read", "approvals:read", "releases:read", "memberships:read", "identity:read", "federation:read", "workspaces:read", "projects:read", "subjects:read"];
       const profiles: Record<string, string[]> = {
         reader: readerScopes,
         operator: [...readerScopes, "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "approvals:write", "releases:write"],
-        admin: [...readerScopes, "views:compile:all", "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write"],
+        admin: [...readerScopes, "views:compile:all", "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write", "principals:read", "grants:read", "grants:write", "models:read", "models:probe"],
       };
       for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!, button));
+      one<HTMLButtonElement>("[data-menu-toggle]").addEventListener("click", (event) => {
+        const button = event.currentTarget as HTMLButtonElement;
+        const shell = one<HTMLElement>(".app-shell");
+        const open = !shell.hasAttribute("data-nav-open");
+        shell.toggleAttribute("data-nav-open", open);
+        button.setAttribute("aria-expanded", String(open));
+      });
+      one<HTMLButtonElement>("[data-graph-open-evidence]").addEventListener("click", () => {
+        if (!graphSelected || graphSelected.type !== "claim") return;
+        const lens = one<HTMLInputElement>('[data-memory-form] input[value="evidence_trace"]');
+        lens.checked = true;
+        updateMemoryRequirements();
+        (memoryForm.elements.namedItem("subject_id") as HTMLInputElement).value = graphSelected.subject_id ?? "";
+        (memoryForm.elements.namedItem("focus_id") as HTMLInputElement).value = graphSelected.id;
+        memoryForm.requestSubmit();
+      });
       one<HTMLFormElement>("[data-login-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget as HTMLFormElement;
@@ -1175,12 +1662,12 @@ const lenses = [
       });
       memoryListNext.addEventListener("click", () => {
         if (!memoryListCursor) return;
-        memoryListHistory.push(memoryListCursor);
+        memoryListHistory.push(memoryListAfter ?? "");
         void loadMemoryList(memoryListCursor);
       });
       memoryListPrev.addEventListener("click", () => {
-        const cursor = memoryListHistory.pop();
-        void loadMemoryList(cursor ?? null);
+        const cursor = memoryListHistory.pop() ?? "";
+        void loadMemoryList(cursor || null);
       });
 
       memoryForm.addEventListener("change", (event) => {
@@ -1199,6 +1686,10 @@ const lenses = [
         const focus = String(values.get("focus_id") ?? "").trim();
         if (subject) payload.subject_id = subject;
         if (focus) payload.focus_id = focus;
+        if (payload.lens === "workspace_graph") {
+          if (workspacePicker.value) payload.workspace_id = workspacePicker.value;
+          payload.max_nodes = Math.max(25, Number(values.get("limit")));
+        }
         if (values.get("administrator_view") === "on") {
           payload.access_mode = "organization_admin";
           payload.administrator_reason = String(values.get("administrator_reason"));
@@ -1236,11 +1727,11 @@ const lenses = [
         if (project) body.project_id = project;
         const target = one<HTMLElement>("[data-context-output]");
         renderMessage(target, "Compiling authorized context…");
-        try { renderPayload(target, await postArea("context/compile", body)); text("[data-context-status]", "Live context compiled."); }
+        try { renderContext(target, await postArea("context/compile", body)); text("[data-context-status]", "Live context compiled."); }
         catch (error) { handleError(error, target); }
       });
       one<HTMLButtonElement>("[data-work-refresh]").addEventListener("click", async () => {
-        try { await loadAvailable(one("[data-work-output]"), [["work/leases?limit=50", "leases:read"], ["work/handoffs", "handoffs:read"]]); }
+        try { await loadWork(); }
         catch (error) { handleError(error, one("[data-work-output]")); }
       });
       one<HTMLFormElement>("[data-checkpoint-form]").addEventListener("submit", async (event) => {
@@ -1263,13 +1754,8 @@ const lenses = [
         try { await loadAvailable(one("[data-audit-output]"), requests); } catch (error) { handleError(error, one("[data-audit-output]")); }
       });
       one<HTMLButtonElement>("[data-governance-refresh]").addEventListener("click", async () => {
-        try {
-          await loadAvailable(one("[data-governance-output]"), [
-            ["governance/memberships", "memberships:read"], ["governance/keys", "keys:manage"],
-            ["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"],
-            ["governance/channels", "releases:read"], ["governance/releases", "releases:read"],
-          ]);
-        } catch (error) { handleError(error, one("[data-governance-output]")); }
+        try { await loadGovernance(); }
+        catch (error) { handleError(error, one("[data-governance-output]")); }
       });
       one<HTMLFormElement>("[data-user-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -1314,8 +1800,96 @@ const lenses = [
       });
       one<HTMLButtonElement>("[data-releases-refresh]").addEventListener("click", async () => {
         const target = one<HTMLElement>("[data-releases-output]");
-        try { renderPayload(target, await getArea("governance/releases")); }
+        try { await loadReleases(); }
         catch (error) { handleError(error, target); }
+      });
+
+      workspacePicker.addEventListener("change", () => {
+        memoryListHistory = [];
+        memoryListCursor = null;
+        if (!one<HTMLElement>('[data-area-panel="memories"]').hidden) void loadMemoryList();
+        clearMemory();
+      });
+      one<HTMLButtonElement>("[data-subjects-refresh]").addEventListener("click", loadSubjects);
+      one<HTMLFormElement>("[data-subjects-form]").addEventListener("submit", (event) => { event.preventDefault(); void loadSubjects(); });
+      one<HTMLButtonElement>("[data-projects-refresh]").addEventListener("click", loadProjects);
+      one<HTMLFormElement>("[data-projects-form]").addEventListener("submit", (event) => { event.preventDefault(); void loadProjects(); });
+      one<HTMLButtonElement>("[data-models-refresh]").addEventListener("click", loadModels);
+      for (const button of all<HTMLButtonElement>("[data-model-probe]")) button.addEventListener("click", async () => {
+        text("[data-model-status]", `Probing ${button.dataset.modelProbe} without a canonical write…`);
+        try {
+          const response = await postArea("models/probe", { group: button.dataset.modelProbe! });
+          text("[data-model-status]", JSON.stringify(payloadData(response)));
+        } catch (error) { text("[data-model-status]", errorMessage(error)); }
+      });
+      one<HTMLButtonElement>("[data-access-refresh]").addEventListener("click", loadAccess);
+      one<HTMLSelectElement>("[data-access-principal]").addEventListener("change", (event) => {
+        const value = (event.currentTarget as HTMLSelectElement).value;
+        (one<HTMLFormElement>("[data-grant-form]").elements.namedItem("principal_id") as HTMLInputElement).value = value;
+        (one<HTMLFormElement>("[data-access-simulator]").elements.namedItem("principal_id") as HTMLInputElement).value = value;
+        void loadAccess();
+      });
+      one<HTMLFormElement>("[data-grant-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        const values = new FormData(form);
+        const type = String(values.get("target_type"));
+        const rawTarget = String(values.get("target_id") ?? "").trim();
+        const target = type === "organization" ? undefined : type === "project" && rawTarget === "~" ? null : rawTarget;
+        text("[data-grant-status]", "Creating bounded grant…");
+        try {
+          await postArea("access/grants", {
+            principal_id: String(values.get("principal_id")).trim(), target_type: type,
+            ...(target !== undefined ? { target_id: target } : {}),
+            permissions: values.getAll("permissions").map(String),
+          });
+          text("[data-grant-status]", "Grant created; next request uses it.");
+          await loadAccess();
+        } catch (error) { text("[data-grant-status]", errorMessage(error)); }
+      });
+      one<HTMLFormElement>("[data-access-simulator]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const body = Object.fromEntries(new FormData(event.currentTarget as HTMLFormElement));
+        const target = one<HTMLElement>("[data-access-simulation]");
+        renderMessage(target, "Evaluating both canonical gates…");
+        try { renderPayload(target, await postArea("access/simulate", body)); }
+        catch (error) { handleError(error, target); }
+      });
+      const filterRoutes = () => {
+        const values = new FormData(one<HTMLFormElement>("[data-route-filter]"));
+        const q = String(values.get("q") ?? "").trim().toLowerCase();
+        const method = String(values.get("method") ?? "");
+        let visible = 0;
+        for (const row of all<HTMLElement>("[data-route-rows] tr")) {
+          row.hidden = Boolean((q && !row.dataset.search?.includes(q)) || (method && row.dataset.method !== method));
+          if (!row.hidden) visible += 1;
+        }
+        text("[data-route-count]", String(visible));
+      };
+      one<HTMLFormElement>("[data-route-filter]").addEventListener("input", filterRoutes);
+      one<HTMLButtonElement>("[data-keys-refresh]").addEventListener("click", loadKeys);
+      one<HTMLFormElement>("[data-key-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        const values = new FormData(form);
+        const type = String(values.get("data_target_type"));
+        const rawTarget = String(values.get("data_target_id") ?? "").trim();
+        const target = type === "organization" ? undefined : type === "project" && rawTarget === "~" ? null : rawTarget;
+        text("[data-key-status]", "Generating a bounded credential…");
+        try {
+          const response = await postArea("api/keys", {
+            label: String(values.get("label")).trim(), principal_kind: String(values.get("principal_kind")),
+            scopes: String(values.get("scopes")).split(",").map((scope) => scope.trim()).filter(Boolean),
+            max_trust: String(values.get("max_trust")), data_target_type: type,
+            ...(target !== undefined ? { data_target_id: target } : {}),
+          });
+          const data = payloadData(response);
+          if (typeof data.api_key !== "string") throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen did not return the one-time key.");
+          text("[data-key-secret]", data.api_key);
+          one<HTMLElement>("[data-key-credential]").hidden = false;
+          text("[data-key-status]", "Key created. Copy it now; Titen stores only the hash.");
+          await loadKeys();
+        } catch (error) { text("[data-key-status]", errorMessage(error)); }
       });
 
       updateMemoryRequirements();

@@ -5,17 +5,25 @@ authenticated Titen API through a loopback same-origin adapter. Human operators
 use username/password; the browser contains no fixture fallback and never stores
 a password or API key in Web Storage.
 
-The product map has six live, capability-gated areas:
+The product map has fifteen live, capability-gated destinations:
 
 | Area | Live job | Required read capability |
 | --- | --- | --- |
 | Memories | list, search, and paginate authorized canonical memories; open a selected record in Atlas | `views:compile` |
-| Atlas | compile six bounded read-only lenses; Evidence Trace centers the selected claim and labels authorized evidence, context, and release relationships | `views:compile` |
-| Context | compile a task-specific context pack | `context:compile` |
-| Work | list leases and pending handoffs; find an exact checkpoint | `leases:read`, `handoffs:read`, or `checkpoints:read` |
+| Atlas | compile seven bounded read-only lenses, including the workspace-wide claim/subject graph | `views:compile` |
+| Context | compile a cited task pack with its token budget and exclusions | `context:compile` |
+| Subjects | inspect authorized subject identities and references | `subjects:read` |
+| Work | inspect/release leases, resolve received handoffs, and find an exact checkpoint | matching collaboration capability |
 | Audit | list bounded audit records and domain events | `audit:read` or `events:read` |
-| Governance | inspect memberships, keys, policies, approvals, channels, and releases | matching governance read capability |
+| System | inspect liveness, readiness, checks, and capabilities | authenticated |
+| Models | inspect immutable masked startup tuples and run bounded read-only probes | `models:read` |
 | Federation | inspect owned peers and a bounded peer log | `federation:read` |
+| Access | inspect principals, grants, key clamps, and simulate both access gates | `principals:read`, `grants:read`, or `keys:manage` |
+| API & Keys | browse fixed routes and create/revoke bounded keys | `keys:manage` |
+| Projects | inspect authorized project scopes and normalized references | `projects:read` |
+| Approvals | inspect policies and decide/revoke approvals with reasons | `governance:read` or `approvals:read` |
+| Releases | inspect and operate the release lifecycle | `releases:read` |
+| Profile | inspect the session principal and rotate its password | authenticated session |
 
 The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
@@ -30,6 +38,19 @@ hidden counts or claims that an empty principal-scoped result means canonical
 memory is globally empty. Memories uses a stable keyset cursor rather than
 offset pagination, so a page can be refreshed without compiling a graph or
 waiting for semantic/vector readiness.
+
+Canonical data also passes the scoped-grant gate documented in
+[Scoped canonical access](./architecture/access-control.md). Access can inspect
+principals and active grants, preview derived-key clamps, and simulate a known
+record's `read`, `write`, or `approve` decision. A selected workspace filters
+team-visible records; organization-visible memory remains present in every
+workspace. Revoking an issuer grant narrows its derived keys on the next
+request.
+
+Models is an immutable diagnostic view. It masks secrets, reports configuration
+and fingerprint drift, generates restart-only environment text, and performs
+one rate-limited audited probe. It never updates model settings or canonical
+memory from the browser.
 
 ## Run disconnected
 
@@ -90,7 +111,7 @@ instead of opening the adapter or API port.
 ## Add a user
 
 An organization `owner` or `admin` with `keys:manage` and
-`memberships:write` sees **Governance → Add a human user**. One submission
+`memberships:write` sees **Access → Add a human user**. One submission
 creates the organization membership and its password account in one transaction.
 Titen generates a random temporary password, displays it once, and requires the
 new user to replace it on first login. An
@@ -119,12 +140,12 @@ pnpm check:workflow
 ```
 
 The real smoke starts temporary Bun/SQLite and proves login, forced first
-password replacement, all six areas, atomic Add User, logout, and fresh login
-through the real adapter. Integration and browser tests also cover credential
+password replacement, all fifteen destinations, atomic Add User, lifecycle
+actions, logout, and fresh login through the real adapter. Integration and browser tests also cover credential
 isolation, revocation, exact origin checks, request-size limits, capability
 hiding, stale private-state clearing, principal-scoped empty results, audited
-administrator mode, semantic-sync readiness, keyboard use, and a 320 px
-viewport.
+administrator mode, workspace visibility, scoped grants and key clamps, masked
+model diagnostics, semantic-sync readiness, keyboard use, and a 320 px viewport.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

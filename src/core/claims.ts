@@ -10,6 +10,7 @@ export { purgedEvidenceGuardStatement } from "./writes";
 import { requireProject } from "./projects";
 import {
   authorizeRecordWorkspace,
+  authorizeRecordTarget,
   recordAccessParams,
   recordAccessSql,
 } from "./authorization";
@@ -102,7 +103,7 @@ async function loadSources(
        FROM observations o
       WHERE o.org_id = ? AND o.id IN (${ids.map(() => "?").join(", ")})
         AND ${recordAccessSql("o")}`,
-    [principal.orgId, ...ids, ...recordAccessParams(principal.principalId)],
+    [principal.orgId, ...ids, ...recordAccessParams(principal)],
   );
   const byId = new Map(rows.map((row) => [row.id, row]));
   for (const source of sources)
@@ -123,6 +124,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     optionalString(body, "project_id", LIMITS.identifier),
   );
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
+  await authorizeRecordTarget(ctx.app.db, principal, subjectId, projectId);
   const claims = body.claims;
   if (claims === undefined) throw validationError('Field "claims" is required.');
   if (!Array.isArray(claims) || claims.length === 0)

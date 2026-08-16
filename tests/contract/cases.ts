@@ -209,7 +209,7 @@ export const CASES: Case[] = [
   {
     name: "memories lists authorized claims with lexical search and keyset pagination",
     async run(fx) {
-      const owner = await fx.provision({ scopes: ["observations:write", "claims:write", "views:compile"] });
+      const owner = await fx.provision({ scopes: ["observations:write", "claims:write", "views:compile", "workspaces:write"] });
       const privateMember = await fx.provision({ orgId: owner.orgId, scopes: ["observations:write", "claims:write", "views:compile"] });
       await seedClaim(fx, owner.key, {
         observation: { subject_id: "memory_subject", visibility: "organization", content: "Rollback smoke is required before a production release." },
@@ -237,11 +237,195 @@ export const CASES: Case[] = [
       expectOk(searched);
       assert.equal(searched.body.data.items.length, 1);
       assert.match(searched.body.data.items[0].statement, /Rollback smoke/);
+      const workspaceA = await fx.call("POST", "/v1/workspaces", { key: owner.key, body: { name: "memory-a" } });
+      const workspaceB = await fx.call("POST", "/v1/workspaces", { key: owner.key, body: { name: "memory-b" } });
+      expectOk(workspaceA, 201);
+      expectOk(workspaceB, 201);
+      await fx.query(
+        `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+         VALUES (?, ?, ?, ?, 'agent', 'member', ?)`,
+        [`mbr_workspace_${fx.runtime}`, owner.orgId, workspaceA.body.data.workspace_id,
+          owner.principalId, "2026-08-16T00:00:00.000Z"],
+      );
+      const organizationClaim = await seedClaim(fx, owner.key, {
+        observation: { subject_id: "memory_subject", workspace_id: workspaceA.body.data.workspace_id,
+          visibility: "organization", content: "Organization memory follows every workspace picker." },
+        claim: { statement: "Organization memory follows every workspace picker." },
+      });
+      const teamClaim = await seedClaim(fx, owner.key, {
+        observation: { subject_id: "memory_subject", workspace_id: workspaceA.body.data.workspace_id,
+          visibility: "team", content: "Team memory stays inside its workspace." },
+        claim: { statement: "Team memory stays inside its workspace.", visibility: "team" },
+      });
+      const workspaceMemories = await fx.call("GET", `/v1/memories?workspace_id=${workspaceB.body.data.workspace_id}`, { key: owner.key });
+      expectOk(workspaceMemories);
+      assert.ok(workspaceMemories.body.data.items.some((item: any) => item.id === organizationClaim.claimId));
+      assert.ok(!workspaceMemories.body.data.items.some((item: any) => item.id === teamClaim.claimId));
+      const workspaceGraph = await fx.call("POST", "/v1/memory-views/compile", {
+        key: owner.key, body: { lens: "workspace_graph", workspace_id: workspaceB.body.data.workspace_id, max_nodes: 50 },
+      });
+      expectOk(workspaceGraph);
+      assert.ok(workspaceGraph.body.data.nodes.some((node: any) => node.id === organizationClaim.claimId));
+      assert.ok(!workspaceGraph.body.data.nodes.some((node: any) => node.id === teamClaim.claimId));
       expectError(await fx.call("GET", "/v1/memories?limit=0", { key: owner.key }), 400, "VALIDATION_ERROR");
       expectError(await fx.call("GET", "/v1/memories?after=not-a-cursor", { key: owner.key }), 400, "VALIDATION_ERROR");
       const memberView = await fx.call("GET", "/v1/memories?subject_id=memory_subject", { key: privateMember.key });
       expectOk(memberView);
-      assert.equal(memberView.body.data.items.length, 3);
+      assert.equal(memberView.body.data.items.length, 4);
+    },
+  },
+  {
+    name: "scoped grants drive directories, Atlas graph, and next-request revocation",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const reader = await fx.provision({
+        orgId: owner.orgId,
+        principalId: `scoped_reader_${fx.runtime}`,
+        scopes: ["views:compile", "projects:read", "subjects:read", "observations:write",
+          "keys:manage", "grants:read", "grants:write"],
+      });
+      const makeProject = async (reference: string) => {
+        const response = await fx.call("POST", "/v1/projects/resolve", {
+          key: owner.key, body: { reference, create: true },
+        });
+        expectOk(response, 201);
+        return response.body.data.project_id as string;
+      };
+      const allowedProject = await makeProject(`scope/${fx.runtime}-allowed`);
+      const hiddenProject = await makeProject(`scope/${fx.runtime}-hidden`);
+      const allowed = await seedClaim(fx, owner.key, {
+        observation: { subject_id: `subject_${fx.runtime}_allowed`, project_id: allowedProject,
+          visibility: "organization", content: "Scoped reader may inspect this claim." },
+        claim: { statement: "Scoped reader may inspect this claim." },
+      });
+      await seedClaim(fx, owner.key, {
+        observation: { subject_id: `subject_${fx.runtime}_hidden`, project_id: hiddenProject,
+          visibility: "organization", content: "Scoped reader must not infer this claim." },
+        claim: { statement: "Scoped reader must not infer this claim." },
+      });
+      await fx.query(
+        `UPDATE access_grants SET revoked_at = ?
+          WHERE org_id = ? AND grantee_principal_id = ? AND revoked_at IS NULL`,
+        ["2026-08-16T00:00:00.000Z", owner.orgId, reader.principalId],
+      );
+      const granted = await fx.call("POST", "/v1/grants", {
+        key: owner.key,
+        body: { principal_id: reader.principalId, target_type: "project",
+          target_id: allowedProject, permissions: ["read"] },
+      });
+      expectOk(granted, 201);
+
+      const memories = await fx.call("GET", "/v1/memories", { key: reader.key });
+      expectOk(memories);
+      assert.deepEqual(memories.body.data.items.map((item: any) => item.id), [allowed.claimId]);
+      const projects = await fx.call("GET", "/v1/projects", { key: reader.key });
+      expectOk(projects);
+      assert.deepEqual(projects.body.data.projects.map((project: any) => project.project_id), [allowedProject]);
+      const subjects = await fx.call("GET", "/v1/subjects", { key: reader.key });
+      expectOk(subjects);
+      assert.deepEqual(subjects.body.data.subjects.map((subject: any) => subject.subject_id), [`subject_${fx.runtime}_allowed`]);
+      const deniedApproval = await fx.call("POST", "/v1/access/simulate", {
+        key: owner.key, body: { principal_id: reader.principalId, resource_type: "claim",
+          resource_id: allowed.claimId, operation: "approve" },
+      });
+      expectOk(deniedApproval);
+      assert.equal(deniedApproval.body.data.allowed, false);
+      const approveGrant = await fx.call("POST", "/v1/grants", {
+        key: owner.key, body: { principal_id: reader.principalId, target_type: "project",
+          target_id: allowedProject, permissions: ["approve"] },
+      });
+      expectOk(approveGrant, 201);
+      const permittedApproval = await fx.call("POST", "/v1/access/simulate", {
+        key: owner.key, body: { principal_id: reader.principalId, resource_type: "claim",
+          resource_id: allowed.claimId, operation: "approve" },
+      });
+      expectOk(permittedApproval);
+      assert.equal(permittedApproval.body.data.allowed, true);
+      expectOk(await fx.call("POST", "/v1/grants", {
+        key: owner.key, body: { principal_id: reader.principalId, target_type: "project",
+          target_id: allowedProject, permissions: ["admin"] },
+      }), 201);
+      const delegated = await fx.call("POST", "/v1/grants", {
+        key: reader.key, body: { principal_id: reader.principalId, target_type: "project",
+          target_id: allowedProject, permissions: ["read", "write"] },
+      });
+      expectOk(delegated, 201);
+      const delegatedInventory = await fx.call("GET", "/v1/grants", { key: reader.key });
+      expectOk(delegatedInventory);
+      assert.ok(delegatedInventory.body.data.grants.some((grant: any) => grant.grant_id === delegated.body.data.grant_id));
+      expectOk(await fx.call("DELETE", `/v1/grants/${delegated.body.data.grant_id}`, { key: reader.key }));
+      const graph = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reader.key, body: { lens: "workspace_graph", max_nodes: 25 },
+      });
+      expectOk(graph);
+      assert.ok(graph.body.data.nodes.some((node: any) => node.id === allowed.claimId));
+      assert.ok(!JSON.stringify(graph.body).includes("must not infer"));
+      for (let index = 0; index < 13; index += 1) await seedClaim(fx, owner.key, {
+        observation: { subject_id: `graph_cap_${fx.runtime}_${index}`, project_id: allowedProject,
+          visibility: "organization", content: `Graph cap claim ${index}.` },
+        claim: { statement: `Graph cap claim ${index}.` },
+      });
+      const cappedGraph = await fx.call("POST", "/v1/memory-views/compile", {
+        key: reader.key, body: { lens: "workspace_graph", max_nodes: 25 },
+      });
+      expectOk(cappedGraph);
+      assert.equal(cappedGraph.body.data.truncated, true);
+      assert.ok(cappedGraph.body.data.nodes.length <= 25);
+      assert.equal(cappedGraph.body.data.withheld_edges, 2);
+
+      const boundedAdmin = await fx.call("POST", "/v1/keys", {
+        key: owner.key, body: { label: "bounded grant admin",
+          scopes: ["grants:read", "grants:write"], max_trust: "asserted",
+          data_target_type: "project", data_target_id: allowedProject },
+      });
+      expectOk(boundedAdmin, 201);
+      expectError(await fx.call("POST", "/v1/grants", {
+        key: boundedAdmin.body.data.api_key,
+        body: { principal_id: reader.principalId, target_type: "project",
+          target_id: hiddenProject, permissions: ["read"] },
+      }), 404, "NOT_FOUND");
+      const boundedGrant = await fx.call("POST", "/v1/grants", {
+        key: boundedAdmin.body.data.api_key,
+        body: { principal_id: reader.principalId, target_type: "project",
+          target_id: allowedProject, permissions: ["read", "approve"] },
+      });
+      expectOk(boundedGrant, 201);
+      expectOk(await fx.call("DELETE", `/v1/grants/${boundedGrant.body.data.grant_id}`, {
+        key: boundedAdmin.body.data.api_key,
+      }));
+
+      expectError(await fx.call("POST", "/v1/observations", {
+        key: reader.key,
+        body: observation({ subject_id: `subject_${fx.runtime}_allowed`, project_id: allowedProject }),
+      }), 404, "NOT_FOUND");
+      const writeGrant = await fx.call("POST", "/v1/grants", {
+        key: owner.key,
+        body: { principal_id: reader.principalId, target_type: "project",
+          target_id: allowedProject, permissions: ["write"] },
+      });
+      expectOk(writeGrant, 201);
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: reader.key,
+        body: observation({ subject_id: `subject_${fx.runtime}_allowed`, project_id: allowedProject }),
+      }), 201);
+      const child = await fx.call("POST", "/v1/keys", {
+        key: reader.key,
+        body: { label: "scoped child", scopes: ["views:compile"], max_trust: "asserted",
+          data_target_type: "project", data_target_id: allowedProject },
+      });
+      expectOk(child, 201);
+      const childBeforeRevoke = await fx.call("GET", "/v1/memories", { key: child.body.data.api_key });
+      expectOk(childBeforeRevoke);
+      assert.ok(childBeforeRevoke.body.data.items.some((item: any) => item.id === allowed.claimId));
+      assert.ok(!JSON.stringify(childBeforeRevoke.body).includes("must not infer"));
+
+      expectOk(await fx.call("DELETE", `/v1/grants/${granted.body.data.grant_id}`, { key: owner.key }));
+      const revoked = await fx.call("GET", "/v1/memories", { key: reader.key });
+      expectOk(revoked);
+      assert.deepEqual(revoked.body.data.items, []);
+      const childRevoked = await fx.call("GET", "/v1/memories", { key: child.body.data.api_key });
+      expectOk(childRevoked);
+      assert.deepEqual(childRevoked.body.data.items, []);
     },
   },
   {
@@ -251,6 +435,37 @@ export const CASES: Case[] = [
       const wrongMethod = await fx.call("GET", "/v1/observations");
       expectError(wrongMethod, 405, "METHOD_NOT_ALLOWED");
       assert.match(wrongMethod.body.error.message, /POST/);
+    },
+  },
+  {
+    name: "model diagnostics stay read-only, masked, and audited",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const before = await fx.query<{ observations: number; claims: number }>(
+        `SELECT (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims`,
+        [owner.orgId, owner.orgId],
+      );
+      const config = await fx.call("GET", "/v1/models/config", { key: owner.key });
+      expectOk(config);
+      assert.equal(config.body.data.immutable_startup_snapshot, true);
+      assert.equal(config.body.data.extraction.api_key, "unset");
+      assert.equal(config.body.data.embedding.api_key, "unset");
+      assert.ok(!JSON.stringify(config.body).includes("titen_sk_"));
+      expectError(await fx.call("POST", "/v1/models/probe", {
+        key: owner.key, body: { group: "embedding" },
+      }), 503, "UNAVAILABLE");
+      const after = await fx.query<{ observations: number; claims: number }>(
+        `SELECT (SELECT COUNT(*) FROM observations WHERE org_id = ?) AS observations,
+                (SELECT COUNT(*) FROM claims WHERE org_id = ?) AS claims`,
+        [owner.orgId, owner.orgId],
+      );
+      assert.deepEqual(after, before);
+      const audit = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM audit_log WHERE org_id = ? AND action = 'model.probe'`,
+        [owner.orgId],
+      );
+      assert.equal(Number(audit[0]!.count), 1);
     },
   },
   {
@@ -2327,6 +2542,9 @@ export const CASES: Case[] = [
         key_id: owner.keyId,
         scopes: ["*"],
         max_trust: "policy_approved",
+        issued_by: owner.principalId,
+        data_target_type: "organization",
+        data_target_id: null,
         organization_role: "root",
       });
       expectError(await fx.call("GET", "/v1/principal"), 401, "UNAUTHENTICATED");

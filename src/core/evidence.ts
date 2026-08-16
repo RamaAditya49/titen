@@ -59,7 +59,7 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
             trust, visibility, status, version, valid_from, valid_to, created_at,
             enrichment_job_id
        FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
-    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+    [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
 
@@ -70,7 +70,7 @@ export async function claimEvidence(ctx: RequestContext): Promise<Result> {
        JOIN observations o ON o.id = s.observation_id
       WHERE s.claim_id = ? AND o.org_id = ? AND ${recordAccessSql("o")}
       ORDER BY s.relation, o.ingested_at, o.id`,
-    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+    [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   const enrichment = claim.enrichment_job_id
     ? await first<{
@@ -193,7 +193,7 @@ export async function loadAuthorizedSources(
       [
         ...group,
         principal.orgId,
-        ...(organizationWide ? [] : recordAccessParams(principal.principalId)),
+        ...(organizationWide ? [] : recordAccessParams(principal)),
       ],
     );
     for (const row of rows) {

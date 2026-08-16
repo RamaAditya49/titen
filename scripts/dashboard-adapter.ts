@@ -42,7 +42,7 @@ const json = (data: unknown, status = 200, extra?: HeadersInit) => {
 };
 const error = (status: number, code: string, message: string, extra?: HeadersInit) =>
   json({ error: { code, message } }, status, extra);
-const lenses = new Set(["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "knowledge_release"]);
+const lenses = new Set(["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "workspace_graph", "knowledge_release"]);
 const reviewReasons = new Set(["all", "disputed", "contradiction", "low_confidence", "negative_feedback"]);
 const accessModes = new Set(["principal", "organization_admin"]);
 const administratorReasons = new Set(["incident_response", "recovery", "deletion_verification", "export_verification"]);
@@ -122,7 +122,7 @@ const sessionKey = sessionMode ? await (async () => {
   const material = configured ? decodeBase64Url(configured) : crypto.getRandomValues(new Uint8Array(32));
   if (material?.length !== 32)
     throw new Error("TITEN_DASHBOARD_SESSION_KEY must be a base64url-encoded 32-byte key");
-  return crypto.subtle.importKey("raw", material, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", material.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
 })() : undefined;
 function safePrincipal(value: unknown): DashboardPrincipal | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return;
@@ -162,7 +162,7 @@ async function sessionFor(request: Request): Promise<Session | undefined> {
   const ciphertext = rawCiphertext ? decodeBase64Url(rawCiphertext) : undefined;
   if (version !== "v1" || iv?.length !== 12 || !ciphertext?.length || rest.length) return;
   try {
-    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sessionKey, ciphertext);
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv.slice().buffer }, sessionKey, ciphertext.slice().buffer);
     const value = JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>;
     const principal = safePrincipal(value.principal);
     if (typeof value.key !== "string" || !value.key.startsWith("titen_sk_")
@@ -256,7 +256,7 @@ async function proxyJson(request: Request, path: string, init?: RequestInit): Pr
     const clear = response.status === 401 && sessionMode ? clearSession(request) : undefined;
     if (!payload || typeof payload !== "object") return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned invalid JSON.", clear);
     if (!response.ok) {
-      const status = [400, 401, 403, 404, 409, 413, 503].includes(response.status) ? response.status : 502;
+      const status = [400, 401, 403, 404, 409, 413, 429, 503].includes(response.status) ? response.status : 502;
       const code = status === 401 && sessionMode ? "DASHBOARD_AUTH_REQUIRED" : `UPSTREAM_${status}`;
       return error(status, code, upstreamMessage(status), clear);
     }
@@ -265,7 +265,13 @@ async function proxyJson(request: Request, path: string, init?: RequestInit): Pr
 }
 
 const readRoutes = new Map<string, { path: string; query: string[] }>([
-  ["/dashboard-api/memories", { path: "/v1/memories", query: ["q", "subject_id", "project_id", "status", "visibility", "kind", "limit", "after"] }],
+  ["/dashboard-api/memories", { path: "/v1/memories", query: ["q", "subject_id", "project_id", "workspace_id", "status", "visibility", "kind", "limit", "after"] }],
+  ["/dashboard-api/workspaces", { path: "/v1/workspaces", query: [] }],
+  ["/dashboard-api/projects", { path: "/v1/projects", query: ["q", "limit"] }],
+  ["/dashboard-api/subjects", { path: "/v1/subjects", query: ["q", "type", "limit"] }],
+  ["/dashboard-api/access/principals", { path: "/v1/principals", query: ["q", "limit"] }],
+  ["/dashboard-api/access/grants", { path: "/v1/grants", query: ["principal_id", "limit"] }],
+  ["/dashboard-api/models/config", { path: "/v1/models/config", query: [] }],
   ["/dashboard-api/work/leases", { path: "/v1/leases", query: ["limit", "after"] }],
   ["/dashboard-api/work/handoffs", { path: "/v1/handoffs", query: [] }],
   ["/dashboard-api/work/checkpoint", { path: "/v1/checkpoints", query: ["subject_id", "agent_id", "kind"] }],
@@ -386,12 +392,15 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     const text = (key: string, max = 200) => body[key] === undefined ? undefined
       : typeof body[key] === "string" && body[key].length > 0 && body[key].length <= max ? body[key] : null;
     const subjectId = text("subject_id"), focusId = text("focus_id"), ownerId = text("owner_id"), cursor = text("cursor", 1000);
+    const workspaceId = text("workspace_id");
     const limit = body.limit === undefined ? 50 : body.limit;
+    const maxNodes = body.max_nodes === undefined ? 150 : body.max_nodes;
     const reviewReason = body.review_reason === undefined ? "all" : String(body.review_reason);
     const accessMode = body.access_mode === undefined ? "principal" : String(body.access_mode);
     const administratorReason = body.administrator_reason === undefined ? undefined : String(body.administrator_reason);
-    if (!lenses.has(lens) || subjectId === null || focusId === null || ownerId === null || cursor === null
+    if (!lenses.has(lens) || subjectId === null || focusId === null || ownerId === null || cursor === null || workspaceId === null
       || !Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 100
+      || !Number.isInteger(maxNodes) || Number(maxNodes) < 25 || Number(maxNodes) > 300
       || !reviewReasons.has(reviewReason)
       || !accessModes.has(accessMode)
       || (accessMode === "organization_admin" && !administratorReasons.has(administratorReason ?? ""))
@@ -404,10 +413,12 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       ...(subjectId ? { subject_id: subjectId } : {}),
       ...(focusId ? { focus_id: focusId } : {}),
       ...(ownerId ? { owner_id: ownerId } : {}),
+      ...(workspaceId ? { workspace_id: workspaceId } : {}),
       ...(cursor ? { cursor } : {}),
       ...(lens === "review_queue" ? { review_reason: reviewReason } : {}),
       ...(accessMode === "organization_admin" ? { access_mode: accessMode, administrator_reason: administratorReason } : {}),
       limit,
+      ...(lens === "workspace_graph" ? { max_nodes: maxNodes } : {}),
     };
     return proxyJson(request, "/v1/memory-views/compile", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
@@ -430,12 +441,45 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
     });
   }
+  const mutation = (() => {
+    if (url.pathname === "/dashboard-api/models/probe" && request.method === "POST") return "/v1/models/probe";
+    if (url.pathname === "/dashboard-api/api/keys" && request.method === "POST") return "/v1/keys";
+    if (url.pathname === "/dashboard-api/access/grants" && request.method === "POST") return "/v1/grants";
+    if (url.pathname === "/dashboard-api/access/simulate" && request.method === "POST") return "/v1/access/simulate";
+    const routes: Array<[RegExp, string, string]> = [
+      [/^\/dashboard-api\/api\/keys\/([^/]+)$/u, "DELETE", "/v1/keys/$1"],
+      [/^\/dashboard-api\/access\/grants\/([^/]+)$/u, "DELETE", "/v1/grants/$1"],
+      [/^\/dashboard-api\/work\/leases\/([^/]+)$/u, "DELETE", "/v1/leases/$1"],
+      [/^\/dashboard-api\/work\/leases\/([^/]+)\/force-release$/u, "POST", "/v1/leases/$1/force-release"],
+      [/^\/dashboard-api\/work\/handoffs\/([^/]+)\/resolve$/u, "POST", "/v1/handoffs/$1/resolve"],
+      [/^\/dashboard-api\/approvals\/([^/]+)\/decide$/u, "POST", "/v1/claim-approvals/$1/decide"],
+      [/^\/dashboard-api\/releases\/([^/]+)\/(approve|activate|revoke)$/u, "POST", "/v1/knowledge-releases/$1/$2"],
+    ];
+    for (const [pattern, method, path] of routes) {
+      const match = url.pathname.match(pattern);
+      if (match && request.method === method)
+        return path.replace("$1", encodeURIComponent(match[1]!)).replace("$2", match[2] ?? "");
+    }
+  })();
+  if (mutation) {
+    if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const hasBody = request.method !== "DELETE";
+    const body = hasBody ? await bodyObject(request) : undefined;
+    if (hasBody && !body) return error(400, "INVALID_REQUEST", "A bounded JSON body is required.");
+    return proxyJson(request, mutation, {
+      method: request.method,
+      ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}),
+    });
+  }
   if (request.method === "GET") {
     const route = readRoutes.get(url.pathname);
     if (route) {
       const path = queryPath(url, route.path, route.query);
       return path ? proxyJson(request, path) : error(400, "INVALID_REQUEST", "Query parameters are not allowlisted.");
     }
+    const reference = url.pathname.match(/^\/dashboard-api\/(projects|subjects)\/([^/]+)\/references$/u);
+    if (reference && [...url.searchParams].length === 0)
+      return proxyJson(request, `/v1/${reference[1]}/${encodeURIComponent(reference[2]!)}/references`);
   }
   if (url.pathname.startsWith("/dashboard-api/")) return error(404, "NOT_FOUND", "Route is not allowlisted.");
   return staticFile(raw);

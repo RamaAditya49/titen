@@ -164,7 +164,7 @@ export async function retrieveClaimsByIds(
       [
         // `disputed` sits in the SELECT list, so its authorization parameters
         // bind ahead of the id list in the WHERE clause.
-        ...recordAccessParams(principal.principalId),
+        ...recordAccessParams(principal),
         ...group,
         principal.orgId,
         scope.subjectId,
@@ -172,7 +172,7 @@ export async function retrieveClaimsByIds(
         scope.projectId,
         scope.at,
         scope.at,
-        ...recordAccessParams(principal.principalId),
+        ...recordAccessParams(principal),
       ],
     );
     found.push(...rows);
@@ -248,11 +248,11 @@ export async function retrieveClaimCandidates(
       scope.projectId,
       scope.at,
       scope.at,
-      ...recordAccessParams(principal.principalId),
+      ...recordAccessParams(principal),
       limit,
       // The CTE closes before `disputed` is projected, so its authorization
       // parameters bind after the candidate LIMIT.
-      ...recordAccessParams(principal.principalId),
+      ...recordAccessParams(principal),
     ],
   );
 }

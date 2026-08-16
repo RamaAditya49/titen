@@ -124,7 +124,7 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
         ORDER BY o.id LIMIT ?`,
       wholeDeployment
         ? [principal.orgId, after, limit]
-        : [principal.orgId, after, ...recordAccessParams(principal.principalId), limit],
+        : [principal.orgId, after, ...recordAccessParams(principal), limit],
     );
   } else {
     const claimCursor = after;
@@ -147,8 +147,8 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
           : [
               principal.orgId,
               claimCursor,
-              ...recordAccessParams(principal.principalId),
-              ...recordAccessParams(principal.principalId),
+              ...recordAccessParams(principal),
+              ...recordAccessParams(principal),
             ],
       );
       if (!available.length)
@@ -274,8 +274,8 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
         ? [principal.orgId, principal.orgId, principal.orgId, principal.orgId, claimCursor, claimCursor, limit]
         : [
             principal.orgId,
-            ...recordAccessParams(principal.principalId),
-            ...recordAccessParams(principal.principalId),
+            ...recordAccessParams(principal),
+            ...recordAccessParams(principal),
             principal.orgId,
             principal.orgId,
             principal.orgId,
@@ -316,7 +316,7 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
           ORDER BY s.claim_id, s.observation_id, s.relation`,
         wholeDeployment
           ? [...group, principal.orgId]
-          : [...group, principal.orgId, ...recordAccessParams(principal.principalId)],
+          : [...group, principal.orgId, ...recordAccessParams(principal)],
       ));
     }
     const grouped = new Map<string, unknown[]>();
@@ -442,10 +442,10 @@ async function exportableEnrichmentJobIds(
       [
         ctx.principal!.orgId,
         ...group,
-        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!.principalId)),
-        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!.principalId)),
-        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!.principalId)),
-        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!.principalId)),
+        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!)),
+        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!)),
+        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!)),
+        ...(wholeDeployment ? [] : recordAccessParams(ctx.principal!)),
       ],
     );
     for (const row of rows) result.add(row.id);
@@ -1774,7 +1774,7 @@ async function loadEvidence(
           AND ${administrative ? "1 = 1" : recordAccessSql("o")}`,
       administrative
         ? [ctx.principal!.orgId, ...group]
-        : [ctx.principal!.orgId, ...group, ...recordAccessParams(ctx.principal!.principalId)],
+        : [ctx.principal!.orgId, ...group, ...recordAccessParams(ctx.principal!)],
     );
     for (const row of rows) result.set(String(row.id), row);
   }
@@ -1820,7 +1820,7 @@ async function loadAuthorizedPortableRecords(
           AND ${administrative ? "1 = 1" : recordAccessSql(alias)}`,
       administrative
         ? [ctx.principal!.orgId, ...group]
-        : [ctx.principal!.orgId, ...group, ...recordAccessParams(ctx.principal!.principalId)],
+        : [ctx.principal!.orgId, ...group, ...recordAccessParams(ctx.principal!)],
     );
     for (const row of rows) result.set(String(row.id), row);
   }

@@ -4,6 +4,7 @@ import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import { requireOrgRole } from "./governance";
+import { requireDelegableTarget } from "./directory";
 import type { RequestContext, Result } from "./http";
 import {
   LIMITS,
@@ -36,6 +37,10 @@ export async function getPrincipal(ctx: RequestContext): Promise<Result> {
     key_id: principal.keyId,
     scopes: principal.scopes,
     max_trust: principal.maxTrust,
+    issued_by: principal.issuedBy ?? principal.principalId,
+    data_target_type: principal.dataTargetType ?? "organization",
+    data_target_id: principal.dataTargetType === "project" && principal.dataTargetId === "~"
+      ? null : principal.dataTargetId ?? null,
     organization_role: principal.scopes.includes("*") ? "root" : membership?.role ?? null,
   } };
 }
@@ -46,6 +51,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   const allowed = new Set([
     "label", "scopes", "max_trust", "principal_kind", "principal_id",
     "not_before", "expires_at", "membership_role",
+    "data_target_type", "data_target_id",
   ]);
   const unknown = Object.keys(body).find((field) => !allowed.has(field));
   if (unknown) throw validationError(`Unknown key creation field "${unknown}".`);
@@ -71,6 +77,18 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       throw forbidden("A managed credential may only reuse its own principal identity.");
   }
   const principalId = requestedPrincipalId ?? newId(membershipRole ? "human" : "agent");
+  const dataTargetType = optionalEnum(body, "data_target_type", ["organization", "project", "subject"] as const, "organization");
+  const dataTargetId = dataTargetType === "organization"
+    ? null
+    : dataTargetType === "project" && body.data_target_id === null
+      ? "~"
+      : requireString(body, "data_target_id", LIMITS.identifier);
+  const dataPermissions: Array<"read" | "write" | "approve" | "admin"> = ["read"];
+  if (scopes.some((scope) => /:(?:write|manage|create|purge)$/u.test(scope))) dataPermissions.push("write");
+  if (scopes.some((scope) => scope.endsWith(":approve"))) dataPermissions.push("approve");
+  if (scopes.includes("grants:write")) dataPermissions.push("admin");
+  if (body.data_target_type !== undefined || body.data_target_id !== undefined)
+    await requireDelegableTarget(ctx, dataTargetType, dataTargetType === "organization" ? "*" : dataTargetId!, dataPermissions);
   let membershipId: string | null = null;
   if (membershipRole) {
     requireScope(principal, "memberships:write");
@@ -95,6 +113,9 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       maxTrust,
       notBefore: new Date(notBefore),
       expiresAt: expiresAt === null ? null : new Date(expiresAt),
+      issuedBy: principal.principalId,
+      dataTargetType,
+      dataTargetId: dataTargetType === "organization" ? null : dataTargetId,
     },
     now,
   );
@@ -138,6 +159,8 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       principal_kind: principalKind,
       not_before: notBefore,
       expires_at: expiresAt,
+      data_target_type: dataTargetType,
+      data_target_id: dataTargetType === "project" && dataTargetId === "~" ? null : dataTargetId,
       last_used_at: null,
       ...(membershipId ? { membership_id: membershipId, membership_role: membershipRole } : {}),
       warning: "Store this key now. Titen keeps only its hash and cannot show it again.",
@@ -149,7 +172,8 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const rows = await ctx.app.db.all<Record<string, unknown>>(
     `SELECT id, principal_id, principal_kind, label, scopes, max_trust, created_at,
-            not_before, expires_at, last_used_at, revoked_at
+            not_before, expires_at, last_used_at, revoked_at,
+            data_target_type, data_target_id, issued_by
        FROM api_keys WHERE org_id = ? ORDER BY created_at, id LIMIT 500`,
     [principal.orgId],
   );
@@ -167,6 +191,10 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
         expires_at: row.expires_at,
         last_used_at: row.last_used_at,
         revoked_at: row.revoked_at,
+        issued_by: row.issued_by,
+        data_target_type: row.data_target_type ?? "organization",
+        data_target_id: row.data_target_type === "project" && row.data_target_id === "~"
+          ? null : row.data_target_id,
         status: keyLifecycleStatus({
           notBefore: String(row.not_before),
           expiresAt: row.expires_at === null ? null : String(row.expires_at),

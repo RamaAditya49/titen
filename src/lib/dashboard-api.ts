@@ -1,7 +1,7 @@
 /** Browser-safe client for the same-origin dashboard adapter. */
 export interface AtlasNode {
   id: string;
-  type: "claim" | "observation" | "context" | "principal" | "release";
+  type: "claim" | "observation" | "context" | "principal" | "release" | "subject";
   label: string;
   trust: string;
   status: string;
@@ -15,15 +15,21 @@ export interface AtlasNode {
   deadline?: string | null;
   evidence_refs?: string[];
   audit_refs?: string[];
+  kind?: string;
+  subject_id?: string;
+  project_ref?: string | null;
+  degree?: number;
 }
 
 export interface AtlasEdge { from: string; to: string; relation: string; }
 export interface AtlasView {
-  lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue" | "scope_preview" | "knowledge_release";
+  lens: "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue" | "scope_preview" | "workspace_graph" | "knowledge_release";
   focus_id: string | null;
   nodes: AtlasNode[];
   edges: AtlasEdge[];
   metadata: Record<string, unknown>;
+  truncated?: boolean;
+  withheld_edges?: number;
 }
 
 export interface MemoryRecord {
@@ -45,6 +51,7 @@ export interface MemoryPage {
   items: MemoryRecord[];
   page: { limit: number; has_more: boolean; next_cursor: string | null };
   query: Record<string, unknown>;
+  facets: { status: Record<string, number>; kind: Record<string, number> };
   authorization: { principal_id: string; access_mode: "principal" };
 }
 
@@ -158,6 +165,10 @@ export async function postArea(path: string, input: Record<string, unknown>): Pr
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export async function deleteArea(path: string): Promise<Record<string, unknown>> {
+  return request(`/dashboard-api/${path}`, { method: "DELETE" });
 }
 
 export async function checkService(path: "health" | "readiness"): Promise<ServiceCheck> {

@@ -9,6 +9,7 @@ features explicitly listed as proposed are not routes.
 <!-- ROUTE_INVENTORY_START -->
 - `DELETE /v1/checkpoints/:id`
 - `DELETE /v1/dashboard-sessions/current`
+- `DELETE /v1/grants/:id`
 - `DELETE /v1/identity-mappings/:id`
 - `DELETE /v1/keys/:id`
 - `DELETE /v1/leases/:id`
@@ -24,7 +25,6 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/checkpoints/:id`
 - `GET /v1/claim-approvals`
 - `GET /v1/claims/:id/evidence`
-- `GET /v1/memories`
 - `GET /v1/context/:id`
 - `GET /v1/events`
 - `GET /v1/events/:id`
@@ -32,14 +32,22 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/federation/log`
 - `GET /v1/federation/peers`
 - `GET /v1/federation/peers/:id/filters`
+- `GET /v1/grants`
 - `GET /v1/handoffs`
 - `GET /v1/identity-mappings`
 - `GET /v1/keys`
 - `GET /v1/knowledge-releases`
 - `GET /v1/leases`
 - `GET /v1/memberships`
+- `GET /v1/memories`
+- `GET /v1/models/config`
 - `GET /v1/policies`
 - `GET /v1/principal`
+- `GET /v1/principals`
+- `GET /v1/projects`
+- `GET /v1/projects/:id/references`
+- `GET /v1/subjects`
+- `GET /v1/subjects/:id/references`
 - `GET /v1/webhooks`
 - `GET /v1/webhooks/:id/deliveries`
 - `GET /v1/workspaces`
@@ -47,6 +55,7 @@ features explicitly listed as proposed are not routes.
 - `PATCH /v1/operator-accounts/current/password`
 - `PATCH /v1/policies/:id`
 - `POST /mcp`
+- `POST /v1/access/simulate`
 - `POST /v1/channels`
 - `POST /v1/channels/:id/context/compile`
 - `POST /v1/checkpoints`
@@ -65,6 +74,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/federation/peers/:id/suspend`
 - `POST /v1/federation/pull`
 - `POST /v1/federation/push`
+- `POST /v1/grants`
 - `POST /v1/handoffs`
 - `POST /v1/handoffs/:id/resolve`
 - `POST /v1/identity-mappings`
@@ -82,6 +92,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/legal-holds/:id/release`
 - `POST /v1/memberships`
 - `POST /v1/memory-views/compile`
+- `POST /v1/models/probe`
 - `POST /v1/observations`
 - `POST /v1/operator-accounts`
 - `POST /v1/policies`
@@ -104,7 +115,9 @@ features explicitly listed as proposed are not routes.
 ## API keys
 
 `POST /v1/keys` accepts a label, scopes, and optional `max_trust`,
-`principal_id`, `principal_kind`, `not_before`, and `expires_at`. Timestamps are
+`principal_id`, `principal_kind`, `not_before`, `expires_at`, and one bounded
+`data_target_type`/`data_target_id`. Targets are `organization`, `project`
+(including JSON `null` for explicit unscoped memory), or `subject`. Timestamps are
 canonical UTC; `not_before` is inclusive, `expires_at` is exclusive, and the
 former must precede the latter. The lifecycle window is immutable. Unknown
 creation fields are rejected so a client cannot mistake an ignored security
@@ -113,8 +126,10 @@ the raw `api_key`, credential `key_id`, and the caller-supplied or generated
 `principal_id`. Use `principal_id` for handoff targets; `key_id` identifies the
 revocable credential and is not an agent identity. `GET /v1/keys` returns the
 same non-secret identity metadata plus `not_before`, `expires_at`, monotonic
-nullable `last_used_at`, and `pending|active|expired|revoked` status, but never
-returns the raw key.
+nullable `last_used_at`, issuer, declared data target, and
+`pending|active|expired|revoked` status, but never returns the raw key. The
+effective target is re-evaluated against the issuer's current grants on every
+request; revoking an issuer grant narrows every derived key without a sweep.
 
 A wildcard root credential may reissue any explicit principal identity. A
 non-wildcard key manager may explicitly reuse only its own `principal_id` with
@@ -174,6 +189,45 @@ list.
 `DELETE /v1/dashboard-sessions/current` revokes the bearer dashboard session.
 API keys created for agents, services, SDKs, CLI recovery, or other integrations
 are separate and unchanged.
+
+## Directories and scoped access
+
+`GET /v1/principals` returns the bounded non-secret identity directory to an
+organization owner/admin with `principals:read`. `GET /v1/projects` and
+`GET /v1/subjects` return only entries backed by at least one canonical record
+the caller may read. Their `/:id/references` routes return bounded canonical or
+namespaced references; the explicit unscoped project uses `~` in the path and
+returns `project_id: null`. Directory counts and searches never include a
+record that failed authorization.
+
+`GET /v1/grants`, `POST /v1/grants`, and `DELETE /v1/grants/:id` expose
+append-and-revoke additive grants over `organization`, `project`, or `subject`
+targets. Permissions are `read`, `write`, `approve`, and `admin`; `admin` may
+delegate only within that same target (an organization admin target covers its
+children). The caller must hold every permission it delegates. Owners retain
+the documented explicit bypass, organization admins remain role-bound, and a
+foreign or inaccessible target returns the same `404` as a missing target.
+
+`POST /v1/access/simulate` accepts `principal_id`, `resource_type`
+(`claim|observation`), `resource_id`, and `operation`
+(`read|write|approve`). It returns the visibility gate, grant gate, and final
+decision only to an organization owner with `grants:read`; it is not an
+impersonation route and creates no authority.
+
+## Model diagnostics
+
+`GET /v1/models/config` requires `models:read` and returns the immutable
+non-secret startup snapshot for extraction and embedding: configured state,
+effective model tuple, masked key state, stored fingerprint, drift, and runtime
+authority. It never returns a credential, prompt, raw provider output, or
+embedding and cannot update the process environment.
+
+`POST /v1/models/probe` requires `models:probe` and accepts exactly one `group`
+(`extraction|embedding`). It is rate-limited per process, runs one bounded
+provider validation without committing canonical memory, and appends a
+metadata-only audit entry. A disabled or partial tuple is reported explicitly;
+the browser cannot make it active without an operator restart using valid
+environment configuration.
 
 ## Webhook delivery
 
@@ -640,7 +694,7 @@ and embeddings never enter that entry. Owner status without the dedicated
 capability does not widen access.
 
 The implemented lenses are `evidence_trace`, `neighborhood`,
-`conflict_freshness`, `review_queue`, `scope_preview`, and
+`conflict_freshness`, `workspace_graph`, `review_queue`, `scope_preview`, and
 `knowledge_release`. `scope_preview` additionally requires `governance:read`
 and an owner/admin/reader organization role, then returns role eligibility
 without impersonating or granting authority. `knowledge_release` additionally
@@ -649,6 +703,15 @@ snapshots and exact claim-version references in metadata, emits no dangling
 graph edges, and never includes source evidence.
 The example limits are caller requests, not normative server maxima; the server
 clamps them to measured deployment limits.
+
+`workspace_graph` accepts optional `workspace_id` and `max_nodes` from 25
+through 300. It returns only authorized claim and subject nodes plus canonical
+`about`, `related`, `contradicts`, and `supersedes` edges. Organization-visible
+claims remain visible through every selected workspace; team-visible claims
+must match it. Subject hubs count toward the node cap. The top-level and
+metadata `truncated`/`withheld_edges` fields disclose only bounded aggregate
+state, never hidden identifiers. Coordinates remain a deterministic client-side
+projection rather than canonical data.
 
 `evidence_trace` returns the authorized focus claim, its readable source
 observations, and typed `supports`, `contradicts`, or `qualifies` edges. It may

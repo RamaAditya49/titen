@@ -115,7 +115,7 @@ schema 20, one-read schema verification, enabled semantic readiness, 1024-value
 BGE-M3 output, scoped metadata filtering, and a keyword-free target recalled
 about two seconds after an explicit drain. A real Cron invocation indexed
 pending work; unauthenticated and foreign-organization probes returned `401`
-and non-disclosing `404`. Forced password replacement, six dashboard areas,
+and non-disclosing `404`. Forced password replacement, fifteen dashboard destinations,
 Add User, logout, D1 persistence, and Worker rollback/redeploy also belong to
 the release gate; the exact terminal revision is recorded in the paired done
 spec.
@@ -170,6 +170,12 @@ the retained live reference stack. Extraction remains disabled.
   delivery maintenance; trigger provisioning is operator work.
 - **Channel serving** — CRM/chatbot gateway via scoped service credential.
 - **Memory Atlas** — read-only browser client against authenticated REST.
+
+The dashboard's Models area reads the same immutable Worker startup snapshot
+through `GET /v1/models/config`. `POST /v1/models/probe` performs one bounded,
+rate-limited validation using the configured binding/provider, returns no raw
+provider payload, writes no canonical memory, and cannot mutate bindings or
+environment variables.
 
 With no AI/Vectorize binding or embedding variables, the Worker remains ready
 in intentional FTS-only mode. Semantic opt-in requires both native bindings and

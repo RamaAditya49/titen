@@ -1,4 +1,4 @@
-import { recordAccessParams, recordAccessSql } from "./authorization";
+import { principalRecordAccessSql, recordAccessParams, recordAccessSql } from "./authorization";
 import { first, type Db, type Stmt } from "./db";
 import {
   ExtractionProviderError,
@@ -650,7 +650,7 @@ export async function scheduleReflections(options: {
                AND reflected_job.org_id = c.org_id
                AND reflected_job.lane = 'reflection'
           )
-          AND ${recordAccessSql("c", "c.actor_id")}
+          AND ${principalRecordAccessSql("c", "c.actor_id")}
         ORDER BY c.created_at DESC, c.id
         LIMIT ?`,
       [

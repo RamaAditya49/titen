@@ -293,13 +293,14 @@ try {
     { input: { lens: "evidence_trace", focus_id: importedClaimId, limit: 5 }, marker: importedMarker },
     { input: { lens: "review_queue", subject_id: federatedSubject, review_reason: "all", limit: 5 }, marker: importedMarker },
     { input: { lens: "scope_preview", focus_id: destination.principalId, limit: 5 }, marker: "human" },
+    { input: { lens: "workspace_graph", max_nodes: 25, limit: 5 }, marker: importedMarker, global: true },
     { input: { lens: "knowledge_release", focus_id: channel.channel_id, limit: 5 }, marker: releaseMarker },
   ];
-  for (const { input, marker: expected } of cases) {
+  for (const { input, marker: expected, global } of cases) {
     const payload = (await dashboardCall("/dashboard-api/atlas/compile", { body: input })).payload;
     const labels = payload.data.nodes.map((node: any) => node.label);
     assert.ok(labels.includes(expected), `${input.lens} returns its authorized record`);
-    assert.ok(!labels.includes(leak), `${input.lens} excludes another subject`);
+    if (!global) assert.ok(!labels.includes(leak), `${input.lens} excludes another subject`);
   }
 
   const context = (await dashboardCall("/dashboard-api/context/compile", { body: {
@@ -317,7 +318,23 @@ try {
 
   assert.ok((await dashboardCall("/dashboard-api/audit/log?limit=50")).payload.data.entries.length > 0, "Audit area returns entries");
   assert.ok((await dashboardCall("/dashboard-api/audit/events?limit=50")).payload.data.events.length > 0, "Audit area returns events");
+  assert.ok((await dashboardCall(`/dashboard-api/memories?subject_id=${federatedSubject}`)).payload.data.items
+    .some((item: any) => item.statement.includes(importedMarker)), "Memories area returns imported memory");
+  assert.ok((await dashboardCall(`/dashboard-api/subjects?q=${federatedSubject}`)).payload.data.subjects.length > 0,
+    "Subjects area returns its directory");
+  assert.ok(Array.isArray((await dashboardCall("/dashboard-api/projects")).payload.data.projects),
+    "Projects area returns its directory");
+  assert.ok((await dashboardCall("/dashboard-api/access/principals")).payload.data.principals
+    .some((item: any) => item.principal_id === ownerAccount.principal_id), "Access area returns principals");
+  assert.ok((await dashboardCall("/dashboard-api/access/grants")).payload.data.grants.length > 0,
+    "Access area returns scoped grants");
+  assert.equal((await dashboardCall("/dashboard-api/models/config")).payload.data.immutable_startup_snapshot, true,
+    "Models area returns the masked startup snapshot");
+  assert.ok((await dashboardCall("/dashboard-api/governance/keys")).payload.data.keys.length > 0,
+    "API & Keys area returns managed credentials");
   assert.ok((await dashboardCall("/dashboard-api/governance/channels")).payload.data.channels.length > 0, "Governance area returns channels");
+  assert.ok(Array.isArray((await dashboardCall("/dashboard-api/governance/approvals")).payload.data.approvals),
+    "Approvals area returns its queue");
   assert.ok((await dashboardCall("/dashboard-api/governance/releases")).payload.data.releases.length > 0, "Governance area returns releases");
   assert.ok((await dashboardCall("/dashboard-api/federation/peers")).payload.data.peers.length > 0, "Federation area returns peers");
   assert.ok((await dashboardCall(`/dashboard-api/federation/log?peer_id=${ownerPeer.peer_id}&limit=50`)).payload.data.entries.length > 0, "Federation area returns exchange log");
@@ -376,7 +393,7 @@ try {
   assert.equal(establishedReader.payload.data.password_change_required, false);
   assert.equal((await dashboardCall("/dashboard-api/session")).payload.data.organization_role, "reader");
 
-  console.log("OK — six live product areas, forced first password change, atomic add-user, and canonical federation passed through the real adapter");
+  console.log("OK — fifteen live product destinations, forced first password change, atomic add-user, and canonical federation passed through the real adapter");
 } finally {
   adapter.kill();
   await api.stop();

@@ -83,7 +83,9 @@ export async function listMemories(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const q = queryValue(ctx, "q", LIMITS.statement);
   const subjectId = queryValue(ctx, "subject_id", LIMITS.identifier);
-  const projectId = queryValue(ctx, "project_id", LIMITS.identifier);
+  const projectQuery = queryValue(ctx, "project_id", LIMITS.identifier);
+  const projectId = projectQuery === "~" ? null : projectQuery;
+  const workspaceId = queryValue(ctx, "workspace_id", LIMITS.identifier);
   const statuses = parseList(queryValue(ctx, "status", 120), STATUSES, "status");
   const visibilities = parseList(queryValue(ctx, "visibility", 80), VISIBILITIES, "visibility");
   const kinds = parseList(queryValue(ctx, "kind", 240), CLAIM_KINDS, "kind");
@@ -95,7 +97,8 @@ export async function listMemories(ctx: RequestContext): Promise<Result> {
   conditions.push(`c.status IN (${activeStatuses.map(() => "?").join(", ")})`);
   params.push(...activeStatuses);
   if (subjectId) { conditions.push("c.subject_id = ?"); params.push(subjectId); }
-  if (projectId) { conditions.push("c.project_id IS ?"); params.push(projectId); }
+  if (projectQuery) { conditions.push("c.project_id IS ?"); params.push(projectId); }
+  if (workspaceId) { conditions.push("(c.workspace_id IS ? OR c.visibility = 'organization')"); params.push(workspaceId); }
   if (visibilities.length > 0) {
     conditions.push(`c.visibility IN (${visibilities.map(() => "?").join(", ")})`);
     params.push(...visibilities);
@@ -116,7 +119,7 @@ export async function listMemories(ctx: RequestContext): Promise<Result> {
     params.push(principal.orgId, plan.match);
   }
   conditions.push(recordAccessSql("c"));
-  params.push(...recordAccessParams(principal.principalId));
+  params.push(...recordAccessParams(principal));
   if (after) {
     conditions.push("(c.created_at < ? OR (c.created_at = ? AND c.id < ?))");
     params.push(after.createdAt, after.createdAt, after.id);
@@ -134,6 +137,30 @@ export async function listMemories(ctx: RequestContext): Promise<Result> {
   const hasMore = rows.length > limit;
   const items = rows.slice(0, limit);
   const tail = items.at(-1);
+  const facetConditions = ["c.org_id = ?"];
+  const facetParams: Param[] = [principal.orgId];
+  if (subjectId) { facetConditions.push("c.subject_id = ?"); facetParams.push(subjectId); }
+  if (projectQuery) { facetConditions.push("c.project_id IS ?"); facetParams.push(projectId); }
+  if (workspaceId) { facetConditions.push("(c.workspace_id IS ? OR c.visibility = 'organization')"); facetParams.push(workspaceId); }
+  if (visibilities.length > 0) {
+    facetConditions.push(`c.visibility IN (${visibilities.map(() => "?").join(", ")})`);
+    facetParams.push(...visibilities);
+  }
+  if (plan.match) {
+    facetConditions.push("claims_fts MATCH ('org_scope : \"' || lower(hex(?)) || '0\" AND statement : (' || ? || ')')");
+    facetParams.push(principal.orgId, plan.match);
+  }
+  facetConditions.push(recordAccessSql("c"));
+  facetParams.push(...recordAccessParams(principal));
+  const facets = await ctx.app.db.all<{ status: string; kind: string; count: number }>(
+    `SELECT c.status, c.kind, COUNT(*) AS count FROM claims c
+       ${plan.match ? "JOIN claims_fts f ON f.claim_id = c.id" : ""}
+      WHERE ${facetConditions.join(" AND ")} GROUP BY c.status, c.kind`, facetParams);
+  const counts = (field: "status" | "kind") => Object.fromEntries(facets.reduce((entries, row) => {
+    const key = row[field];
+    entries.set(key, (entries.get(key) ?? 0) + Number(row.count));
+    return entries;
+  }, new Map<string, number>()));
   return {
     data: {
       items,
@@ -142,7 +169,10 @@ export async function listMemories(ctx: RequestContext): Promise<Result> {
         has_more: hasMore,
         next_cursor: hasMore && tail ? encodeCursor({ createdAt: tail.created_at, id: tail.id }) : null,
       },
-      query: { q, subject_id: subjectId, project_id: projectId, status: activeStatuses, visibility: visibilities, kind: kinds, terms_used: plan.termsUsed, terms_dropped: plan.termsDropped },
+      query: { q, subject_id: subjectId, project_id: projectQuery === "~" ? null : projectId,
+        workspace_id: workspaceId, status: activeStatuses, visibility: visibilities,
+        kind: kinds, terms_used: plan.termsUsed, terms_dropped: plan.termsDropped },
+      facets: { status: counts("status"), kind: counts("kind") },
       authorization: { principal_id: principal.principalId, access_mode: "principal" },
     },
   };

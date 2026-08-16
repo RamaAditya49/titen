@@ -55,6 +55,8 @@ version="$(node -p 'require("./node_modules/titen-memory/package.json").version'
   || { echo "FAIL: installed CLI version differs from package.json" >&2; exit 1; }
 [ -f node_modules/titen-memory/dist/dashboard/index.html ] \
   || { echo "FAIL: packaged dashboard HTML is missing" >&2; exit 1; }
+[ -f node_modules/titen-memory/dist/index.html ] \
+  || { echo "FAIL: packaged root dashboard redirect is missing" >&2; exit 1; }
 [ -f node_modules/titen-memory/scripts/dashboard-adapter.ts ] \
   || { echo "FAIL: packaged dashboard adapter is missing" >&2; exit 1; }
 grep -q 'data-profile-password-form' node_modules/titen-memory/dist/dashboard/index.html \
@@ -303,6 +305,9 @@ for _ in $(seq 1 60); do
     || { echo "FAIL: packaged dashboard exited" >&2; cat "$work/dashboard.log" >&2; exit 1; }
   sleep 0.25
 done
+curl --max-time 2 -sf "http://127.0.0.1:$dashboard_port/" \
+  | grep -q 'url=/dashboard/' \
+  || { echo "FAIL: packaged dashboard root does not redirect to /dashboard/" >&2; exit 1; }
 grep -q 'data-profile-password-form' "$work/dashboard.html" \
   || { echo "FAIL: packaged dashboard served stale HTML" >&2; exit 1; }
 dashboard_status="$(curl --max-time 5 -sf "http://127.0.0.1:$dashboard_port/dashboard-api/status")"

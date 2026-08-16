@@ -112,8 +112,10 @@ migrations, Cloudflare and Bun entrypoints, and a shared dual-runtime contract
 suite. Their precise verification boundary is centralized in the [roadmap
 maturity matrix](../ROADMAP.md#maturity-matrix).
 
-The Astro dashboard is a live client of health, readiness, Memories, Context,
-Work, Audit, Governance, and Federation through a same-origin loopback adapter.
+The Astro dashboard is a live client of the fifteen-destination product map,
+including health/readiness, canonical directories, model diagnostics, scoped
+access, collaboration, governance, and federation through a same-origin
+loopback adapter.
 Its optional per-principal login verifies canonical human password accounts,
 seals short-lived raw API keys into opaque HttpOnly cookies with Web Crypto,
 and optionally shares the sealing key across replicas; every API operation still performs canonical key, scope, role, and
@@ -191,13 +193,14 @@ rebuildable and cannot become canonical memory.
 1. Serve one optional static client that consumes authenticated REST only.
 2. Render only areas implemented in the current build and discoverable by the
    authenticated principal; navigation never replaces route authorization.
-3. Discover Memories, Context, Work, Audit, Governance, and Federation from the
+3. Discover the fifteen product destinations from the
    authenticated principal's scopes; an undiscoverable area exposes no control
    or prior private result.
 4. Route each area only through the adapter's fixed method/path/query allowlist;
-   Memories reuses Atlas and no dashboard route becomes domain authority.
-5. Keep categories/tags as memory filters, events inside Audit, account settings
-   absent, and backup/recovery in deployment tooling.
+   Memories opens a selected record in Atlas and no dashboard route becomes
+   domain authority.
+5. Keep categories/tags as memory filters, events inside Audit, password
+   rotation inside Profile, and backup/recovery in deployment tooling.
 
 Disabling or rolling back the static client changes no canonical data, API
 contract, or ordinary-agent MCP behavior.

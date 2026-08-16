@@ -15,7 +15,7 @@ function retentionAccessSql(alias: RecordAlias): string {
 }
 
 /** SQL eligibility shared by every canonical memory projection. */
-export function recordAccessSql(alias: RecordAlias, principalSql = "?"): string {
+export function recordAccessSql(alias: RecordAlias, principalSql = "?", permission: "read" | "write" | "approve" = "read"): string {
   return `(
     ${alias}.visibility = 'organization'
     OR (${alias}.visibility = 'private' AND ${alias}.actor_id = ${principalSql})
@@ -30,11 +30,121 @@ export function recordAccessSql(alias: RecordAlias, principalSql = "?"): string 
            AND access_membership.removed_at IS NULL
       )
     )
-  ) AND ${retentionAccessSql(alias)}`;
+  )
+  AND (
+    EXISTS (
+      SELECT 1 FROM memberships access_owner
+       WHERE access_owner.org_id = ${alias}.org_id
+         AND access_owner.workspace_id IS NULL
+         AND access_owner.principal_id = ?
+         AND access_owner.role = 'owner'
+         AND access_owner.removed_at IS NULL
+    )
+    OR EXISTS (
+      SELECT 1 FROM access_grants access_grant
+       WHERE access_grant.org_id = ${alias}.org_id
+         AND access_grant.grantee_principal_id = ?
+         AND access_grant.revoked_at IS NULL
+         AND (access_grant.expires_at IS NULL OR access_grant.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+         AND instr(' ' || access_grant.permissions || ' ', ' ${permission} ') > 0
+         AND (
+           access_grant.target_type = 'organization'
+           OR (access_grant.target_type = 'project' AND access_grant.target_id = COALESCE(${alias}.project_id, '~'))
+           OR (access_grant.target_type = 'subject' AND access_grant.target_id = ${alias}.subject_id)
+         )
+    )
+  )
+  AND (
+    NOT EXISTS (SELECT 1 FROM api_keys access_key WHERE access_key.id = ?)
+    OR EXISTS (
+      SELECT 1 FROM api_keys access_key
+       WHERE access_key.id = ?
+         AND (
+           access_key.data_target_type IS NULL
+           OR access_key.data_target_type = 'organization'
+           OR (access_key.data_target_type = 'project' AND access_key.data_target_id = COALESCE(${alias}.project_id, '~'))
+           OR (access_key.data_target_type = 'subject' AND access_key.data_target_id = ${alias}.subject_id)
+         )
+    )
+  )
+  AND ${retentionAccessSql(alias)}`;
 }
 
-export function recordAccessParams(principalId: string): Param[] {
-  return [principalId, principalId];
+export function recordAccessParams(principal: string | Principal): Param[] {
+  const principalId = typeof principal === "string" ? principal : principal.principalId;
+  const authorityId = typeof principal === "string" ? principal : principal.issuedBy ?? principal.principalId;
+  const keyId = typeof principal === "string" ? "" : principal.keyId;
+  return [principalId, principalId, authorityId, authorityId, keyId, keyId];
+}
+
+/** Fails closed before a canonical write whose target is not currently delegated. */
+export async function authorizeRecordTarget(
+  db: Db,
+  principal: Principal,
+  subjectId: string,
+  projectId: string | null,
+): Promise<void> {
+  const authorityId = principal.issuedBy ?? principal.principalId;
+  const allowed = await first<{ allowed: number }>(db,
+    `SELECT 1 AS allowed WHERE (
+       EXISTS (
+         SELECT 1 FROM memberships m WHERE m.org_id = ? AND m.workspace_id IS NULL
+          AND m.principal_id = ? AND m.role = 'owner' AND m.removed_at IS NULL
+       ) OR EXISTS (
+         SELECT 1 FROM access_grants g WHERE g.org_id = ? AND g.grantee_principal_id = ?
+          AND g.revoked_at IS NULL
+          AND (g.expires_at IS NULL OR g.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+          AND instr(' ' || g.permissions || ' ', ' write ') > 0
+          AND (g.target_type = 'organization'
+            OR (g.target_type = 'project' AND g.target_id = COALESCE(?, '~'))
+            OR (g.target_type = 'subject' AND g.target_id = ?))
+       )
+     ) AND (
+       NOT EXISTS (SELECT 1 FROM api_keys k WHERE k.id = ?)
+       OR EXISTS (
+         SELECT 1 FROM api_keys k WHERE k.id = ? AND (
+           k.data_target_type IS NULL OR k.data_target_type = 'organization'
+           OR (k.data_target_type = 'project' AND k.data_target_id = COALESCE(?, '~'))
+           OR (k.data_target_type = 'subject' AND k.data_target_id = ?)
+         )
+       )
+     )`,
+    [principal.orgId, authorityId, principal.orgId, authorityId, projectId, subjectId,
+      principal.keyId, principal.keyId, projectId, subjectId]);
+  if (!allowed) throw notFound();
+}
+
+/** Record access for a principal already available as a trusted SQL column. */
+export function principalRecordAccessSql(alias: RecordAlias, principalSql: string): string {
+  return `(
+    ${alias}.visibility = 'organization'
+    OR (${alias}.visibility = 'private' AND ${alias}.actor_id = ${principalSql})
+    OR (${alias}.visibility = 'team' AND ${alias}.workspace_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM memberships access_membership
+       WHERE access_membership.org_id = ${alias}.org_id
+         AND access_membership.workspace_id = ${alias}.workspace_id
+         AND access_membership.principal_id = ${principalSql}
+         AND access_membership.removed_at IS NULL
+    ))
+  ) AND (
+    EXISTS (
+      SELECT 1 FROM memberships access_owner
+       WHERE access_owner.org_id = ${alias}.org_id
+         AND access_owner.workspace_id IS NULL
+         AND access_owner.principal_id = ${principalSql}
+         AND access_owner.role = 'owner' AND access_owner.removed_at IS NULL
+    ) OR EXISTS (
+      SELECT 1 FROM access_grants access_grant
+       WHERE access_grant.org_id = ${alias}.org_id
+         AND access_grant.grantee_principal_id = ${principalSql}
+         AND access_grant.revoked_at IS NULL
+         AND (access_grant.expires_at IS NULL OR access_grant.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+         AND instr(' ' || access_grant.permissions || ' ', ' read ') > 0
+         AND (access_grant.target_type = 'organization'
+           OR (access_grant.target_type = 'project' AND access_grant.target_id = COALESCE(${alias}.project_id, '~'))
+           OR (access_grant.target_type = 'subject' AND access_grant.target_id = ${alias}.subject_id))
+    )
+  ) AND ${retentionAccessSql(alias)}`;
 }
 
 /** Explicit organization-administrator view; callers must bind org authority first. */

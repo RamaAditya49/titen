@@ -1,5 +1,5 @@
 import { chunk, first, MAX_BOUND_PARAMS } from "./db";
-import { hasScope } from "./auth";
+import { hasScope, type Principal } from "./auth";
 import {
   contradictedSql,
   organizationRecordAccessSql,
@@ -13,7 +13,7 @@ import type { RequestContext, Result } from "./http";
 import { requireObject, optionalString, requireEnum } from "./validate";
 import { requireOrgRole } from "./governance";
 
-const LENSES = ["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "knowledge_release"] as const;
+const LENSES = ["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "workspace_graph", "knowledge_release"] as const;
 type Lens = (typeof LENSES)[number];
 const REVIEW_REASONS = ["all", "disputed", "contradiction", "low_confidence", "negative_feedback"] as const;
 const ACCESS_MODES = ["principal", "organization_admin"] as const;
@@ -26,8 +26,8 @@ function accessSql(alias: "c" | "o", mode: AccessMode): string {
     : recordAccessSql(alias);
 }
 
-function accessParams(principalId: string, mode: AccessMode) {
-  return mode === "organization_admin" ? [] : recordAccessParams(principalId);
+function accessParams(principal: Principal, mode: AccessMode) {
+  return mode === "organization_admin" ? [] : recordAccessParams(principal);
 }
 
 function claimAccessSql(alias: "hc" | "rc", mode: AccessMode): string {
@@ -39,12 +39,16 @@ function claimAccessSql(alias: "hc" | "rc", mode: AccessMode): string {
 
 interface Node {
   id: string;
-  type: "claim" | "observation" | "context" | "principal" | "release";
+  type: "claim" | "observation" | "context" | "principal" | "release" | "subject";
   label: string;
   trust: string;
   status: string;
   created_at: string;
   freshness?: number;
+  kind?: string;
+  subject_id?: string;
+  project_ref?: string | null;
+  degree?: number;
 }
 
 interface ReviewNode extends Node {
@@ -78,6 +82,8 @@ interface ViewResult {
   nodes: Node[];
   edges: Edge[];
   metadata: Record<string, unknown>;
+  truncated?: boolean;
+  withheld_edges?: number;
 }
 
 function daysSince(iso: string, now: Date): number {
@@ -118,13 +124,13 @@ function decodeCursor(value: string | null): ReviewCursor | null {
 
 // --- Lens handlers ---
 
-async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string, principalId: string, mode: AccessMode, limit: number): Promise<ViewResult> {
+async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string, principal: Principal, mode: AccessMode, limit: number): Promise<ViewResult> {
   const claim = await first<{ id: string; statement: string; trust: string; status: string; visibility: string; actor_id: string; created_at: string }>(
     ctx.app.db,
     `SELECT c.id, c.statement, c.trust, c.status, c.visibility, c.actor_id, c.created_at
        FROM claims c
       WHERE c.id = ? AND c.org_id = ? AND ${accessSql("c", mode)}`,
-    [focusId, orgId, ...accessParams(principalId, mode)],
+    [focusId, orgId, ...accessParams(principal, mode)],
   );
   if (!claim) throw notFound();
 
@@ -135,7 +141,7 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
       WHERE s.claim_id = ? AND o.org_id = ? AND ${accessSql("o", mode)}
       ORDER BY o.ingested_at, o.id
       LIMIT ?`,
-    [focusId, orgId, ...accessParams(principalId, mode), Math.max(0, limit - 1)],
+    [focusId, orgId, ...accessParams(principal, mode), Math.max(0, limit - 1)],
   );
 
   const nodes: Node[] = [
@@ -171,7 +177,7 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
         )
       ORDER BY r.created_at DESC, r.id DESC
       LIMIT ?`,
-    [orgId, focusId, principalId, principalId, ...accessParams(principalId, mode), Math.min(20, Math.max(0, limit - nodes.length))],
+    [orgId, focusId, principal.principalId, principal.principalId, ...accessParams(principal, mode), Math.min(20, Math.max(0, limit - nodes.length))],
   );
   for (const context of contexts) {
     nodes.push({
@@ -202,7 +208,7 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
         AND ${claimAccessSql("rc", mode)}
       ORDER BY COALESCE(r.activated_at, r.created_at) DESC, r.id DESC
       LIMIT ?`,
-    [orgId, focusId, now, now, ...accessParams(principalId, mode), Math.min(20, Math.max(0, limit - nodes.length))],
+    [orgId, focusId, now, now, ...accessParams(principal, mode), Math.min(20, Math.max(0, limit - nodes.length))],
   );
   for (const release of releases) {
     nodes.push({
@@ -229,13 +235,13 @@ async function evidenceTrace(ctx: RequestContext, focusId: string, orgId: string
   };
 }
 
-async function neighborhood(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number, mode: AccessMode): Promise<ViewResult> {
+async function neighborhood(ctx: RequestContext, subjectId: string, orgId: string, principal: Principal, limit: number, mode: AccessMode): Promise<ViewResult> {
   const claims = await ctx.app.db.all<{ id: string; statement: string; trust: string; status: string; visibility: string; actor_id: string; created_at: string }>(
     `SELECT id, statement, trust, status, visibility, actor_id, created_at
        FROM claims c WHERE c.subject_id = ? AND c.org_id = ? AND c.status != 'revoked'
         AND ${accessSql("c", mode)}
       ORDER BY created_at DESC LIMIT ?`,
-    [subjectId, orgId, ...accessParams(principalId, mode), limit],
+    [subjectId, orgId, ...accessParams(principal, mode), limit],
   );
 
   const nodes: Node[] = [];
@@ -250,7 +256,7 @@ async function neighborhood(ctx: RequestContext, subjectId: string, orgId: strin
          FROM claim_sources s
          JOIN observations o ON o.id = s.observation_id
         WHERE s.claim_id = ? AND o.org_id = ? AND ${accessSql("o", mode)}`,
-      [c.id, orgId, ...accessParams(principalId, mode)],
+      [c.id, orgId, ...accessParams(principal, mode)],
     );
 
     for (const s of sources) {
@@ -265,7 +271,7 @@ async function neighborhood(ctx: RequestContext, subjectId: string, orgId: strin
   return { lens: "neighborhood", focus_id: null, nodes, edges, metadata: { subject_id: subjectId, claim_count: claims.length } };
 }
 
-async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: string, principalId: string, limit: number, mode: AccessMode): Promise<ViewResult> {
+async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: string, principal: Principal, limit: number, mode: AccessMode): Promise<ViewResult> {
   const now = ctx.app.now();
 
   // Claims that have at least one contradicting source
@@ -279,8 +285,8 @@ async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: 
     [
       orgId,
       subjectId,
-      ...accessParams(principalId, mode),
-      ...accessParams(principalId, mode),
+      ...accessParams(principal, mode),
+      ...accessParams(principal, mode),
       limit,
     ],
   );
@@ -298,7 +304,7 @@ async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: 
          JOIN observations o ON o.id = s.observation_id
         WHERE s.claim_id = ? AND s.relation = 'contradicts' AND o.org_id = ?
           AND ${accessSql("o", mode)}`,
-      [c.id, orgId, ...accessParams(principalId, mode)],
+      [c.id, orgId, ...accessParams(principal, mode)],
     );
 
     for (const o of contradictions) {
@@ -311,6 +317,117 @@ async function conflictFreshness(ctx: RequestContext, subjectId: string, orgId: 
   }
 
   return { lens: "conflict_freshness", focus_id: null, nodes, edges, metadata: { subject_id: subjectId, disputed_count: disputed.length } };
+}
+
+async function workspaceGraph(
+  ctx: RequestContext,
+  workspaceId: string | null,
+  maxNodes: number,
+  mode: AccessMode,
+): Promise<ViewResult> {
+  const principal = ctx.principal!;
+  const totals = await first<{
+    claim_count: number; subject_count: number; link_count: number; supersede_count: number;
+  }>(ctx.app.db,
+    `WITH authorized AS (
+       SELECT c.id, c.subject_id, c.superseded_by FROM claims c
+        WHERE c.org_id = ? AND (c.workspace_id IS ? OR c.visibility = 'organization')
+          AND ${accessSql("c", mode)}
+     )
+     SELECT COUNT(*) AS claim_count, COUNT(DISTINCT subject_id) AS subject_count,
+       (SELECT COUNT(*) FROM claim_links l
+         JOIN authorized source ON source.id = l.source_claim_id
+         JOIN authorized target ON target.id = l.target_claim_id
+        WHERE l.org_id = ?) AS link_count,
+       COALESCE(SUM(CASE WHEN superseded_by IN (SELECT id FROM authorized) THEN 1 ELSE 0 END), 0)
+         AS supersede_count
+       FROM authorized`,
+    [principal.orgId, workspaceId, ...accessParams(principal, mode), principal.orgId]);
+  const claims = await ctx.app.db.all<{
+    id: string; subject_id: string; statement: string; kind: string; status: string;
+    trust: string; created_at: string; superseded_by: string | null; project_ref: string | null;
+  }>(
+    `SELECT c.id, c.subject_id, c.statement, c.kind, c.status, c.trust,
+            c.created_at, c.superseded_by, p.reference AS project_ref
+       FROM claims c LEFT JOIN projects p ON p.id = c.project_id AND p.org_id = c.org_id
+      WHERE c.org_id = ? AND (c.workspace_id IS ? OR c.visibility = 'organization')
+        AND ${accessSql("c", mode)}
+      ORDER BY c.created_at DESC, c.id DESC LIMIT ?`,
+    [principal.orgId, workspaceId, ...accessParams(principal, mode), maxNodes + 1],
+  );
+  const totalNodes = Number(totals?.claim_count ?? 0) + Number(totals?.subject_count ?? 0);
+  const truncated = totalNodes > maxNodes;
+  const selected = claims.slice(0, maxNodes);
+  const claimIds = new Set(selected.map((claim) => claim.id));
+  const subjectIds = [...new Set(selected.map((claim) => claim.subject_id))].sort();
+  while (selected.length + subjectIds.length > maxNodes) {
+    const removed = selected.pop();
+    if (!removed) break;
+    claimIds.delete(removed.id);
+    if (!selected.some((claim) => claim.subject_id === removed.subject_id))
+      subjectIds.splice(subjectIds.indexOf(removed.subject_id), 1);
+  }
+  const subjectRows = subjectIds.length ? await ctx.app.db.all<{ id: string; label: string; created_at: string }>(
+    `SELECT id, label, created_at FROM subjects
+      WHERE org_id = ? AND id IN (${subjectIds.map(() => "?").join(", ")})`,
+    [principal.orgId, ...subjectIds],
+  ) : [];
+  const subjectById = new Map(subjectRows.map((subject) => [subject.id, subject]));
+  const nodes: Node[] = subjectIds.map((id) => ({
+    id: `subject:${id}`,
+    type: "subject",
+    label: subjectById.get(id)?.label ?? id,
+    trust: "canonical",
+    status: "active",
+    created_at: subjectById.get(id)?.created_at ?? selected.find((claim) => claim.subject_id === id)!.created_at,
+    degree: 0,
+  }));
+  nodes.push(...selected.map((claim) => ({
+    id: claim.id,
+    type: "claim" as const,
+    label: claim.statement,
+    kind: claim.kind,
+    subject_id: claim.subject_id,
+    trust: claim.trust,
+    status: claim.status,
+    created_at: claim.created_at,
+    project_ref: claim.project_ref,
+    degree: 0,
+  })));
+  const edges: Edge[] = selected.map((claim) => ({
+    from: claim.id, to: `subject:${claim.subject_id}`, relation: "about",
+  }));
+  if (selected.length) {
+    const ids = selected.map((claim) => claim.id);
+    const links = await ctx.app.db.all<{ source_claim_id: string; target_claim_id: string; relation: string }>(
+      `SELECT source_claim_id, target_claim_id, relation FROM claim_links
+        WHERE org_id = ? AND source_claim_id IN (${ids.map(() => "?").join(", ")})
+          AND target_claim_id IN (${ids.map(() => "?").join(", ")})
+        ORDER BY created_at, id`,
+      [principal.orgId, ...ids, ...ids],
+    );
+    for (const link of links) edges.push({
+      from: link.source_claim_id,
+      to: link.target_claim_id,
+      relation: link.relation === "conflict_candidate" ? "contradicts" : "related",
+    });
+    for (const claim of selected)
+      if (claim.superseded_by && claimIds.has(claim.superseded_by))
+        edges.push({ from: claim.id, to: claim.superseded_by, relation: "supersedes" });
+  }
+  const degree = new Map<string, number>();
+  for (const edge of edges) {
+    degree.set(edge.from, (degree.get(edge.from) ?? 0) + 1);
+    degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
+  }
+  for (const node of nodes) node.degree = degree.get(node.id) ?? 0;
+  const totalEdges = Number(totals?.claim_count ?? 0) + Number(totals?.link_count ?? 0)
+    + Number(totals?.supersede_count ?? 0);
+  const withheldEdges = Math.max(0, totalEdges - edges.length);
+  return { lens: "workspace_graph", focus_id: selected[0]?.id ?? null, nodes, edges,
+    truncated, withheld_edges: withheldEdges,
+    metadata: { workspace_id: workspaceId, truncated, withheld_edges: withheldEdges,
+      node_count: nodes.length, edge_count: edges.length } };
 }
 
 async function loadAuditRefs(ctx: RequestContext, claimIds: string[]): Promise<Map<string, string[]>> {
@@ -346,9 +463,9 @@ async function reviewQueue(
   const principal = ctx.principal!;
   const scoredConditions = ["c.org_id = ?", "c.status IN ('active', 'disputed')", accessSql("c", mode)];
   const params: (string | number | null)[] = [
-    ...accessParams(principal.principalId, mode),
+    ...accessParams(principal, mode),
     principal.orgId,
-    ...accessParams(principal.principalId, mode),
+    ...accessParams(principal, mode),
   ];
   if (subjectId) { scoredConditions.push("c.subject_id = ?"); params.push(subjectId); }
   if (ownerId) { scoredConditions.push("c.actor_id = ?"); params.push(ownerId); }
@@ -557,6 +674,7 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
   const focusId = optionalString(body, "focus_id", 200);
   const subjectId = optionalString(body, "subject_id", 200);
   const ownerId = optionalString(body, "owner_id", 200);
+  const workspaceId = optionalString(body, "workspace_id", 200);
   const cursor = decodeCursor(optionalString(body, "cursor", 1000));
   const reviewReason = requireEnum({ review_reason: body.review_reason ?? "all" }, "review_reason", REVIEW_REASONS);
   const accessMode = requireEnum({ access_mode: body.access_mode ?? "principal" }, "access_mode", ACCESS_MODES);
@@ -564,6 +682,9 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
     ? requireEnum(body, "administrator_reason", ADMINISTRATOR_REASONS)
     : null;
   const limit = clampLimit(body);
+  const maxNodes = body.max_nodes === undefined ? 150 : body.max_nodes;
+  if (!Number.isInteger(maxNodes) || Number(maxNodes) < 25 || Number(maxNodes) > 300)
+    throw validationError('Field "max_nodes" must be an integer between 25 and 300.');
 
   if (accessMode === "organization_admin") {
     if (!hasScope(principal, "views:compile:all")) throw notFound();
@@ -578,17 +699,17 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
   switch (lens) {
     case "evidence_trace": {
       if (!focusId) throw validationError('Field "focus_id" is required for evidence_trace lens.');
-      view = await evidenceTrace(ctx, focusId, orgId, principalId, accessMode, limit);
+      view = await evidenceTrace(ctx, focusId, orgId, principal, accessMode, limit);
       break;
     }
     case "neighborhood": {
       if (!subjectId) throw validationError('Field "subject_id" is required for neighborhood lens.');
-      view = await neighborhood(ctx, subjectId, orgId, principalId, limit, accessMode);
+      view = await neighborhood(ctx, subjectId, orgId, principal, limit, accessMode);
       break;
     }
     case "conflict_freshness": {
       if (!subjectId) throw validationError('Field "subject_id" is required for conflict_freshness lens.');
-      view = await conflictFreshness(ctx, subjectId, orgId, principalId, limit, accessMode);
+      view = await conflictFreshness(ctx, subjectId, orgId, principal, limit, accessMode);
       break;
     }
     case "review_queue": {
@@ -598,6 +719,10 @@ export async function compileView(ctx: RequestContext): Promise<Result> {
     case "scope_preview": {
       if (!focusId) throw validationError('Field "focus_id" is required for scope_preview lens.');
       view = await scopePreview(ctx, focusId);
+      break;
+    }
+    case "workspace_graph": {
+      view = await workspaceGraph(ctx, workspaceId, Number(maxNodes), accessMode);
       break;
     }
     case "knowledge_release": {

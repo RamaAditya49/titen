@@ -9,6 +9,13 @@ export const KEY_PREFIX = "titen_sk_";
 export const SCOPES = [
   "projects:resolve",
   "projects:create",
+  "projects:read",
+  "subjects:read",
+  "principals:read",
+  "grants:read",
+  "grants:write",
+  "models:read",
+  "models:probe",
   "observations:write",
   "observations:purge",
   "claims:write",
@@ -64,6 +71,9 @@ export interface Principal {
   principalKind: "human" | "agent" | "service";
   scopes: string[];
   maxTrust: Trust;
+  issuedBy?: string;
+  dataTargetType?: "organization" | "project" | "subject" | null;
+  dataTargetId?: string | null;
 }
 
 interface KeyRow {
@@ -76,6 +86,9 @@ interface KeyRow {
   not_before: string;
   expires_at: string | null;
   revoked_at: string | null;
+  issued_by: string | null;
+  data_target_type: "organization" | "project" | "subject" | null;
+  data_target_id: string | null;
 }
 
 export function bearerToken(request: Request): string | undefined {
@@ -134,7 +147,8 @@ export async function authenticate(
       WHERE key_hash = ? AND revoked_at IS NULL
         AND not_before <= ? AND (expires_at IS NULL OR expires_at > ?)
       RETURNING id, org_id, principal_id, principal_kind, scopes, max_trust,
-                not_before, expires_at, revoked_at`,
+                not_before, expires_at, revoked_at, issued_by,
+                data_target_type, data_target_id`,
     [staleBefore, at, await sha256Hex(token), at, at],
   );
   const row = rows[0];
@@ -146,6 +160,9 @@ export async function authenticate(
     principalKind: row.principal_kind,
     scopes: row.scopes.split(" ").filter(Boolean),
     maxTrust: row.max_trust,
+    issuedBy: row.issued_by ?? row.principal_id,
+    dataTargetType: row.data_target_type,
+    dataTargetId: row.data_target_id,
   };
 }
 
@@ -200,6 +217,9 @@ export interface NewKey {
   maxTrust: Trust;
   notBefore?: Date;
   expiresAt?: Date | null;
+  issuedBy?: string;
+  dataTargetType?: "organization" | "project" | "subject" | null;
+  dataTargetId?: string | null;
 }
 
 /**
@@ -221,8 +241,9 @@ export async function createApiKey(
   const statement = {
     sql: `INSERT INTO api_keys
             (id, org_id, principal_id, principal_kind, key_hash, label, scopes, max_trust,
-             created_at, not_before, expires_at, last_used_at, revoked_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+             created_at, not_before, expires_at, last_used_at, revoked_at,
+             issued_by, data_target_type, data_target_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`,
     params: [
       id,
       key.orgId,
@@ -235,6 +256,9 @@ export async function createApiKey(
       now.toISOString(),
       notBefore.toISOString(),
       expiresAt?.toISOString() ?? null,
+      key.issuedBy ?? key.principalId,
+      key.dataTargetType ?? null,
+      key.dataTargetId ?? null,
     ],
   };
   return { id, key: raw, statement };

@@ -159,6 +159,10 @@ test("hot retrieval SQL bounds candidates and drives evidence from claim sources
     "org_test",
     "agent_test",
     "agent_test",
+    "agent_test",
+    "agent_test",
+    "key_test",
+    "key_test",
   ]);
 });
 

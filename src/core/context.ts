@@ -91,7 +91,7 @@ async function countUnconsolidatedObservations(
       subjectId,
       Number(crossProject),
       projectId,
-      ...recordAccessParams(principal.principalId),
+      ...recordAccessParams(principal),
     ],
   );
   return Number(row?.count ?? 0);
@@ -422,13 +422,13 @@ export async function getContext(ctx: RequestContext): Promise<Result> {
       ORDER BY i.position`,
     [
       // `disputed` is projected before the WHERE clause binds.
-      ...recordAccessParams(principal.principalId),
+      ...recordAccessParams(principal),
       contextId,
       principal.orgId,
       run.subject_id,
       Number(crossProject),
       run.project_id,
-      ...recordAccessParams(principal.principalId),
+      ...recordAccessParams(principal),
     ],
   );
   const count = await first<{ count: number }>(

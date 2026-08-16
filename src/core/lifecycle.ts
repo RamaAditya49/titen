@@ -30,8 +30,8 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
   const claim = await first<{ id: string; status: string; version: number; subject_id: string; project_id: string | null; workspace_id: string | null; kind: string; visibility: "private" | "team" | "organization" }>(
     ctx.app.db,
     `SELECT c.id, c.status, c.version, c.subject_id, c.project_id, c.workspace_id, c.kind, c.visibility
-       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
-    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c", "?", "write")}`,
+    [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
   if (newClaimId === claimId) throw validationError("A claim cannot supersede itself.");
@@ -43,8 +43,8 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
   const replacement = await first<{ id: string; status: string; subject_id: string; project_id: string | null; workspace_id: string | null; kind: string; visibility: string }>(
     ctx.app.db,
     `SELECT c.id, c.status, c.subject_id, c.project_id, c.workspace_id, c.kind, c.visibility
-       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
-    [newClaimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c", "?", "write")}`,
+    [newClaimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!replacement) throw notFound();
   if (replacement.status !== "active")
@@ -114,8 +114,8 @@ export async function revokeClaim(ctx: RequestContext): Promise<Result> {
   const claim = await first<{ id: string; status: string; version: number; workspace_id: string | null; visibility: "private" | "team" | "organization" }>(
     ctx.app.db,
     `SELECT c.id, c.status, c.version, c.workspace_id, c.visibility
-       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
-    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c", "?", "write")}`,
+    [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
   await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
@@ -169,8 +169,8 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
   const claim = await first<{ id: string; status: string; version: number; workspace_id: string | null; visibility: "private" | "team" | "organization"; valid_to: string | null }>(
     ctx.app.db,
     `SELECT c.id, c.status, c.version, c.workspace_id, c.visibility, c.valid_to
-       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c")}`,
-    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+       FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c", "?", "write")}`,
+    [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
   await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);

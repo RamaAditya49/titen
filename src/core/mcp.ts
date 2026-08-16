@@ -572,7 +572,7 @@ async function loadCompatStore(ctx: RequestContext): Promise<CompatStore> {
       ENTITY_REF,
       OBSERVATION_REF,
       RELATION_REF,
-      ...recordAccessParams(principal.principalId),
+      ...recordAccessParams(principal),
     ],
   );
   // A purged row keeps its hash and its history but is no longer in the graph.

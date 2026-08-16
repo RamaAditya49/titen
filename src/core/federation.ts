@@ -1,4 +1,4 @@
-import { first, type Stmt } from "./db";
+import { first, type Param, type Stmt } from "./db";
 import { auditStatement } from "./audit";
 import { assertTrustCeiling, requireScope } from "./auth";
 import { recordAccessParams, recordAccessSql } from "./authorization";
@@ -286,7 +286,7 @@ async function memoryBundleForClaim(
       WHERE c.id = ? AND c.org_id = ? AND c.workspace_id IS NULL
         AND c.visibility = 'organization' AND c.status IN ('active', 'disputed')
         AND c.enrichment_job_id IS NULL AND ${recordAccessSql("c")}`,
-    [claimId, principal.orgId, ...recordAccessParams(principal.principalId)],
+    [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim || (claim.project_id && !claim.project_reference)) return undefined;
 
@@ -303,7 +303,7 @@ async function memoryBundleForClaim(
       WHERE s.claim_id = ? AND o.org_id = ? AND o.workspace_id IS NULL
         AND o.visibility = 'organization' AND ${recordAccessSql("o")}
       ORDER BY o.id, s.relation`,
-    [claim.id, principal.orgId, ...recordAccessParams(principal.principalId)],
+    [claim.id, principal.orgId, ...recordAccessParams(principal)],
   );
   if (
     sources.length === 0
@@ -697,9 +697,9 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
 
   // Fetch events after cursor
   const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
-  const params: (string | number)[] = [
+  const params: Param[] = [
     principal.orgId,
-    ...eventAccessParams(principal.principalId),
+    ...eventAccessParams(principal),
   ];
   if (includeMemory) conditions.push("e.resource_type = 'claim'", "e.kind = 'claim.materialized'");
 

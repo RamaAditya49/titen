@@ -1,8 +1,10 @@
 # Titen product interface design
 
-- Status: live six-area operator dashboard implemented
+- Status: live fifteen-destination operator dashboard implemented
 - Scope: optional operator dashboard and progressive information architecture
-- Product map: Memories, Context, Work, Audit, Governance, Federation
+- Product map: Atlas, Memories, Context, Subjects, Work, Audit & Events,
+  System, Models, Federation, Access, API & Keys, Projects, Approvals, Releases,
+  Profile
 - Target runtimes: Cloudflare Workers and Bun on a VPS
 
 ## 1. Design intent
@@ -44,30 +46,35 @@ authority. A headless installation remains a complete Titen installation.
 
 ## 3. Progressive information architecture
 
-The operator interface uses six product areas. Each is backed by a current
+The operator interface uses fifteen destinations. Each is backed by a current
 authenticated REST contract and remains hidden when the principal lacks every
 read capability for it.
 
 ```text
 Titen Dashboard
-├── Memories      # authorized Atlas projections
-├── Context       # bounded task context compilation
-├── Work          # checkpoints, leases, and handoffs
-├── Audit         # audit log and domain events
-├── Governance    # access, policy, approval, and release state
-└── Federation    # signed peers and exchange log
+├── Memory         # Atlas, Memories, Context, Subjects
+├── Collaboration  # Work
+├── Operations     # Audit & Events, System, Models, Federation
+├── Administration # Access, API & Keys, Projects
+├── Governance     # Approvals, Releases
+└── Operator       # Profile
 ```
 
 ### Area contract
 
 | Area | Operator job | Backing contract |
 | --- | --- | --- |
-| Memories | Trace evidence, neighborhoods, conflicts, review work, scope, and release lineage | `POST /v1/memory-views/compile` |
+| Atlas | Trace evidence, neighborhoods, conflicts, workspace graph, review work, scope, and release lineage | `POST /v1/memory-views/compile` |
+| Memories | Search/filter/page authorized canonical claims without compilation | `GET /v1/memories` |
 | Context | Compile one bounded, cited context pack for a subject and task | `POST /v1/context/compile` |
-| Work | Inspect active leases, pending handoffs, and an exact checkpoint head | `GET /v1/leases`, `GET /v1/handoffs`, `GET /v1/checkpoints` |
+| Subjects / Projects | Inspect authorized identities/scopes and canonical references | directory/reference reads |
+| Work | Inspect/release leases, resolve received handoffs, and find an exact checkpoint | collaboration routes |
 | Audit | Reconstruct bounded metadata activity and visible domain events | `GET /v1/audit`, `GET /v1/events` |
-| Governance | Inspect membership, key, policy, approval, channel, and release state; add a human user atomically | governance list routes and `POST /v1/keys` with `membership_role` |
+| System / Models | Inspect readiness and immutable masked model configuration; probe without canonical writes | health/readiness and model diagnostics |
 | Federation | Inspect owned signed peers and their bounded exchange log | `GET /v1/federation/peers`, `GET /v1/federation/log` |
+| Access / API & Keys | Inspect principals/grants/key clamps, simulate gates, and manage bounded credentials | directory, grant, simulation, and key routes |
+| Approvals / Releases | Inspect and perform reasoned, version-fenced governance transitions | policy, approval, and release routes |
+| Profile | Inspect the principal and rotate a session password | principal/session routes |
 
 An early backend release does not automatically create a dashboard area. The
 area appears only after all emergence gates below pass.
@@ -93,7 +100,7 @@ shipped.
 
 ### Live product map
 
-The implemented Astro dashboard exposes the six live areas at `/dashboard/` in
+The implemented Astro dashboard exposes the fifteen live destinations at `/dashboard/` in
 one static application shell. Area changes do not create domain authority or
 retain a previous principal's result.
 
@@ -115,11 +122,10 @@ Every visible record comes from the authorized view compiler through the
 same-origin adapter. Credentials remain server-only; disconnected or failed
 integration displays no fixture data.
 
-Context compilation and Add user are the only mutations in this surface.
-Creating a context run changes no canonical memory. Add user is visibly
-separate, requires session mode, and atomically creates a bounded human password
-account and organization membership with an explicit role. Every other area is
-diagnostic.
+Context compilation changes no canonical memory. Access and API & Keys expose
+confirmed grant/key/user mutations; Work exposes lease/handoff transitions;
+Approvals and Releases expose reasoned version-fenced lifecycle actions. Every
+mutation re-renders server state, and destructive actions require confirmation.
 
 ## 6. Intentional non-menus
 
@@ -131,7 +137,8 @@ diagnostic.
   capability- and authority-gated.
 - **Runtime configuration** starts as read-only capability/readiness state.
   Browser mutations require a separate secure configuration contract.
-- **Settings** remain absent. The implemented adapter verifies an operator
+- **General settings** remain absent; Profile contains only identity and
+  password rotation. The implemented adapter verifies an operator
   account and AES-GCM seals its short-lived server-side key in an opaque cookie;
   only required first-login/current password replacement exists. Recovery and
   profile settings remain separate product work.
@@ -154,7 +161,7 @@ Navigation does not determine authorization. Every route and request performs
 server-side authorization again, and a foreign resource returns a
 non-disclosing response.
 
-On small screens, navigation contracts to the active Atlas item. Content order,
+On small screens, navigation moves into a labelled off-canvas rail. Content order,
 focus order, and labels remain available without horizontal page scrolling;
 phone layouts linearize graphs and tables, while wider bounded views may scroll
 inside their labelled regions.
@@ -213,10 +220,10 @@ channels. Color alone never carries meaning.
 ## 11. Design acceptance
 
 - **AC-DESIGN-001 — State-driven:** While an area lacks an implemented authorized contract or completed UI work item, Titen shall expose no route or interactive control for it and shall present any reference-shell label only as non-interactive orientation.
-- **AC-DESIGN-002 — Optional feature:** Where the live dashboard is enabled, Titen shall render only the authenticated principal's discoverable Memories, Context, Work, Audit, Governance, and Federation controls.
+- **AC-DESIGN-002 — Optional feature:** Where the live dashboard is enabled, Titen shall render only the authenticated principal's discoverable destinations from the fifteen-area product map.
 - **AC-DESIGN-003 — Event-driven:** When an area passes its emergence gate, Titen shall convert only that authorized discoverable area from an orientation label into an interactive control and route.
 - **AC-DESIGN-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign area or resource, then Titen shall return a non-disclosing state and shall clear any prior private content that could be mistaken for the current result.
-- **AC-DESIGN-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, backup/recovery in deployment tooling, and account settings absent.
+- **AC-DESIGN-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, backup/recovery in deployment tooling, and bounded password rotation inside Profile.
 - **AC-DESIGN-007 — Event-driven:** When session mode authenticates a principal, Titen shall discover areas from that principal's scopes and shall clear prior private data on denial, logout, expiry, identity change, or adapter restart without a configured shared sealing key.
 - **AC-DESIGN-006 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
 

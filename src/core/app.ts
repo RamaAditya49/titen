@@ -18,7 +18,19 @@ import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvent
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation, purgeObservation } from "./observations";
 import { resolveProject } from "./projects";
+import {
+  createGrant,
+  listGrants,
+  listPrincipals,
+  listProjectReferences,
+  listProjects,
+  listSubjectReferences,
+  listSubjects,
+  revokeGrant,
+  simulateAccess,
+} from "./directory";
 import { schemaState } from "./migrations";
+import { getModelConfig, probeModel } from "./models";
 import { ApiError, forbidden, unavailable, validationError } from "./errors";
 import { assertJsonDepth } from "./validate";
 import {
@@ -85,6 +97,12 @@ export interface AppContext {
     extraction: CapabilityState;
     backgroundEnrichment: CapabilityState;
   };
+  modelConfiguration?: {
+    extraction: { baseUrl?: string; model?: string; modelFingerprint?: string;
+      responseMode?: string; timeoutMs?: number; apiKeySet: boolean };
+    embedding: { baseUrl?: string; model?: string; dimensions?: number;
+      revision?: string; profile?: string; minimumCosine?: number; apiKeySet: boolean };
+  };
   /** Optional untrusted proposal boundary. Canonical writes never await it. */
   extraction?: ExtractionCapability;
   /** Scheduler intent; readiness still derives state from canonical evidence. */
@@ -149,6 +167,17 @@ export const ROUTES: RouteDef[] = [
     scope: "projects:resolve",
     handler: resolveProject,
   },
+  { method: "GET", path: "/v1/projects", scope: "projects:read", handler: listProjects },
+  { method: "GET", path: "/v1/projects/:id/references", scope: "projects:read", handler: listProjectReferences },
+  { method: "GET", path: "/v1/subjects", scope: "subjects:read", handler: listSubjects },
+  { method: "GET", path: "/v1/subjects/:id/references", scope: "subjects:read", handler: listSubjectReferences },
+  { method: "GET", path: "/v1/principals", scope: "principals:read", handler: listPrincipals },
+  { method: "GET", path: "/v1/grants", scope: "grants:read", handler: listGrants },
+  { method: "POST", path: "/v1/grants", scope: "grants:write", handler: createGrant },
+  { method: "DELETE", path: "/v1/grants/:id", scope: "grants:write", handler: revokeGrant },
+  { method: "POST", path: "/v1/access/simulate", scope: "grants:read", handler: simulateAccess },
+  { method: "GET", path: "/v1/models/config", scope: "models:read", handler: getModelConfig },
+  { method: "POST", path: "/v1/models/probe", scope: "models:probe", handler: probeModel },
   {
     method: "POST",
     path: "/v1/observations",
@@ -441,6 +470,7 @@ export function createApp(context: {
     extraction?: CapabilityState;
     backgroundEnrichment?: CapabilityState;
   };
+  modelConfiguration?: AppContext["modelConfiguration"];
   extraction?: ExtractionCapability;
   backgroundRepair?: { configured: boolean; staleAfterMs: number };
   migrationsReady?: boolean;
@@ -487,6 +517,7 @@ export function createApp(context: {
       extraction: extractionState,
       backgroundEnrichment: backgroundEnrichmentState,
     },
+    modelConfiguration: context.modelConfiguration,
     extraction,
     backgroundRepair: context.backgroundRepair ?? { configured: false, staleAfterMs: 60_000 },
     migrationsReady: context.migrationsReady ?? true,

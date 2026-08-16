@@ -408,6 +408,7 @@ switch (command) {
         embedApiKey: process.env.TITEN_EMBED_API_KEY,
         extraction: extraction.capability,
         extractionState: extraction.state,
+        extractionApiKeySet: Boolean(process.env.TITEN_EXTRACT_API_KEY),
         maintenanceIntervalMs:
           process.env.TITEN_MAINTENANCE_INTERVAL_MS === undefined
             ? undefined

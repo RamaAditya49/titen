@@ -174,6 +174,13 @@ FTS-only, or all six are set and valid.
 `TITEN_EMBED_*` variable set at all, the same probe answers `200` with
 `checks.semantic_index: "disabled"` and `capabilities.fts: "enabled"`.
 
+An operator key with `models:read` may compare this immutable startup snapshot
+through `GET /v1/models/config`; secrets are represented only as `set`. A key
+with `models:probe` may call `POST /v1/models/probe` for one extraction or
+embedding probe. Probes are process-rate-limited, metadata-audited, and make no
+canonical write. Configuration changes still require the documented service
+restart and, for embedding fingerprint drift, the reindex procedure below.
+
 **`TITEN_EMBED_REVISION`** is an operator-supplied immutable identifier for the
 exact weights behind the endpoint. Titen does not validate its shape — it is
 stored in the semantic index fingerprint, so a changed revision invalidates the

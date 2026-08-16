@@ -112,7 +112,9 @@ Credential metadata; never the raw secret.
 Required fields: `id`, `organization_id`, `principal_id`, `label`,
 `secret_hash`, bounded capability/scope data, `created_at`, immutable
 `not_before` and `expires_at`, monotonic nullable `last_used_at`, and
-`revoked_at`.
+`revoked_at`. Optional `issued_by`, `data_target_type`, and `data_target_id`
+bind a derived credential to the issuer's live authority and one organization,
+project (including the explicit `~` encoding of `project:null`), or subject.
 
 Rules:
 
@@ -122,6 +124,22 @@ Rules:
 - rotation creates a new record and may keep the prior key valid only for an
   explicit bounded overlap;
 - revocation is checked on every request.
+
+### `access_grants`
+
+Append-and-revoke additive authority rows. Each row binds one organization and
+grantee principal to an `organization`, `project`, or `subject` target and a
+space-normalized set of `read`, `write`, `approve`, or `admin` permissions.
+`admin` delegates only within the target; it is not a global role. Optional
+expiry and revocation are checked on every request. Migration 23 backfills one
+organization grant for each active principal so the new second gate preserves
+the previously observable API behavior until an operator narrows it.
+
+Canonical reads, writes, and approvals require both the pre-existing visibility
+predicate and a matching active grant, except the explicit organization-owner
+bypass. A key adds a third clamp: its declared target and its issuer's current
+grant must both cover the record. Grants, key targets, and simulations contain
+no memory content and are not logical-export evidence.
 
 ### `operator_accounts`
 
@@ -155,7 +173,10 @@ label, status, creation actor, and timestamps. Optional
 one subject. Automatic entity similarity may propose a link but never merges
 subjects.
 
-P0 may use pre-provisioned opaque subject IDs without enabling alias management.
+Migration 23 and insert triggers register existing/new observation and claim
+subjects as `concept` rows when no richer directory entry exists. This is
+identity registration, not entity merging; reference listing remains bounded
+by the caller's readable canonical records.
 
 ### `workspaces`, `projects`, `project_references`, and `memberships`
 
@@ -169,7 +190,9 @@ Removing membership prevents new access but does not erase record provenance.
 one project. For Git-hosted repositories the preferred portable value is
 lowercase `owner/repo`. The mapping stores no credential-bearing URL or local
 absolute path. Resolving a reference never creates membership; creating a
-missing project requires an explicit capability.
+missing project requires an explicit capability. Migration 23 creates one
+canonical reference for every existing project and the insert trigger keeps new
+projects aligned.
 
 ## Evidence and memory
 

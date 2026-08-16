@@ -1360,6 +1360,141 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `UPDATE webhooks SET created_seq = (SELECT COALESCE(MAX(seq), 0) FROM event_order)`,
     ],
   },
+  {
+    version: 23,
+    statements: [
+      `CREATE TABLE subjects (
+         id TEXT NOT NULL,
+         org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+         type TEXT NOT NULL CHECK (type IN ('human', 'agent', 'service', 'organization', 'repository', 'artifact', 'system', 'concept')),
+         label TEXT NOT NULL,
+         status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'merged', 'archived')),
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         PRIMARY KEY (org_id, id)
+       )`,
+      `CREATE INDEX subjects_directory ON subjects (org_id, type, label, id)`,
+      `CREATE TABLE subject_references (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL,
+         subject_id TEXT NOT NULL,
+         namespace TEXT NOT NULL,
+         value TEXT NOT NULL,
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         FOREIGN KEY (org_id, subject_id) REFERENCES subjects(org_id, id) ON DELETE CASCADE,
+         UNIQUE (org_id, namespace, value)
+       )`,
+      `CREATE INDEX subject_references_subject ON subject_references (org_id, subject_id, namespace, value)`,
+      `CREATE TABLE project_references (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL,
+         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+         namespace TEXT NOT NULL,
+         value TEXT NOT NULL,
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         UNIQUE (org_id, namespace, value)
+       )`,
+      `CREATE INDEX project_references_project ON project_references (org_id, project_id, namespace, value)`,
+      `CREATE TABLE access_grants (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+         grantee_principal_id TEXT NOT NULL,
+         target_type TEXT NOT NULL CHECK (target_type IN ('organization', 'project', 'subject')),
+         target_id TEXT NOT NULL,
+         permissions TEXT NOT NULL,
+         created_by TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         expires_at TEXT,
+         revoked_at TEXT,
+         CHECK (target_type <> 'organization' OR target_id = '*')
+       )`,
+      `CREATE INDEX access_grants_effective
+         ON access_grants (org_id, grantee_principal_id, target_type, target_id, revoked_at, expires_at)`,
+      `CREATE UNIQUE INDEX access_grants_active
+         ON access_grants (org_id, grantee_principal_id, target_type, target_id, permissions)
+         WHERE revoked_at IS NULL`,
+      `ALTER TABLE api_keys ADD COLUMN issued_by TEXT`,
+      `ALTER TABLE api_keys ADD COLUMN data_target_type TEXT CHECK (data_target_type IN ('organization', 'project', 'subject'))`,
+      `ALTER TABLE api_keys ADD COLUMN data_target_id TEXT`,
+      `UPDATE api_keys SET issued_by = principal_id WHERE issued_by IS NULL`,
+      `CREATE INDEX api_keys_issuer ON api_keys (org_id, issued_by, revoked_at)`,
+      `CREATE TRIGGER subjects_from_observations
+         AFTER INSERT ON observations
+         BEGIN
+           INSERT OR IGNORE INTO subjects
+             (id, org_id, type, label, status, created_by, created_at, updated_at)
+           VALUES (NEW.subject_id, NEW.org_id, 'concept', NEW.subject_id, 'active',
+                   NEW.actor_id, NEW.ingested_at, NEW.ingested_at);
+         END`,
+      `CREATE TRIGGER subjects_from_claims
+         AFTER INSERT ON claims
+         BEGIN
+           INSERT OR IGNORE INTO subjects
+             (id, org_id, type, label, status, created_by, created_at, updated_at)
+           VALUES (NEW.subject_id, NEW.org_id, 'concept', NEW.subject_id, 'active',
+                   NEW.actor_id, NEW.created_at, NEW.created_at);
+         END`,
+      `CREATE TRIGGER project_canonical_reference
+         AFTER INSERT ON projects
+         BEGIN
+           INSERT OR IGNORE INTO project_references
+             (id, org_id, project_id, namespace, value, created_by, created_at)
+           VALUES ('pref_' || lower(hex(NEW.id)), NEW.org_id, NEW.id, 'canonical',
+                   NEW.reference, 'project.create', NEW.created_at);
+         END`,
+      `CREATE TRIGGER api_keys_self_grant
+         AFTER INSERT ON api_keys
+         WHEN NEW.issued_by = NEW.principal_id
+          AND NOT EXISTS (
+            SELECT 1 FROM access_grants g
+             WHERE g.org_id = NEW.org_id
+               AND g.grantee_principal_id = NEW.principal_id
+               AND g.revoked_at IS NULL
+          )
+         BEGIN
+           INSERT INTO access_grants
+             (id, org_id, grantee_principal_id, target_type, target_id,
+              permissions, created_by, created_at, expires_at, revoked_at)
+           VALUES ('grant_key_' || NEW.id, NEW.org_id, NEW.principal_id,
+                   COALESCE(NEW.data_target_type, 'organization'),
+                   CASE COALESCE(NEW.data_target_type, 'organization')
+                     WHEN 'organization' THEN '*'
+                     ELSE COALESCE(NEW.data_target_id, '~') END,
+                   'read write approve admin', NEW.principal_id,
+                   NEW.created_at, NULL, NULL);
+         END`,
+      `INSERT OR IGNORE INTO subjects
+         (id, org_id, type, label, status, created_by, created_at, updated_at)
+       SELECT subject_id, org_id, 'concept', subject_id, 'active', actor_id,
+              MIN(created_at), MAX(created_at)
+         FROM (
+           SELECT subject_id, org_id, actor_id, created_at FROM claims
+           UNION ALL
+           SELECT subject_id, org_id, actor_id, ingested_at AS created_at FROM observations
+         ) source
+        GROUP BY org_id, subject_id`,
+      `INSERT OR IGNORE INTO project_references
+         (id, org_id, project_id, namespace, value, created_by, created_at)
+       SELECT 'pref_' || lower(hex(id)), org_id, id, 'canonical', reference,
+              'migration:23', created_at FROM projects`,
+      `INSERT OR IGNORE INTO access_grants
+         (id, org_id, grantee_principal_id, target_type, target_id, permissions,
+          created_by, created_at, expires_at, revoked_at)
+       SELECT 'grant_m23_' || lower(hex(source.org_id || ':' || source.principal_id)),
+              source.org_id, source.principal_id, 'organization', '*',
+              'read write approve admin', 'migration:23', source.created_at, NULL, NULL
+         FROM (
+           SELECT org_id, principal_id, MIN(created_at) AS created_at
+             FROM api_keys WHERE revoked_at IS NULL GROUP BY org_id, principal_id
+           UNION
+           SELECT org_id, principal_id, MIN(created_at) AS created_at
+             FROM memberships WHERE removed_at IS NULL GROUP BY org_id, principal_id
+         ) source`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

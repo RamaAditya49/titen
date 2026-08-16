@@ -770,8 +770,9 @@ the [Cloudflare deployment guide](https://github.com/RamaAditya49/titen/blob/mai
 
 ## Dashboard
 
-The checked-in Astro client at `/dashboard/` is a live operator surface for
-Memories, Context, Work, Audit, Governance, and Federation. Each person signs
+The checked-in Astro client at `/dashboard/` is a live fifteen-destination
+operator surface spanning memory, collaboration, operations, administration,
+governance, and Profile. Each person signs
 in with a username/password; the loopback adapter keeps the resulting
 short-lived key behind an opaque HttpOnly session and never writes either secret
 to browser storage. Bootstrap creates `owner` with a random temporary password,

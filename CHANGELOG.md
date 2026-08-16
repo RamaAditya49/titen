@@ -26,6 +26,56 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.6] — 2026-08-16
+
+The complete Level 6 operator surface now runs on live, scoped contracts in
+both runtimes, with package and Cloudflare regressions closed before release.
+
+### Added
+
+- The Astro operator dashboard now implements the complete fifteen-destination
+  product map from the approved Level 6 mockup: Atlas, Memories, Context,
+  Subjects, Work, Audit & Events, System, Models, Federation, Access, API &
+  Keys, Projects, Approvals, Releases, and Profile.
+- Atlas adds a bounded `workspace_graph` lens over authorized claim/subject
+  nodes and canonical relationships, with stable layout, selection, legend,
+  truncation state, and direct Evidence Trace navigation.
+- New principal, project, subject, reference, scoped-grant, access-simulation,
+  and masked model-diagnostic routes run through the shared Bun/Cloudflare
+  contract. Model probes are bounded, rate-limited, metadata-audited, and make
+  no canonical write.
+- Work, grant/key management, approval, and release controls now execute their
+  existing versioned server operations with confirmation and refreshed live
+  state. Context shows its token budget; System shows readiness detail.
+
+### Changed
+
+- Canonical reads, writes, approvals, events, Atlas, context, federation, and
+  directories now share a visibility-plus-additive-grant boundary. Derived API
+  keys are clamped to their declared target and their issuer's current grants
+  on every request; `admin` delegation remains bounded to its grant target.
+- Memories and Workspace Graph keep organization-visible records available in
+  every selected workspace while limiting team-visible records to the matching
+  workspace.
+- Dashboard navigation, responsive rail, local typography, loading/empty/error
+  states, search, pagination, and action surfaces now match the approved
+  warm-paper desktop and 320 px mobile system without new runtime dependencies.
+
+### Fixed
+
+- The npm package includes `dist/index.html`, so an installed `titen dashboard`
+  serves the root redirect as well as `/dashboard/` (#303).
+- Atlas fallback routing remains in the shared API root, preserving the
+  authenticated Cloudflare administrator compile path (#304).
+
+### Security
+
+- Migration 23 backfills compatibility grants without rewriting evidence;
+  denied resources remain absent from labels, counts, facets, cursors, graph
+  topology, disputes, citations, and directory summaries.
+- Model configuration exposes only masked immutable tuples; dashboard secrets,
+  provider payloads, prompts, and embeddings never enter browser-visible state.
+
 ## [0.8.5] — 2026-08-15
 
 Atlas Evidence Trace now matches the approved relationship-graph direction:
@@ -1341,7 +1391,10 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.6...HEAD
+[0.8.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.6
+[0.8.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.5
+[0.8.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.4
 [0.8.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.3
 [0.8.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.2
 [0.8.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.1

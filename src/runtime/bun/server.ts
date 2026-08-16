@@ -32,6 +32,7 @@ export interface ServeOptions {
   vectors?: VectorCapability;
   extraction?: ExtractionCapability;
   extractionState?: ExtractionConfigurationState;
+  extractionApiKeySet?: boolean;
   vecDbPath?: string;
   embedBaseUrl?: string;
   embedModel?: string;
@@ -117,6 +118,24 @@ export async function serve(options: ServeOptions) {
         : extractionState === "enabled" && intervalMs > 0
           ? "enabled"
           : "disabled",
+    },
+    modelConfiguration: {
+      extraction: {
+        baseUrl: extraction?.providerIdentity,
+        model: extraction?.modelId,
+        modelFingerprint: extraction?.modelFingerprint,
+        responseMode: extraction?.responseMode,
+        apiKeySet: Boolean(options.extractionApiKeySet),
+      },
+      embedding: {
+        baseUrl: options.embedBaseUrl,
+        model: options.embedModel,
+        dimensions: options.embedDims === undefined ? undefined : Number(options.embedDims),
+        revision: options.embedRevision,
+        profile: options.embedProfile,
+        minimumCosine: options.embedMinCosine === undefined ? undefined : Number(options.embedMinCosine),
+        apiKeySet: Boolean(options.embedApiKey),
+      },
     },
     backgroundRepair: {
       configured: backgroundRepair,

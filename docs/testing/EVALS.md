@@ -52,10 +52,10 @@ Runtime-specific request IDs, timestamps assigned by the server, and diagnostic
 fields may differ. Authorization, status codes, selected canonical IDs, and
 failure classes may not.
 
-The dual-runtime contract covers all six read-only Memory Atlas lenses,
+The dual-runtime contract covers all seven read-only Memory Atlas lenses,
 canonical re-authorization, limits, and disabled behavior. The dashboard's
-real-runtime smoke starts Bun/SQLite and proves login, the six live product
-areas, atomic Add User, restricted temporary-password login, password
+real-runtime smoke starts Bun/SQLite and proves login, all fifteen live product
+destinations, atomic Add User, restricted temporary-password login, password
 replacement, logout, and fresh new-user login through the actual adapter;
 browser-only mocks remain UX evidence rather than service evidence.
 
