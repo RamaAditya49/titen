@@ -26,6 +26,25 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.8.7] — 2026-08-16
+
+The Level 6 sidebar now restores the approved workspace-selection hierarchy
+without changing the live authorization or request contract.
+
+### Fixed
+
+- The exposed native workspace select is replaced by the mockup-aligned
+  two-line trigger, workspace icon, animated chevron, active checkmark, and
+  bounded menu explanation on desktop and mobile.
+- Selecting an authorized workspace still clears stale results and scopes
+  Memories and Workspace Graph requests with the same live `workspace_id`.
+
+### Security
+
+- Workspace names and selection state are cleared when the principal signs out
+  or the adapter disconnects; no workspace or credential state enters browser
+  storage.
+
 ## [0.8.6] — 2026-08-16
 
 The complete Level 6 operator surface now runs on live, scoped contracts in
@@ -1391,7 +1410,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.7...HEAD
+[0.8.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.7
 [0.8.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.6
 [0.8.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.5
 [0.8.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.4

@@ -30,6 +30,10 @@ async function mockServerMode(page: Page, readiness: Record<string, unknown> = {
     : route.fulfill({ status: 503, json: { error: { code: "DASHBOARD_DISCONNECTED", message: "disconnected" } } }));
   await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun", revision: "stable-42" } } }));
   await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: readiness }));
+  await page.route("**/dashboard-api/workspaces", (route) => route.fulfill({ json: { data: { workspaces: [
+    { workspace_id: "ws_platform", name: "platform-team", created_at: "2026-08-01T00:00:00Z" },
+    { workspace_id: "ws_crm", name: "crm", created_at: "2026-08-02T00:00:00Z" },
+  ] } } }));
   return { disconnect: () => { connected = false; } };
 }
 
@@ -99,6 +103,46 @@ test("loads Memories as a searchable list and opens one record in Atlas", async 
   expect(compileCalls).toBe(1);
 });
 
+test("matches the workspace mockup and scopes live requests without storing state", async ({ page }) => {
+  await mockServerMode(page);
+  const memoryQueries: string[] = [];
+  await page.route("**/dashboard-api/memories**", async (route) => {
+    memoryQueries.push(new URL(route.request().url()).search);
+    await route.fulfill({ json: { data: {
+      items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {}, facets: {},
+      authorization: { principal_id: "server_operator", access_mode: "principal" },
+    } } });
+  });
+  await page.goto("/dashboard/");
+  const picker = page.locator("[data-workspace-menu]");
+  await expect(picker.locator("summary")).toContainText("Unscoped memory");
+  await expect(picker.locator("summary")).toContainText("organization-visible memory");
+  await expect(page.locator("[data-workspace-picker]")).toBeHidden();
+  await picker.locator("summary").click();
+  await expect(page.locator("[data-workspace-options] .workspace-option")).toHaveCount(3);
+  await expect(page.locator('[data-workspace-value=""]')).toHaveAttribute("aria-current", "true");
+  await page.getByRole("button", { name: /platform-team/ }).click();
+  await expect(picker.locator("summary")).toContainText("platform-team");
+  await expect(page.locator("[data-workspace-picker]")).toHaveValue("ws_platform");
+  await expect.poll(() => memoryQueries.at(-1)).toContain("workspace_id=ws_platform");
+  await expect(picker).not.toHaveAttribute("open", "");
+  await picker.locator("summary").click();
+  await page.keyboard.press("Escape");
+  await expect(picker).not.toHaveAttribute("open", "");
+  await picker.locator("summary").click();
+  await page.locator(".topbar-title").click();
+  await expect(picker).not.toHaveAttribute("open", "");
+  expect(await page.evaluate(() => [Object.keys(localStorage), Object.keys(sessionStorage)])).toEqual([[], []]);
+
+  await page.setViewportSize({ width: 320, height: 760 });
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(page.locator(".sidebar")).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+  const box = await picker.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
@@ -145,6 +189,8 @@ test("renders live Memories and clears stale private data on disconnect", async 
   await expect(page.getByText("Disconnected", { exact: true })).toBeVisible();
   await expect(page.getByText("Production retry budget is 400 ms")).toHaveCount(0);
   await expect(page.locator("[data-inspector-title]")).toHaveText("Nothing selected");
+  await expect(page.locator("[data-workspace-control]")).toBeHidden();
+  await expect(page.locator("[data-workspace-options] .workspace-option")).toHaveCount(1);
 });
 
 test("explains principal-scoped empty results and explicitly audits administrator mode", async ({ page }) => {

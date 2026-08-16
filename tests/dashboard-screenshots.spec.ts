@@ -14,6 +14,10 @@ async function live(page: Page) {
   } } }));
   await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun", revision: "stable" } } }));
   await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+  await page.route("**/dashboard-api/workspaces", (route) => route.fulfill({ json: { data: { workspaces: [
+    { workspace_id: "ws_platform", name: "platform-team", created_at: "2026-08-01T00:00:00Z" },
+    { workspace_id: "ws_crm", name: "crm", created_at: "2026-08-02T00:00:00Z" },
+  ] } } }));
   await page.route("**/dashboard-api/memories**", (route) => route.fulfill({ json: { data: {
     items: [{ id: "clm_release", subject_id: "platform-team", project_id: null, kind: "procedural", statement: "Production retry budget is 400 ms", confidence: .96, trust: "verified", visibility: "organization", status: "disputed", valid_from: "2026-08-01T00:00:00Z", valid_to: null, created_at: "2026-08-01T00:00:00Z" }],
     page: { limit: 25, has_more: false, next_cursor: null }, query: {}, authorization: { principal_id: "docs_operator", access_mode: "principal" },
@@ -57,4 +61,16 @@ test("capture live dashboard mobile", async ({ page }) => {
   await page.getByRole("button", { name: "Open in Atlas" }).click();
   await expect(page.locator("[data-atlas-nodes]").getByText("Production retry budget is 400 ms")).toBeVisible();
   await page.screenshot({ path: resolve(output, "dashboard-mobile.png"), fullPage: true });
+});
+
+test("capture workspace picker desktop and mobile", async ({ page }) => {
+  await live(page);
+  await page.setViewportSize({ width: 1600, height: 1080 });
+  await page.goto("/dashboard/");
+  await page.locator("[data-workspace-menu] summary").click();
+  await page.screenshot({ path: resolve(output, "dashboard-workspace-picker.png") });
+  await page.setViewportSize({ width: 320, height: 760 });
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.locator("[data-workspace-menu] summary").click();
+  await page.screenshot({ path: resolve(output, "dashboard-workspace-picker-mobile.png") });
 });

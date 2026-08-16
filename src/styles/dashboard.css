@@ -47,6 +47,31 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand-row img { border-radius: 3px; }
 .brand-row strong { font: 500 13px "JetBrains Mono Variable", monospace; letter-spacing: -.01em; }
 .brand-row span { margin-left: auto; color: var(--muted); font: 9.5px "JetBrains Mono Variable", monospace; }
+.workspace-picker { position: relative; z-index: 4; margin: 13px 13px 6px; }
+.workspace-picker details { position: relative; }
+.workspace-picker summary { display: flex; align-items: center; justify-content: space-between; gap: 9px; width: 100%; min-height: 51px; padding: 9px 11px; background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 3px; cursor: pointer; list-style: none; }
+.workspace-picker summary::-webkit-details-marker { display: none; }
+.workspace-picker summary:hover, .workspace-picker details[open] > summary { border-color: var(--muted); }
+.workspace-trigger-copy { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.workspace-trigger-copy > svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.workspace-trigger-copy > span { display: grid; gap: 2px; min-width: 0; }
+.workspace-trigger-copy strong, .workspace-trigger-copy small { overflow: hidden; font-family: "JetBrains Mono Variable", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-trigger-copy strong { font-size: 11.5px; font-weight: 500; }
+.workspace-trigger-copy small { color: var(--muted); font-size: 9px; }
+.workspace-chevron { width: 14px; height: 14px; flex: 0 0 auto; color: var(--muted); transition: transform 150ms ease; }
+.workspace-picker details[open] .workspace-chevron { transform: rotate(180deg); }
+.workspace-menu { position: absolute; top: calc(100% + 5px); right: 0; left: 0; z-index: 5; overflow: hidden; background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 3px; box-shadow: 0 6px 18px rgba(23,19,16,.13); }
+.workspace-menu-heading { display: block; padding: 9px 11px 6px; color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .14em; text-transform: uppercase; }
+.workspace-option { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 11px; color: var(--ink); background: transparent; border: 0; cursor: pointer; text-align: left; }
+.workspace-option:hover { background: #efe7d8; }
+.workspace-option[aria-current="true"] { background: #efe7d8; }
+.workspace-option:active { transform: translateY(1px); }
+.workspace-check { width: 13px; flex: 0 0 auto; color: var(--accent); font: 11px "JetBrains Mono Variable", monospace; }
+.workspace-option > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.workspace-option strong, .workspace-option small { overflow: hidden; font-family: "JetBrains Mono Variable", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-option strong { font-size: 11.5px; font-weight: 500; }
+.workspace-option small { color: var(--muted); font-size: 9px; }
+.workspace-menu > p { margin: 0; padding: 8px 11px 9px; color: var(--muted); border-top: 1px solid #efe7d8; font-size: 10.5px; line-height: 1.45; text-wrap: pretty; }
 .sidebar nav { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; padding: 10px 9px 16px; overflow-y: auto; scrollbar-width: thin; }
 .nav-group-label { margin: 0; padding: 9px 11px 5px; color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .16em; text-transform: uppercase; }
 .nav-group-label:not(:first-child) { padding-top: 14px; }
@@ -422,5 +447,5 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @media (forced-colors: active) {
-  .connection i, .lens-picker span, .service-strip, .query-panel, .atlas-workspace, .metadata-panel, .login-panel, .user-admin, .compile-trace, .search-dialog { border: 1px solid CanvasText; }
+  .connection i, .workspace-picker summary, .workspace-menu, .lens-picker span, .service-strip, .query-panel, .atlas-workspace, .metadata-panel, .login-panel, .user-admin, .compile-trace, .search-dialog { border: 1px solid CanvasText; }
 }

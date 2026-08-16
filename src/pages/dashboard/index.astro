@@ -50,6 +50,8 @@ const lenses = [
         <symbol id="icon-governance" viewBox="0 0 100 100"><path d="M50 12l30 12v28c0 18-14 30-30 36-16-6-30-18-30-36V24z" fill="none" stroke="currentColor" stroke-width="6.4"/><path d="M36 50l11 11 19-21" fill="none" stroke="var(--accent)" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
         <symbol id="icon-release" viewBox="0 0 100 100"><rect x="16" y="26" width="46" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="6"/><path d="M62 38h26M78 28l10 10-10 10" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
         <symbol id="icon-federation" viewBox="0 0 100 100"><ellipse cx="50" cy="25" rx="15" ry="25" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="50" cy="75" rx="15" ry="25" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="25" cy="50" rx="25" ry="15" fill="none" stroke="currentColor" stroke-width="5"/><ellipse cx="75" cy="50" rx="25" ry="15" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="50" cy="50" r="8" fill="var(--accent)"/></symbol>
+        <symbol id="icon-workspace" viewBox="-4 -4 108 108"><g fill="none" stroke="currentColor" stroke-width="1.6" opacity=".28"><ellipse cx="50" cy="25" rx="15" ry="25"/><ellipse cx="50" cy="75" rx="15" ry="25"/></g><ellipse cx="25" cy="50" rx="25" ry="15" fill="currentColor" stroke="var(--paper-strong)" stroke-width="2.4"/><ellipse cx="75" cy="50" rx="25" ry="15" fill="currentColor" stroke="var(--paper-strong)" stroke-width="2.4"/><circle cx="50" cy="50" r="8.5" fill="var(--paper-strong)"/><circle cx="50" cy="50" r="4.6" fill="currentColor"/></symbol>
+        <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
         <symbol id="icon-api" viewBox="0 0 100 100"><circle cx="34" cy="50" r="16" fill="none" stroke="currentColor" stroke-width="6"/><path d="M50 50h38M72 50v14M84 50v10" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="34" cy="50" r="5" fill="var(--accent)"/></symbol>
         <symbol id="icon-model" viewBox="0 0 100 100"><rect x="26" y="26" width="48" height="48" fill="none" stroke="currentColor" stroke-width="6"/><path d="M38 14v12M62 14v12M38 74v12M62 74v12M14 38h12M14 62h12M74 38h12M74 62h12" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="50" r="9" fill="var(--accent)"/></symbol>
         <symbol id="icon-subject" viewBox="0 0 100 100"><circle cx="50" cy="34" r="15" fill="none" stroke="currentColor" stroke-width="6"/><path d="M22 84c0-20 12-28 28-28s28 8 28 28" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="78" cy="26" r="7" fill="var(--accent)"/></symbol>
@@ -67,10 +69,23 @@ const lenses = [
           <span>v{packageJson.version}</span>
         </header>
 
-        <label class="workspace-picker" data-workspace-control hidden>
-          <span>Workspace</span>
-          <select data-workspace-picker aria-label="Active workspace"><option value="">Unscoped memory</option></select>
-        </label>
+        <div class="workspace-picker" data-workspace-control hidden>
+          <details data-workspace-menu>
+            <summary aria-label="Select active workspace">
+              <span class="workspace-trigger-copy">
+                <svg viewBox="-4 -4 108 108" aria-hidden="true"><use href="#icon-workspace"></use></svg>
+                <span><strong data-workspace-label>Unscoped memory</strong><small data-workspace-meta>organization-visible memory</small></span>
+              </span>
+              <svg class="workspace-chevron" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-chevron"></use></svg>
+            </summary>
+            <div class="workspace-menu">
+              <span class="workspace-menu-heading" data-workspace-heading>Workspaces</span>
+              <div data-workspace-options></div>
+              <p>Scopes team-visible memory only — organization-visible records show in every workspace.</p>
+            </div>
+          </details>
+          <select data-workspace-picker aria-label="Active workspace" aria-hidden="true" tabindex="-1" hidden><option value="">Unscoped memory</option></select>
+        </div>
 
         <nav data-product-nav hidden>
           <p class="nav-group-label">Memory</p>
@@ -619,6 +634,7 @@ const lenses = [
       const searchDialog = one<HTMLDialogElement>("[data-search-dialog]");
       const searchForm = one<HTMLFormElement>("[data-search-form]");
       const workspacePicker = one<HTMLSelectElement>("[data-workspace-picker]");
+      const workspaceMenu = one<HTMLDetailsElement>("[data-workspace-menu]");
       let view: AtlasView | null = null;
       let principal: DashboardPrincipal | null = null;
       let dashboardStatus: DashboardStatus | null = null;
@@ -812,8 +828,41 @@ const lenses = [
               workspacePicker.add(new Option(row.name, row.workspace_id));
           }
           workspacePicker.value = [...workspacePicker.options].some((option) => option.value === current) ? current : "";
+          renderWorkspacePicker();
           one<HTMLElement>("[data-workspace-control]").hidden = false;
         } catch (error) { handleError(error); }
+      }
+      function renderWorkspacePicker() {
+        const selected = workspacePicker.selectedOptions[0] ?? workspacePicker.options[0];
+        text("[data-workspace-label]", selected?.text ?? "Unscoped memory");
+        text("[data-workspace-meta]", selected?.value ? "team + organization memory" : "organization-visible memory");
+        text("[data-workspace-heading]", `Workspaces · ${Math.max(0, workspacePicker.options.length - 1)} available`);
+        const target = one<HTMLElement>("[data-workspace-options]");
+        target.replaceChildren();
+        for (const option of workspacePicker.options) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "workspace-option";
+          button.dataset.workspaceValue = option.value;
+          button.setAttribute("aria-current", String(option === selected));
+          const check = document.createElement("span");
+          check.className = "workspace-check";
+          check.textContent = option === selected ? "✓" : "";
+          check.setAttribute("aria-hidden", "true");
+          const copy = document.createElement("span");
+          const label = document.createElement("strong");
+          label.textContent = option.text;
+          const detail = document.createElement("small");
+          detail.textContent = option.value ? "team + organization-visible records" : "organization-visible records without a workspace filter";
+          copy.append(label, detail);
+          button.append(check, copy);
+          button.addEventListener("click", () => {
+            workspacePicker.value = option.value;
+            workspaceMenu.open = false;
+            workspacePicker.dispatchEvent(new Event("change", { bubbles: true }));
+          });
+          target.append(button);
+        }
       }
       async function loadSubjects() {
         const target = one<HTMLElement>("[data-subjects-output]");
@@ -1131,6 +1180,10 @@ const lenses = [
       }
       function clearPrivateState() {
         clearMemory();
+        workspaceMenu.open = false;
+        workspacePicker.replaceChildren(new Option("Unscoped memory", ""));
+        renderWorkspacePicker();
+        one<HTMLElement>("[data-workspace-control]").hidden = true;
         memoryListCursor = null;
         memoryListAfter = null;
         memoryListHistory = [];
@@ -1648,10 +1701,18 @@ const lenses = [
         memoryListSearch.focus();
       });
       document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && workspaceMenu.open) {
+          workspaceMenu.open = false;
+          one<HTMLElement>("[data-workspace-menu] summary").focus();
+          return;
+        }
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
           event.preventDefault();
           if (!searchDialog.open) one<HTMLButtonElement>("[data-search-open]").click();
         }
+      });
+      document.addEventListener("pointerdown", (event) => {
+        if (workspaceMenu.open && !workspaceMenu.contains(event.target as Node)) workspaceMenu.open = false;
       });
 
       memoryListForm.addEventListener("submit", (event) => {
@@ -1805,6 +1866,7 @@ const lenses = [
       });
 
       workspacePicker.addEventListener("change", () => {
+        renderWorkspacePicker();
         memoryListHistory = [];
         memoryListCursor = null;
         if (!one<HTMLElement>('[data-area-panel="memories"]').hidden) void loadMemoryList();
