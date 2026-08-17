@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-workspace-picker-fidelity-20260816
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-16
-updated: 2026-08-16
-review_after: 2026-08-23
+updated: 2026-08-17
 owner: CADIS
 ---
 
@@ -53,3 +52,18 @@ selection in browser storage, or adding a component framework.
 All acceptance criteria have reproducible evidence, the package and website
 release identify the same patch version, production smokes pass, and this spec
 and its paired plan are moved to `done/` with no unchecked work.
+
+## Delivery evidence
+
+- Commit `ff419db329c4b40c4aaa0bfd3e197cb6cce1d630` and tag `v0.8.7`
+  contain the mockup-aligned selector, live scope behavior, accessibility
+  coverage, and reviewed desktop/320 px references.
+- `titen-memory@0.8.7` is npm `latest` with SHA-1
+  `527d1eae721a88994ff8913b5efb5a3cd055f7cf` and the same `gitHead`.
+- Production server-wulan runs package/revision `0.8.7`/`npm-0.8.7` with
+  health and readiness `200`, schema `23/23`, dashboard `200`, and an
+  unauthenticated protected request rejected with `401`. Rollback backup:
+  `/opt/titen/backups/npm-0.8.7-20260817-080321`.
+- `titen-web` commit `0354a7d` is deployed as Cloudflare version
+  `0838c332-9c8a-4a70-aeec-96f5679f473d`; both public hostnames, release
+  metadata/page/OG, and the live dashboard passed HTTP and browser smoke.
