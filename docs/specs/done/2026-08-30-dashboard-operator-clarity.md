@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-operator-clarity-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
 ---
 
@@ -145,3 +144,14 @@ upgrade. Pulihkan package dan deployment website sebelumnya bila smoke gagal.
 - Npm sudah mendapat persetujuan Rama dan sudah diterbitkan.
 - Server produksi memakai release baru atau rollback yang terverifikasi.
 - Spec dan plan sudah pindah ke direktori `done/`.
+
+## Acceptance evidence
+
+- AC-DOC-001 sampai AC-DOC-005 lulus melalui tes collection dan payload teknis.
+- AC-DOC-006 sampai AC-DOC-009 lulus melalui tes state dan mutasi.
+- AC-DOC-010 sampai AC-DOC-017 lulus melalui tes semua area dashboard.
+- AC-DOC-018 sampai AC-DOC-020 lulus melalui tes capability, session, keyboard, dan mobile.
+- AC-DOC-021 lulus dengan bundle dashboard 26,3 KiB gzip.
+- AC-DOC-022 lulus melalui dokumentasi, website, dan metadata versi 0.9.0.
+- AC-DOC-023 lulus setelah persetujuan npm melalui browser.
+- AC-DOC-024 lulus melalui backup dan production smoke pada server-wulan.

@@ -1,19 +1,18 @@
 ---
 work_id: dashboard-operator-clarity-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
-spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
+spec: docs/specs/done/2026-08-30-dashboard-operator-clarity.md
 ---
 
 # Dashboard Operator Clarity Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Check each step during execution.
 
 **Goal:** Bangun tampilan operator yang spesifik untuk setiap area dashboard Titen.
 
@@ -21,7 +20,7 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 
 **Tech Stack:** Astro 7, TypeScript 5.9, native DOM, native CSS, Playwright 1.62, Node 24, pnpm 11, Bun, dan Cloudflare.
 
-**Spec:** `docs/specs/active/2026-08-30-dashboard-operator-clarity.md`
+**Spec:** `docs/specs/done/2026-08-30-dashboard-operator-clarity.md`
 
 ## Global Constraints
 
@@ -86,7 +85,7 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 
 **Interfaces:**
 
-- Consumes: `Record<string, unknown>` dari same-origin dashboard adapter.
+- Consumes: Object key-value dari same-origin dashboard adapter.
 - Produces: `renderCollection(target, definition)` dan `renderFacts(target, definition)`.
 - Produces: `CollectionDefinition`, `CollectionColumn`, `CollectionAction`, dan `FactDefinition`.
 
@@ -380,31 +379,35 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: Dashboard dan dokumentasi final.
 - Produces: Package `titen-memory@0.9.0` yang belum diterbitkan.
 
-- [ ] **Step 1: Jalankan tes fokus.**
+- [x] **Step 1: Jalankan tes fokus.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts tests/dashboard-screenshots.spec.ts`
 
-- [ ] **Step 2: Jalankan seluruh gate repository.**
+- [x] **Step 2: Jalankan seluruh gate repository.**
 
   Run: `pnpm test:all`
 
-- [ ] **Step 3: Jalankan typecheck dan audit.**
+- [x] **Step 3: Jalankan typecheck dan audit.**
 
   Run: `pnpm typecheck`
 
   Run: `pnpm audit --prod`
 
+  Audit lulus tanpa vulnerability. Typecheck menemukan utang lama di harness
+  arsip, benchmark, contract test, dan mock Bun. Source dashboard yang diubah
+  tidak menambah error typecheck.
+
 - [x] **Step 4: Sinkronkan versi `0.9.0`.**
 
   Jalankan mekanisme release lokal yang terdokumentasi.
 
-- [ ] **Step 5: Verifikasi tarball bersih.**
+- [x] **Step 5: Verifikasi tarball bersih.**
 
   Run: `bash scripts/verify-pack.sh`
 
   Expected: Semua package smoke lulus.
 
-- [ ] **Step 6: Verifikasi status dan diff.**
+- [x] **Step 6: Verifikasi status dan diff.**
 
   Run: `git diff --check && git status --short`
 
@@ -419,27 +422,27 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: Commit Titen yang sudah terverifikasi dan versi `0.9.0`.
 - Produces: Branch GitHub, website commit, dan Cloudflare deployment.
 
-- [ ] **Step 1: Commit implementasi Titen.**
+- [x] **Step 1: Commit implementasi Titen.**
 
   Gunakan commit kecil. Tambah trailer CADIS pada setiap commit.
 
-- [ ] **Step 2: Push branch dan integrasikan ke main.**
+- [x] **Step 2: Push branch dan integrasikan ke main.**
 
   Verifikasi remote SHA setelah push.
 
-- [ ] **Step 3: Jalankan release sync pada titen-web.**
+- [x] **Step 3: Jalankan release sync pada titen-web.**
 
   Run: `pnpm release:sync 0.9.0`
 
-- [ ] **Step 4: Build dan check website.**
+- [x] **Step 4: Build dan check website.**
 
   Run: `pnpm build && pnpm check`
 
-- [ ] **Step 5: Commit dan push titen-web.**
+- [x] **Step 5: Commit dan push titen-web.**
 
   Tambah trailer CADIS pada commit.
 
-- [ ] **Step 6: Deploy website dengan prosedur manual repo.**
+- [x] **Step 6: Deploy website dengan prosedur manual repo.**
 
   Verifikasi hostname utama, changelog, release page, dan version metadata.
 
@@ -455,43 +458,44 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: Tarball, website, commit SHA, dan rollback target yang terverifikasi.
 - Produces: npm release, server release, smoke evidence, dan closed workflow artifacts.
 
-- [ ] **Step 1: Siapkan browser approval npm.**
+- [x] **Step 1: Siapkan browser approval npm.**
 
   Jalankan `npm publish --registry https://registry.npmjs.org` hanya saat semua gate lulus.
 
-- [ ] **Step 2: Tunggu persetujuan Rama pada browser npm.**
+- [x] **Step 2: Tunggu persetujuan Rama pada browser npm.**
 
   Jangan ulangi publikasi bila approval masih aktif.
 
-- [ ] **Step 3: Verifikasi npm registry.**
+- [x] **Step 3: Verifikasi npm registry.**
 
   Pastikan `latest`, integrity, gitHead, dan tarball sesuai commit.
 
-- [ ] **Step 4: Buat tag dan GitHub release manual.**
+- [x] **Step 4: Buat tag dan GitHub release manual.**
 
   Gunakan tag anotasi `v0.9.0`. Jangan gunakan GitHub Actions.
 
-- [ ] **Step 5: Simpan backup server.**
+- [x] **Step 5: Simpan backup server.**
 
   Catat package, revision, database quick check, count aman, dan rollback path.
 
-- [ ] **Step 6: Upgrade server-wulan.**
+- [x] **Step 6: Upgrade server-wulan.**
 
   Pasang package exact dari registry npmjs. Tunggu health dan readiness.
 
-- [ ] **Step 7: Jalankan production smoke.**
+- [x] **Step 7: Jalankan production smoke.**
 
   Verifikasi root, dashboard, health, readiness, schema, dan protected 401.
 
-- [ ] **Step 8: Jalankan rollback bila smoke gagal.**
+- [x] **Step 8: Konfirmasi rollback tidak diperlukan.**
 
-  Pulihkan package dan deployment sebelumnya. Ulangi smoke rollback.
+  Production smoke lulus. Rollback tetap tersedia pada backup server dan
+  revision deployment sebelumnya.
 
-- [ ] **Step 9: Tutup spec dan plan.**
+- [x] **Step 9: Tutup spec dan plan.**
 
   Isi acceptance evidence dan verification. Pindahkan kedua file ke `done/`.
 
-- [ ] **Step 10: Commit dan push bukti release.**
+- [x] **Step 10: Commit dan push bukti release.**
 
   Pastikan main, npm, website, server, tag, dan release memakai revision yang sesuai.
 
@@ -511,10 +515,29 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 
 ## Verification
 
-Belum dijalankan untuk implementasi. Baseline `pnpm build` dan 10 tes browser
-lulus sebelum perubahan source.
+- `pnpm test:all` lulus pada main. D1 lulus 128 tes. Bun dan SDK lulus 156 tes.
+- Integration lulus 230 tes. Live dashboard verifier dan 15 tes browser lulus.
+- Lima tes screenshot lulus saat baseline visual diperbarui.
+- Build menghasilkan bundle dashboard 26,3 KiB gzip. Batasnya 80 KiB gzip.
+- `pnpm audit --prod` tidak menemukan vulnerability.
+- `bash scripts/verify-pack.sh` lulus sembilan dari sembilan pemeriksaan.
+- Route checker, workflow checker, dan `git diff --check` lulus.
+- `pnpm typecheck` masih gagal pada utang lama di luar source dashboard yang diubah.
+- npmjs menerbitkan `titen-memory@0.9.0` dari gitHead `8bd45de148143025a85313af7f33f74edefa2c46`.
+- Website memakai commit `82db3d32bc436c9fd451ad814221ab27493a18ad`.
+- Cloudflare memakai Worker version `237a3872-b026-4c9d-88b0-35f86896d408`.
+- server-wulan memakai package dan CLI 0.9.0. Health dan readiness lulus.
+- Database server lulus quick check dan tetap memakai schema 23 dari 23.
+- Endpoint privat tanpa otorisasi mengembalikan 401.
 
 ## Acceptance evidence
 
-Belum tersedia. Bagian ini akan memuat bukti final untuk setiap acceptance
-criterion saat workflow ditutup.
+- AC-DOC-001, AC-DOC-002, AC-DOC-003, AC-DOC-004, dan AC-DOC-005 lulus melalui tes collection dan technical payload.
+- AC-DOC-006, AC-DOC-007, AC-DOC-008, dan AC-DOC-009 lulus melalui tes empty state, stale-state reset, mutation, dan server reload.
+- AC-DOC-010, AC-DOC-011, dan AC-DOC-012 lulus melalui tes Projects dan Subjects.
+- AC-DOC-013, AC-DOC-014, AC-DOC-015, AC-DOC-016, dan AC-DOC-017 lulus melalui tes seluruh area operasional.
+- AC-DOC-018, AC-DOC-019, dan AC-DOC-020 lulus melalui tes capability, session reset, keyboard, dan mobile 320 piksel.
+- AC-DOC-021 lulus melalui build dan bundle checker.
+- AC-DOC-022 lulus melalui README, guide, changelog, release page, dan production website smoke.
+- AC-DOC-023 lulus setelah Rama memberi persetujuan npm melalui browser.
+- AC-DOC-024 lulus melalui backup server dan production smoke. Rollback tidak diperlukan.
