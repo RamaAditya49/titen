@@ -1,7 +1,7 @@
 ---
 work_id: dashboard-operator-clarity-20260830
 status: active
-stage: spec
+stage: plan
 outcome: pending
 complexity: complex
 created: 2026-08-30
