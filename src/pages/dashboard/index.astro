@@ -607,6 +607,10 @@ const lenses = [
         type DashboardStatus,
         type MemoryRecord,
       } from "../../lib/dashboard-api";
+      import {
+        renderCollection,
+        renderPayloadView,
+      } from "../../lib/dashboard-view";
 
       const one = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
       const all = <T extends Element>(selector: string) => [...document.querySelectorAll<T>(selector)];
@@ -712,65 +716,12 @@ const lenses = [
         if (danger) paragraph.className = "output-error";
         target.append(paragraph);
       }
-      function rowLabel(row: Record<string, unknown>, index: number): string {
-        for (const key of ["label", "statement", "claim", "name", "action", "kind", "principal_id", "peer_id", "lease_id", "handoff_id", "event_id", "membership_id", "policy_id", "release_id", "key_id", "id", "status"])
-          if (typeof row[key] === "string" && row[key]) return String(row[key]);
-        return `Record ${index + 1}`;
-      }
-      function renderPayload(target: HTMLElement, payload: Record<string, unknown>) {
-        target.replaceChildren();
-        const data = payloadData(payload);
-        const arrays = Object.entries(data).filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1]));
-        if (!arrays.length) {
-          const pre = document.createElement("pre");
-          pre.textContent = JSON.stringify(data, null, 2);
-          target.append(pre);
-          return;
-        }
-        for (const [name, rows] of arrays) {
-          const section = document.createElement("section");
-          const heading = document.createElement("h3");
-          heading.textContent = `${name.replaceAll("_", " ")} · ${rows.length}`;
-          section.append(heading);
-          if (!rows.length) {
-            const empty = document.createElement("p");
-            empty.textContent = "No authorized records returned.";
-            section.append(empty);
-          }
-          rows.slice(0, 200).forEach((value, index) => {
-            const row = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : { value };
-            const details = document.createElement("details");
-            const summary = document.createElement("summary");
-            const pre = document.createElement("pre");
-            summary.textContent = rowLabel(row, index);
-            pre.textContent = JSON.stringify(row, null, 2);
-            details.append(summary, pre);
-            section.append(details);
-          });
-          target.append(section);
-        }
-        const metadata = Object.fromEntries(Object.entries(data).filter(([, value]) => !Array.isArray(value)));
-        if (Object.keys(metadata).length) {
-          const details = document.createElement("details");
-          const summary = document.createElement("summary");
-          const pre = document.createElement("pre");
-          summary.textContent = "Response metadata";
-          pre.textContent = JSON.stringify(metadata, null, 2);
-          details.append(summary, pre);
-          target.append(details);
-        }
-      }
-      function appendAction(target: HTMLElement, label: string, run: () => Promise<void>) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "text-button";
-        button.textContent = label;
-        button.addEventListener("click", async () => {
-          button.disabled = true;
-          try { await run(); } catch (error) { handleError(error, target); }
-          finally { button.disabled = false; }
-        });
-        target.append(button);
+      function renderPayload(
+        target: HTMLElement,
+        payload: Record<string, unknown>,
+        options: Parameters<typeof renderPayloadView>[2] = {},
+      ) {
+        renderPayloadView(target, payloadData(payload), options);
       }
       function renderContext(target: HTMLElement, payload: Record<string, unknown>) {
         const data = payloadData(payload);
@@ -795,7 +746,11 @@ const lenses = [
         target.append(records);
         renderPayload(records, { data: { items: data.items ?? [], conflicts: data.conflicts ?? [], instructions: data.instructions, policy_snapshot: data.policy_snapshot } });
       }
-      async function loadAvailable(target: HTMLElement, requests: Array<[string, string]>): Promise<Record<string, unknown>> {
+      async function loadAvailable(
+        target: HTMLElement,
+        requests: Array<[string, string]>,
+        options: Parameters<typeof renderPayloadView>[2] = {},
+      ): Promise<Record<string, unknown>> {
         renderMessage(target, "Loading authorized live data…");
         const selected = requests.filter(([, scope]) => has(scope));
         if (!selected.length) {
@@ -805,7 +760,7 @@ const lenses = [
         const results = await Promise.all(selected.map(async ([path]) => [path.split("/").at(-1)!, await getArea(path)] as const));
         const merged: Record<string, unknown> = {};
         for (const [name, payload] of results) Object.assign(merged, payloadData(payload));
-        renderPayload(target, { data: merged });
+        renderPayload(target, { data: merged }, options);
         return merged;
       }
 
@@ -869,17 +824,21 @@ const lenses = [
         renderMessage(target, "Loading authorized subjects…");
         try {
           const payload = await getArea("subjects", formQuery(one<HTMLFormElement>("[data-subjects-form]")));
-          renderPayload(target, payload);
           const subjects = payloadData(payload).subjects;
-          if (Array.isArray(subjects)) for (const value of subjects) {
-            const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-            if (typeof row.subject_id !== "string") continue;
-            appendAction(target, `References · ${row.label ?? row.subject_id}`, async () => {
+          const rows = Array.isArray(subjects)
+            ? subjects.map((value) => value && typeof value === "object" ? value as Record<string, unknown> : {})
+            : [];
+          renderCollection(target, {
+            name: "subjects",
+            rows,
+            emptyMessage: "No authorized subject identities returned.",
+            inspect: async (row) => {
+              if (typeof row.subject_id !== "string") return;
               const references = one<HTMLElement>("[data-subject-references]");
               renderMessage(references, "Loading authorized references…");
               renderPayload(references, await getArea(`subjects/${encodeURIComponent(row.subject_id as string)}/references`));
-            });
-          }
+            },
+          });
         }
         catch (error) { handleError(error, target); }
       }
@@ -888,17 +847,21 @@ const lenses = [
         renderMessage(target, "Loading authorized projects…");
         try {
           const payload = await getArea("projects", formQuery(one<HTMLFormElement>("[data-projects-form]")));
-          renderPayload(target, payload);
           const projects = payloadData(payload).projects;
-          if (Array.isArray(projects)) for (const value of projects) {
-            const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-            const id = typeof row.project_id === "string" ? row.project_id : "~";
-            appendAction(target, `References · ${row.reference ?? "(unscoped)"}`, async () => {
+          const rows = Array.isArray(projects)
+            ? projects.map((value) => value && typeof value === "object" ? value as Record<string, unknown> : {})
+            : [];
+          renderCollection(target, {
+            name: "projects",
+            rows,
+            emptyMessage: "No authorized project scopes returned.",
+            inspect: async (row) => {
+              const id = typeof row.project_id === "string" ? row.project_id : "~";
               const references = one<HTMLElement>("[data-project-references]");
               renderMessage(references, "Loading authorized references…");
               renderPayload(references, await getArea(`projects/${encodeURIComponent(id)}/references`));
-            });
-          }
+            },
+          });
         }
         catch (error) { handleError(error, target); }
       }
@@ -910,68 +873,86 @@ const lenses = [
         if (!selected.length) return renderMessage(target, "This principal has no read capability for work state.");
         const responses = await Promise.all(selected.map(async ([path]) => payloadData(await getArea(path))));
         const data = Object.assign({}, ...responses);
-        renderPayload(target, { data });
-        if (has("leases:write") && Array.isArray(data.leases)) for (const value of data.leases) {
-          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-          if (typeof row.lease_id !== "string" || row.status !== "active") continue;
-          const own = row.holder_id === principal?.principal_id;
-          const privileged = ["root", "owner", "admin"].includes(principal?.organization_role ?? "");
-          if (!own && !privileged) continue;
-          appendAction(target, `${own ? "Release" : "Force-release"} · ${row.resource_id ?? row.lease_id}`, async () => {
-            if (!confirm(`${own ? "Release" : "Force-release"} this lease now?`)) return;
-            if (own) await deleteArea(`work/leases/${encodeURIComponent(row.lease_id as string)}`);
-            else await postArea(`work/leases/${encodeURIComponent(row.lease_id as string)}/force-release`, {});
-            await loadWork();
-          });
-        }
-        if (has("handoffs:write") && Array.isArray(data.handoffs)) for (const value of data.handoffs) {
-          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-          if (typeof row.handoff_id !== "string" || row.status !== "pending" || row.to_principal !== principal?.principal_id) continue;
-          for (const status of ["accepted", "rejected"] as const) appendAction(target, `${status === "accepted" ? "Accept" : "Reject"} handoff · ${row.subject_id}`, async () => {
-            if (!confirm(`${status === "accepted" ? "Accept" : "Reject"} this handoff?`)) return;
-            await postArea(`work/handoffs/${encodeURIComponent(row.handoff_id as string)}/resolve`, { status });
-            await loadWork();
-          });
-        }
+        renderPayload(target, { data }, { actions: {
+          leases: (row) => {
+            if (!has("leases:write") || typeof row.lease_id !== "string" || row.status !== "active") return [];
+            const own = row.holder_id === principal?.principal_id;
+            const privileged = ["root", "owner", "admin"].includes(principal?.organization_role ?? "");
+            if (!own && !privileged) return [];
+            const verb = own ? "Release" : "Force-release";
+            return [{
+              label: `${verb} · ${row.resource_id ?? row.lease_id}`,
+              tone: "danger",
+              run: async () => {
+                if (!confirm(`${verb} this lease now?`)) return;
+                try {
+                  if (own) await deleteArea(`work/leases/${encodeURIComponent(row.lease_id as string)}`);
+                  else await postArea(`work/leases/${encodeURIComponent(row.lease_id as string)}/force-release`, {});
+                  await loadWork();
+                } catch (error) { handleError(error, target); }
+              },
+            }];
+          },
+          handoffs: (row) => {
+            if (!has("handoffs:write") || typeof row.handoff_id !== "string" || row.status !== "pending" || row.to_principal !== principal?.principal_id) return [];
+            return (["accepted", "rejected"] as const).map((status) => ({
+              label: `${status === "accepted" ? "Accept" : "Reject"} handoff · ${row.subject_id}`,
+              tone: status === "rejected" ? "danger" as const : "default" as const,
+              run: async () => {
+                if (!confirm(`${status === "accepted" ? "Accept" : "Reject"} this handoff?`)) return;
+                try {
+                  await postArea(`work/handoffs/${encodeURIComponent(row.handoff_id as string)}/resolve`, { status });
+                  await loadWork();
+                } catch (error) { handleError(error, target); }
+              },
+            }));
+          },
+        } });
       }
       async function loadGovernance() {
         const target = one<HTMLElement>("[data-governance-output]");
-        const data = await loadAvailable(target, [["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"]]);
-        if (!has("approvals:approve")) return;
-        const approvals = data.approvals;
-        if (!Array.isArray(approvals)) return;
-        for (const value of approvals) {
-          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-          if (typeof row.approval_id !== "string" || !["pending", "approved"].includes(String(row.status))) continue;
-          const decisions = row.status === "pending" ? ["approve", "reject"] : ["revoke"];
-          for (const decision of decisions) appendAction(target, `${decision[0]!.toUpperCase()}${decision.slice(1)} · ${row.claim_id}`, async () => {
-            const reason = prompt(`Reason to ${decision} this approval:`)?.trim();
-            if (!reason) return;
-            await postArea(`approvals/${encodeURIComponent(row.approval_id as string)}/decide`, { decision, reason, expected_version: Number(row.version) });
-            await loadGovernance();
-          });
-        }
+        await loadAvailable(target, [["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"]], { actions: {
+          approvals: (row) => {
+            if (!has("approvals:approve") || typeof row.approval_id !== "string" || !["pending", "approved"].includes(String(row.status))) return [];
+            const decisions = row.status === "pending" ? ["approve", "reject"] : ["revoke"];
+            return decisions.map((decision) => ({
+              label: `${decision[0]!.toUpperCase()}${decision.slice(1)} · ${row.claim_id}`,
+              tone: decision === "approve" ? "default" as const : "danger" as const,
+              run: async () => {
+                const reason = prompt(`Reason to ${decision} this approval:`)?.trim();
+                if (!reason) return;
+                try {
+                  await postArea(`approvals/${encodeURIComponent(row.approval_id as string)}/decide`, { decision, reason, expected_version: Number(row.version) });
+                  await loadGovernance();
+                } catch (error) { handleError(error, target); }
+              },
+            }));
+          },
+        } });
       }
       async function loadReleases() {
         const target = one<HTMLElement>("[data-releases-output]");
         const payload = await getArea("governance/releases");
-        renderPayload(target, payload);
-        if (!has("releases:approve")) return;
-        const releases = payloadData(payload).releases;
-        if (!Array.isArray(releases)) return;
-        for (const value of releases) {
-          const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-          if (typeof row.release_id !== "string") continue;
-          const status = String(row.status);
-          const actions = status === "draft" || status === "suspended" ? ["approve"]
-            : status === "approved" ? ["activate", "revoke"] : status === "active" ? ["revoke"] : [];
-          for (const action of actions) appendAction(target, `${action[0]!.toUpperCase()}${action.slice(1)} · ${row.release_id}`, async () => {
-            const reason = action === "activate" ? undefined : prompt(`Reason to ${action} this release:`)?.trim();
-            if (action !== "activate" && !reason) return;
-            await postArea(`releases/${encodeURIComponent(row.release_id as string)}/${action}`, { expected_version: Number(row.version), ...(reason ? { reason } : {}) });
-            await loadReleases();
-          });
-        }
+        renderPayload(target, payload, { actions: {
+          releases: (row) => {
+            if (!has("releases:approve") || typeof row.release_id !== "string") return [];
+            const status = String(row.status);
+            const actions = status === "draft" || status === "suspended" ? ["approve"]
+              : status === "approved" ? ["activate", "revoke"] : status === "active" ? ["revoke"] : [];
+            return actions.map((action) => ({
+              label: `${action[0]!.toUpperCase()}${action.slice(1)} · ${row.release_id}`,
+              tone: action === "revoke" ? "danger" as const : "default" as const,
+              run: async () => {
+                const reason = action === "activate" ? undefined : prompt(`Reason to ${action} this release:`)?.trim();
+                if (action !== "activate" && !reason) return;
+                try {
+                  await postArea(`releases/${encodeURIComponent(row.release_id as string)}/${action}`, { expected_version: Number(row.version), ...(reason ? { reason } : {}) });
+                  await loadReleases();
+                } catch (error) { handleError(error, target); }
+              },
+            }));
+          },
+        } });
       }
       async function loadModels() {
         text("[data-model-status]", "Loading immutable startup snapshot…");
@@ -1019,20 +1000,22 @@ const lenses = [
             const row = value as Record<string, unknown>;
             return row.principal_id === picker.value || row.issued_by === picker.value;
           }) : [];
-          renderPayload(target, { data: { principals, ...(payloadData(grants)), key_clamp_preview: selectedKeys } });
-          const rows = payloadData(grants).grants;
-          if (has("grants:write") && Array.isArray(rows)) for (const grant of rows) {
-            if (!grant || typeof grant !== "object" || typeof (grant as any).grant_id !== "string" || (grant as any).revoked_at) continue;
-            const button = document.createElement("button");
-            button.type = "button"; button.className = "text-button";
-            button.textContent = `Revoke ${(grant as any).grant_id}`;
-            button.addEventListener("click", async () => {
-              if (!confirm("Revoke this grant on the next request?")) return;
-              try { await deleteArea(`access/grants/${encodeURIComponent((grant as any).grant_id)}`); await loadAccess(); }
-              catch (error) { handleError(error, target); }
-            });
-            target.append(button);
-          }
+          renderPayload(target, { data: { principals, ...(payloadData(grants)), key_clamp_preview: selectedKeys } }, { actions: {
+            grants: (row) => {
+              if (!has("grants:write") || typeof row.grant_id !== "string" || row.revoked_at) return [];
+              return [{
+                label: `Revoke ${row.grant_id}`,
+                tone: "danger",
+                run: async () => {
+                  if (!confirm("Revoke this grant on the next request?")) return;
+                  try {
+                    await deleteArea(`access/grants/${encodeURIComponent(row.grant_id as string)}`);
+                    await loadAccess();
+                  } catch (error) { handleError(error, target); }
+                },
+              }];
+            },
+          } });
         } catch (error) { handleError(error, target); }
       }
       async function loadKeys() {
@@ -1040,20 +1023,22 @@ const lenses = [
         renderMessage(target, "Loading masked key metadata…");
         try {
           const payload = await getArea("governance/keys");
-          renderPayload(target, payload);
-          const keys = payloadData(payload).keys;
-          if (Array.isArray(keys)) for (const key of keys) {
-            if (!key || typeof key !== "object" || typeof (key as any).key_id !== "string" || (key as any).status === "revoked") continue;
-            const button = document.createElement("button");
-            button.type = "button"; button.className = "text-button";
-            button.textContent = `Revoke ${(key as any).label ?? (key as any).key_id}`;
-            button.addEventListener("click", async () => {
-              if (!confirm("Revoke this API key immediately?")) return;
-              try { await deleteArea(`api/keys/${encodeURIComponent((key as any).key_id)}`); await loadKeys(); }
-              catch (error) { handleError(error, target); }
-            });
-            target.append(button);
-          }
+          renderPayload(target, payload, { actions: {
+            keys: (row) => {
+              if (typeof row.key_id !== "string" || row.status === "revoked") return [];
+              return [{
+                label: `Revoke ${row.label ?? row.key_id}`,
+                tone: "danger",
+                run: async () => {
+                  if (!confirm("Revoke this API key immediately?")) return;
+                  try {
+                    await deleteArea(`api/keys/${encodeURIComponent(row.key_id as string)}`);
+                    await loadKeys();
+                  } catch (error) { handleError(error, target); }
+                },
+              }];
+            },
+          } });
         } catch (error) { handleError(error, target); }
       }
 
@@ -1857,7 +1842,10 @@ const lenses = [
         const values = new FormData(event.currentTarget as HTMLFormElement);
         const query = new URLSearchParams({ peer_id: String(values.get("peer_id")).trim(), limit: String(values.get("limit")) });
         const target = one<HTMLElement>("[data-federation-output]");
-        try { renderPayload(target, await getArea("federation/log", query)); } catch (error) { handleError(error, target); }
+        try {
+          const response = await getArea("federation/log", query);
+          renderPayload(target, { data: { federation_entries: payloadData(response).entries ?? [] } });
+        } catch (error) { handleError(error, target); }
       });
       one<HTMLButtonElement>("[data-releases-refresh]").addEventListener("click", async () => {
         const target = one<HTMLElement>("[data-releases-output]");

@@ -1,7 +1,7 @@
 ---
 work_id: dashboard-operator-clarity-20260830
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-30
@@ -90,35 +90,35 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Produces: `renderCollection(target, definition)` dan `renderFacts(target, definition)`.
 - Produces: `CollectionDefinition`, `CollectionColumn`, `CollectionAction`, dan `FactDefinition`.
 
-- [ ] **Step 1: Tulis tes collection yang gagal.**
+- [x] **Step 1: Tulis tes collection yang gagal.**
 
   Tambah fixture Projects dengan project scoped dan unscoped.
   Pastikan tabel mempunyai kolom Reference, Scope, Records, Subjects, dan Last write.
   Pastikan tampilan utama tidak memuat `Record 1`.
   Pastikan disclosure `Technical payload` tertutup.
 
-- [ ] **Step 2: Jalankan tes Projects dan lihat kegagalan.**
+- [x] **Step 2: Jalankan tes Projects dan lihat kegagalan.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "structured project directory"`
 
   Expected: FAIL karena tabel operator belum ada.
 
-- [ ] **Step 3: Buat primitive collection minimum.**
+- [x] **Step 3: Buat primitive collection minimum.**
 
   `renderCollection` harus membuat summary, table, selected-record inspector,
   empty state, action cell, dan disclosure payload.
 
-- [ ] **Step 4: Hubungkan Projects ke primitive baru.**
+- [x] **Step 4: Hubungkan Projects ke primitive baru.**
 
   Gunakan field map yang eksplisit. Muat references saat operator memilih row.
 
-- [ ] **Step 5: Jalankan tes Projects.**
+- [x] **Step 5: Jalankan tes Projects.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "structured project directory"`
 
   Expected: PASS.
 
-- [ ] **Step 6: Refactor CSS collection.**
+- [x] **Step 6: Refactor CSS collection.**
 
   Gunakan border tipis, spacing, table header sticky, inspector, dan mobile list.
   Jangan ubah shell, sidebar, topbar, atau Atlas graph.
@@ -137,22 +137,22 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: `subjects`, `projects`, dan endpoint references saat ini.
 - Produces: Directory row yang dapat dipilih dan inspector reference.
 
-- [ ] **Step 1: Tulis tes Subjects yang gagal.**
+- [x] **Step 1: Tulis tes Subjects yang gagal.**
 
   Pastikan tabel menampilkan Identity, Type, References, dan Created.
   Pastikan pilihan subject memuat canonical references.
 
-- [ ] **Step 2: Jalankan tes directory.**
+- [x] **Step 2: Jalankan tes directory.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "operator directories"`
 
   Expected: FAIL pada tabel Subjects.
 
-- [ ] **Step 3: Implementasikan Subjects.**
+- [x] **Step 3: Implementasikan Subjects.**
 
   Gunakan label sebagai nilai utama. Gunakan subject ID sebagai nilai teknis.
 
-- [ ] **Step 4: Jalankan tes directory.**
+- [x] **Step 4: Jalankan tes directory.**
 
   Expected: PASS.
 
@@ -170,24 +170,24 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: `leases`, `handoffs`, `audit`, `events`, `peers`, dan federation log.
 - Produces: Section terpisah untuk setiap record kind.
 
-- [ ] **Step 1: Tulis tes operasi yang gagal.**
+- [x] **Step 1: Tulis tes operasi yang gagal.**
 
   Pastikan Work membedakan lease dan handoff.
   Pastikan Audit membedakan audit record dan event.
   Pastikan Federation membedakan peer dan exchange log.
 
-- [ ] **Step 2: Jalankan tes operasi.**
+- [x] **Step 2: Jalankan tes operasi.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "structured operations"`
 
   Expected: FAIL karena accordion JSON masih menjadi tampilan utama.
 
-- [ ] **Step 3: Implementasikan tiga tampilan operasi.**
+- [x] **Step 3: Implementasikan tiga tampilan operasi.**
 
   Tampilkan status, actor, target, time, dan identifier yang relevan.
   Letakkan release lease, resolve handoff, dan sync peer pada row terkait.
 
-- [ ] **Step 4: Jalankan tes operasi.**
+- [x] **Step 4: Jalankan tes operasi.**
 
   Expected: PASS.
 
@@ -205,23 +205,23 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: `policies`, `approvals`, dan `releases`.
 - Produces: Governance queue dengan state, version, target, dan row actions.
 
-- [ ] **Step 1: Tulis tes governance yang gagal.**
+- [x] **Step 1: Tulis tes governance yang gagal.**
 
   Pastikan action hanya muncul pada state yang sesuai.
   Pastikan action memakai ID dan expected version dari row.
 
-- [ ] **Step 2: Jalankan tes governance.**
+- [x] **Step 2: Jalankan tes governance.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "governance queues"`
 
   Expected: FAIL karena action terpisah dari record.
 
-- [ ] **Step 3: Implementasikan governance queue.**
+- [x] **Step 3: Implementasikan governance queue.**
 
   Pertahankan reason prompt dan confirmation contract.
   Muat ulang server state setelah mutasi.
 
-- [ ] **Step 4: Jalankan tes governance.**
+- [x] **Step 4: Jalankan tes governance.**
 
   Expected: PASS.
 
@@ -239,22 +239,22 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: `principals`, `grants`, `key_clamp_preview`, dan `keys`.
 - Produces: Authority table, grant table, clamp table, dan key table.
 
-- [ ] **Step 1: Tulis tes administration yang gagal.**
+- [x] **Step 1: Tulis tes administration yang gagal.**
 
   Pastikan principal, grant, clamp, dan key mempunyai section terpisah.
   Pastikan revoke berada pada row yang benar.
 
-- [ ] **Step 2: Jalankan tes administration.**
+- [x] **Step 2: Jalankan tes administration.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "structured administration"`
 
   Expected: FAIL pada section terstruktur.
 
-- [ ] **Step 3: Implementasikan administration view.**
+- [x] **Step 3: Implementasikan administration view.**
 
   Pertahankan form Add User, Add Grant, Generate Key, dan gate capability.
 
-- [ ] **Step 4: Jalankan tes administration.**
+- [x] **Step 4: Jalankan tes administration.**
 
   Expected: PASS.
 
@@ -272,23 +272,23 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: readiness checks, model tuples, context items, conflicts, instructions, dan policy snapshot.
 - Produces: Fact grid dan context item list dengan detail teknis.
 
-- [ ] **Step 1: Tulis tes diagnostic yang gagal.**
+- [x] **Step 1: Tulis tes diagnostic yang gagal.**
 
   Pastikan model fields dan system checks tampil sebagai facts.
   Pastikan context items tampil sebagai selected items dan conflicts.
 
-- [ ] **Step 2: Jalankan tes diagnostic.**
+- [x] **Step 2: Jalankan tes diagnostic.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "structured diagnostics"`
 
   Expected: FAIL pada facts dan context list.
 
-- [ ] **Step 3: Implementasikan diagnostic view.**
+- [x] **Step 3: Implementasikan diagnostic view.**
 
   Pertahankan restart configuration sebagai disclosure teknis.
   Pertahankan token budget meter.
 
-- [ ] **Step 4: Jalankan tes diagnostic.**
+- [x] **Step 4: Jalankan tes diagnostic.**
 
   Expected: PASS.
 
@@ -309,25 +309,25 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: Primitive collection dan shell dashboard.
 - Produces: Empty, loading, error, unauthorized, keyboard, dan mobile behavior.
 
-- [ ] **Step 1: Tulis tes stale-state yang gagal.**
+- [x] **Step 1: Tulis tes stale-state yang gagal.**
 
   Muat data privat. Paksa 401 atau disconnect. Pastikan DOM tidak menyimpan record.
 
-- [ ] **Step 2: Jalankan tes state.**
+- [x] **Step 2: Jalankan tes state.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts --grep "clears structured private data"`
 
   Expected: FAIL bila collection baru tidak dibersihkan.
 
-- [ ] **Step 3: Implementasikan reset terpusat.**
+- [x] **Step 3: Implementasikan reset terpusat.**
 
   Bersihkan table, inspector, payload disclosure, dan action handler.
 
-- [ ] **Step 4: Tambah screenshot Projects desktop dan mobile.**
+- [x] **Step 4: Tambah screenshot Projects desktop dan mobile.**
 
   Run: `UPDATE_DASHBOARD_SCREENSHOTS=1 pnpm test:browser tests/dashboard-screenshots.spec.ts`
 
-- [ ] **Step 5: Jalankan tes keyboard dan mobile.**
+- [x] **Step 5: Jalankan tes keyboard dan mobile.**
 
   Run: `pnpm build && pnpm test:browser tests/dashboard.spec.ts`
 

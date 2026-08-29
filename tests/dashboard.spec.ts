@@ -143,6 +143,222 @@ test("matches the workspace mockup and scopes live requests without storing stat
   expect(box!.x + box!.width).toBeLessThanOrEqual(320);
 });
 
+test("renders a structured project directory with contextual details", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/projects**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/references")) {
+      return route.fulfill({ json: { data: {
+        project_id: "project_titen",
+        references: [
+          { namespace: "canonical", value: "ramaaditya49/titen" },
+          { namespace: "git", value: "https://github.com/RamaAditya49/titen.git" },
+        ],
+      } } });
+    }
+    return route.fulfill({ json: { data: { projects: [
+      {
+        project_id: "project_titen",
+        reference: "ramaaditya49/titen",
+        created_at: "2026-08-01T00:00:00Z",
+        record_count: 184,
+        subject_count: 7,
+        last_write: "2026-08-29T13:57:14Z",
+      },
+      {
+        project_id: null,
+        reference: "(unscoped)",
+        created_at: null,
+        record_count: 24,
+        subject_count: 2,
+        last_write: "2026-08-28T09:12:11Z",
+      },
+    ] } } });
+  });
+
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Projects" }).click();
+
+  const output = page.locator("[data-projects-output]");
+  await expect(output.getByRole("columnheader")).toHaveText([
+    "Reference", "Scope", "Records", "Subjects", "Last write", "Action",
+  ]);
+  await expect(output.getByText("ramaaditya49/titen", { exact: true })).toBeVisible();
+  await expect(output.getByText("Unscoped", { exact: true })).toBeVisible();
+  await expect(output).not.toContainText("Record 1");
+  const payload = output.getByText("Technical payload", { exact: true });
+  await expect(payload).toBeVisible();
+  await expect(payload.locator("xpath=..")).not.toHaveAttribute("open", "");
+
+  await output.getByRole("button", { name: "Inspect ramaaditya49/titen" }).click();
+  const details = page.locator("[data-project-references]");
+  await expect(details).toContainText("project_titen");
+  await expect(details).toContainText("canonical");
+  await expect(details).toContainText("https://github.com/RamaAditya49/titen.git");
+
+  await page.setViewportSize({ width: 320, height: 700 });
+  const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, body: document.body.scrollWidth }));
+  expect(width.body).toBeLessThanOrEqual(width.viewport);
+});
+
+test("clears structured private data after a disconnect", async ({ page }) => {
+  const service = await mockServerMode(page);
+  await page.route("**/dashboard-api/projects**", (route) => route.fulfill({ json: { data: { projects: [{
+    project_id: "private_project",
+    reference: "internal/private-project",
+    record_count: 91,
+    subject_count: 4,
+    last_write: "2026-08-29T13:57:14Z",
+  }] } } }));
+
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Projects" }).click();
+  await expect(page.locator("[data-projects-output]")).toContainText("internal/private-project");
+  service.disconnect();
+  await page.getByRole("button", { name: "Refresh service" }).click();
+  await expect(page.locator("[data-projects-output]")).not.toContainText("internal/private-project");
+  await expect(page.locator("[data-projects-output]")).toContainText("No live data loaded");
+});
+
+test("renders subject identities with canonical references", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/subjects**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/references")) {
+      return route.fulfill({ json: { data: {
+        subject_id: "user:rama",
+        references: [
+          { namespace: "canonical", value: "user:rama" },
+          { namespace: "account", value: "ramaaditya49" },
+        ],
+      } } });
+    }
+    return route.fulfill({ json: { data: { subjects: [{
+      subject_id: "user:rama",
+      label: "Rama Aditya",
+      type: "human",
+      reference_count: 2,
+      created_at: "2026-08-01T00:00:00Z",
+    }] } } });
+  });
+
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Subjects" }).click();
+
+  const output = page.locator("[data-subjects-output]");
+  await expect(output.getByRole("columnheader")).toHaveText([
+    "Identity", "Type", "References", "Created", "Action",
+  ]);
+  await output.getByRole("button", { name: "Inspect Rama Aditya" }).click();
+  const details = page.locator("[data-subject-references]");
+  await expect(details).toContainText("user:rama");
+  await expect(details).toContainText("ramaaditya49");
+  await expect(output).not.toContainText("Record 1");
+});
+
+test("separates federation peers from the exchange log", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/federation/peers", (route) => route.fulfill({ json: { data: { peers: [{
+    peer_id: "peer_primary",
+    name: "Primary VPS",
+    endpoint: "https://titen.internal",
+    direction: "bidirectional",
+    source_org_id: "org_remote",
+    status: "active",
+    last_sync_at: "2026-08-29T13:57:14Z",
+  }] } } }));
+  await page.route("**/dashboard-api/federation/log**", (route) => route.fulfill({ json: { data: { entries: [{
+    id: "exchange_01",
+    direction: "received",
+    resource_type: "claim",
+    resource_id: "clm_remote",
+    status: "success",
+    created_at: "2026-08-29T14:01:02Z",
+  }] } } }));
+
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Federation" }).click();
+  await page.getByRole("button", { name: "Refresh peers" }).click();
+
+  const output = page.locator("[data-federation-output]");
+  await expect(output.locator('[data-collection="peers"] h3')).toHaveText("Federation peers");
+  await expect(output.getByRole("columnheader")).toHaveText([
+    "Peer", "Endpoint", "Direction", "Source organization", "Status", "Last sync", "Action",
+  ]);
+  await expect(output).toContainText("Primary VPS");
+  await expect(output).toContainText("org_remote");
+
+  await page.locator('[data-federation-form] input[name="peer_id"]').fill("peer_primary");
+  await page.locator("[data-federation-form]").getByRole("button", { name: "Load peer log" }).click();
+  await expect(output.locator('[data-collection="federation_entries"] h3')).toHaveText("Exchange log");
+  await expect(output.getByRole("columnheader")).toHaveText([
+    "ID", "Direction", "Resource", "Resource ID", "Status", "Time", "Action",
+  ]);
+  await expect(output).toContainText("exchange_01");
+  await expect(output).not.toContainText("Metadata activity");
+});
+
+test("renders structured administration and diagnostic facts", async ({ page }) => {
+  await mockServerMode(page, { data: {
+    ready: true,
+    revision: "release-candidate",
+    checks: { database: "ok", semantic_index: "current" },
+    capabilities: { vector: "enabled", extraction: "configured" },
+  } });
+  await page.route("**/dashboard-api/access/principals", (route) => route.fulfill({ json: { data: { principals: [{
+    principal_id: "user_editor",
+    username: "editor",
+    principal_kind: "human",
+    organization_role: "member",
+    max_trust: "verified",
+    status: "active",
+  }] } } }));
+  await page.route("**/dashboard-api/access/grants**", (route) => route.fulfill({ json: { data: { grants: [{
+    grant_id: "grant_editor",
+    principal_id: "user_editor",
+    target_type: "project",
+    target_id: "project_titen",
+    permissions: ["read", "write"],
+    status: "active",
+  }] } } }));
+  await page.route("**/dashboard-api/governance/keys", (route) => route.fulfill({ json: { data: { keys: [{
+    key_id: "key_editor",
+    label: "Editor CLI",
+    principal_id: "user_editor",
+    scopes: ["views:compile", "context:compile"],
+    max_trust: "verified",
+    data_target_type: "project",
+    data_target_id: "project_titen",
+    status: "active",
+  }] } } }));
+  await page.route("**/dashboard-api/models/config", (route) => route.fulfill({ json: { data: {
+    extraction: { model: "qwen3-30b", provider: "openai-compatible", api_key: "set", response_mode: "json_object" },
+    embedding: { model: "embeddinggemma", dimensions: 768, api_key: "set", profile: "balanced" },
+  } } }));
+
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "System" }).click();
+  await expect(page.locator('[data-system-checks] .operator-facts h3')).toHaveText(["Checks", "Capabilities"]);
+  await expect(page.locator("[data-system-checks]")).toContainText("Database");
+  await expect(page.locator("[data-system-checks]")).toContainText("enabled");
+
+  await page.getByRole("button", { name: "Models" }).click();
+  await expect(page.locator("[data-extraction-model]")).toContainText("qwen3-30b");
+  await expect(page.locator("[data-embedding-model]")).toContainText("embeddinggemma");
+  await expect(page.locator("[data-extraction-model] details")).not.toHaveAttribute("open", "");
+
+  await page.getByRole("button", { name: "Access" }).click();
+  await expect(page.locator('[data-collection="principals"] h3')).toHaveText("Principals");
+  await page.locator("[data-access-principal]").selectOption("user_editor");
+  const grantRow = page.locator('[data-collection="grants"] tbody tr').filter({ hasText: "grant_editor" });
+  await expect(grantRow.getByRole("button", { name: "Revoke grant_editor" })).toBeVisible();
+
+  await page.getByRole("button", { name: "API & Keys" }).click();
+  const keyRow = page.locator('[data-collection="keys"] tbody tr').filter({ hasText: "Editor CLI" });
+  await expect(keyRow.getByRole("button", { name: "Revoke Editor CLI" })).toBeVisible();
+  await expect(keyRow).toContainText("views:compile");
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
@@ -372,30 +588,41 @@ test("logs in per principal, wires all fifteen destinations, adds a user once, a
   await page.locator('[data-context-form] input[name="task"]').fill("prepare release");
   await page.getByRole("button", { name: "Compile context" }).click();
   await expect(page.getByText("Bounded context", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-collection="items"] h3')).toHaveText("Selected context items");
 
   await page.locator('[data-area="work"]').click();
   await page.getByRole("button", { name: "Refresh work" }).click();
   await expect(page.getByText("lease_live", { exact: true })).toBeVisible();
   await expect(page.getByText("handoff_live", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-collection="leases"] h3')).toHaveText("Active leases");
+  await expect(page.locator('[data-collection="handoffs"] h3')).toHaveText("Handoffs");
+  const handoffRow = page.locator('[data-collection="handoffs"] tbody tr').filter({ hasText: "subject_live" });
+  await expect(handoffRow.getByRole("button", { name: "Accept handoff · subject_live" })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Accept handoff · subject_live" }).click();
+  await handoffRow.getByRole("button", { name: "Accept handoff · subject_live" }).click();
   await expect.poll(() => calls.includes("handoff:accepted")).toBe(true);
 
   await page.locator('[data-area="audit"]').click();
   await page.getByRole("button", { name: "Refresh activity" }).click();
   await expect(page.getByText("membership.add", { exact: true })).toBeVisible();
   await expect(page.getByText("lease.created", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-collection="entries"] h3')).toHaveText("Metadata activity");
+  await expect(page.locator('[data-collection="events"] h3')).toHaveText("Domain events");
 
   await page.locator('[data-area="governance"]').click();
   await page.getByRole("button", { name: "Refresh governance" }).click();
   await expect(page.getByText("policies_live", { exact: true })).toBeVisible();
+  const approvalRow = page.locator('[data-collection="approvals"] tbody tr').filter({ hasText: "clm_live" });
+  await expect(approvalRow.getByRole("button", { name: "Approve · clm_live" })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept("Independent browser review passed."));
-  await page.getByRole("button", { name: "Approve · clm_live" }).click();
+  await approvalRow.getByRole("button", { name: "Approve · clm_live" }).click();
   await expect.poll(() => calls.includes("approval:approve")).toBe(true);
   await page.locator('[data-area="releases"]').click();
   await page.getByRole("button", { name: "Refresh releases" }).click();
+  const releaseRow = page.locator('[data-collection="releases"] tbody tr').filter({ hasText: "release_live" });
+  await expect(releaseRow.getByRole("button", { name: "Approve · release_live" })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept("Release wording reviewed."));
-  await page.getByRole("button", { name: "Approve · release_live" }).click();
+  await releaseRow.getByRole("button", { name: "Approve · release_live" }).click();
   await expect.poll(() => calls.includes("release:approve")).toBe(true);
   await page.locator('[data-area="access"]').click();
   await page.locator('[data-user-form] input[name="username"]').fill("new.reader");
@@ -406,6 +633,7 @@ test("logs in per principal, wires all fifteen destinations, adds a user once, a
   await page.locator('[data-area="federation"]').click();
   await page.getByRole("button", { name: "Refresh peers" }).click();
   await expect(page.getByText("peer_live", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-collection="peers"] h3')).toHaveText("Federation peers");
 
   const state = await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
   expect(state).toEqual({ local: [], session: [] });

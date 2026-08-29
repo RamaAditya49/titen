@@ -22,6 +22,11 @@ async function live(page: Page) {
     items: [{ id: "clm_release", subject_id: "platform-team", project_id: null, kind: "procedural", statement: "Production retry budget is 400 ms", confidence: .96, trust: "verified", visibility: "organization", status: "disputed", valid_from: "2026-08-01T00:00:00Z", valid_to: null, created_at: "2026-08-01T00:00:00Z" }],
     page: { limit: 25, has_more: false, next_cursor: null }, query: {}, authorization: { principal_id: "docs_operator", access_mode: "principal" },
   } } }));
+  await page.route("**/dashboard-api/projects**", (route) => route.fulfill({ json: { data: { projects: [
+    { project_id: "project_titen", reference: "ramaaditya49/titen", record_count: 2095, subject_count: 8, last_write: "2026-08-29T13:57:14Z" },
+    { project_id: "project_growth", reference: "growth-circle/semaya", record_count: 488, subject_count: 3, last_write: "2026-08-28T11:22:09Z" },
+    { project_id: null, reference: "(unscoped)", record_count: 24, subject_count: 2, last_write: "2026-08-27T09:12:11Z" },
+  ] } } }));
   await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ json: { data: {
     lens: "evidence_trace", focus_id: "clm_release",
     nodes: [
@@ -73,4 +78,27 @@ test("capture workspace picker desktop and mobile", async ({ page }) => {
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.locator("[data-workspace-menu] summary").click();
   await page.screenshot({ path: resolve(output, "dashboard-workspace-picker-mobile.png") });
+});
+
+test("capture structured Projects desktop", async ({ page }) => {
+  await live(page);
+  await page.setViewportSize({ width: 1600, height: 1080 });
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Projects" }).click();
+  await expect(page.locator('[data-collection="projects"]')).toBeVisible();
+  await page.screenshot({ path: resolve(output, "dashboard-operator-projects.png"), fullPage: true });
+});
+
+test("capture structured Projects mobile", async ({ page }) => {
+  await live(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Projects" }).click();
+  await expect(page.locator('[data-collection="projects"]')).toBeVisible();
+  await expect.poll(async () => {
+    const box = await page.locator(".sidebar").boundingBox();
+    return box ? Math.ceil(box.x + box.width) : 1;
+  }).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: resolve(output, "dashboard-operator-projects-mobile.png"), fullPage: true });
 });
