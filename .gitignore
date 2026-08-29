@@ -23,6 +23,7 @@ plugins/claude/titen-memory/reports/
 
 # Project-local developer tools
 .tools/
+.worktrees/
 
 # Default CLI store when titen is run from the repository root.
 titen.db
