@@ -127,6 +127,26 @@ confirmed grant/key/user mutations; Work exposes lease/handoff transitions;
 Approvals and Releases expose reasoned version-fenced lifecycle actions. Every
 mutation re-renders server state, and destructive actions require confirmation.
 
+### Collection presentation
+
+Operational data uses one stable hierarchy:
+
+1. The area heading states the operator job.
+2. The collection heading states the authorized record count.
+3. Task-specific columns expose the fields needed for a decision.
+4. Row actions target only the record in that row.
+5. Selection opens an inspector in the same area.
+6. A closed technical disclosure preserves the authorized response.
+
+The main view never uses generated labels such as `Record 1`. A schema maps
+known response collections to stable titles and columns. Unknown collections
+use scalar fields as a safe fallback. They use `Item N` only when no identity
+field exists.
+
+The inspector does not request hidden data. Projects and Subjects may request
+their existing authorized reference routes after selection. All rendered text
+uses DOM text nodes. The dashboard does not render response HTML.
+
 ## 6. Intentional non-menus
 
 - **Categories and tags** are filters inside Memories or Atlas, not a top-level
@@ -189,6 +209,8 @@ channels. Color alone never carries meaning.
 - Every graph or relationship view has equivalent structured HTML.
 - Loading preserves layout; empty states fabricate no records or metrics.
 - Selection changes local detail without relabeling stale data as current.
+- Technical payload disclosures stay closed until an operator opens them.
+- Mobile tables become linear records without horizontal page scrolling.
 - Destructive actions, when separately specified, require explicit target,
   impact, authority, and recovery context.
 - The interface supports 200% zoom, reduced motion, forced colors, and WCAG 2.2

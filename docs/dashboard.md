@@ -29,6 +29,32 @@ The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
 every request again.
 
+## Read operator data
+
+Each area uses the same information order:
+
+1. Read the area heading and authorized record count.
+2. Use the area filter when one is available.
+3. Scan the task-specific columns or facts.
+4. Select **Inspect** to open the record inspector.
+5. Open **Technical payload** only when diagnosis needs the complete response.
+
+Projects and Subjects show their canonical references after selection. Work,
+Access, API & Keys, Approvals, and Releases place actions in the affected row.
+Each successful action reloads server state. System and Models show named facts
+instead of generic JSON records.
+
+The dashboard separates Audit entries from domain events. It also separates
+Federation peers from their exchange log. This prevents similar response keys
+from receiving the wrong operator label.
+
+![Structured Projects directory](./assets/screenshots/dashboard-operator-projects.png)
+
+On a phone, each table becomes a linear record list. The page does not require
+horizontal scrolling at a 320 pixel viewport.
+
+![Structured Projects directory on mobile](./assets/screenshots/dashboard-operator-projects-mobile.png)
+
 Memories and Atlas are principal-scoped by default, including for owners. A root/owner
 with the separate `views:compile:all` capability may explicitly enable the
 same-organization administrator view and choose a bounded incident/recovery
@@ -141,11 +167,13 @@ pnpm check:workflow
 
 The real smoke starts temporary Bun/SQLite and proves login, forced first
 password replacement, all fifteen destinations, atomic Add User, lifecycle
-actions, logout, and fresh login through the real adapter. Integration and browser tests also cover credential
-isolation, revocation, exact origin checks, request-size limits, capability
-hiding, stale private-state clearing, principal-scoped empty results, audited
-administrator mode, workspace visibility, scoped grants and key clamps, masked
-model diagnostics, semantic-sync readiness, keyboard use, and a 320 px viewport.
+actions, logout, and fresh login through the real adapter. Integration and
+browser tests also cover credential isolation, revocation, exact origin checks,
+request-size limits, capability hiding, stale private-state clearing,
+principal-scoped empty results, audited administrator mode, workspace
+visibility, scoped grants and key clamps, masked model diagnostics, structured
+operator collections, semantic-sync readiness, keyboard use, and a 320 px
+viewport.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

@@ -780,6 +780,13 @@ and Add User follows the same forced-first-change flow. API keys remain for
 agents, services, SDKs, and recovery. There is no fixture fallback when the
 service is disconnected or denies a request.
 
+Each data area uses a task-specific table, list, or fact view. Select a record
+to open its inspector. Row actions operate on that exact record. The full
+authorized response remains available in a closed **Technical payload**
+disclosure for diagnosis.
+
+![Projects directory with task-specific columns](https://raw.githubusercontent.com/RamaAditya49/titen/main/docs/assets/screenshots/dashboard-operator-projects.png)
+
 The [dashboard guide](https://github.com/RamaAditya49/titen/blob/main/docs/dashboard.md)
 covers configuration and verification. Use the
 [secure ingress guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/secure-ingress.md)

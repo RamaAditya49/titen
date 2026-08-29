@@ -349,19 +349,19 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 - Consumes: Behavior dashboard yang terverifikasi.
 - Produces: Dokumentasi faktual dan sinkron.
 
-- [ ] **Step 1: Perbarui README.**
+- [x] **Step 1: Perbarui README.**
 
   Jelaskan task-specific collections, selected-record inspector, dan technical payload.
 
-- [ ] **Step 2: Perbarui dashboard guide dan design guide.**
+- [x] **Step 2: Perbarui dashboard guide dan design guide.**
 
   Jelaskan pola ringkasan, filter, collection, inspector, dan payload teknis.
 
-- [ ] **Step 3: Perbarui changelog untuk target `0.9.0`.**
+- [x] **Step 3: Perbarui changelog untuk target `0.9.0`.**
 
   Nyatakan area yang berubah. Jangan klaim perubahan API atau runtime.
 
-- [ ] **Step 4: Jalankan pemeriksaan dokumentasi.**
+- [x] **Step 4: Jalankan pemeriksaan dokumentasi.**
 
   Run: `pnpm check:routes && pnpm check:workflow && git diff --check`
 
@@ -394,7 +394,7 @@ spec: docs/specs/active/2026-08-30-dashboard-operator-clarity.md
 
   Run: `pnpm audit --prod`
 
-- [ ] **Step 4: Sinkronkan versi `0.9.0`.**
+- [x] **Step 4: Sinkronkan versi `0.9.0`.**
 
   Jalankan mekanisme release lokal yang terdokumentasi.
 

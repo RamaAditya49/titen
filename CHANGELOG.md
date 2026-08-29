@@ -26,6 +26,37 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-29
+
+The operator dashboard now presents each data area for its specific task. The
+REST, MCP, storage, and authorization contracts do not change.
+
+### Added
+
+- Task-specific tables and fact views cover Projects, Subjects, Work, Audit &
+  Events, Federation, Access, API & Keys, Approvals, Releases, Models, System,
+  and Context.
+- Each collection includes an authorized record count, selected-record
+  inspector, empty state, and closed technical payload disclosure.
+- Projects and Subjects load normalized references in the selected area.
+- Desktop and 320 pixel mobile screenshots document the Projects directory.
+
+### Changed
+
+- Work, grant, key, approval, and release actions now appear in the affected
+  row. Successful mutations still reload state from the server.
+- Federation peers and exchange records now use separate schemas. Audit entries
+  and domain events also keep separate operator labels.
+- Mobile tables now become linear record lists without horizontal page
+  scrolling. The dashboard bundle remains below its 80 KiB gzip limit.
+
+### Security
+
+- The new renderer uses text nodes for authorized response data. It does not
+  render response HTML or save private data in browser storage.
+- Disconnect, denial, logout, and capability changes clear the new tables,
+  inspectors, payload disclosures, and row actions.
+
 ## [0.8.7] — 2026-08-16
 
 The Level 6 sidebar now restores the approved workspace-selection hierarchy
@@ -1410,7 +1441,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.8.7...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.0
 [0.8.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.7
 [0.8.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.6
 [0.8.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.5
