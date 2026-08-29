@@ -110,11 +110,11 @@ function validate(records, today = new Date()) {
           criteria[index + 1]?.index ?? record.text.length,
         );
         const forms = {
-          Ubiquitous: /\bshall\b/is,
-          "Event-driven": /\bWhen\b[\s\S]*\bshall\b/is,
-          "State-driven": /\bWhile\b[\s\S]*\bshall\b/is,
-          "Optional feature": /\bWhere\b[\s\S]*\bshall\b/is,
-          "Unwanted behavior": /\bIf\b[\s\S]*\bthen\b[\s\S]*\bshall\b/is,
+          Ubiquitous: /(?:\bshall\b|\bTiten\s+harus\b)/is,
+          "Event-driven": /(?:\bWhen\b[\s\S]*\bshall\b|\bSaat\b[\s\S]*\bTiten\s+harus\b)/is,
+          "State-driven": /(?:\bWhile\b[\s\S]*\bshall\b|\bSelama\b[\s\S]*\bTiten\s+harus\b)/is,
+          "Optional feature": /(?:\bWhere\b[\s\S]*\bshall\b|\bJika\b[\s\S]*\bTiten\s+harus\b)/is,
+          "Unwanted behavior": /(?:\bIf\b[\s\S]*\bthen\b[\s\S]*\bshall\b|\bJika\b[\s\S]*\bmaka\b[\s\S]*\bTiten\s+harus\b)/is,
         };
         if (!forms[match[2]].test(segment))
           errors.push(
@@ -208,8 +208,8 @@ function validate(records, today = new Date()) {
 }
 
 function selfTest() {
-  const specText = `---\nwork_id: demo\nstatus: done\nstage: done\noutcome: completed\ncomplexity: complex\ncreated: 2026-07-27\nupdated: 2026-07-27\nowner: test\n---\n\n## EARS acceptance criteria\n\n- **AC-DEMO-001 — Event-driven:** When a request arrives, Titen shall respond.\n`;
-  const planText = `---\nwork_id: demo\nstatus: done\nstage: done\noutcome: completed\ncomplexity: complex\ncreated: 2026-07-27\nupdated: 2026-07-27\nowner: test\nspec: docs/specs/done/demo.md\n---\n\n- [x] Complete.\n\n## Acceptance evidence\n\nAC-DEMO-001 passed.\n\n## Verification\n\nPassed.\n`;
+  const specText = `---\nwork_id: demo\nstatus: done\nstage: done\noutcome: completed\ncomplexity: complex\ncreated: 2026-07-27\nupdated: 2026-07-27\nowner: test\n---\n\n## EARS acceptance criteria\n\n- **AC-DEMO-001 — Event-driven:** When a request arrives, Titen shall respond.\n- **AC-DEMO-002 — Event-driven:** Saat permintaan masuk, Titen harus merespons.\n`;
+  const planText = `---\nwork_id: demo\nstatus: done\nstage: done\noutcome: completed\ncomplexity: complex\ncreated: 2026-07-27\nupdated: 2026-07-27\nowner: test\nspec: docs/specs/done/demo.md\n---\n\n- [x] Complete.\n\n## Acceptance evidence\n\nAC-DEMO-001 dan AC-DEMO-002 lulus.\n\n## Verification\n\nPassed.\n`;
   const valid = [
     {
       kind: "specs",
@@ -234,7 +234,7 @@ function selfTest() {
   );
   broken[1].text = broken[1].text
     .replace("[x]", "[ ]")
-    .replace("AC-DEMO-001 passed.", "Evidence missing.");
+    .replace("AC-DEMO-001 dan AC-DEMO-002 lulus.", "Evidence missing.");
   broken[1].meta.spec = "docs/specs/done/wrong.md";
   broken[1].meta.owner = "different-owner";
   const errors = validate(broken, new Date("2026-07-27T00:00:00Z"));

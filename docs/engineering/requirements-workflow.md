@@ -47,6 +47,22 @@ Use one observable behavior per criterion. Give every criterion a stable ID.
 | Optional feature  | `Where <feature is enabled>, Titen shall <response>.`        | behavior exists only with an option      |
 | Unwanted behavior | `If <failure>, then Titen shall <response or safe failure>.` | an error or unsafe condition must be met |
 
+### Indonesian EARS syntax
+
+Use the Indonesian syntax when the work item requires Indonesian text. Keep the
+English pattern name because the checker and evidence map use it as an ID.
+
+| Pattern | Indonesian syntax |
+| --- | --- |
+| Ubiquitous | `Titen harus <respons>.` |
+| Event-driven | `Saat <peristiwa>, Titen harus <respons>.` |
+| State-driven | `Selama <keadaan>, Titen harus <respons>.` |
+| Optional feature | `Jika <fitur tersedia>, Titen harus <respons>.` |
+| Unwanted behavior | `Jika <kegagalan>, maka Titen harus <respons aman>.` |
+
+Use active sentences. Use one observable behavior in each criterion. Use one
+consistent term for each item or action.
+
 An acceptable criterion identifies the trigger or state when relevant, the
 observable response, and a measurable boundary or authoritative reference.
 Words such as "fast", "secure", "easy", "stable", or "correct" are invalid
