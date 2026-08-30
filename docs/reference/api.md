@@ -288,10 +288,30 @@ Error envelope:
     "message": "Request is invalid."
   },
   "meta": {
-    "request_id": "req_..."
+    "request_id": "req_...",
+    "support": {
+      "classification": "expected",
+      "action": "Correct the request using the documented field contract, then retry once.",
+      "docs_url": "https://titen.dev/docs/agent-integrations#error-triage"
+    }
   }
 }
 ```
+
+`meta.support.classification` is `expected`, `investigate`, or
+`defect_candidate`. It supplies recovery guidance, not proof that a defect
+exists. Support text comes from fixed, allowlisted values. It never copies a
+request body, exception, provider response, credential, or memory content.
+
+The server uses `expected` for validation, authentication, authorization,
+not-found, method, conflict, and unresolved-reference results. It uses
+`investigate` for temporary unavailability. It uses `defect_candidate` for an
+internal server failure. The client must reproduce and sanitize a defect before
+reporting it.
+
+MCP tool failures preserve the same safe metadata inside the readable tool
+result. They also include the MCP HTTP request ID. An unknown exception remains
+the fixed `Tool execution failed.` text.
 
 ## Kernel operations
 
@@ -305,6 +325,22 @@ are never accepted as shared project identity.
 Resolution does not grant membership. Creating a missing project requires a
 separate capability; ordinary agents may only resolve projects already in their
 authorized scope.
+
+When a normalized reference is not registered, the route keeps `404 NOT_FOUND`
+and adds this safe metadata:
+
+```json
+{
+  "reason": "project_not_registered",
+  "reference": "owner/repository",
+  "can_create": true
+}
+```
+
+The caller supplied the reference. `can_create` reports only the caller's
+`projects:create` capability. Retry with `create:true` only after an authorized
+operator approves project creation. Other not-found routes do not return this
+route-specific metadata.
 
 ### `POST /v1/observations`
 

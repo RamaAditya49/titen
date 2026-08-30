@@ -37,6 +37,7 @@ async function rpc(payload: unknown, headers: Record<string, string> = {}) {
   const text = await res.text();
   return {
     status: res.status,
+    requestId: res.headers.get("x-request-id"),
     text,
     body: text === "" ? null : (JSON.parse(text) as any),
   };
@@ -345,6 +346,25 @@ test("a tool call returns MCP content and a failure stays readable", async () =>
   assert.equal(failed.body.result.isError, true, "a tool failure is flagged in the result");
   assert.ok(failed.body.result.content[0].text.length > 0, "the reason must be readable");
   assert.equal(failed.body.error, undefined, "a tool failure is not a JSON-RPC error");
+
+  const missingProject = await rpc({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "tools/call",
+    params: {
+      name: "titen_project_resolve",
+      arguments: { reference: "Rama/MCP-Missing" },
+    },
+  });
+  const missingPayload = JSON.parse(missingProject.body.result.content[0].text);
+  assert.equal(missingProject.body.result.isError, true);
+  assert.equal(missingPayload.code, "NOT_FOUND");
+  assert.equal(missingPayload.meta.request_id, missingProject.requestId);
+  assert.equal(missingPayload.meta.reason, "project_not_registered");
+  assert.equal(missingPayload.meta.reference, "rama/mcp-missing");
+  assert.equal(missingPayload.meta.can_create, true);
+  assert.equal(missingPayload.meta.support.classification, "expected");
+  assert.match(missingPayload.meta.support.action, /create=true/);
 });
 
 test("protocol-level errors use JSON-RPC error codes", async () => {

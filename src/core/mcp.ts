@@ -1,5 +1,5 @@
 import type { RequestContext, Result } from "./http";
-import { ApiError, validationError } from "./errors";
+import { ApiError, supportGuidance, validationError } from "./errors";
 import { requireScope } from "./auth";
 import { recordAccessParams, recordAccessSql } from "./authorization";
 import { chunk } from "./db";
@@ -1038,7 +1038,15 @@ async function dispatchRpc(
             {
               type: "text",
               text: error instanceof ApiError
-                ? JSON.stringify({ code: error.code, message: error.message })
+                ? JSON.stringify({
+                    code: error.code,
+                    message: error.message,
+                    meta: {
+                      ...error.meta,
+                      request_id: ctx.requestId,
+                      support: supportGuidance(error),
+                    },
+                  })
                 : "Tool execution failed.",
             },
           ],

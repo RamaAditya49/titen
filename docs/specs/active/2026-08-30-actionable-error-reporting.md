@@ -1,7 +1,7 @@
 ---
 work_id: actionable-error-reporting-20260830
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-30
@@ -67,7 +67,7 @@ The response metadata adds a bounded `support` object:
 {
   "classification": "expected | investigate | defect_candidate",
   "action": "bounded operator action",
-  "docs_url": "https://titen.dev/docs/..."
+  "docs_url": "https://titen.dev/docs/agent-integrations#project-resolution"
 }
 ```
 

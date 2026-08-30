@@ -234,6 +234,37 @@ const obs = await titen.observe({
 });
 ```
 
+Calling `resolveProject(reference)` does not create a missing project. A missing
+reference returns `404 NOT_FOUND` with `reason: "project_not_registered"` and a
+truthful `can_create` value. Retry with `resolveProject(reference, true)` only
+after an authorized operator approves creation.
+
+## Error triage and issue reporting
+
+Read `TitenError.code`, `requestId`, and `meta.support` before retrying. Support
+classification is `expected`, `investigate`, or `defect_candidate`. It is
+triage guidance, not proof.
+
+Use this sequence:
+
+1. Perform the stated recovery for an expected result.
+2. Check readiness and dependencies for an investigate result.
+3. Reproduce a suspected defect with synthetic or redacted input.
+4. Verify the Titen version, runtime, and current source or health state.
+5. Search open and closed Titen issues for the same behavior.
+6. Follow `SECURITY.md` when protected data or authorization can be exposed.
+7. Create one sanitized public issue for one unique, verified non-security
+   defect when the host has GitHub write authority.
+8. Otherwise produce a complete sanitized draft. Do not claim submission.
+
+Include the runtime, version or commit, request ID, minimal reproduction,
+expected behavior, safe error envelope, and verification evidence. Never
+include credentials, prompts, memory content, request bodies, or raw production
+payloads.
+
+The host owns GitHub authentication. Never send a GitHub credential to Titen.
+The Titen server does not create issues.
+
 ## Key management
 
 Create scoped keys for different agents:

@@ -541,21 +541,45 @@ export const CASES: Case[] = [
   {
     name: "resolution never creates a project without the create capability",
     async run(fx) {
+      const owner = await fx.provision();
       const limited = await fx.provision({ scopes: ["projects:resolve"] });
-      expectError(
-        await fx.call("POST", "/v1/projects/resolve", {
-          key: limited.key,
-          body: { reference: "rama/unseen", create: true },
-        }),
-        404,
+      const ownerMissing = await fx.call("POST", "/v1/projects/resolve", {
+        key: owner.key,
+        body: { reference: "HTTPS://GITHUB.COM/Rama/Unseen.git" },
+      });
+      expectError(ownerMissing, 404, "NOT_FOUND");
+      assert.equal(ownerMissing.body.meta.reason, "project_not_registered");
+      assert.equal(ownerMissing.body.meta.reference, "rama/unseen");
+      assert.equal(ownerMissing.body.meta.can_create, true);
+      assert.deepEqual(ownerMissing.body.meta.support, {
+        classification: "expected",
+        action: "Retry with create=true only after an authorized operator approves project creation.",
+        docs_url: "https://titen.dev/docs/agent-integrations#project-resolution",
+      });
+
+      const deniedCreate = await fx.call("POST", "/v1/projects/resolve", {
+        key: limited.key,
+        body: { reference: "rama/unseen", create: true },
+      });
+      expectError(deniedCreate, 404, "NOT_FOUND");
+      assert.equal(deniedCreate.body.meta.reason, "project_not_registered");
+      assert.equal(deniedCreate.body.meta.reference, "rama/unseen");
+      assert.equal(deniedCreate.body.meta.can_create, false);
+
+      const limitedMissing = await fx.call("POST", "/v1/projects/resolve", {
+        key: limited.key,
+        body: { reference: "rama/unseen" },
+      });
+      expectError(limitedMissing, 404, "NOT_FOUND");
+      assert.equal(limitedMissing.body.meta.reason, "project_not_registered");
+      assert.equal(limitedMissing.body.meta.reference, "rama/unseen");
+      assert.equal(limitedMissing.body.meta.can_create, false);
+
+      const projects = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM projects WHERE reference = ?`,
+        ["rama/unseen"],
       );
-      expectError(
-        await fx.call("POST", "/v1/projects/resolve", {
-          key: limited.key,
-          body: { reference: "rama/unseen" },
-        }),
-        404,
-      );
+      assert.equal(Number(projects[0]!.count), 0, "a failed resolution must not create a project");
     },
   },
   {
@@ -837,14 +861,15 @@ export const CASES: Case[] = [
       });
       expectOk(created, 201);
       const mine = await fx.provision();
-      expectError(
-        await fx.call("POST", "/v1/observations", {
-          key: mine.key,
-          body: observation({ project_id: created.body.data.project_id }),
-        }),
-        404,
-        "NOT_FOUND",
-      );
+      const denied = await fx.call("POST", "/v1/observations", {
+        key: mine.key,
+        body: observation({ project_id: created.body.data.project_id }),
+      });
+      expectError(denied, 404, "NOT_FOUND");
+      assert.equal(denied.body.meta.reason, undefined);
+      assert.equal(denied.body.meta.reference, undefined);
+      assert.equal(denied.body.meta.can_create, undefined);
+      assert.equal(denied.body.meta.support.classification, "expected");
     },
   },
   {

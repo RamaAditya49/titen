@@ -1,4 +1,4 @@
-import { ApiError } from "./errors";
+import { ApiError, supportGuidance } from "./errors";
 import { newId } from "./ids";
 import type { Principal } from "./auth";
 import type { AppContext } from "./app";
@@ -67,7 +67,7 @@ export function failure(error: unknown, requestId: string): Response {
     api.status,
     {
       error: { code: api.code, message: api.message },
-      meta: { request_id: requestId, ...api.meta },
+      meta: { ...api.meta, request_id: requestId, support: supportGuidance(api) },
     },
     requestId,
   );

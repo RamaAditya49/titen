@@ -352,6 +352,25 @@ test("object-style consolidate misuse fails locally before fetch", async () => {
 });
 
 test("TitenError preserves safe metadata and request ids", async () => {
+  await assert.rejects(
+    () => titen.resolveProject("Rama/SDK-Missing"),
+    (error: unknown) => {
+      assert.ok(error instanceof TitenError);
+      assert.equal(error.status, 404);
+      assert.equal(error.code, "NOT_FOUND");
+      assert.equal(error.requestId, error.meta?.request_id);
+      assert.equal(error.meta?.reason, "project_not_registered");
+      assert.equal(error.meta?.reference, "rama/sdk-missing");
+      assert.equal(error.meta?.can_create, true);
+      assert.deepEqual(error.meta?.support, {
+        classification: "expected",
+        action: "Retry with create=true only after an authorized operator approves project creation.",
+        docs_url: "https://titen.dev/docs/agent-integrations#project-resolution",
+      });
+      return true;
+    },
+  );
+
   const local = new TitenClient({
     url: "http://example.test",
     key: "test",

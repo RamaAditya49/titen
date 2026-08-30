@@ -26,6 +26,22 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- REST and MCP errors now include bounded support guidance that classifies an
+  error as expected, requiring investigation, or a defect candidate.
+- Missing project references keep `404 NOT_FOUND` and now identify the expected
+  setup action, normalized caller-supplied reference, and create capability.
+- Distributed agent skills now reproduce and sanitize a defect, search existing
+  issues, and use a draft when GitHub write access is unavailable.
+
+### Security
+
+- Error guidance uses allowlisted constants and never copies request bodies,
+  exception details, provider responses, credentials, prompts, or memory content.
+- Titen keeps GitHub authentication in the host agent. Security findings use the
+  private disclosure path instead of a public issue.
+
 ## [0.9.0] — 2026-08-29
 
 The operator dashboard now presents each data area for its specific task. The

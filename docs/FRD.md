@@ -219,7 +219,18 @@ Project scope behavior:
   unambiguous; local absolute paths are not shared project identifiers;
 - resolution never creates membership, and creating a missing project requires
   an explicit capability;
+- a missing normalized reference remains `404 NOT_FOUND` and returns only the
+  caller-supplied reference, create capability, and a bounded setup action;
 - Titen never infers project scope from memory content or a model response.
+
+Public error behavior:
+
+- every REST and MCP `ApiError` returns constant support guidance;
+- support guidance classifies expected, investigate, and defect-candidate
+  results without copying request or provider content;
+- the host agent reproduces and sanitizes a defect before it uses its own
+  GitHub authority;
+- Titen never accepts a GitHub credential or creates an external issue.
 
 ## 7. Level 5 memory kernel
 

@@ -247,9 +247,16 @@ export interface ListEventsOptions {
   signal?: AbortSignal;
 }
 
+export interface TitenErrorSupportGuidance {
+  classification: "expected" | "investigate" | "defect_candidate";
+  action: string;
+  docs_url: string;
+}
+
 export interface TitenResponseMeta extends Record<string, unknown> {
   request_id?: string;
   replayed?: boolean;
+  support?: TitenErrorSupportGuidance;
 }
 
 export interface TitenResponse<T> {
@@ -539,7 +546,7 @@ export class TitenError extends Error {
   status: number;
   code: string;
   requestId: string | undefined;
-  meta: Record<string, unknown> | undefined;
+  meta: TitenResponseMeta | undefined;
 
   constructor(
     status: number,

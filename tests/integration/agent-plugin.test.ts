@@ -147,6 +147,14 @@ test("the portable skill keeps the nine-tool and security boundaries", () => {
   assert.match(skill, /Never store credentials or other secrets, raw transcripts or private\nconversations/);
   assert.match(skill, /chain of thought, prompts, embeddings, or routine command output/);
   assert.match(skill, /failed write must\nnever be reported as durable memory/);
+  assert.match(skill, /## Handle failures and report defects/);
+  assert.match(skill, /`expected`, `investigate`, or\s+`defect_candidate`/);
+  assert.match(skill, /Reproduce a suspected defect with synthetic or redacted input/);
+  assert.match(skill, /Search open and closed Titen issues/);
+  assert.match(skill, /create one public issue/);
+  assert.match(skill, /produce a complete sanitized issue draft/);
+  assert.match(skill, /Follow `SECURITY\.md` instead of creating a public issue/);
+  assert.match(skill, /Never send a GitHub credential to Titen/);
 
   const tools = [...new Set(skill.match(/(?<=`)titen_[a-z_]+(?=`)/g))].sort();
   assert.deepEqual(tools, ordinaryTools);

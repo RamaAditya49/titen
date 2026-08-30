@@ -406,6 +406,12 @@ When a directory is not a project, `project_id` may be absent. Personal
 preferences can still use subject/private scope; company policy can use
 workspace or organization scope.
 
+A missing normalized reference is an expected setup condition. The resolver
+keeps `404 NOT_FOUND` and returns `project_not_registered`, the supplied
+normalized reference, and the caller's `projects:create` capability. This detail
+is safe only because the caller supplied that reference. Foreign project IDs on
+other routes remain indistinguishable.
+
 ## Fast agent lifecycle
 
 ### 1. Start or resume
@@ -439,6 +445,25 @@ context pack only when one of these boundaries occurs:
 - context was compacted and the active task state is no longer present;
 - the agent is about to make an irreversible/high-risk decision and needs a
   targeted policy or incident recall.
+
+### Failure triage and issue boundary
+
+REST and MCP return constant support guidance with each public `ApiError`. The
+guidance classifies the result as expected, investigate, or a defect candidate.
+It contains no request body, exception detail, provider response, credential, or
+memory content.
+
+The host adapter performs expected recovery first. It then reproduces a
+suspected defect with synthetic input and checks the current version and
+runtime. It searches open and closed issues before any write.
+
+The host may create one public issue for a unique, verified non-security defect.
+It uses its own authorized GitHub integration. Without write authority, it
+returns a sanitized draft. Security reports follow the private disclosure path
+in `SECURITY.md`.
+
+Titen never accepts or stores a GitHub credential. It does not make the external
+issue mutation.
 
 ### 3. Capture durable signals
 
@@ -944,6 +969,9 @@ evidence link, authorization check, or lifecycle step.
 - [ ] Credentials are outside source control and absent from URLs/logs.
 - [ ] Tenant and actor come from authentication, never request metadata.
 - [ ] Project resolution strips credentials and is explicit.
+- [ ] Expected errors recover before any defect report.
+- [ ] Verified defects are sanitized and deduplicated before a host-owned issue.
+- [ ] GitHub credentials never enter Titen configuration, memory, or logs.
 - [ ] Every mutation has a retry-safe idempotency key.
 - [ ] Hook recursion is prevented.
 - [ ] Raw transcript and chain of thought are not auto-captured.

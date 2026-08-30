@@ -1,7 +1,7 @@
 ---
 work_id: actionable-error-reporting-20260830
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-30
@@ -73,30 +73,30 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 - Produces: `meta.support.classification`, `meta.support.action`, and `meta.support.docs_url`.
 - Produces on missing project reference: `meta.reason`, `meta.reference`, and `meta.can_create`.
 
-- [ ] **Step 1: Write dual-runtime failing contract assertions.**
+- [x] **Step 1: Write dual-runtime failing contract assertions.**
 
   Extend `resolution never creates a project without the create capability`.
   Assert `404 NOT_FOUND`, `project_not_registered`, normalized reference,
   truthful `can_create`, and no created project.
 
-- [ ] **Step 2: Run the Bun contract and confirm RED.**
+- [x] **Step 2: Run the Bun contract and confirm RED.**
 
   Run: `bun test tests/contract/bun-sqlite.test.ts --test-name-pattern "resolution never creates"`
 
   Expected: FAIL because the metadata does not exist.
 
-- [ ] **Step 3: Implement constant support guidance and resolver metadata.**
+- [x] **Step 3: Implement constant support guidance and resolver metadata.**
 
   Build actions and documentation URLs from allowlisted constants. Do not use an
   exception message or request body.
 
-- [ ] **Step 4: Run the focused Bun contract and confirm GREEN.**
+- [x] **Step 4: Run the focused Bun contract and confirm GREEN.**
 
   Run the Step 2 command.
 
   Expected: PASS.
 
-- [ ] **Step 5: Run the same contract on D1.**
+- [x] **Step 5: Run the same contract on D1.**
 
   Run: `pnpm build:worker && pnpm test:d1`
 
@@ -117,23 +117,23 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 - `meta.request_id` identifies the MCP HTTP request.
 - `TitenError.meta.support` preserves the REST guidance unchanged.
 
-- [ ] **Step 1: Write failing MCP and SDK tests.**
+- [x] **Step 1: Write failing MCP and SDK tests.**
 
   Make a missing-project tool call and assert the resolver metadata, support
   guidance, and request ID. Make an SDK request and assert the same metadata.
 
-- [ ] **Step 2: Run focused tests and confirm RED.**
+- [x] **Step 2: Run focused tests and confirm RED.**
 
   Run: `bun test tests/integration/mcp-protocol.test.ts tests/sdk/sdk.test.ts`
 
   Expected: FAIL because MCP drops `ApiError.meta` and support guidance is absent.
 
-- [ ] **Step 3: Implement the minimal metadata preservation.**
+- [x] **Step 3: Implement the minimal metadata preservation.**
 
   Reuse the central support helper. Keep unknown exceptions at the fixed
   `Tool execution failed.` text.
 
-- [ ] **Step 4: Run focused tests and confirm GREEN.**
+- [x] **Step 4: Run focused tests and confirm GREEN.**
 
   Run the Step 2 command.
 
@@ -156,21 +156,21 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 - Consumes: safe REST/MCP error envelope.
 - Produces: one identical triage and reporting policy for every host package.
 
-- [ ] **Step 1: Add the canonical triage policy.**
+- [x] **Step 1: Add the canonical triage policy.**
 
   Require expected recovery, synthetic reproduction, version/runtime checks,
   duplicate search, private security reporting, and a sanitized issue or draft.
 
-- [ ] **Step 2: Copy the exact policy to every distributed skill.**
+- [x] **Step 2: Copy the exact policy to every distributed skill.**
 
   Keep all six files byte-identical.
 
-- [ ] **Step 3: Extend the artifact consistency test.**
+- [x] **Step 3: Extend the artifact consistency test.**
 
   Assert byte identity and required safety boundaries. Do not claim this test
   evaluates model behavior.
 
-- [ ] **Step 4: Run the agent package test.**
+- [x] **Step 4: Run the agent package test.**
 
   Run: `bun test tests/integration/agent-plugin.test.ts`
 
@@ -183,6 +183,7 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 - Modify: `docs/reference/api.md`
 - Modify: `docs/agent-guide.md`
 - Modify: `docs/architecture/agent-integration.md`
+- Modify: `docs/FRD.md`
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
@@ -191,21 +192,21 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 - Documents the additive `meta.support` contract.
 - Documents expected resolver recovery and host-owned GitHub issue authority.
 
-- [ ] **Step 1: Update the API reference.**
+- [x] **Step 1: Update the API reference.**
 
   Add the exact support fields, classifications, resolver fields, and MCP
   preservation behavior.
 
-- [ ] **Step 2: Update the agent guide and integration architecture.**
+- [x] **Step 2: Update the agent guide and integration architecture.**
 
   Add the triage sequence, report fields, security path, and draft fallback.
 
-- [ ] **Step 3: Update README and Unreleased changelog.**
+- [x] **Step 3: Update README and Unreleased changelog.**
 
   State that agents distinguish setup errors from verified defects. Do not claim
   automatic server-side issue creation.
 
-- [ ] **Step 4: Run route, workflow, and diff checks.**
+- [x] **Step 4: Run route, workflow, and diff checks.**
 
   Run: `pnpm check:routes && pnpm check:workflow && git diff --check`
 
@@ -221,24 +222,24 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 
 - Produces: a release candidate that satisfies `AC-AER-001` through `AC-AER-015`.
 
-- [ ] **Step 1: Run changed-scope tests.**
+- [x] **Step 1: Run changed-scope tests.**
 
   Run: `pnpm test:api && pnpm test:integration && pnpm check:workflow`
 
   Expected: PASS with zero failures.
 
-- [ ] **Step 2: Run package verification.**
+- [x] **Step 2: Run package verification.**
 
   Run: `bash scripts/verify-pack.sh`
 
   Expected: PASS for packed SDK, CLI, server, root dashboard, and global install.
 
-- [ ] **Step 3: Review the complete diff against the spec.**
+- [x] **Step 3: Review the complete diff against the spec.**
 
   Check authorization, disclosure, compatibility, every acceptance criterion,
   and all distributed skill copies. Fix Critical and Important findings.
 
-- [ ] **Step 4: Commit and push implementation.**
+- [x] **Step 4: Commit and push implementation.**
 
   Commit subject: `feat: beri panduan error actionable`
 

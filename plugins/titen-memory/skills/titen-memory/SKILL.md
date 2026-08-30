@@ -67,6 +67,32 @@ Never store credentials or other secrets, raw transcripts or private
 conversations, chain of thought, prompts, embeddings, or routine command output.
 Do not observe Titen's own tool calls and feed them back recursively.
 
+## Handle failures and report defects
+
+Titen error metadata classifies a result as `expected`, `investigate`, or
+`defect_candidate`. Treat this classification as triage guidance, not proof.
+
+1. For `expected`, perform the stated support action. Do not create an issue.
+2. For `investigate`, check readiness and dependencies before a bounded retry.
+3. Reproduce a suspected defect with synthetic or redacted input.
+4. Verify the current Titen version, runtime, and relevant source or health state.
+5. Search open and closed Titen issues for the same behavior.
+6. Follow `SECURITY.md` instead of creating a public issue when protected data,
+   credentials, or authorization boundaries can be exposed.
+7. For one unique, verified, non-security defect, create one public issue only
+   when the host has GitHub write authority.
+8. Without GitHub write authority, produce a complete sanitized issue draft.
+   Do not claim that the issue was submitted.
+
+Include the runtime, Titen version or commit, request ID when available, minimal
+reproduction, expected behavior, safe error envelope, and verification evidence.
+Never include credentials, prompts, memory content, request bodies, or raw
+production payloads. Never send a GitHub credential to Titen.
+
+The host owns GitHub authentication and the external issue mutation. Memory
+operations still use only the nine Titen tools. Issue reporting may use an
+authorized host GitHub tool only after this triage.
+
 ## Coordinate only when needed
 
 - Use `titen_checkpoint_save` for bounded resumable execution state, not facts.

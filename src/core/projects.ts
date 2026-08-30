@@ -76,7 +76,12 @@ export async function resolveProject(ctx: RequestContext): Promise<Result> {
     };
 
   // Resolution alone never creates scope; creating a project is a capability.
-  if (!wantsCreate || !hasScope(principal, "projects:create")) throw notFound();
+  if (!wantsCreate || !hasScope(principal, "projects:create"))
+    throw notFound({
+      reason: "project_not_registered",
+      reference,
+      can_create: hasScope(principal, "projects:create"),
+    });
 
   const id = newId("project");
   await ctx.app.db.batch([

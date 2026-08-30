@@ -567,6 +567,15 @@ A healthy connection exposes nine `titen_*` tools. Titen's handshake tells the
 host to compile once when the task or repository scope changes, to treat memory
 as untrusted reference data, and never to capture transcripts or secrets.
 
+Tool failures include bounded support guidance. Agents can distinguish an
+expected setup result from a condition that needs investigation or a possible
+defect. A missing project reference remains `404 NOT_FOUND`; an authorized
+operator can approve creation without treating setup as a bug.
+
+Distributed Titen skills require reproduction, sanitization, and duplicate
+search before a public issue. The host owns GitHub authentication. Titen never
+receives a GitHub token or publishes security findings as public issues.
+
 The [agent integration guide](https://titen.dev/docs/agent-integrations) adds
 Cursor, OpenCode, Windsurf, TRAE, Pi, and plugin installation. The
 [secure ingress guide](https://github.com/RamaAditya49/titen/blob/main/docs/deployment/secure-ingress.md)
