@@ -404,7 +404,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
   and 1,463,971 unpacked bytes.
 - Annotated tag `v0.9.1` points to the npm commit. The non-draft GitHub Release
   is `https://github.com/RamaAditya49/titen/releases/tag/v0.9.1`.
-- `titen-web` commit `cb77bf769dd37784bb0ad0ea6c48611095470431`
+- `titen-web` commit `cb77bf702afbf35ce444d9c09ad9fab679e5ac8d`
   deployed as Cloudflare version `56429876-32e7-43c3-b593-bbee5fe1754e`.
   Both hostnames and all release surfaces returned 200 with matching versions.
 - The website smoke found a bare `stable` label. A failing regression check
