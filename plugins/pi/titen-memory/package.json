@@ -1,6 +1,6 @@
 {
   "name": "titen-memory-pi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Portable Titen memory skill for Pi.",
   "license": "Apache-2.0",
   "repository": "https://github.com/RamaAditya49/titen",

@@ -1,7 +1,7 @@
 {
   "name": "titen-memory",
   "displayName": "Titen Memory",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minClientVersions": {
     "cursor": "3.13.0"
   },

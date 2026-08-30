@@ -26,6 +26,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-08-30
+
 ### Added
 
 - REST and MCP errors now include bounded support guidance that classifies an
@@ -34,6 +36,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
   setup action, normalized caller-supplied reference, and create capability.
 - Distributed agent skills now reproduce and sanitize a defect, search existing
   issues, and use a draft when GitHub write access is unavailable.
+- Codex, Claude, Cursor, OpenClaw, Hermes, and Pi plugin manifests now publish
+  the updated issue-triage instructions under new patch versions.
 
 ### Security
 
@@ -1457,7 +1461,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.1
 [0.9.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.0
 [0.8.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.7
 [0.8.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.6

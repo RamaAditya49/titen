@@ -256,17 +256,17 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 
 - Produces: `titen-memory@0.9.1`, tag `v0.9.1`, and matching GitHub Release.
 
-- [ ] **Step 1: Set version `0.9.1` and close the changelog heading in UTC.**
+- [x] **Step 1: Set version `0.9.1` and close the changelog heading in UTC.**
 
   Use `0.9.1` because the public change is additive and compatible.
 
-- [ ] **Step 2: Run the complete local release gate.**
+- [x] **Step 2: Run the complete local release gate.**
 
   Run: `pnpm test:all && bash scripts/verify-pack.sh`
 
   Expected: PASS with zero failures.
 
-- [ ] **Step 3: Commit and push the release candidate.**
+- [x] **Step 3: Commit and push the release candidate.**
 
   Commit subject: `chore: siapkan rilis error actionable 0.9.1`
 

@@ -2,7 +2,7 @@
   "id": "titen-memory",
   "name": "Titen Memory",
   "description": "Use Titen's evidence-grounded collaborative memory. The local stdio mode needs no configuration; a served Titen endpoint is the alternative for a shared store.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "skills": ["skills/titen-memory"],
   "configSchema": {
     "type": "object",
