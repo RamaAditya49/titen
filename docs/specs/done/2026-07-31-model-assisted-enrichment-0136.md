@@ -14,7 +14,7 @@ owner: CADIS
 
 Titen stores observations and caller-supplied claims, but it cannot yet turn an
 accepted raw conversation into recallable claims or reflect over related claims
-without an external harness. This blocks the server-wulan Mem0 replacement gate
+without an external harness. This blocks the deployment-host Mem0 replacement gate
 in issue #136. A model is untrusted and optional, so adding it must not place a
 provider call on the canonical write or retrieval path, widen authority, or make
 Cloudflare and Bun implement different memory semantics.

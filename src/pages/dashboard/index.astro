@@ -217,6 +217,19 @@ const lenses = [
             <p class="login-boundary"><strong>First-login requirement.</strong> Updating the password revokes every dashboard session for this user, then asks you to sign in again.</p>
             <span data-password-status role="status" aria-live="polite"></span>
           </form>
+          <section class="second-factor-panel" data-second-factor-panel hidden>
+            <button class="primary-button" type="button" data-passkey-auth>Continue with passkey</button>
+            <p class="login-boundary"><strong>Phishing-resistant check.</strong> The browser verifies the relying party and asks for user verification.</p>
+            <span data-passkey-status role="status" aria-live="polite"></span>
+            <form data-recovery-form>
+              <label>
+                <span>One-time recovery code</span>
+                <input name="recovery_code" autocomplete="one-time-code" maxlength="64" required />
+              </label>
+              <button class="secondary-button" type="submit">Use recovery code</button>
+              <span data-recovery-status role="status" aria-live="polite"></span>
+            </form>
+          </section>
         </section>
 
         <section class="service-strip" data-service-strip hidden aria-label="Service checks">
@@ -368,6 +381,25 @@ const lenses = [
             <span data-profile-password-status role="status"></span>
           </form>
           <p class="panel-note" data-profile-password-note hidden>Password changes are available only for session-authenticated operator accounts.</p>
+          <section class="passkey-management" data-passkey-management>
+            <div>
+              <p class="eyebrow">Phishing-resistant authentication</p>
+              <h3>Passkeys and recovery</h3>
+              <p>Register more than one passkey. Store the one-time recovery codes away from this browser.</p>
+            </div>
+            <form class="inline-form" data-passkey-register-form>
+              <label><span>Passkey label</span><input name="label" maxlength="80" required placeholder="Work laptop" /></label>
+              <button class="primary-button" type="submit">Register passkey</button>
+            </form>
+            <label class="passkey-confirmation"><span>Current password for last-passkey removal</span><input data-passkey-password type="password" maxlength="128" autocomplete="current-password" /></label>
+            <div class="live-output compact-output" data-passkey-list><p>No passkeys loaded.</p></div>
+            <button class="secondary-button" type="button" data-recovery-regenerate>Generate new recovery codes</button>
+            <span data-passkey-management-status role="status"></span>
+            <section class="one-time-credential" data-recovery-codes hidden aria-label="Recovery codes">
+              <div><strong>Recovery codes</strong><span>Shown once · each code works once</span></div>
+              <code data-recovery-code-values></code>
+            </section>
+          </section>
         </section>
 
         <section class="area-panel query-panel" data-area-panel="releases" hidden aria-labelledby="releases-heading">
@@ -592,21 +624,30 @@ const lenses = [
         DashboardApiError,
         changePassword,
         checkService,
+        completePasskeyAuthentication,
+        completeRecoveryAuthentication,
         compileView,
         deleteArea,
         getArea,
         getDashboardStatus,
+        getPasskeyAuthenticationOptions,
+        getPasskeyRegistrationOptions,
+        getPasskeys,
         getSession,
         listMemories,
         login,
         logout,
         postArea,
+        regenerateRecoveryCodes,
+        registerPasskey,
+        removePasskey,
         type AtlasNode,
         type AtlasView,
         type DashboardPrincipal,
         type DashboardStatus,
         type MemoryRecord,
       } from "../../lib/dashboard-api";
+      import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
       import {
         renderCollection,
         renderPayloadView,
@@ -648,6 +689,7 @@ const lenses = [
       let memoryListHistory: string[] = [];
       let memoryKind = "";
       let graphSelected: AtlasNode | null = null;
+      let webauthnEnabled = false;
 
       const text = (selector: string, value: string) => { one<HTMLElement>(selector).textContent = value; };
       const has = (scope: string) => Boolean(principal?.scopes.includes("*") || principal?.scopes.includes(scope));
@@ -688,6 +730,72 @@ const lenses = [
       function renderAccessPolicy() {
         renderPrincipalDetails("[data-access-details]");
         renderPrincipalDetails("[data-profile-details]");
+      }
+      function showRecoveryCodes(codes: unknown) {
+        const panel = one<HTMLElement>("[data-recovery-codes]");
+        if (!Array.isArray(codes) || !codes.length || !codes.every((code) => typeof code === "string")) {
+          panel.hidden = true;
+          text("[data-recovery-code-values]", "");
+          return;
+        }
+        text("[data-recovery-code-values]", codes.join("\n"));
+        panel.hidden = false;
+      }
+      async function loadPasskeys() {
+        const target = one<HTMLElement>("[data-passkey-list]");
+        target.replaceChildren();
+        if (dashboardStatus?.authentication !== "session") {
+          renderMessage(target, "Passkey controls require a per-principal dashboard session.");
+          return;
+        }
+        if (!webauthnEnabled) {
+          renderMessage(target, "WebAuthn is not enabled for this deployment.");
+          return;
+        }
+        try {
+          const data = payloadData(await getPasskeys());
+          const credentials = Array.isArray(data.credentials) ? data.credentials : [];
+          if (!credentials.length) {
+            renderMessage(target, "No passkey is registered. Register one before relying on recovery codes.");
+            return;
+          }
+          for (const value of credentials) {
+            if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+            const credential = value as Record<string, unknown>;
+            if (typeof credential.id !== "string" || typeof credential.label !== "string") continue;
+            const row = document.createElement("article");
+            const copy = document.createElement("div");
+            const label = document.createElement("strong");
+            const detail = document.createElement("small");
+            const remove = document.createElement("button");
+            label.textContent = credential.label;
+            detail.textContent = [credential.device_type, credential.backed_up === true ? "backed up" : "single copy"]
+              .filter(Boolean).join(" · ");
+            copy.append(label, detail);
+            remove.type = "button";
+            remove.className = "secondary-button";
+            remove.textContent = "Remove";
+            remove.addEventListener("click", async () => {
+              const password = one<HTMLInputElement>("[data-passkey-password]");
+              text("[data-passkey-management-status]", "Removing passkey…");
+              try {
+                await removePasskey(credential.id as string, password.value);
+                password.value = "";
+                showRecoveryCodes([]);
+                await loadPasskeys();
+                text("[data-passkey-management-status]", "Passkey removed.");
+              } catch (error) {
+                password.value = "";
+                text("[data-passkey-management-status]", errorMessage(error));
+              }
+            });
+            row.append(copy, remove);
+            target.append(row);
+          }
+        } catch (error) {
+          renderMessage(target, errorMessage(error));
+          handleError(error);
+        }
       }
       function setNotice(element: HTMLElement, message?: string) {
         element.hidden = !message;
@@ -1182,6 +1290,11 @@ const lenses = [
         one<HTMLDListElement>("[data-profile-details]").replaceChildren();
         one<HTMLFormElement>("[data-profile-password-form]").reset();
         text("[data-profile-password-status]", "");
+        one<HTMLFormElement>("[data-passkey-register-form]").reset();
+        one<HTMLInputElement>("[data-passkey-password]").value = "";
+        renderMessage(one("[data-passkey-list]"), "No passkeys loaded.");
+        text("[data-passkey-management-status]", "");
+        showRecoveryCodes([]);
         one<HTMLElement>("[data-user-credential]").hidden = true;
         text("[data-user-temporary-password]", "");
         for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]", "[data-subjects-output]", "[data-subject-references]", "[data-projects-output]", "[data-project-references]", "[data-keys-output]", "[data-access-output]", "[data-system-checks]"])
@@ -1449,6 +1562,7 @@ const lenses = [
         if (id === "models") void loadModels();
         if (id === "access") void loadAccess();
         if (id === "api") void loadKeys();
+        if (id === "profile") void loadPasskeys();
       }
       function showPrivateSurface() {
         one<HTMLElement>(".app-shell").dataset.shell = "private";
@@ -1479,6 +1593,7 @@ const lenses = [
         text("[data-profile-avatar]", profileName.slice(0, 2).toUpperCase());
         one<HTMLFormElement>("[data-profile-password-form]").hidden = dashboardStatus?.authentication !== "session";
         one<HTMLElement>("[data-profile-password-note]").hidden = dashboardStatus?.authentication === "session";
+        one<HTMLElement>("[data-passkey-management]").hidden = dashboardStatus?.authentication !== "session";
         one<HTMLElement>("[data-user-admin]").hidden = !(dashboardStatus?.authentication === "session"
           && has("keys:manage") && has("memberships:write")
           && ["root", "owner", "admin"].includes(String(principal?.organization_role)));
@@ -1515,19 +1630,34 @@ const lenses = [
         showLoginSurface();
         one<HTMLFormElement>("[data-login-form]").hidden = false;
         one<HTMLFormElement>("[data-password-form]").hidden = true;
+        one<HTMLElement>("[data-second-factor-panel]").hidden = true;
         one<HTMLFormElement>("[data-password-form]").reset();
+        one<HTMLFormElement>("[data-recovery-form]").reset();
         text("[data-login-heading]", "Sign in");
         text("[data-login-copy]", "Use the operator account issued by your Titen organization.");
         text("[data-login-status]", message ?? "");
         text("[data-password-status]", "");
+        text("[data-passkey-status]", "");
+        text("[data-recovery-status]", "");
       }
       function showPasswordChange() {
         showLoginSurface();
         one<HTMLFormElement>("[data-login-form]").hidden = true;
         one<HTMLFormElement>("[data-password-form]").hidden = false;
+        one<HTMLElement>("[data-second-factor-panel]").hidden = true;
         text("[data-login-heading]", "Set a new password");
         text("[data-login-copy]", "Replace the temporary password before accessing organization data.");
         text("[data-password-status]", "");
+      }
+      function showSecondFactor() {
+        showLoginSurface();
+        one<HTMLFormElement>("[data-login-form]").hidden = true;
+        one<HTMLFormElement>("[data-password-form]").hidden = true;
+        one<HTMLElement>("[data-second-factor-panel]").hidden = false;
+        text("[data-login-heading]", "Verify identity");
+        text("[data-login-copy]", "Use a registered passkey or one unused recovery code.");
+        text("[data-passkey-status]", "");
+        text("[data-recovery-status]", "");
       }
       async function refreshService() {
         const notice = one<HTMLElement>("[data-service-notice]");
@@ -1545,6 +1675,8 @@ const lenses = [
           if (dashboardStatus.authentication === "session" && !dashboardStatus.authenticated) return signedOut();
           principal = await getSession();
           if (principal.password_change_required) return showPasswordChange();
+          if (principal.auth_stage === "second_factor" || principal.second_factor_required)
+            return showSecondFactor();
           showPrivateSurface();
           renderAccessPolicy();
           text("[data-principal]", principal?.principal_id ?? "Server key");
@@ -1553,6 +1685,10 @@ const lenses = [
           const healthLabel = health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`;
           const runtimeLabel = serviceDetail(health.payload, "runtime") ?? "healthz";
           const semanticSyncing = semanticDiagnostic(readiness.payload) === "index_projection_pending";
+          const readinessCapabilities = payloadData(readiness.payload).capabilities;
+          webauthnEnabled = Boolean(readinessCapabilities && typeof readinessCapabilities === "object"
+            && !Array.isArray(readinessCapabilities)
+            && (readinessCapabilities as Record<string, unknown>).webauthn === "enabled");
           const readinessLabel = readiness.ok
             ? semanticSyncing ? "Ready · semantic syncing" : "Ready"
             : `Not ready · ${readiness.status}`;
@@ -1643,6 +1779,38 @@ const lenses = [
           text("[data-password-status]", errorMessage(error));
         }
       });
+      one<HTMLButtonElement>("[data-passkey-auth]").addEventListener("click", async () => {
+        text("[data-passkey-status]", "Waiting for your passkey…");
+        try {
+          const payload = payloadData(await getPasskeyAuthenticationOptions());
+          if (typeof payload.challenge_id !== "string" || !payload.options
+            || typeof payload.options !== "object" || Array.isArray(payload.options))
+            throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen returned invalid passkey options.");
+          const response = await startAuthentication({ optionsJSON: payload.options as never });
+          principal = await completePasskeyAuthentication(
+            payload.challenge_id,
+            response as unknown as Record<string, unknown>,
+          );
+          await refreshService();
+        } catch (error) {
+          text("[data-passkey-status]", errorMessage(error));
+        }
+      });
+      one<HTMLFormElement>("[data-recovery-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        if (!form.reportValidity()) return;
+        const code = form.elements.namedItem("recovery_code") as HTMLInputElement;
+        text("[data-recovery-status]", "Verifying recovery code…");
+        try {
+          principal = await completeRecoveryAuthentication(code.value);
+          code.value = "";
+          await refreshService();
+        } catch (error) {
+          code.value = "";
+          text("[data-recovery-status]", errorMessage(error));
+        }
+      });
       one<HTMLButtonElement>("[data-logout]").addEventListener("click", async () => {
         try {
           await logout();
@@ -1665,6 +1833,42 @@ const lenses = [
           password.value = "";
           confirm.value = "";
           text("[data-profile-password-status]", errorMessage(error));
+        }
+      });
+      one<HTMLFormElement>("[data-passkey-register-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        if (!form.reportValidity()) return;
+        const label = form.elements.namedItem("label") as HTMLInputElement;
+        text("[data-passkey-management-status]", "Waiting for the new passkey…");
+        try {
+          const data = payloadData(await getPasskeyRegistrationOptions());
+          if (typeof data.challenge_id !== "string" || !data.options
+            || typeof data.options !== "object" || Array.isArray(data.options))
+            throw new DashboardApiError(502, "INVALID_UPSTREAM_RESPONSE", "Titen returned invalid passkey options.");
+          const response = await startRegistration({ optionsJSON: data.options as never });
+          const registered = payloadData(await registerPasskey(
+            data.challenge_id,
+            label.value,
+            response as unknown as Record<string, unknown>,
+          ));
+          label.value = "";
+          showRecoveryCodes(registered.recovery_codes);
+          await loadPasskeys();
+          text("[data-passkey-management-status]", "Passkey registered.");
+        } catch (error) {
+          text("[data-passkey-management-status]", errorMessage(error));
+        }
+      });
+      one<HTMLButtonElement>("[data-recovery-regenerate]").addEventListener("click", async () => {
+        if (!window.confirm("Invalidate all unused recovery codes and generate a new set?")) return;
+        text("[data-passkey-management-status]", "Generating replacement recovery codes…");
+        try {
+          const data = payloadData(await regenerateRecoveryCodes());
+          showRecoveryCodes(data.recovery_codes);
+          text("[data-passkey-management-status]", "Recovery codes replaced. Store them now.");
+        } catch (error) {
+          text("[data-passkey-management-status]", errorMessage(error));
         }
       });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);

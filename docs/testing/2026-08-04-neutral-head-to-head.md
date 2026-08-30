@@ -1,6 +1,6 @@
 # Neutral-corpus head-to-head, 0.6.0 candidate versus self-hosted Mem0
 
-Date: 2026-08-04. Host `rama-tuf`, 16 cores. Models served by one OpenAI-compatible
+Date: 2026-08-04. Host `benchmark-host`, 16 cores. Models served by one OpenAI-compatible
 router shared by both systems: embeddings `tuf/embeddinggemma` at 768 dimensions.
 Neither system called an LLM on the retrieval path.
 

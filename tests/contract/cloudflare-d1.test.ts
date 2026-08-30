@@ -24,6 +24,7 @@ import {
   assertSemanticIndexWriteRepair,
   assertSemanticReadiness,
 } from "./semantic-readiness";
+import { assertWebAuthnContract } from "./webauthn";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
 if (!existsSync(scriptPath))
@@ -161,6 +162,10 @@ d1Test(
 d1Test("D1 replays bounded model enrichment", async () => {
   await assertEnrichmentContract(db, "cloudflare-d1");
 }, 120_000);
+
+d1Test("D1 enforces the WebAuthn and recovery contract", async () => {
+  await assertWebAuthnContract(db, "cloudflare-d1");
+}, 60_000);
 
 d1Test("workerd dispatches JSON-object extraction without following redirects", async () => {
   const extractionPersist = mkdtempSync(join(tmpdir(), "titen-d1-extraction-"));

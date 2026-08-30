@@ -106,7 +106,7 @@ pnpm build
 TITEN_DASHBOARD_LIVE=true \
 TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
-TITEN_DASHBOARD_ORIGIN=https://titen-host.example-tailnet.ts.net \
+TITEN_DASHBOARD_ORIGIN=https://node.example.ts.net \
 pnpm dashboard:adapter
 ```
 

@@ -39,12 +39,12 @@ previous npm version; restore the previous website release and dashboard bundle
 from the recorded deployment backup if needed.
 
 Source rollback is a revert of `47172bf`; npm consumers can pin `0.8.1`.
-server-wulan can restore package, dashboard environment, unit, and revision
+deployment-host can restore package, dashboard environment, unit, and revision
 files from `/opt/titen/backups/npm-dashboard-0.8.2-20260815T021206Z`.
 
 ## Verification
 
 `pnpm test:all`, the 70-file pack manifest inspection, `scripts/verify-pack.sh`,
-registry install, GitHub release, website build/deploy smoke, and server-wulan
+registry install, GitHub release, website build/deploy smoke, and deployment-host
 packaged-dashboard smoke passed. The paired spec records exact acceptance
 evidence and the unchanged upstream readiness condition.

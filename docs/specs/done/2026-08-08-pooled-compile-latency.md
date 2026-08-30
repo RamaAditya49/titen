@@ -138,7 +138,7 @@ one-thread ceiling is separate), no change to ranking or recall.
 
 ## Evidence
 
-Measurement reuses the preserved stores and E-LAT harness on `rama-tuf`
+Measurement reuses the preserved stores and E-LAT harness on `benchmark-host`
 (`~/titen-bench-20260807/lanes/pooled-19829.db`, key in
 `logs/pooled-19829.log.bootstrap`; anchor copy procedure in
 [`run_day1.sh`](../../testing/results/2026-08-07-pooled-store/harness/run_day1.sh)),

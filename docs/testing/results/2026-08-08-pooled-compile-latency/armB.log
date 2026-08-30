@@ -10,4 +10,4 @@ readyz 200 {"ready": true, "runtime": "bun-sqlite", "revision": "dev", "schema":
   "failure_rate": 0.0
 }
 latency {'p50': 416.94, 'p95': 864.4, 'p99': 1072.41}
-wrote /home/ramaaditya/titen-bench-20260804/results/titen-fts-pooled-19829-20260808-headfix.json
+wrote /srv/titen-workspace/titen-bench-20260804/results/titen-fts-pooled-19829-20260808-headfix.json

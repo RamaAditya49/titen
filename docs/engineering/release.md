@@ -242,7 +242,7 @@ checked by hand on every deploy:
   contradicts both `README.md` and `CHANGELOG.md`. The badge must name the
   channel and disclose pre-1.0, for example `v0.5.7 · stable channel · pre-1.0`.
 - **Vectorize.** Cloudflare Vectorize and Workers AI are verified live only on
-  the maintainer's isolated `titen-test-*` stack. Every surface says test
+  the maintainer's isolated the maintainer release stack stack. Every surface says test
   production, not general availability. Table cells and prose in the same
   section must not disagree.
 

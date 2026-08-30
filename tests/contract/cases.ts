@@ -589,8 +589,8 @@ export const CASES: Case[] = [
       for (const reference of [
         "https://user:token@github.com/rama/titen",
         "https://github.com/rama/titen?token=abc",
-        "/home/rama/Project/titen",
-        "C:\\Users\\rama\\titen",
+        ["", "home", "private-user", "Project", "titen"].join("/"),
+        "C:\\Users\\private-user\\titen",
         "~/titen",
         "ssh://git@github.com/rama/titen",
       ]) {
@@ -2571,6 +2571,7 @@ export const CASES: Case[] = [
         data_target_type: "organization",
         data_target_id: null,
         organization_role: "root",
+        auth_stage: "full",
       });
       expectError(await fx.call("GET", "/v1/principal"), 401, "UNAUTHENTICATED");
 
@@ -2721,7 +2722,7 @@ export const CASES: Case[] = [
       const principal = await fx.call("GET", "/v1/principal", { key: sessionKey });
       expectOk(principal);
       assert.equal(principal.body.data.organization_role, "reader");
-      expectError(await fx.call("GET", "/v1/memberships", { key: sessionKey }), 403, "FORBIDDEN");
+      expectError(await fx.call("GET", "/v1/memberships", { key: sessionKey }), 403, "STAGED_SESSION");
       expectError(await fx.call("PATCH", "/v1/operator-accounts/current/password", {
         key: sessionKey,
         body: { password: temporaryPassword },
@@ -2816,13 +2817,13 @@ export const CASES: Case[] = [
       }), 403, "FORBIDDEN");
 
       const throttled = `locked-${fx.runtime}`;
-      for (let attempt = 0; attempt < 10; attempt++)
+      for (let attempt = 0; attempt < 5; attempt++)
         expectError(await fx.call("POST", "/v1/dashboard-sessions", {
           body: { username: throttled, password: "this is the wrong passphrase" },
         }), 401, "INVALID_LOGIN");
       expectError(await fx.call("POST", "/v1/dashboard-sessions", {
         body: { username: throttled, password: "this is the wrong passphrase" },
-      }), 429, "LOGIN_RATE_LIMITED");
+      }), 401, "INVALID_LOGIN");
     },
   },
   {
@@ -2950,9 +2951,20 @@ export const CASES: Case[] = [
       assert.match(rows.find((row: any) => row.key_id === activeId).last_used_at, /^\d{4}-/u);
       assert.equal(rows.find((row: any) => row.key_id === pending.body.data.key_id).status, "pending");
 
+      const stagedId = `key_staged_export_${fx.runtime}`;
+      const stagedCreatedAt = new Date().toISOString();
+      await fx.query(
+        `INSERT INTO api_keys
+           (id, org_id, principal_id, principal_kind, key_hash, label, scopes,
+            max_trust, created_at, not_before, auth_stage)
+         VALUES (?, ?, ?, 'human', ?, 'Dashboard session', '', 'verified', ?, ?, 'second_factor')`,
+        [stagedId, owner.orgId, owner.principalId, "f".repeat(64), stagedCreatedAt, stagedCreatedAt],
+      );
+
       const exported = await fx.call("GET", "/v1/export?type=keys&all=true", { key: owner.key });
       assert.equal(exported.status, 200);
       assert.ok(!String(exported.body).includes(activeKey), "credential backup must never contain raw bearer material");
+      assert.ok(!String(exported.body).includes(stagedId), "credential backup must exclude dashboard sessions");
       const header = JSON.parse(String(exported.body).trim().split("\n")[0]!);
       assert.equal(header.format_version, 4);
       assert.equal(header.record_type, "keys");

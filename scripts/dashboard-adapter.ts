@@ -98,6 +98,8 @@ interface DashboardPrincipal {
   max_trust: "unverified" | "asserted" | "verified" | "policy_approved";
   organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
   password_change_required?: boolean;
+  second_factor_required?: boolean;
+  auth_stage?: "full" | "password_change" | "second_factor";
 }
 interface Session {
   key: string;
@@ -135,7 +137,9 @@ function safePrincipal(value: unknown): DashboardPrincipal | undefined {
     || !["unverified", "asserted", "verified", "policy_approved"].includes(String(trust))
     || !Array.isArray(row.scopes) || row.scopes.length > 256 || !row.scopes.every((scope) => typeof scope === "string")
     || (role !== null && !["root", "owner", "admin", "member", "reader"].includes(String(role)))
-    || (row.password_change_required !== undefined && typeof row.password_change_required !== "boolean")) return;
+    || (row.password_change_required !== undefined && typeof row.password_change_required !== "boolean")
+    || (row.second_factor_required !== undefined && typeof row.second_factor_required !== "boolean")
+    || (row.auth_stage !== undefined && !["full", "password_change", "second_factor"].includes(String(row.auth_stage)))) return;
   return {
     organization_id: row.organization_id,
     principal_id: row.principal_id,
@@ -146,6 +150,10 @@ function safePrincipal(value: unknown): DashboardPrincipal | undefined {
     organization_role: role as DashboardPrincipal["organization_role"],
     ...(typeof row.password_change_required === "boolean"
       ? { password_change_required: row.password_change_required } : {}),
+    ...(typeof row.second_factor_required === "boolean"
+      ? { second_factor_required: row.second_factor_required } : {}),
+    ...(typeof row.auth_stage === "string"
+      ? { auth_stage: row.auth_stage as DashboardPrincipal["auth_stage"] } : {}),
   };
 }
 function sessionId(request: Request): string | undefined {
@@ -171,20 +179,34 @@ async function sessionFor(request: Request): Promise<Session | undefined> {
     return { key: value.key, principal, expiresAt: value.expiresAt };
   } catch { return; }
 }
-async function rememberSession(key: string, principal: DashboardPrincipal): Promise<string> {
+async function rememberSession(
+  key: string,
+  principal: DashboardPrincipal,
+  upstreamExpiry?: unknown,
+): Promise<{ id: string; maxAge: number }> {
   if (!sessionKey) throw new Error("Dashboard session key is unavailable.");
   const iv = crypto.getRandomValues(new Uint8Array(12));
+  const parsedExpiry = typeof upstreamExpiry === "string" ? Date.parse(upstreamExpiry) : Number.NaN;
+  const stageTtl = principal.auth_stage === "second_factor" || principal.auth_stage === "password_change"
+    ? 15 * 60 * 1000
+    : SESSION_TTL_MS;
+  const expiresAt = Number.isFinite(parsedExpiry)
+    ? Math.min(parsedExpiry, Date.now() + stageTtl)
+    : Date.now() + stageTtl;
   const plaintext = new TextEncoder().encode(JSON.stringify({
     key,
     principal,
-    expiresAt: Date.now() + SESSION_TTL_MS,
+    expiresAt,
   }));
   const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     sessionKey,
     plaintext,
   ));
-  return `v1.${base64Url(iv)}.${base64Url(ciphertext)}`;
+  return {
+    id: `v1.${base64Url(iv)}.${base64Url(ciphertext)}`,
+    maxAge: Math.max(1, Math.ceil((expiresAt - Date.now()) / 1000)),
+  };
 }
 function cookie(id: string, maxAge = SESSION_TTL_MS / 1000): string {
   return `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${publicOrigin ? "; Secure" : ""}`;
@@ -285,6 +307,7 @@ const readRoutes = new Map<string, { path: string; query: string[] }>([
   ["/dashboard-api/governance/releases", { path: "/v1/knowledge-releases", query: [] }],
   ["/dashboard-api/federation/peers", { path: "/v1/federation/peers", query: [] }],
   ["/dashboard-api/federation/log", { path: "/v1/federation/log", query: ["peer_id", "limit"] }],
+  ["/dashboard-api/profile/passkeys", { path: "/v1/operator-accounts/current/passkeys", query: [] }],
 ]);
 
 const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
@@ -327,14 +350,16 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       const principal = safePrincipal(data);
       if (!response.ok || !principal) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid principal.");
       if (!key) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid session.");
-      const id = await rememberSession(key, principal);
-      return json({ data: principal }, 201, { "set-cookie": cookie(id) });
+      const sealed = await rememberSession(key, principal, data?.expires_at);
+      return json({ data: principal }, 201, { "set-cookie": cookie(sealed.id, sealed.maxAge) });
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
   }
   if (url.pathname === "/dashboard-api/session" && request.method === "GET") {
     const found = sessionMode ? await sessionFor(request) : undefined;
     const key = sessionMode ? found?.key : apiKey;
     if (!key) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.");
+    if (found?.principal.auth_stage === "second_factor")
+      return json({ data: found.principal });
     try {
       const { response, principal } = await introspect(key);
       if (response.status === 401) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.",
@@ -382,6 +407,77 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       }
       return json(payload, response.status, clearSession(request));
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
+  }
+
+  const stagedCompletionPath = url.pathname === "/dashboard-api/session/passkey"
+    ? "/v1/dashboard-sessions/current/passkey"
+    : url.pathname === "/dashboard-api/session/recovery-code"
+      ? "/v1/dashboard-sessions/current/recovery-code"
+      : undefined;
+  if (stagedCompletionPath && request.method === "POST") {
+    if (!sessionMode) return error(404, "NOT_FOUND", "Dashboard session mode is not enabled.");
+    if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const found = await sessionFor(request);
+    if (!found) return error(401, "DASHBOARD_AUTH_REQUIRED", "Sign in to continue.");
+    const body = await bodyObject(request);
+    const allowed = stagedCompletionPath.endsWith("passkey")
+      ? new Set(["challenge_id", "response"])
+      : new Set(["recovery_code"]);
+    if (!body || Object.keys(body).some((field) => !allowed.has(field)))
+      return error(400, "INVALID_REQUEST", "A bounded second-factor body is required.");
+    try {
+      const response = await upstreamRequest(stagedCompletionPath, found.key, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => null) as { data?: unknown } | null;
+      const data = payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+        ? payload.data as Record<string, unknown> : undefined;
+      if (!response.ok || !data) {
+        const status = [400, 401, 403, 409, 429, 503].includes(response.status) ? response.status : 502;
+        return error(status, status === 401 ? "SECOND_FACTOR_INVALID" : `UPSTREAM_${status}`, upstreamMessage(status));
+      }
+      const key = typeof data.api_key === "string" && data.api_key.startsWith("titen_sk_") ? data.api_key : undefined;
+      const principal = safePrincipal(data);
+      if (!key || !principal || principal.auth_stage !== "full")
+        return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid completed session.");
+      const sealed = await rememberSession(key, principal, data.expires_at);
+      return json({ data: principal }, 201, { "set-cookie": cookie(sealed.id, sealed.maxAge) });
+    } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
+  }
+
+  if (url.pathname === "/dashboard-api/session/passkey-options" && request.method === "POST") {
+    if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const body = await bodyObject(request);
+    if (!body || Object.keys(body).length > 0)
+      return error(400, "INVALID_REQUEST", "Passkey options do not accept fields.");
+    return proxyJson(request, "/v1/dashboard-sessions/current/passkey-options", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    });
+  }
+
+  const profileMutation = (() => {
+    if (url.pathname === "/dashboard-api/profile/passkeys/options" && request.method === "POST")
+      return { path: "/v1/operator-accounts/current/passkeys/options", allowed: new Set<string>() };
+    if (url.pathname === "/dashboard-api/profile/passkeys" && request.method === "POST")
+      return { path: "/v1/operator-accounts/current/passkeys", allowed: new Set(["challenge_id", "label", "response"]) };
+    if (url.pathname === "/dashboard-api/profile/recovery-codes" && request.method === "POST")
+      return { path: "/v1/operator-accounts/current/recovery-codes", allowed: new Set<string>() };
+    const revoke = url.pathname.match(/^\/dashboard-api\/profile\/passkeys\/([^/]+)$/u);
+    if (revoke && request.method === "DELETE")
+      return { path: `/v1/operator-accounts/current/passkeys/${encodeURIComponent(revoke[1]!)}`, allowed: new Set(["password"]) };
+  })();
+  if (profileMutation) {
+    if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const body = await bodyObject(request);
+    if (!body || Object.keys(body).some((field) => !profileMutation.allowed.has(field)))
+      return error(400, "INVALID_REQUEST", "A bounded passkey request is required.");
+    return proxyJson(request, profileMutation.path, {
+      method: request.method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
   }
 
   if (url.pathname === "/dashboard-api/atlas/compile" && request.method === "POST") {

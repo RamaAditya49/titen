@@ -154,4 +154,4 @@ upgrade. Pulihkan package dan deployment website sebelumnya bila smoke gagal.
 - AC-DOC-021 lulus dengan bundle dashboard 26,3 KiB gzip.
 - AC-DOC-022 lulus melalui dokumentasi, website, dan metadata versi 0.9.0.
 - AC-DOC-023 lulus setelah persetujuan npm melalui browser.
-- AC-DOC-024 lulus melalui backup dan production smoke pada server-wulan.
+- AC-DOC-024 lulus melalui backup dan production smoke pada deployment-host.

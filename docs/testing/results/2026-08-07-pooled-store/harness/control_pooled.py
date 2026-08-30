@@ -8,8 +8,8 @@ pooled_run.py so every lane sees byte-identical store contents at each size.
 """
 import argparse, hashlib, json, os, sys, time
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import common
 import numpy as np
 from control import (FastembedEmbedder, RouterEmbedder, TRUNC_CHARS, truncate,
@@ -110,7 +110,7 @@ def main():
             "query_seconds": round(query_seconds, 2),
             "python": sys.version.split()[0],
             "numpy": np.__version__,
-            "host": "rama-tuf",
+            "host": "benchmark-host",
         }
         print(json.dumps({k: v for k, v in result.items() if k != "by_type"}, indent=2), flush=True)
         print("size", size, "latency", meta["query_ms"], flush=True)

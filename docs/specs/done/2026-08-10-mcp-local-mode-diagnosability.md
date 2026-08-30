@@ -12,7 +12,7 @@ owner: ramaaditya
 
 ## Problem
 
-On `rama-tuf`, 0.7.3 serving `~/titen.db` on `127.0.0.1:8787` held one active
+On `benchmark-host`, 0.7.3 serving `~/titen.db` on `127.0.0.1:8787` held one active
 claim under subject `caraka`. `POST /v1/context/compile` with
 `{"subject_id":"caraka","task":"oxfmt prettier","max_tokens":800}` returned one
 item. A coding agent calling `titen_compile` with the same subject and the same
@@ -20,7 +20,7 @@ task received zero. The bridge reported healthy: connected, eighteen tools
 listed, and writes through it landed in a database.
 
 They landed in a different database. `~/.claude.json` carried a project-scoped
-registration for `/home/ramaaditya/Project/caraka` running `titen mcp` with an
+registration for `/srv/titen-workspace/Project/caraka` running `titen mcp` with an
 empty `env`, which shadowed the user-scoped entry that had both variables. With
 neither variable set, `runMcpStdio` falls back to `runLocalMcpStdio` and serves
 `~/.titen/memory.db`. The fallback is correct behaviour and Titen cannot fix a

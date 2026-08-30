@@ -99,7 +99,7 @@ spec: docs/specs/done/2026-08-02-host-compatibility-adapters.md
   as Worker version `0335b2bb-5490-49ee-a35c-c3cb3caaf17a`; readiness reports
   the exact release revision, verified schema 21, Vectorize, Workers AI, and
   background repair, while unauthenticated MCP returns `401`.
-- `rama-tuf` runs rootless image `localhost/titen:0.5.7-f226df0` for the API and
+- `benchmark-host` runs rootless image `localhost/titen:0.5.7-f226df0` for the API and
   dashboard. A verified production snapshot with SHA-256
   `8fcd6f682dfc92f2b8d2e8b4bbc35825fe5490a9ca220f9440b6359c8b2b30c1`
   passed a restored-data canary, authenticated nine-tool MCP smoke, dashboard

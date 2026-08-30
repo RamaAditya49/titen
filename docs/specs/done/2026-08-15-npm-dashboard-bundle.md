@@ -78,7 +78,7 @@ therefore run the service but cannot obtain the current dashboard release.
 - titen-web commit `8ffb6cf` was deployed as Worker version
   `33109b05-b7af-4e92-bac6-85a4196f5baf`. Both public domains return version
   `0.8.2`, release HTTP 200, and the packaged-dashboard install command.
-- server-wulan now runs package `0.8.2`; its dashboard service executes the
+- deployment-host now runs package `0.8.2`; its dashboard service executes the
   packaged `titen dashboard` command with no legacy root override. Dashboard
   HTML and assets return 200, unauthenticated session access returns 401,
   health reports revision `npm-0.8.2`, and both services are active.

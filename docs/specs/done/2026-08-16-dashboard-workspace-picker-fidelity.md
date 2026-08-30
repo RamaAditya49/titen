@@ -60,7 +60,7 @@ and its paired plan are moved to `done/` with no unchecked work.
   coverage, and reviewed desktop/320 px references.
 - `titen-memory@0.8.7` is npm `latest` with SHA-1
   `527d1eae721a88994ff8913b5efb5a3cd055f7cf` and the same `gitHead`.
-- Production server-wulan runs package/revision `0.8.7`/`npm-0.8.7` with
+- Production deployment-host runs package/revision `0.8.7`/`npm-0.8.7` with
   health and readiness `200`, schema `23/23`, dashboard `200`, and an
   unauthenticated protected request rejected with `401`. Rollback backup:
   `/opt/titen/backups/npm-0.8.7-20260817-080321`.

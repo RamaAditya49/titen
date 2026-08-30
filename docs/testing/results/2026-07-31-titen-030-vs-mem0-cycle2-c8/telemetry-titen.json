@@ -5,7 +5,7 @@
     "ended_at": "2026-07-31T08:10:55.468Z"
   },
   "interval_ms": 500,
-  "host": "server-wulan",
+  "host": "deployment-host",
   "containers": [
     "titen-canary"
   ],

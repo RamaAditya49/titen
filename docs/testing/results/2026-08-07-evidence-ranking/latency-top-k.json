@@ -1,6 +1,6 @@
 {
   "purpose": "Kill criterion 3 of the pre-registration: the signal does not ship if it costs measurable compile latency without a significant recall@1 gain. The recall gain is zero, so the cost had to be measured rather than argued.",
-  "host": "rama-tuf",
+  "host": "benchmark-host",
   "store": "copy of ~/titen-bench-20260804/lanes/titen/fts-500.db, 424,168 claims / 25,112 observations",
   "method": "harness/latency.py, serial client, 20 untimed warm-up compiles, then the first 100 corpus instances repeated; A and B alternate rounds against two servers on the same store file",
   "builds": {

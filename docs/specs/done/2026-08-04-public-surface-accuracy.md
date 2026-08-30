@@ -35,7 +35,7 @@ found six contradictions and gaps across the widest-reach surfaces.
    fewest caveats.
 2. Issue #223 — the homepage capability table calls Vectorize verified while the
    prose two lines below says it has not landed. `README.md` scoped it to
-   `titen-test-*` without saying whose account that is or that it is not general
+   the maintainer release stack without saying whose account that is or that it is not general
    availability.
 3. Issue #224 — `CHANGELOG.md` dated 0.5.7 as 2026-08-02 while npm and
    `version.json` say 2026-08-01. The registry shows the same drift on 0.5.6,
@@ -90,7 +90,7 @@ change; the repository-side contract for it belongs in the release guide.
   badge, then the release guide shall require that badge to name the channel and
   disclose pre-1.0 before the release is announced complete.
 - **AC-VECTORIZE-001 — Ubiquitous:** Every surface describing Cloudflare
-  Vectorize shall scope the live evidence to the isolated `titen-test-*` stack
+  Vectorize shall scope the live evidence to the isolated the maintainer release stack stack
   on the maintainer's own account and shall deny general availability.
 - **AC-DATE-001 — Ubiquitous:** Every released changelog heading shall carry the
   UTC date that the npm registry records for that exact version.

@@ -21,7 +21,7 @@ harness reports precision@k and F1@k alongside recall. Closes issues #239,
 
 ## Problem
 
-Three defects reported from the `v0.5.7` release-bound benchmark on `rama-tuf`,
+Three defects reported from the `v0.5.7` release-bound benchmark on `benchmark-host`,
 all landing on the same event queue or on the harness that measures retrieval.
 
 **#239 — inclusive registration boundary.** `src/core/webhooks.ts` and

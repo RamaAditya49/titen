@@ -416,6 +416,9 @@ switch (command) {
         secretCipher: parseSecretCipher(process.env.TITEN_SECRET_KEYS),
         webhookSecurity: createBunWebhookSecurity(process.env.TITEN_WEBHOOK_ALLOWED_HOSTNAMES),
         mcpOrigin: process.env.TITEN_MCP_ORIGIN,
+        webauthnRpId: process.env.TITEN_WEBAUTHN_RP_ID,
+        webauthnOrigin: process.env.TITEN_WEBAUTHN_ORIGIN,
+        webauthnRpName: process.env.TITEN_WEBAUTHN_RP_NAME,
       });
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error

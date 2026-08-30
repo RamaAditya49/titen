@@ -35,7 +35,7 @@ create a human account with an explicit organization role.
   SDKs, CLI recovery, and existing integrations.
 - Apply and verify the same forward-only schema and route behavior on D1 and
   Bun/SQLite.
-- Deploy the exact candidate on `rama-tuf`, then manually publish npm, GitHub,
+- Deploy the exact candidate on `benchmark-host`, then manually publish npm, GitHub,
   and titen.dev discovery without GitHub Actions.
 
 ## Out of scope
@@ -108,11 +108,11 @@ and exact-image restore canary before production activation.
   are tested, both D1 and Bun/SQLite shall pass account creation, login, denial,
   role escalation, logout/revocation, migration, and existing contract suites.
 - **AC-DPA-011 — Event-driven:** When the exact release is activated on
-  `rama-tuf`, Titen shall pass backup/restore canary, readiness, username/password
+  `benchmark-host`, Titen shall pass backup/restore canary, readiness, username/password
   login, Add User with role, all six dashboard areas, denial, restart, loopback
   exposure, and rollback probes against the deployed revision.
 - **AC-DPA-012 — Event-driven:** When publication completes, npm `latest`, the
-  annotated Git tag, GitHub Release, `origin/main`, the `rama-tuf` image, and both
+  annotated Git tag, GitHub Release, `origin/main`, the `benchmark-host` image, and both
   titen.dev discovery hosts shall agree on one stable version and tagged revision
   without a GitHub Actions workflow.
 - **AC-DPA-013 — State-driven:** While this work is complete, this spec and its
@@ -135,7 +135,7 @@ hygiene, and workflow checks pass; both paired artifacts move to `done/`.
 - Bun contract `101/101`, D1 contract `108/108`, integration `190/190`,
   CLI/adapter `19/19`, browser `6/6`, live-dashboard verification, Worker dry
   build, package clean install, route, audit, and workflow checks pass.
-- `rama-tuf` runs schema `20/20` behind loopback-only rootless Quadlets. A
+- `benchmark-host` runs schema `20/20` behind loopback-only rootless Quadlets. A
   checksum-matched schema-19 backup, restored-data canary, forced-change owner,
   Add User, six-area dashboard, restart invalidation, and exact prior-image
   rollback probe pass; recovery artifacts remain under the release directory.

@@ -29,7 +29,7 @@ stable replacement candidate.
   denial, error, governance lenses, and federated canonical recall through Atlas;
 - resolve issues #208-#212 at their shared CLI/context boundaries;
 - verify Bun/SQLite and workerd/D1, package/install the candidate, deploy the same
-  candidate on `rama-tuf`, run immediate live and rollback smokes, publish the
+  candidate on `benchmark-host`, run immediate live and rollback smokes, publish the
   stable npm/GitHub release, update titen.dev release discovery, and close issues;
 - keep GitHub Actions disabled and remove only branches proven merged or obsolete.
 
@@ -78,7 +78,7 @@ stable replacement candidate.
   and workerd/D1 with adversarial cross-organization, migration, replay, conflict,
   dashboard-build, CLI, SDK, packaging, and workflow checks.
 - **AC-ECS-010 — Event-driven:** When the exact candidate is deployed on
-  `rama-tuf`, it shall start from persistent storage, become ready, serve the live
+  `benchmark-host`, it shall start from persistent storage, become ready, serve the live
   dashboard through a tailnet-authenticated operator path, preserve data through
   a bounded restart/restore smoke, and expose a URL verified from the operator host.
 - **AC-ECS-011 — Event-driven:** When every gate passes, maintainers shall publish
@@ -94,13 +94,13 @@ deployed revision agree, and the final dashboard URL passes a fresh smoke.
 
 ## Terminal evidence
 
-- `main`, `v0.5.1`, the GitHub Release, npm `latest`, the `rama-tuf` images, and
+- `main`, `v0.5.1`, the GitHub Release, npm `latest`, the `benchmark-host` images, and
   the live dashboard all resolve to release `0.5.1`; the deployed revision is
   `3d53431`.
 - Bun/vector/SDK passed 129/129, integration passed 182/182, browser passed 5/5,
   D1 passed all 105 cases, package install passed 9/9, and the production
   dependency audit reported no known vulnerabilities.
-- `rama-tuf` passed schema 19 readiness, signed canonical federation recall,
+- `benchmark-host` passed schema 19 readiness, signed canonical federation recall,
   six Atlas lenses, restart persistence, disposable restore, a read-only
   migration probe, visual dashboard inspection, and direct API denial.
 - `titen.dev` and `www.titen.dev` publish stable discovery `0.5.1`; GitHub has no

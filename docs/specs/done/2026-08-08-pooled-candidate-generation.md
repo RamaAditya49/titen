@@ -153,7 +153,7 @@ Full accounting in
 
 ## Evidence
 
-Stores and harness preserved on `rama-tuf` (see the latency spec's Evidence
+Stores and harness preserved on `benchmark-host` (see the latency spec's Evidence
 section). Results land in
 `docs/testing/2026-08-XX-pooled-candidate-generation.md` with artifacts +
 SHA256SUMS; prereg first, per AC-PCG-001.

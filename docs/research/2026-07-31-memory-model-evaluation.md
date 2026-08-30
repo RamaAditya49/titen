@@ -25,7 +25,7 @@
 
 ## What was tested
 
-The live OpenAI-compatible endpoint ran 9router `0.5.40` on `server-wulan`.
+The live OpenAI-compatible endpoint ran 9router `0.5.40` on `deployment-host`.
 Its catalog exposed 14 model IDs, including:
 
 - `cx/gpt-5.6-luna`;
@@ -76,7 +76,7 @@ failed before persisting an artifact. No values from it were used. The scored
 run completed 333/333 HTTP calls and retained synthetic raw and summary
 artifacts outside the repository for independent review.
 
-Artifact manifest on `server-wulan` at review time:
+Artifact manifest on `deployment-host` at review time:
 
 - raw response/result SHA-256:
   `cd7a3565f88f1f0d70fde00a6c6ec8a86ecb747d86d1e1590999379764760d41`;

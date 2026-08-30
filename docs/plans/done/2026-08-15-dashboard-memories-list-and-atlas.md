@@ -71,4 +71,4 @@ bundle and service revision; canonical memory rows are never rewritten.
 - Adapter suite: 16 passed; `node scripts/check-route-docs.mjs`: 85 routes; `node scripts/check-workflow-docs.mjs` and self-test passed.
 - `pnpm check`, `pnpm build`, and `pnpm release:sync 0.8.4 --check` passed in titen-web (two existing prose warnings only).
 - npm registry latest is `0.8.4`; `titen.dev` and `www.titen.dev` serve version manifest `0.8.4` from Worker version `a6ecb042-94b9-4e49-82ed-142ae79334f3`.
-- server-wulan package is `0.8.4`, services are active, `/healthz` is 200 with revision `npm-0.8.4`, `/readyz` is ready with schema 22/22, dashboard is 200, and unauthenticated Memories is 401.
+- deployment-host package is `0.8.4`, services are active, `/healthz` is 200 with revision `npm-0.8.4`, `/readyz` is ready with schema 22/22, dashboard is 200, and unauthenticated Memories is 401.

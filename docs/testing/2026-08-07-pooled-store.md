@@ -23,7 +23,7 @@ subject-scoped anchor arm re-queried a copy of the published per-instance
 store with the same tarball.
 
 System under test: `titen-memory@0.7.0` from the npm registry (dist.shasum
-`620af9a392b13c9bef91a215cf96eee2569e8f3e`), not a checkout. Host: `rama-tuf`
+`620af9a392b13c9bef91a215cf96eee2569e8f3e`), not a checkout. Host: `benchmark-host`
 (AMD Ryzen 9 8945H, 16 threads, 30 GiB RAM), loopback, zero request failures
 in every scored lane.
 
@@ -267,6 +267,6 @@ extrapolation-labelled cost row, and the reason it has no scored cell.
 ## Evidence
 
 Raw artifacts (`*.json`, `*.ranked.json` with per-qid latency, `*.audit.json`,
-`SHA256SUMS`) under `~/titen-bench-20260804/results/` on `rama-tuf`; the
+`SHA256SUMS`) under `~/titen-bench-20260804/results/` on `benchmark-host`; the
 harness, analysis script, and checksummed summaries under
 [`results/2026-08-07-pooled-store/`](./results/2026-08-07-pooled-store/).

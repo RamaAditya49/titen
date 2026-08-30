@@ -882,7 +882,7 @@ Acceptance (EARS):
 
 ### UI-001 — Progressive dashboard information architecture
 
-**Release:** fifteen live destinations plus optional password-backed operator sessions
+**Release:** fifteen live destinations plus optional hardened operator sessions
 
 The canonical area map is defined in [DESIGN](./DESIGN.md): Atlas, Memories,
 Context, Subjects, Work, Audit & Events, System, Models, Federation, Access,
@@ -902,8 +902,8 @@ Required behavior:
 - authorize every route and request independently from navigation state and
   return a non-disclosing response for foreign resources;
 - keep categories and tags as memory filters, domain events inside Audit,
-  export/import and recovery in deployment tooling, general Settings absent,
-  and bounded password rotation inside Profile;
+  export/import and backup recovery in deployment tooling, general Settings
+  absent, and account security controls inside Profile;
 - optionally verify each operator's username/password and exchange it for an
   AES-GCM-sealed opaque HttpOnly browser session carrying a short-lived API key,
   without exposing either raw secret to browser-visible JSON or browser storage;
@@ -912,6 +912,10 @@ Required behavior:
   temporary password once;
 - restrict bootstrap/Add User temporary-password sessions to password
   replacement, revoke them after a successful change, and require fresh login;
+- persist a hashed per-account failure throttle before password verification;
+- where WebAuthn is configured, restrict accounts with active passkeys to a
+  short-lived second-factor session until passkey or recovery verification;
+- show high-entropy recovery codes once and store only their hashes;
 - retain API-key authentication for agents, services, SDKs, CLI recovery, and
   existing integrations;
 - keep read-only diagnosis visibly distinct from key, approval, release,
@@ -925,7 +929,7 @@ Acceptance (EARS):
 - **AC-UI-002 — Optional feature:** Where the live dashboard is enabled, Titen shall expose the fifteen canonical destinations only when the current principal holds a corresponding capability.
 - **AC-UI-003 — Event-driven:** When an area passes its emergence gate, Titen shall convert only that authorized discoverable area into an interactive control and route under the canonical DESIGN group.
 - **AC-UI-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign dashboard route or resource, then Titen shall return a non-disclosing state and shall clear prior private content that could be mistaken for the requested result.
-- **AC-UI-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, portability and recovery in deployment tooling, and bounded password rotation inside Profile.
+- **AC-UI-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, portability and backup recovery in deployment tooling, and account security controls inside Profile.
 - **AC-UI-006 — State-driven:** While runtime configuration lacks an authorized mutation contract, Titen shall expose configuration only as non-secret read-only capability and readiness state.
 - **AC-UI-007 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
 - **AC-UI-008 — Unwanted behavior:** If documentation or a reference-shell label names a dashboard area whose emergence gate has not passed, then Titen shall not present that area as a shipped route, control, or implementation claim.
@@ -933,6 +937,8 @@ Acceptance (EARS):
 - **AC-UI-010 — Unwanted behavior:** If atomic human-user provisioning fails authorization, scope/trust ceilings, username or membership uniqueness, or storage, then Titen shall create neither its account nor membership.
 - **AC-UI-011 — State-driven:** While a human account retains its bootstrap or Add User temporary password, Titen shall expose only password replacement, keep every private product area hidden, revoke the temporary session after replacement, and require a fresh login.
 - **AC-UI-012 — Event-driven:** When an operator performs a destructive or versioned dashboard action, Titen shall require confirmation or a reason as applicable and shall re-render authoritative server state without an optimistic fixture.
+- **AC-UI-013 — State-driven:** While an account has an active passkey, Titen shall hide every private product area until passkey or one-time recovery verification replaces the staged session.
+- **AC-UI-014 — Event-driven:** When an operator registers the first passkey, Titen shall show the recovery set once and shall revoke older dashboard sessions.
 
 ## 12. Enterprise governance features
 

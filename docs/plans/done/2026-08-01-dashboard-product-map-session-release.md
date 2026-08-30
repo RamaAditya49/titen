@@ -25,7 +25,7 @@ spec: docs/specs/done/2026-08-01-dashboard-product-map-session-release.md
   Tailscale Serve and Cloudflare Tunnel tutorials.
 - [x] Run focused and full local security, contract, integration, browser,
   package, route, dependency, bundle, and workflow gates.
-- [x] Build and deploy the exact candidate container on `rama-tuf`, preserve a
+- [x] Build and deploy the exact candidate container on `benchmark-host`, preserve a
   rollback target, and run authenticated six-area, add-user, denial, restart,
   persistence, and exposure smokes.
 - [x] Prepare and publish the stable npm package, annotated tag, generated
@@ -52,7 +52,7 @@ spec: docs/specs/done/2026-08-01-dashboard-product-map-session-release.md
   check, and dependency/package inspection.
 - AC-DPM-012: copyable-command review against current official Tailscale and
   Cloudflare documentation plus local config validation and rollback probes.
-- AC-DPM-013: exact-image `rama-tuf` readiness, session, area, user, denial,
+- AC-DPM-013: exact-image `benchmark-host` readiness, session, area, user, denial,
   restart, persistence, loopback, resource, backup, and rollback evidence.
 - AC-DPM-014: npm metadata and clean install, package shasum/integrity, Git/tag/
   release/revision equality, deployed image label, and dual-host website smokes.
@@ -65,7 +65,7 @@ No SQL migration or dependency is planned. New API operations use existing
 tables and one transaction. Dashboard sessions are opt-in, process-local, and
 invalidated by restart; canonical API keys remain hashed in SQL and raw keys
 remain only in the operator and active adapter memory. Deploy one exact image
-to the existing rootless `rama-tuf` units after a verified snapshot and retain
+to the existing rootless `benchmark-host` units after a verified snapshot and retain
 the prior image and data snapshot. Rollback restores the prior unit/image and,
 only if canonical migration or data integrity requires it, the verified
 snapshot. Tailscale and Cloudflare Tunnel mappings can be removed independently
@@ -97,7 +97,7 @@ or hosted release gate is permitted.
 
 ## Remote deployment and publication evidence
 
-- The source bundle and dashboard archive copied to `rama-tuf` match local
+- The source bundle and dashboard archive copied to `benchmark-host` match local
   SHA-256 checksums. Rootless image `localhost/titen:0.5.2-ea44de3` has image ID
   `74cbfda627a62d8329f6a216ff26c256661f3f7d0c7524111e52a44b7cf8677c`
   and labels version `0.5.2`, revision
@@ -139,7 +139,7 @@ or hosted release gate is permitted.
 
 ## Terminal result
 
-All acceptance criteria pass. npm, GitHub, `rama-tuf`, and both discovery hosts
+All acceptance criteria pass. npm, GitHub, `benchmark-host`, and both discovery hosts
 agree on stable 0.5.2 and tagged deployment revision `ea44de3`. The exact
 container remains healthy with rollback evidence retained; the public
 repository has no open issue, pull request, workflow, or non-main branch. The

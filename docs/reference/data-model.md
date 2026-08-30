@@ -115,6 +115,8 @@ Required fields: `id`, `organization_id`, `principal_id`, `label`,
 `revoked_at`. Optional `issued_by`, `data_target_type`, and `data_target_id`
 bind a derived credential to the issuer's live authority and one organization,
 project (including the explicit `~` encoding of `project:null`), or subject.
+`auth_stage` is `full`, `password_change`, or `second_factor`. Existing keys
+default to `full` during migration 24.
 
 Rules:
 
@@ -124,6 +126,8 @@ Rules:
 - rotation creates a new record and may keep the prior key valid only for an
   explicit bounded overlap;
 - revocation is checked on every request.
+- central route authorization limits staged dashboard keys before scope checks;
+- portability excludes transient dashboard sessions.
 
 ### `access_grants`
 
@@ -159,6 +163,20 @@ Rules:
   dashboard sessions;
 - operator accounts are not part of logical export/import because password
   credentials require a separate recovery decision.
+
+### Dashboard authentication security
+
+`login_throttles` stores a SHA-256 account bucket, failure count, block time,
+and last-touch time. It never stores a submitted username or password.
+
+`webauthn_credentials` stores public credential material, the signature
+counter, transports, device metadata, label, use times, and revocation time.
+`webauthn_challenges` stores only a challenge hash bound to organization,
+account, session, purpose, and expiry.
+
+`operator_recovery_generations` identifies the active recovery set.
+`operator_recovery_codes` stores only account-bound code hashes and one-time use
+state. These authentication records are not part of logical export/import.
 
 ### `subjects` and `subject_references`
 

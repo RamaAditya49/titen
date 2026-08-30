@@ -1,7 +1,7 @@
 # Backup and restore runbook
 
 Status: **executed** — every step below was performed against a populated store
-on `rama-tuf` on 2026-08-04, and the output is that run's real output. One
+on `benchmark-host` on 2026-08-04, and the output is that run's real output. One
 substitution is applied throughout and stated here rather than hidden: the drill
 ran as an unprivileged user under a scratch directory, and the transcript's paths
 and file ownership are rewritten to the `/var/lib/titen` layout the systemd unit
@@ -40,7 +40,7 @@ and the verified backup was 860,160 bytes.
 
 ## The drill
 
-Executed on `rama-tuf`, Bun 1.3.14, working tree at `titen-memory` 0.5.7,
+Executed on `benchmark-host`, Bun 1.3.14, working tree at `titen-memory` 0.5.7,
 schema version 21.
 
 ### 1. Back up while the service is running

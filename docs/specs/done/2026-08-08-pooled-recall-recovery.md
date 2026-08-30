@@ -44,7 +44,7 @@ of this is unreachable.
 ## Approach — three experiments, gates before any of them
 
 Everything runs against the preserved pooled store (19,829 sessions, 342,129
-claims) on `rama-tuf`, scored by the shared scorer, 500 instances, failures in
+claims) on `benchmark-host`, scored by the shared scorer, 500 instances, failures in
 the denominator. The anchor (per-instance scoped) condition is the
 no-regression control throughout: it is the shape a product actually serves,
 and nothing may ship that damages it.
@@ -127,13 +127,13 @@ Written before any run.
 
 Results in [`docs/testing/2026-08-08-pooled-recall-recovery.md`](../../testing/2026-08-08-pooled-recall-recovery.md); artifacts and
 checksums under `results/2026-08-08-pooled-recall-recovery/`. The stores,
-harness and lane runners are preserved on `rama-tuf` as recorded in the
+harness and lane runners are preserved on `benchmark-host` as recorded in the
 [compile-latency spec](./2026-08-08-pooled-compile-latency.md)'s Evidence
 section.
 
 ## Acceptance evidence
 
-Measured 2026-08-08 on `rama-tuf`. Full results in
+Measured 2026-08-08 on `benchmark-host`. Full results in
 [`docs/testing/2026-08-08-pooled-recall-recovery.md`](../../testing/2026-08-08-pooled-recall-recovery.md).
 
 | AC | Evidence | Met |

@@ -55,7 +55,7 @@ Store: read-only copies of the 2026-08-07 pooled store — 19,829 sessions,
 342,129 claims, 19,829 observations, one org, one subject, **zero** rows with
 `relation = 'contradicts'`, zero retention exclusions. Every candidate takes
 the *false* branch, so this is the cost of proving a contradiction absent — the
-common case, not a worst case. Host `rama-tuf`, loopback, concurrency 1.
+common case, not a worst case. Host `benchmark-host`, loopback, concurrency 1.
 
 | | candidate query, real statement | served compile |
 | --- | ---: | ---: |
@@ -150,7 +150,7 @@ published:
 
 ## Evidence
 
-Artifacts on `rama-tuf` under `~/titen-bench-20260808/` (both plans, both
+Artifacts on `benchmark-host` under `~/titen-bench-20260808/` (both plans, both
 timing sets, the 500-question served run) and
 `~/titen-bench-20260804/results/titen-fts-pooled-19829-20260808-headfix.json`.
 Checksummed copies under

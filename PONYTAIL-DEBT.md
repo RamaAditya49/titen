@@ -13,7 +13,7 @@ is local and requires no hosted automation.
 
 ## Tracked markers
 
-- `src/runtime/bun/server.ts:281` — in-process mode still binds a listening
+- `src/runtime/bun/server.ts:290` — in-process mode still binds a listening
   socket. `serve()` now returns the handler it serves so an embedded consumer
   can call the kernel directly (#230), but the port is opened and then never
   connected to. Removing it means splitting the app, maintenance timer, and
@@ -42,7 +42,7 @@ is local and requires no hosted automation.
 The zero-marker release is public as
 [`titen-memory@0.5.5`](https://www.npmjs.com/package/titen-memory/v/0.5.5) and
 [GitHub release v0.5.5](https://github.com/RamaAditya49/titen/releases/tag/v0.5.5).
-Exact Cloudflare, `rama-tuf`, registry, and rollback identifiers live in the
+Exact Cloudflare, `benchmark-host`, registry, and rollback identifiers live in the
 [terminal delivery evidence](./docs/specs/done/2026-08-01-ponytail-zero.md#delivery-evidence).
 
 ## The measured position, LongMemEval-S, 2026-08-04
@@ -106,7 +106,7 @@ context length, not the 8.2 points of model quality first published.
 ## Strategic debt beyond the issue tracker
 
 Recorded 2026-08-04 from a release-bound benchmark of the published
-`titen-memory@0.5.7` tarball on `rama-tuf` (seven lanes, adversarial
+`titen-memory@0.5.7` tarball on `benchmark-host` (seven lanes, adversarial
 verification of every reported failure) and a same-date survey of Mem0, Honcho,
 Zep/Graphiti, Letta, Cognee and Supermemory.
 

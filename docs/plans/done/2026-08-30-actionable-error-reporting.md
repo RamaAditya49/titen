@@ -14,7 +14,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-**Goal:** Add safe actionable error guidance and a verified agent-owned GitHub issue workflow, then release it to npm, titen.dev, and `server-wulan`.
+**Goal:** Add safe actionable error guidance and a verified agent-owned GitHub issue workflow, then release it to npm, titen.dev, and `deployment-host`.
 
 **Architecture:** Keep existing public error codes and attach constant support guidance in response metadata. Add project-specific recovery metadata only to the caller-supplied reference path. Preserve that metadata through MCP and teach every distributed agent skill to triage before it uses host GitHub authority.
 
@@ -31,7 +31,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 - Do not add GitHub Actions or automated deployment.
 - Use the exact CADIS commit trailer.
 - Wait for browser approval before npm publication.
-- Keep Mem0 active on `server-wulan`.
+- Keep Mem0 active on `deployment-host`.
 
 ---
 
@@ -293,7 +293,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 
 **Files:**
 
-- Modify in `/home/ramaaditya/Project/titen-web`: generated release metadata,
+- Modify in `/srv/titen-workspace/Project/titen-web`: generated release metadata,
   release page, and any version assets produced by `pnpm release:sync 0.9.1`.
 
 **Interfaces:**
@@ -320,7 +320,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
   Verify both hostnames, `/version.json`, `/releases/0.9.1`, homepage badge, and
   changelog content.
 
-### Task 9: Upgrade and verify `server-wulan`
+### Task 9: Upgrade and verify `deployment-host`
 
 **Files:**
 
@@ -334,7 +334,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 
 - [x] **Step 1: Inspect current remote revision, service units, drop-ins, schema, and database counts.**
 
-  Use direct `ssh server-wulan`. Fall back through `rama-tuf` only if direct
+  Use direct `ssh deployment-host`. Fall back through `benchmark-host` only if direct
   access fails.
 
 - [x] **Step 2: Create and verify a rollback backup.**
@@ -412,7 +412,7 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 - Backup `/var/backups/titen/20260830T194247+0700-pre-0.9.1` contains both
   SQLite stores, package files, configuration, systemd state, modes, checksums,
   and restore instructions. Both backup stores passed `PRAGMA quick_check`.
-- `server-wulan` runs package and CLI `0.9.1` at revision `npm-0.9.1`.
+- `deployment-host` runs package and CLI `0.9.1` at revision `npm-0.9.1`.
   Services are active and enabled with zero restarts. Readiness verifies schema
   23 of 23. Protected REST and MCP calls return 401 with safe support guidance.
   Recent error-log count is zero.
@@ -445,4 +445,4 @@ spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 | AC-AER-015 | API, agent-guide, architecture, README, and route-doc checks |
 | AC-AER-016 | npm, tag, GitHub Release, and titen.dev version agreement |
 | AC-AER-017 | Browser approval plus successful npm publish process |
-| AC-AER-018 | Verified backup and `server-wulan` production smoke or rollback |
+| AC-AER-018 | Verified backup and `deployment-host` production smoke or rollback |

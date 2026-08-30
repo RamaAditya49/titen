@@ -153,15 +153,13 @@ uses DOM text nodes. The dashboard does not render response HTML.
   product area. They never alter scope, visibility, trust, or authority.
 - **Webhooks** belong inside Audit & Events because they deliver post-commit
   metadata events; they are not a separate memory concept.
-- **Export/import, backup, and recovery** belong inside System and remain
+- **Export/import and backup recovery** belong inside System and remain
   capability- and authority-gated.
 - **Runtime configuration** starts as read-only capability/readiness state.
   Browser mutations require a separate secure configuration contract.
-- **General settings** remain absent; Profile contains only identity and
-  password rotation. The implemented adapter verifies an operator
-  account and AES-GCM seals its short-lived server-side key in an opaque cookie;
-  only required first-login/current password replacement exists. Recovery and
-  profile settings remain separate product work.
+- **General settings** remain absent; Profile contains identity, password,
+  passkey, and one-time login recovery controls. The adapter AES-GCM seals each
+  short-lived server-side key in an opaque cookie.
 - **Overview analytics** do not exist until a named operator job and bounded,
   privacy-safe metric contract justify them.
 
@@ -227,6 +225,11 @@ channels. Color alone never carries meaning.
 - Bootstrap and Add User generate a random temporary password shown once. Until
   it is replaced, the session has no product scopes and the private shell stays
   hidden; replacement revokes every dashboard session for that principal.
+- A persistent hashed account throttle runs before password verification.
+  Accounts with passkeys receive only a short-lived second-factor session until
+  passkey or recovery verification succeeds.
+- Recovery codes appear once. Titen stores only their hashes. Removing the last
+  passkey requires the current password.
 - Credentials, private IDs, response content, and view data never enter URLs,
   browser storage, analytics, third-party requests, service workers, or logs.
 - Navigation, counts, search suggestions, and empty states must not reveal
@@ -245,9 +248,10 @@ channels. Color alone never carries meaning.
 - **AC-DESIGN-002 — Optional feature:** Where the live dashboard is enabled, Titen shall render only the authenticated principal's discoverable destinations from the fifteen-area product map.
 - **AC-DESIGN-003 — Event-driven:** When an area passes its emergence gate, Titen shall convert only that authorized discoverable area from an orientation label into an interactive control and route.
 - **AC-DESIGN-004 — Unwanted behavior:** If a principal requests an unauthorized or foreign area or resource, then Titen shall return a non-disclosing state and shall clear any prior private content that could be mistaken for the current result.
-- **AC-DESIGN-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, backup/recovery in deployment tooling, and bounded password rotation inside Profile.
+- **AC-DESIGN-005 — Ubiquitous:** Titen shall keep categories and tags as memory filters, domain events inside Audit, backup recovery in deployment tooling, and account security controls inside Profile.
 - **AC-DESIGN-007 — Event-driven:** When session mode authenticates a principal, Titen shall discover areas from that principal's scopes and shall clear prior private data on denial, logout, expiry, identity change, or adapter restart without a configured shared sealing key.
 - **AC-DESIGN-006 — Optional feature:** Where the dashboard is disabled or omitted, Titen shall preserve complete authorized REST/MCP behavior on Cloudflare and VPS.
+- **AC-DESIGN-008 — State-driven:** While a dashboard session requires a second factor, Titen shall show only passkey and recovery completion and shall keep all private product areas hidden.
 
 These criteria define product design behavior. Each implemented slice must copy
 the applicable behavior into its own active EARS work spec and evidence plan.

@@ -71,6 +71,8 @@ export interface DashboardPrincipal {
   max_trust: string;
   organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
   password_change_required?: boolean;
+  second_factor_required?: boolean;
+  auth_stage?: "full" | "password_change" | "second_factor";
 }
 
 export interface ServiceCheck {
@@ -152,6 +154,73 @@ export async function changePassword(password: string): Promise<void> {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ password }),
+  });
+}
+
+export async function getPasskeyAuthenticationOptions(): Promise<Record<string, unknown>> {
+  return request("/dashboard-api/session/passkey-options", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+}
+
+export async function completePasskeyAuthentication(
+  challengeId: string,
+  response: Record<string, unknown>,
+): Promise<DashboardPrincipal> {
+  return principal(await request("/dashboard-api/session/passkey", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ challenge_id: challengeId, response }),
+  }));
+}
+
+export async function completeRecoveryAuthentication(recoveryCode: string): Promise<DashboardPrincipal> {
+  return principal(await request("/dashboard-api/session/recovery-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ recovery_code: recoveryCode }),
+  }));
+}
+
+export async function getPasskeys(): Promise<Record<string, unknown>> {
+  return request("/dashboard-api/profile/passkeys");
+}
+
+export async function getPasskeyRegistrationOptions(): Promise<Record<string, unknown>> {
+  return request("/dashboard-api/profile/passkeys/options", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+}
+
+export async function registerPasskey(
+  challengeId: string,
+  label: string,
+  response: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return request("/dashboard-api/profile/passkeys", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ challenge_id: challengeId, label, response }),
+  });
+}
+
+export async function regenerateRecoveryCodes(): Promise<Record<string, unknown>> {
+  return request("/dashboard-api/profile/recovery-codes", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+}
+
+export async function removePasskey(id: string, password: string): Promise<void> {
+  await request(`/dashboard-api/profile/passkeys/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(password ? { password } : {}),
   });
 }
 

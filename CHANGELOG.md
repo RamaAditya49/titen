@@ -26,6 +26,42 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-30
+
+### Added
+
+- Optional WebAuthn passkeys now protect dashboard accounts on Cloudflare and
+  Bun/SQLite with exact RP ID and origin verification.
+- First passkey enrollment returns eight recovery codes once. Profile can list,
+  revoke, and add passkeys or replace the recovery set.
+- The dashboard completes passkey assertions through fixed same-origin routes.
+  A real browser WebAuthn test uses a virtual authenticator.
+- A public-artifact release gate rejects private deployment identifiers in the
+  source tree and generated package assets.
+
+### Changed
+
+- Migration 24 adds persistent login throttles, explicit API-key authentication
+  stages, WebAuthn credentials and challenges, and recovery generations.
+- Password login now applies progressive SQL-backed delays before verification.
+  The fifth failure waits 30 seconds. Later delays reach at most 30 minutes.
+- Accounts with passkeys receive a 15-minute staged key until passkey or
+  recovery verification creates a full dashboard session.
+- Dashboard sessions are no longer part of credential portability exports.
+- Account-specific Cloudflare configuration and private runtime evidence are no
+  longer part of the public repository or npm release surface.
+
+### Security
+
+- Login throttle rows store only a hashed account bucket and bounded timing
+  state. Passwords and submitted usernames do not enter throttle storage.
+- Challenges bind to organization, account, session, purpose, and expiry.
+  Conditional SQL claims prevent challenge and recovery-code replay.
+- First passkey enrollment revokes older dashboard sessions. Removing the last
+  passkey requires the current password.
+- Staged keys have no product scopes. Central route authorization permits only
+  the required password-change or second-factor completion operations.
+
 ## [0.9.1] — 2026-08-30
 
 ### Added
@@ -811,7 +847,7 @@ two pre-registered falsifiers fired against Titen and published, plus the
   `TITEN_EMBED_MIN_COSINE` has no shipped default and semantic retrieval fails
   closed without it.
 - Vectorize status is stated identically everywhere: verified live only on the
-  maintainer's isolated `titen-test-*` stack, which is test production and not
+  maintainer's isolated the maintainer release stack stack, which is test production and not
   general availability.
 
 ### Fixed
@@ -939,7 +975,7 @@ two pre-registered falsifiers fired against Titen and published, plus the
 
 ### Added
 
-- A checked-in `titen-test-*` Wrangler profile provisions the isolated live
+- A checked-in the maintainer release stack Wrangler profile provisions the isolated live
   Worker, D1, Vectorize, Workers AI, and Cron contract without storing an
   account API token in the Worker.
 
@@ -1461,7 +1497,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.0
 [0.9.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.1
 [0.9.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.0
 [0.8.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.8.7

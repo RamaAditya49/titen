@@ -17,7 +17,7 @@ Completed. `scripts/rehearse-upgrade.ts` seeds a store on a published
 `titen-memory` release through that release's own HTTP API, upgrades it in place
 with the working tree, runs `deploy/backup.sh` with a destroy and restore, and
 round-trips the logical NDJSON export into a fresh store. Nine published
-releases from 0.1.0 to 0.5.1 were rehearsed on `rama-tuf`. Every lane preserved
+releases from 0.1.0 to 0.5.1 were rehearsed on `benchmark-host`. Every lane preserved
 every canonical row. Two published limits and one script defect came out of it,
 all recorded in `docs/testing/2026-08-04-operational-lifecycle.md`. An
 hour-scale soak was started and left running.
@@ -43,7 +43,7 @@ are needed.
 - One correction to `deploy/backup.sh` if the drill exposes a defect.
 - Two documents: a dated testing record and a backup/restore runbook written
   from the transcript of the drill actually executed.
-- A soak started on `rama-tuf` and deliberately left running past handoff.
+- A soak started on `benchmark-host` and deliberately left running past handoff.
 
 Out of scope: Cloudflare D1, which needs an authorised real-account smoke;
 multi-host restore; and the hour-scale soak verdict, which cannot be reached
@@ -81,7 +81,7 @@ prompt, memory content, or raw embedding.
 
 ## Verification
 
-Nine rehearsal lanes on `rama-tuf`, one hand-run backup drill whose transcript
+Nine rehearsal lanes on `benchmark-host`, one hand-run backup drill whose transcript
 became the runbook, and a soak sampling once per minute into
 `/tmp/titen-soak-20260804/samples.tsv`. Numbers, defects, and the limits of each
 measurement are in `docs/testing/2026-08-04-operational-lifecycle.md`.

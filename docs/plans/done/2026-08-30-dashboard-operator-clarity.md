@@ -415,7 +415,7 @@ spec: docs/specs/done/2026-08-30-dashboard-operator-clarity.md
 
 **Files:**
 
-- Modify: `/home/ramaaditya/Project/titen-web` release page and release metadata through its documented sync command.
+- Modify: `/srv/titen-workspace/Project/titen-web` release page and release metadata through its documented sync command.
 
 **Interfaces:**
 
@@ -478,7 +478,7 @@ spec: docs/specs/done/2026-08-30-dashboard-operator-clarity.md
 
   Catat package, revision, database quick check, count aman, dan rollback path.
 
-- [x] **Step 6: Upgrade server-wulan.**
+- [x] **Step 6: Upgrade deployment-host.**
 
   Pasang package exact dari registry npmjs. Tunggu health dan readiness.
 
@@ -526,7 +526,7 @@ spec: docs/specs/done/2026-08-30-dashboard-operator-clarity.md
 - npmjs menerbitkan `titen-memory@0.9.0` dari gitHead `8bd45de148143025a85313af7f33f74edefa2c46`.
 - Website memakai commit `82db3d32bc436c9fd451ad814221ab27493a18ad`.
 - Cloudflare memakai Worker version `237a3872-b026-4c9d-88b0-35f86896d408`.
-- server-wulan memakai package dan CLI 0.9.0. Health dan readiness lulus.
+- deployment-host memakai package dan CLI 0.9.0. Health dan readiness lulus.
 - Database server lulus quick check dan tetap memakai schema 23 dari 23.
 - Endpoint privat tanpa otorisasi mengembalikan 401.
 

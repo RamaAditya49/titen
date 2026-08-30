@@ -22,7 +22,7 @@ the environment. `deploy/titen.container` now names a real image and, separately
 was found to be non-functional under rootless podman and was fixed.
 
 The image itself is verified: built, run, restarted, and health-checked on
-`rama-tuf`. The workflow is not verified, because it runs only on a version tag
+`benchmark-host`. The workflow is not verified, because it runs only on a version tag
 and no tag has been pushed.
 
 ## Problem

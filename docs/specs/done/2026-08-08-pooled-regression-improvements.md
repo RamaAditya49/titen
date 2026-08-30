@@ -89,5 +89,5 @@ any scored run. Headline gates, restated:
 ## Evidence
 
 Measured results in docs/testing/2026-08-08-pooled-improvements.md; raw
-artifacts under ~/titen-bench-20260804/results/ on rama-tuf, checksummed
+artifacts under ~/titen-bench-20260804/results/ on benchmark-host, checksummed
 summaries under docs/testing/results/2026-08-08-pooled-improvements/.

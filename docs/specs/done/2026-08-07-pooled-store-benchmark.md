@@ -75,5 +75,5 @@ scored run. A null or negative on any falsifier is a publishable outcome.
 ## Evidence
 
 Measured results in docs/testing/2026-08-07-pooled-store.md; artifacts under
-~/titen-bench-20260804/results/ on rama-tuf with checksummed summaries in
+~/titen-bench-20260804/results/ on benchmark-host with checksummed summaries in
 docs/testing/results/2026-08-07-pooled-store/.

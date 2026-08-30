@@ -145,7 +145,7 @@ that produced it. Bumping Bun means changing that digest deliberately.
 
 ## Measured evidence
 
-Built with podman 5.8.2 on `rama-tuf` (Linux x86_64), 2026-08-04, from this
+Built with podman 5.8.2 on `benchmark-host` (Linux x86_64), 2026-08-04, from this
 commit's `Dockerfile`:
 
 | | |

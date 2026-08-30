@@ -2,7 +2,7 @@
 
 Date: 2026-08-08. Committed ahead of every scored run of this cycle. Paired
 with spec/plan `2026-08-08-pooled-regression-improvements`. Stores are the
-2026-08-07 pooled artifacts' stores (still on disk on `rama-tuf`) or rebuilt
+2026-08-07 pooled artifacts' stores (still on disk on `benchmark-host`) or rebuilt
 from the same pinned gold-first order; the system under test remains the
 `titen-memory@0.7.0` registry tarball for served cells.
 

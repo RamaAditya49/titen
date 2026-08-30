@@ -62,7 +62,7 @@ discloses pre-1.0, with the suggested rendering spelled out.
 **AC-VECTORIZE-001.** `README.md` carries one "Vectorize scope" note under the
 architecture table; the capability row points at it; the status paragraph
 repeats the scope in one clause. `docs/README.md`, `docs/ROADMAP.md`, and
-`docs/deployment/cloudflare.md` use the same words: isolated `titen-test-*` on
+`docs/deployment/cloudflare.md` use the same words: isolated the maintainer release stack on
 the maintainer's own Cloudflare account, test production, not general
 availability, another account needs its own smoke.
 

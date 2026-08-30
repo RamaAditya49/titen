@@ -1,6 +1,6 @@
 # Evidence-aware ranking: a measured null, and why the corpus could not say otherwise
 
-Measured 2026-08-07 on `rama-tuf`, LongMemEval-S, all 500 instances, the shared
+Measured 2026-08-07 on `benchmark-host`, LongMemEval-S, all 500 instances, the shared
 2026-08-04 scorer used unmodified, failures kept in the denominator, zero
 failures in either pass. Protocol fixed in
 [the pre-registration](./2026-08-07-evidence-ranking-prereg.md), committed in
@@ -361,5 +361,5 @@ Commit under test: branch `feat/evidence-aware-ranking`, baseline `00e21fc`
 (byte-identical to `main` at 0.7.0). Store: a copy of
 `~/titen-bench-20260804/lanes/titen/fts-500.db`, ingested 2026-08-04 by
 `titen-memory@0.6.0`, opened here by 0.7.0 after its migrations applied. Host
-`rama-tuf`, Bun 1.3.14, `bun:sqlite`, FTS-only, no embedding provider, no LLM
+`benchmark-host`, Bun 1.3.14, `bun:sqlite`, FTS-only, no embedding provider, no LLM
 call, no network call.

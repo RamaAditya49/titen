@@ -92,7 +92,7 @@ The current batch groups the root causes as follows:
   disable the affected operation without exposing ciphertext or plaintext.
 - The existing dirty deployment worktree and unique live branch are user work
   and must not be overwritten or deleted.
-- Rebooting `rama-tuf` is destructive to an in-use session and requires an
+- Rebooting `benchmark-host` is destructive to an in-use session and requires an
   explicit operator window. The release cannot claim #15 complete without it.
 - npm publication is effectively permanent. A failed gate stops publication;
   a post-publication defect requires a newer release.
@@ -181,7 +181,7 @@ The current batch groups the root causes as follows:
   rootless deployment artifacts, use loopback-only publication by default,
   document SSH-tunnel and explicit firewall choices, and distinguish verified
   behavior from untested helpers or guessed limits.
-- **AC-RH-023 — Event-driven:** When the operator approves a `rama-tuf` reboot,
+- **AC-RH-023 — Event-driven:** When the operator approves a `benchmark-host` reboot,
   Titen shall return without manual service start, preserve the recorded event,
   report healthy schema and background repair, and pass the full live verifier;
   the measured image and vector behavior shall remain documented and verified.
@@ -248,7 +248,7 @@ unchecked work.
   reviews reported no findings.
 - The corrective tree passed 71 Cloudflare D1, 90 Bun/vector/SDK, 63 integration,
   dashboard-adapter, 10 browser, workflow, Worker dry-build, restricted HOME/XDG,
-  and six-stage packed-tarball gates. The deployed `rama-tuf` image
+  and six-stage packed-tarball gates. The deployed `benchmark-host` image
   `61b70145edbce715b5878d7279c9f6aa3ff83671a85a2418309a598e40d8b603`
   (`sha256:4e0fd3ce9064cce2432a451cba93dcfdef7060f2105f201629c51d20b713ebc4`)
   served revision `a6c9edf` healthy with `NRestarts=0`; generated-principal SDK

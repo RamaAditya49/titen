@@ -1,5 +1,5 @@
 {
-  "store": "/home/ramaaditya/titen-evidence-rank/bench/lane/fts-500.db",
+  "store": "/srv/titen-workspace/titen-evidence-rank/bench/lane/fts-500.db",
   "claims": [
     {
       "n": 424168

@@ -34,7 +34,7 @@ spec: docs/specs/done/2026-08-16-dashboard-workspace-picker-fidelity.md
 | AC-TITEN-WS-002 | Focused Playwright case for authorized live options, explicit unscoped memory, current checkmark, explanation, selection, outside dismissal, and Escape dismissal. |
 | AC-TITEN-WS-003 | Browser request assertions prove Memories and Workspace Graph retain the chosen live `workspace_id` and clear stale results. |
 | AC-TITEN-WS-004 | Keyboard/focus assertions, reviewed 320 px screenshot and overflow smoke, no-storage assertion, and source review showing no synthetic workspace data. |
-| AC-TITEN-WS-005 | Full suite, exact package smoke, npm/tag/release integrity, server-wulan smoke/backup, and `titen-web` build/deploy/public browser smoke. |
+| AC-TITEN-WS-005 | Full suite, exact package smoke, npm/tag/release integrity, deployment-host smoke/backup, and `titen-web` build/deploy/public browser smoke. |
 
 ## Verification
 
@@ -45,7 +45,7 @@ spec: docs/specs/done/2026-08-16-dashboard-workspace-picker-fidelity.md
   reviewed; the selector remains usable without horizontal overflow at 320 px.
 - `bash scripts/verify-pack.sh`: all nine clean-install/package checks passed
   for the exact 0.8.7 tarball; npm reports the matching SHA-1 and `gitHead`.
-- server-wulan: package/revision `0.8.7`/`npm-0.8.7`, health/readiness/dashboard
+- deployment-host: package/revision `0.8.7`/`npm-0.8.7`, health/readiness/dashboard
   `200`, schema `23/23`, protected route `401`, backup
   `/opt/titen/backups/npm-0.8.7-20260817-080321`.
 - `titen-web`: release sync/check, 96-route and 9-tool cross-checks, 63-page

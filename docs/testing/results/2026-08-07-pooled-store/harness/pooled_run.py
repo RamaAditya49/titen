@@ -15,8 +15,8 @@ for why that separation is load-bearing).
 import argparse, hashlib, json, os, sys, time
 from concurrent.futures import ThreadPoolExecutor
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import common
 import tclient
 

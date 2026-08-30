@@ -96,7 +96,7 @@ answer.
 
 ## Evidence
 
-`~/titen-bench-20260808/c1-depth.json` on `rama-tuf` (per-instance class, pack
+`~/titen-bench-20260808/c1-depth.json` on `benchmark-host` (per-instance class, pack
 rank, pool rank, pool size), produced by
 [`c1_depth.ts`](./results/2026-08-08-pooled-candidate-generation/harness/c1_depth.ts).
 Checksummed copy under

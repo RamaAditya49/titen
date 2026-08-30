@@ -12,6 +12,7 @@ import {
   assertSemanticIndexWriteRepair,
   assertSemanticReadiness,
 } from "./semantic-readiness";
+import { assertWebAuthnContract } from "./webauthn";
 
 const directory = mkdtempSync(join(tmpdir(), "titen-bun-"));
 const dbPath = join(directory, "titen.db");
@@ -79,6 +80,10 @@ test("bun:sqlite fences overlapping semantic index attempts", async () => {
 
 test("bun:sqlite repairs stale external semantic index writes", async () => {
   await assertSemanticIndexWriteRepair(db, "bun-sqlite");
+});
+
+test("bun:sqlite enforces the WebAuthn and recovery contract", async () => {
+  await assertWebAuthnContract(db, "bun-sqlite");
 });
 
 for (const contractCase of CASES)

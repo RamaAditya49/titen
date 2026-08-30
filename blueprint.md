@@ -115,7 +115,7 @@ Target v0.1 yang paling kecil tetapi berguna adalah REST API dengan direct remem
 
 Istilah “repo Mem0 ponco” tidak cocok dengan direktori atau Git remote bernama Ponco di workspace ini. Audit mendalam karena itu memakai:
 
-- fork lokal Rama: `/home/ramaaditya/Project/rama-mem0`;
+- fork lokal Rama: `/srv/titen-workspace/Project/local-mem0-fork`;
 - upstream: [`mem0ai/mem0`](https://github.com/mem0ai/mem0).
 
 Jika “Ponco” adalah repo lain, URL-nya perlu ditambahkan pada audit lanjutan. Rancangan ini tidak bergantung pada asumsi bahwa fork lokal identik dengan upstream.
@@ -124,7 +124,7 @@ Audit dilakukan read-only terhadap repo pembanding. Tidak ada source repo yang d
 
 | Repo                                                                                  |       Snapshot | Kedalaman audit                                            | Relevansi                                              |
 | ------------------------------------------------------------------------------------- | -------------: | ---------------------------------------------------------- | ------------------------------------------------------ |
-| `RamaAditya49/rama-mem0` / `mem0ai/mem0`                                              | `69201e9591b7` | kode inti TS, Vectorize adapter, history, provider factory | baseline Mem0 dan pelajaran produksi lokal             |
+| `RamaAditya49/local-mem0-fork` / `mem0ai/mem0`                                              | `69201e9591b7` | kode inti TS, Vectorize adapter, history, provider factory | baseline Mem0 dan pelajaran produksi lokal             |
 | [`rahilp/second-brain-cloudflare`](https://github.com/rahilp/second-brain-cloudflare) | `b1e11f00482e` | kode Worker, schema, write dan recall flow                 | pembanding Cloudflare terdekat                         |
 | [`supermemoryai/supermemory`](https://github.com/supermemoryai/supermemory)           | `6f3c835e8f9f` | repo, local distribution, MCP Worker                       | Bun/local UX dan MCP, dengan batas source availability |
 | [`Tencent/TencentDB-Agent-Memory`](https://github.com/Tencent/TencentDB-Agent-Memory) | `45e6e80ae2e6` | config, SQLite/FTS/vector flow, layering                   | pembanding TypeScript + SQLite + `sqlite-vec`          |
@@ -138,7 +138,7 @@ Nama package `titen` belum ditemukan di npm saat dicek pada 26 Juli 2026 (`npm v
 
 ## 3. Hasil audit repo
 
-### 3.1 Mem0 / fork `rama-mem0`
+### 3.1 Mem0 / fork `local-mem0-fork`
 
 Yang baik dan layak diambil:
 

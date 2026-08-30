@@ -28,7 +28,7 @@ spec: docs/specs/done/2026-08-15-atlas-admin-and-semantic-readiness.md
 - [x] Run workflow/route, focused security, dual-runtime, SDK, integration,
   dashboard/browser, package, and disclosure verification.
 - [x] Commit and push with required attribution, publish the patch release,
-  update titen-web and server-wulan, smoke production, and close #300–#302 with
+  update titen-web and deployment-host, smoke production, and close #300–#302 with
   evidence.
 - [x] Record terminal evidence and move the paired artifacts to `done/`.
 
@@ -59,14 +59,14 @@ spec: docs/specs/done/2026-08-15-atlas-admin-and-semantic-readiness.md
 - Store only selectors and reason metadata in audit evidence, never node labels,
   observation/claim content, prompts, credentials, or embeddings.
 - Source rollback is a revert of the release commit. Published npm consumers can
-  pin `0.8.2`; server-wulan and titen-web retain pre-upgrade backups/deployment
+  pin `0.8.2`; deployment-host and titen-web retain pre-upgrade backups/deployment
   versions for verified restoration.
 
 ## Verification
 
 Commit `a9a1339`, npm `0.8.3`, GitHub tag/release `v0.8.3`, titen-web commit
 `fbc9919`, Cloudflare Worker `6a6e349c-4806-4d09-8ccd-9b3641c181dc`, and the
-server-wulan `npm-0.8.3` health/readiness/dashboard/session smoke provide the
+deployment-host `npm-0.8.3` health/readiness/dashboard/session smoke provide the
 terminal evidence. `pnpm test:all`, route/workflow checks, package disclosure
 smoke, and website build/deploy checks passed. Issues #300–#302 are closed and
 no open issue or pull request remains.

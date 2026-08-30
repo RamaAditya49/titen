@@ -7,7 +7,7 @@ trusting us. The bias direction is disclosed in the report.
 """
 import hashlib, json, os, sys
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
 import common
 
 RESULTS = os.path.expanduser("~/titen-bench-20260804/results")

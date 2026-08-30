@@ -26,7 +26,7 @@ function parseArgs(argv: string[]): Options | "help" | "self-test" {
   if (argv.length === 1 && argv[0] === "--self-test") return "self-test";
   if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) return "help";
   let out = "";
-  let host = "server-wulan";
+  let host = "deployment-host";
   let intervalMs = 500;
   let containers: string[] = [];
   for (let index = 0; index < argv.length; index += 2) {
@@ -198,7 +198,7 @@ async function sample(options: Options) {
 function selfTest() {
   assert.deepEqual(parseArgs(["--out", "x", "--containers", "a,b"]), {
     out: resolve("x"),
-    host: "server-wulan",
+    host: "deployment-host",
     intervalMs: 500,
     containers: ["a", "b"],
   });
@@ -217,7 +217,7 @@ function selfTest() {
   console.log("sample-docker-resources self-test: ok");
 }
 
-const usage = "Usage: bun scripts/sample-docker-resources.ts --out FILE --containers NAME[,NAME] [--host server-wulan] [--interval-ms 500]";
+const usage = "Usage: bun scripts/sample-docker-resources.ts --out FILE --containers NAME[,NAME] [--host deployment-host] [--interval-ms 500]";
 
 try {
   const options = parseArgs(process.argv.slice(2));

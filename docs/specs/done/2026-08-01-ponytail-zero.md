@@ -100,12 +100,12 @@ details, without inflated or unsupported claims.
   84 routes, and deployed Cloudflare version
   `9d8bdc91-1119-477b-83eb-e441e723f979`. Both `titen.dev` hostnames report
   CLI `0.5.5`, and a clean installed CLI reports itself up to date.
-- The isolated `titen-test-*` Worker runs schema 21 with D1, BGE-M3 through
+- The isolated the maintainer release stack Worker runs schema 21 with D1, BGE-M3 through
   Workers AI, Vectorize metadata filtering, Cron repair, replay convergence,
   historical recall, bounded index verification, scope denial, and rollback
   recovery. Final Worker version:
   `dcbcc314-311a-47e5-8da9-08c98c0db081`.
-- `rama-tuf` runs exact rootless image `localhost/titen:0.5.5-35ea555` for the
+- `benchmark-host` runs exact rootless image `localhost/titen:0.5.5-35ea555` for the
   API and dashboard. Schema 21 readiness, restored-data canary, Add User, all
   six product areas, service restart, backup/restore rollback, and loopback-only
   listeners passed. Pre-deploy backup SHA-256:
@@ -128,5 +128,5 @@ details, without inflated or unsupported claims.
 - Dual-runtime contract, security, migration, dashboard, packaging, workflow,
   and zero-ledger checks pass.
 - The exact stable package is published, deployed to the isolated Cloudflare and
-  rama-tuf verification targets, smoke-tested, and linked from release evidence.
+  benchmark-host verification targets, smoke-tested, and linked from release evidence.
 - The spec and plan move together to `done/` with no unchecked work.

@@ -35,7 +35,7 @@ copyable paths for either Tailscale Serve or Cloudflare Tunnel.
 - Publish current Tailscale Serve and Cloudflare Tunnel tutorials that preserve
   loopback-only API and dashboard listeners.
 - Verify the exact candidate locally and as a containerized rootless deployment
-  on `rama-tuf`, then publish the compatible stable npm/GitHub/titen.dev release
+  on `benchmark-host`, then publish the compatible stable npm/GitHub/titen.dev release
   manually without GitHub Actions.
 - Close completed issues and pull requests, terminalize this workflow pair, and
   leave only the remote `main` branch.
@@ -56,7 +56,7 @@ invalidate sessions. Every proxied method/path is fixed in code, request bodies
 remain bounded, upstream errors are non-disclosing, and stale private content
 is cleared on area, identity, denial, or logout changes. User creation must be
 one SQL transaction so a failed membership cannot leave an active orphan key.
-The API remains loopback-only on `rama-tuf`; tunnels expose only the dashboard
+The API remains loopback-only on `benchmark-host`; tunnels expose only the dashboard
 adapter. npm publication is irreversible and follows the repository's manual
 package, provenance, tag, release, and website gates.
 
@@ -110,12 +110,12 @@ package, provenance, tag, release, and website gates.
   only the loopback dashboard adapter through authenticated HTTPS while keeping
   the Titen API listener private and shall include verification and rollback.
 - **AC-DPM-013 — Event-driven:** When the exact release candidate is deployed
-  on `rama-tuf`, Titen shall pass readiness, login/logout, all six product-area
+  on `benchmark-host`, Titen shall pass readiness, login/logout, all six product-area
   smokes, atomic add-user and denial checks, restart persistence, loopback API
   exposure checks, and rollback preparation against the deployed revision.
 - **AC-DPM-014 — Event-driven:** When the stable release is complete, npm
   `latest`, the annotated Git tag, GitHub Release, `origin/main`, the deployed
-  `rama-tuf` image, and both titen.dev discovery hosts shall agree on one release
+  `benchmark-host` image, and both titen.dev discovery hosts shall agree on one release
   version and shall identify its tagged deployment revision without any GitHub
   Actions workflow. Documentation-only closure commits may follow the tag.
 - **AC-DPM-015 — State-driven:** While this work is declared complete, its spec

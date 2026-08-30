@@ -82,7 +82,7 @@ byte for byte.
 
 ## Run identity
 
-- host: `rama-tuf`, Fedora 7.0.12, 16 logical CPUs;
+- host: `benchmark-host`, Fedora 7.0.12, 16 logical CPUs;
 - run id `e66a63b2-83f3-4ed5-b1e8-8b0b0eaedea3`, started
   2026-08-04T09:49:15Z, elapsed 399.2 s;
 - lane commit `f226df0f04b7480b8ebf99df34f6378e5a5dfa88`, `source_frozen:
@@ -233,7 +233,7 @@ published instead of one number.
 
 ## Evidence integrity
 
-The artifact directory is `/tmp/titen-instrument/out-full` on `rama-tuf`. It is
+The artifact directory is `/tmp/titen-instrument/out-full` on `benchmark-host`. It is
 not committed under `docs/testing/results/`, because an unfrozen run is not gate
 evidence and filing it there would imply otherwise. Its `SHA256SUMS`:
 

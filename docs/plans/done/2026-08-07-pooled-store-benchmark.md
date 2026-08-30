@@ -35,9 +35,9 @@ lanes precede P4 phase-2 lanes. P5 publishes; P6 is the website handoff.
 - [x] `pooled_run.py` — Titen lane: tarball serve, per-compile latency.
 - [x] `control_pooled.py` — verbatim-RAG control over the full pool matrix.
 - [x] `prep_pooled.py` + `run_pooled.js` — MCP reference floor lane.
-- [x] Import checks green in each lane's venv on rama-tuf.
+- [x] Import checks green in each lane's venv on benchmark-host.
 
-### P3 — Day-1 scored lanes (rama-tuf, never the laptop)
+### P3 — Day-1 scored lanes (benchmark-host, never the laptop)
 
 - [x] Subject-scoped anchor: copy of the 2026-08-04 `fts-500.db` served by the
       0.7.0 tarball, all 500 questions; the anchor gate (falsifier 1) fires
@@ -72,7 +72,7 @@ lanes precede P4 phase-2 lanes. P5 publishes; P6 is the website handoff.
 
 ### P6 — Release and website handoff
 
-- [x] CHANGELOG Unreleased -> 0.7.1; verify-pack on rama-tuf ("titen-memory
+- [x] CHANGELOG Unreleased -> 0.7.1; verify-pack on benchmark-host ("titen-memory
       -0.7.1.tgz is publishable"); npm publish (registry date 2026-08-07
       matches the heading); tag v0.7.1 -> e8ca89e; GitHub Release live.
 - [x] titen-web: release:sync 0.7.1, benchmark page section 06b from the

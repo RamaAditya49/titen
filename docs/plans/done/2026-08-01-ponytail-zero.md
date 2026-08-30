@@ -34,7 +34,7 @@ spec: docs/specs/done/2026-08-01-ponytail-zero.md
 - [x] Run dual-runtime, security, migration, dashboard, package, workflow, and
   zero-ledger checks; inspect the publish tarball for secrets and omissions.
 - [x] Publish the stable npm package and supported agent bundle, create the GitHub
-  release, deploy the exact artifact to Cloudflare and rama-tuf, smoke all
+  release, deploy the exact artifact to Cloudflare and benchmark-host, smoke all
   surfaces, and verify the recorded rollback path.
 - [x] Move this pair to `done/` with exact command, version, commit, deployment,
   registry, and smoke evidence.
@@ -64,7 +64,7 @@ spec: docs/specs/done/2026-08-01-ponytail-zero.md
 | AC-PZ-019 | package archive inspection, current ClawHub validation, public bundle version, and install smoke |
 | AC-PZ-020 | agent plugin integration test rejects hooks, automatic recall, transcript capture, and Pi extensions |
 | AC-PZ-021 | current compatibility matrix plus public catalog submission URL where supported |
-| AC-PZ-022 | npm/GitHub immutable versions, Worker deployment ID, rama-tuf image/version, live smokes, and rollback artifact |
+| AC-PZ-022 | npm/GitHub immutable versions, Worker deployment ID, benchmark-host image/version, live smokes, and rollback artifact |
 | AC-PZ-023 | README link/attribution assertions plus a manual anti-slop pass against concrete product contracts |
 
 ## Terminal result
@@ -91,7 +91,7 @@ The live debt ledger contains zero markers.
   route returned successfully after Cloudflare deployment.
 - Live `/readyz` checks reported revision
   `35ea5552095cd6509f412266fc4c5458cc7c8b10` and schema 21 on Cloudflare and
-  `rama-tuf`; both rootless VPS services remained active and loopback-only.
+  `benchmark-host`; both rootless VPS services remained active and loopback-only.
 
 ## Security, migration, deploy, and rollback
 

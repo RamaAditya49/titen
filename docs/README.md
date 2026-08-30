@@ -41,13 +41,13 @@ context without a documentation-site dependency.
 
 | Surface                            | Current state                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Astro dashboard | Six live areas, default `owner`, forced first-login password change, and atomic Add User pass local/browser checks and the exact 0.5.5 restored-data canary on `rama-tuf`; production login, scope denial, sealed-session restart, and cross-process checks also pass |
+| Astro dashboard | Six live areas, default `owner`, forced first-login password change, and atomic Add User pass local/browser checks and the exact 0.5.5 restored-data canary on `benchmark-host`; production login, scope denial, sealed-session restart, and cross-process checks also pass |
 | Memory service and REST/MCP | Implemented and verified locally on Bun/SQLite and workerd/D1 |
 | Enterprise governance | Roles, policies, approvals, releases, retention, legal holds, identity mappings, and two governance Atlas lenses pass the shared contract |
 | Canonical federation | Opt-in signed claim/evidence bundles preserve provenance and conflicts; filtered import, replay, source binding, and cross-scope failures pass the shared contract |
-| Optional embedding/indexing | Implemented on Bun and verified live with BGE-M3, Vectorize, bounded repair, and scoped retrieval on `titen-test-*`, an isolated stack on the maintainer's own Cloudflare account — test production, not general availability |
+| Optional embedding/indexing | Implemented on Bun and verified live with BGE-M3, Vectorize, bounded repair, and scoped retrieval on the maintainer release stack, an isolated stack on the maintainer's own Cloudflare account — test production, not general availability |
 | Automatic LLM derivation/reflection | Implemented and dual-runtime tested; opt-in, activation-gated, and not production-activated — no candidate model has passed the gate, so callers author claims explicitly |
-| Live deployment | Exact `0.5.5` API and dashboard run as rootless Quadlets on `rama-tuf`; schema 21 readiness, backup/restore, all-area canary, login/logout, restart recovery, rollback proof, and loopback-only bindings pass. The isolated Cloudflare stack passes the same release's native semantic and repair smokes; see the [0.5.5 delivery evidence](./specs/done/2026-08-01-ponytail-zero.md#delivery-evidence) |
+| Live deployment | Exact `0.5.5` API and dashboard run as rootless Quadlets on `benchmark-host`; schema 21 readiness, backup/restore, all-area canary, login/logout, restart recovery, rollback proof, and loopback-only bindings pass. The isolated Cloudflare stack passes the same release's native semantic and repair smokes; see the [0.5.5 delivery evidence](./specs/done/2026-08-01-ponytail-zero.md#delivery-evidence) |
 
 ## Documentation rules
 

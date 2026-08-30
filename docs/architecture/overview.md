@@ -117,8 +117,10 @@ including health/readiness, canonical directories, model diagnostics, scoped
 access, collaboration, governance, and federation through a same-origin
 loopback adapter.
 Its optional per-principal login verifies canonical human password accounts,
-seals short-lived raw API keys into opaque HttpOnly cookies with Web Crypto,
-and optionally shares the sealing key across replicas; every API operation still performs canonical key, scope, role, and
+applies a persistent SQL throttle, and supports configured WebAuthn passkeys
+with one-time recovery codes. It seals short-lived raw API keys into opaque
+HttpOnly cookies with Web Crypto and can share the sealing key across replicas.
+Every API operation still performs canonical key, stage, scope, role, and
 organization authorization. Agent, service, SDK, CLI, and recovery clients keep
 using API keys. A local build or disconnected page is not deployment evidence.
 Signed federation

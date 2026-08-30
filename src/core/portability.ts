@@ -79,7 +79,9 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
       `SELECT id, principal_id, principal_kind, key_hash, label, scopes, max_trust,
               created_at, not_before, expires_at, last_used_at, revoked_at
          FROM api_keys
-        WHERE org_id = ? AND id > ? ORDER BY id LIMIT ?`,
+        WHERE org_id = ? AND id > ?
+          AND NOT (principal_kind = 'human' AND label = 'Dashboard session')
+        ORDER BY id LIMIT ?`,
       [principal.orgId, after, limit],
     );
   } else if (type === "workspaces") {

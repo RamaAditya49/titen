@@ -1,6 +1,6 @@
 # Authorization on the `disputed` flag — what it cost
 
-Measured 2026-08-07 on host `rama-tuf`. Protocol
+Measured 2026-08-07 on host `benchmark-host`. Protocol
 [pre-registered](./2026-08-07-disputed-authorization-prereg.md) before the first
 scored run; every number below comes from that protocol and nothing in it was
 chosen afterwards.

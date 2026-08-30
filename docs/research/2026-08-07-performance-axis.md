@@ -75,7 +75,7 @@ The favor is on the **cost half of the frontier and on position**, not on recall
 
 ## 5. The smallest experiment
 
-**3–4 days, one person, entirely inside `~/titen-bench-20260804/` on `rama-tuf`** (corpus, lane runners, competitor venvs, local ollama, prior artifacts `results/*-500.json` all present; 16 threads / 30 GB suffice — a ~424k-claim single-file store is ~2 GB by the measured ~4.8 KB/pair, RSS stays ~100 MiB).
+**3–4 days, one person, entirely inside `~/titen-bench-20260804/` on `benchmark-host`** (corpus, lane runners, competitor venvs, local ollama, prior artifacts `results/*-500.json` all present; 16 threads / 30 GB suffice — a ~424k-claim single-file store is ~2 GB by the measured ~4.8 KB/pair, RSS stays ~100 MiB).
 
 - **Day 0 (half day).** Publish the pre-registration: falsifiers above, tolerances, lane configurations, contamination policy, decade hash seed. Re-measure MemPalace per-turn ingest on a 100-session sample to resolve 486 s vs 6,065.8 s before quoting any competitor cost. Publish the pooled harness diff plus Mem0/MemPalace adapter configs with it.
 - **Day 1 — decisive either way.** Build the single-subject pooled Titen store (~11–15 min ingest, $0). Run the P=50 anchor (must reproduce 0.880/0.9147) and Titen FTS-only at all four decades, both query arms (~15 min for 500 compiles; compile p50 was 11.4 ms at 10^5 claims). **If Titen FTS-only pooled holds near 0.85, the frontier exists and everything after merely prices it; if it craters toward 0.5, falsifier 3 fires before a single competitor lane runs and two days are saved.** Start embedding 19,829 sessions on local ollama overnight for the control and the vector arm.

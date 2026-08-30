@@ -11,7 +11,7 @@
     "of": 500
   },
   "store": {
-    "path": "/home/ramaaditya/titen-bench-20260808/probe.db",
+    "path": "/srv/titen-workspace/titen-bench-20260808/probe.db",
     "claims": 342129,
     "observations": 19829,
     "subject": "pooled-v1",

@@ -301,8 +301,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   non-interactive orientation, but MUST NOT render them as placeholder routes,
   locks, disabled controls, paid upgrades, or shipped functionality.
 - Categories and tags MUST remain memory filters; webhooks and domain events
-  MUST remain inside Audit; export and recovery remain deployment operations;
-  bounded password rotation belongs only in Profile. Where per-principal dashboard sessions are
+  MUST remain inside Audit; export and backup recovery remain deployment operations;
+  password, passkey, and login recovery controls belong only in Profile. Where per-principal dashboard sessions are
   enabled, session credentials MUST remain adapter-only; password verifiers and
   user provisioning MUST reuse canonical principal, organization-membership,
   scope, trust, and role authority.
@@ -310,6 +310,11 @@ the [requirements workflow](./engineering/requirements-workflow.md).
   Until it is replaced, the session MUST have no product scope and the private
   dashboard shell MUST remain hidden; replacement MUST revoke dashboard sessions
   and require a fresh login.
+- Failed password exchanges MUST use a persistent hashed account throttle.
+  Where WebAuthn is configured, an account with a passkey MUST complete a
+  short-lived second-factor stage before the private dashboard opens.
+- Passkey challenges and recovery codes MUST be one-time, account-bound, and
+  stored only as hashes or public credential material.
 - Navigation and route discovery MUST NOT bypass authorization or reveal a
   foreign resource, hidden capability, record count, or private scope.
 
@@ -373,7 +378,8 @@ the [requirements workflow](./engineering/requirements-workflow.md).
 - API keys are high entropy, stored only as hashes, scoped, revocable, and never
   logged.
 - Human operator passwords are stored only as uniquely salted, versioned slow
-  verifiers, never exported or logged, and login attempts are bounded.
+  verifiers, never exported or logged, and login attempts are persistently
+  bounded across restarts and replicas.
 - Logs exclude content, prompts, embeddings, credentials, and full private IDs.
 - Destructive tenant purge requires explicit administrative tooling and backup.
 

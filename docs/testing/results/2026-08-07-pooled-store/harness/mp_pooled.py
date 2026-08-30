@@ -13,8 +13,8 @@ same function via query_texts, exactly as the per-instance lane did.
 """
 import argparse, json, os, sys, time
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import common
 from pooled_common import pooled_sessions
 
@@ -133,7 +133,7 @@ def main():
         "query_latency_includes_embedding": True,
         "query_ms": {"p50": pct(0.50), "p95": pct(0.95), "p99": pct(0.99)},
         "n_results": args.n_results,
-        "host": "rama-tuf",
+        "host": "benchmark-host",
     }
     print(json.dumps({k: v for k, v in result.items() if k != "by_type"}, indent=2), flush=True)
     print("latency", meta["query_ms"], flush=True)

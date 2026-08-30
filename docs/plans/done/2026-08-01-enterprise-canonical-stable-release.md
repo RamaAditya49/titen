@@ -22,7 +22,7 @@ Spec: [enterprise-canonical-stable-release](../../specs/done/2026-08-01-enterpri
       weakening cross-scope or lifecycle guarantees.
 - [x] Run complete Bun, workerd/D1, integration, type, build, workflow, Ponytail,
       package-install, and clean-tree checks.
-- [x] Build and deploy the exact candidate on `rama-tuf`; run live, restart,
+- [x] Build and deploy the exact candidate on `benchmark-host`; run live, restart,
       persistence, backup/restore, and dashboard browser/HTTP smokes.
 - [x] Merge the verified commit to `main`, publish npm and GitHub release assets,
       update stable release discovery, and verify a clean install.
@@ -54,7 +54,7 @@ Spec: [enterprise-canonical-stable-release](../../specs/done/2026-08-01-enterpri
 - AC-ECS-009: final local gates pass D1 105/105, Bun/vector/SDK 129/129,
   integration 182/182, browser 5/5, 78 route docs, workflow, package 9/9, and
   production dependency audit without GitHub Actions.
-- AC-ECS-010: rootless Quadlets run exact `3d53431` on `rama-tuf`; schema 19,
+- AC-ECS-010: rootless Quadlets run exact `3d53431` on `benchmark-host`; schema 19,
   signed canonical recall, six Atlas lenses, restart persistence, disposable
   restore, read-only migration, visual logo, and direct-tailnet API denial pass.
   The operator URL is served through an SSH-over-Tailnet loopback tunnel because
@@ -71,11 +71,11 @@ Spec: [enterprise-canonical-stable-release](../../specs/done/2026-08-01-enterpri
   SDK import, annotated tag, GitHub Release, and titen.dev stable manifest pass.
 - Runtime: exact image/revision `3d53431`, schema 19, canonical federation,
   six Atlas lenses, restart, backup/restore, read-only migration, visual UI,
-  loopback API, and the operator tunnel URL pass on `rama-tuf`.
+  loopback API, and the operator tunnel URL pass on `benchmark-host`.
 
 ## Rollback
 
-- Keep the previous `rama-tuf` image and named volume until the candidate passes.
+- Keep the previous `benchmark-host` image and named volume until the candidate passes.
 - Restore the verified online backup and previous Quadlet image reference if any
   runtime or data check fails.
 - Do not publish npm until package/install and deployed-candidate gates pass;

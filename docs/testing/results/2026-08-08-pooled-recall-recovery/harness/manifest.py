@@ -30,7 +30,7 @@ for name in CAPTURES:
     slim = {k: v for k, v in payload.items() if k not in ("items",)}
     slim["items_note"] = (
         "per-item rows omitted from the committed copy; the full capture is "
-        "preserved on rama-tuf at ~/titen-bench-20260808r/results/%s.json" % name
+        "preserved on benchmark-host at ~/titen-bench-20260808r/results/%s.json" % name
     )
     with open(os.path.join(OUT, name + ".slim.json"), "w") as fh:
         json.dump(slim, fh, indent=1)
@@ -51,7 +51,7 @@ for name in ["edeep-pooled-w10", "edeep-pooled-w20", "edeep-anchor-w10", "edeep-
 with open(os.path.join(OUT, "PRESERVED.json"), "w") as fh:
     json.dump({
         "spec": "2026-08-08-pooled-recall-recovery",
-        "host": "rama-tuf",
+        "host": "benchmark-host",
         "note": "artifacts too large to commit, listed by checksum so a later run can "
                 "verify it is reading the same bytes this report was written from",
         "artifacts": preserved,

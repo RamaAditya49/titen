@@ -365,6 +365,6 @@ invariant under every allocation rule tried.
 
 Artifacts and checksums under
 [`results/2026-08-08-pooled-recall-recovery/`](./results/2026-08-08-pooled-recall-recovery/).
-Raw captures are preserved on `rama-tuf` under `~/titen-bench-20260808r/`; the
+Raw captures are preserved on `benchmark-host` under `~/titen-bench-20260808r/`; the
 two instrument captures are several hundred megabytes and are listed by checksum
 in the manifest rather than committed.

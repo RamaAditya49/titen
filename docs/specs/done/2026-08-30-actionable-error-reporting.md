@@ -42,7 +42,7 @@ Titen server a GitHub credential.
 - Update the SDK, API reference, agent guide, README, and changelog.
 - Publish a compatible patch release through the manual release process.
 - Update the Titen website release metadata and changelog page.
-- Back up, upgrade, and verify the Titen services on `server-wulan`.
+- Back up, upgrade, and verify the Titen services on `deployment-host`.
 
 ## Out of scope
 
@@ -154,7 +154,7 @@ behavior.
 - **AC-AER-015 — Ubiquitous:** Titen harus document the additive error contract and host-owned issue workflow in the API reference and agent guide.
 - **AC-AER-016 — Ubiquitous:** Titen harus ship the change as a compatible patch with synchronized package, changelog, tag, GitHub Release, and website metadata.
 - **AC-AER-017 — Unwanted behavior:** Jika npm browser approval is incomplete, maka Titen harus not publish the new package.
-- **AC-AER-018 — Event-driven:** Saat `server-wulan` upgrades, Titen harus preserve its canonical database and return healthy, ready, authorized, and unauthenticated smoke results on the new revision.
+- **AC-AER-018 — Event-driven:** Saat `deployment-host` upgrades, Titen harus preserve its canonical database and return healthy, ready, authorized, and unauthenticated smoke results on the new revision.
 
 ## Risks and mitigations
 
@@ -184,7 +184,7 @@ drop-in if any production smoke fails.
   checks pass.
 - The branch commits and pushes with the required CADIS trailer.
 - npm, tag, GitHub Release, and titen.dev report the same release.
-- `server-wulan` runs the new package revision or a verified rollback.
+- `deployment-host` runs the new package revision or a verified rollback.
 - The spec and plan move to `docs/specs/done/` and `docs/plans/done/`.
 
 ## Completion evidence
@@ -198,7 +198,7 @@ drop-in if any production smoke fails.
   both public hostnames.
 - Backup `/var/backups/titen/20260830T194247+0700-pre-0.9.1` passed checksums
   and SQLite integrity checks before the VPS upgrade.
-- `server-wulan` runs package, CLI, API, and dashboard revision `0.9.1` with
+- `deployment-host` runs package, CLI, API, and dashboard revision `0.9.1` with
   schema 23 of 23 and unchanged canonical counts.
 - A live authenticated missing-project resolve returned safe expected guidance.
   It created no project and required explicit approved `create:true` recovery.

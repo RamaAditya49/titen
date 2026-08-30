@@ -71,6 +71,6 @@
   "status",
   "dedupe_key"
  ],
- "items_note": "per-item rows omitted from the committed copy; the full capture is preserved on rama-tuf at ~/titen-bench-20260808r/results/cap-pooled-full.json",
+ "items_note": "per-item rows omitted from the committed copy; the full capture is preserved on benchmark-host at ~/titen-bench-20260808r/results/cap-pooled-full.json",
  "omitted_note": "ranked order and per-instance latency omitted: the pre-registration takes no recall or latency figure from the instrument runs"
 }

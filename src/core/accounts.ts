@@ -2,7 +2,7 @@ import { createApiKey, requestedScopes, requireScope } from "./auth";
 import { auditStatement } from "./audit";
 import { first, type Stmt } from "./db";
 import { ApiError, forbidden, notFound, validationError } from "./errors";
-import { newId, randomToken } from "./ids";
+import { newId, randomToken, sha256Hex } from "./ids";
 import { requireOrgRole } from "./governance";
 import type { RequestContext, Result } from "./http";
 import {
@@ -23,9 +23,9 @@ const PASSWORD_MIN_LENGTH = 15;
 const PASSWORD_MAX_LENGTH = 128;
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const PASSWORD_CHANGE_TTL_MS = 15 * 60 * 1000;
-const ATTEMPT_LIMIT = 10;
+const ATTEMPT_LIMIT = 5;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPT_BUCKETS = 256;
+const MAX_ATTEMPT_BUCKETS = 4_096;
 const MEMBER_ROLES = ["owner", "admin", "member", "reader"] as const;
 const encoder = new TextEncoder();
 const COMMON_PASSWORDS = new Set([
@@ -45,11 +45,9 @@ interface AccountRow {
   max_trust: Trust;
   role: (typeof MEMBER_ROLES)[number];
   must_change_password: number;
+  webauthn_credentials: number;
 }
 
-interface AttemptBucket { failures: number; blockedUntil: number; touchedAt: number }
-
-const attempts = new Map<string, AttemptBucket>();
 let dummyVerifier: Promise<string> | undefined;
 
 function base64Url(bytes: Uint8Array): string {
@@ -163,28 +161,64 @@ function invalidLogin(): ApiError {
   return new ApiError(401, "INVALID_LOGIN", "Username or password is invalid.");
 }
 
-function attemptKey(value: string | undefined): string {
-  return value ?? "__invalid_username__";
+async function attemptKey(value: string | undefined): Promise<string> {
+  return sha256Hex(`dashboard-login:${value ?? "__invalid_username__"}`);
 }
 
-function assertAttemptAllowed(key: string, now: number): void {
-  const bucket = attempts.get(key);
+async function assertAttemptAllowed(ctx: RequestContext, key: string, now: number): Promise<void> {
+  const bucket = await first<{ blocked_until_ms: number; touched_at_ms: number }>(
+    ctx.app.db,
+    `SELECT blocked_until_ms, touched_at_ms FROM login_throttles WHERE identity_hash = ?`,
+    [key],
+  );
   if (!bucket) return;
-  if (bucket.blockedUntil > now)
-    throw new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
-  if (now - bucket.touchedAt >= ATTEMPT_WINDOW_MS) attempts.delete(key);
+  if (bucket.blocked_until_ms > now)
+    throw invalidLogin();
+  if (now - bucket.touched_at_ms >= ATTEMPT_WINDOW_MS)
+    await ctx.app.db.batch([{ sql: `DELETE FROM login_throttles WHERE identity_hash = ? AND touched_at_ms = ?`, params: [key, bucket.touched_at_ms] }]);
 }
 
-function failedAttempt(key: string, now: number): void {
-  const current = attempts.get(key);
-  const failures = current && now - current.touchedAt < ATTEMPT_WINDOW_MS ? current.failures + 1 : 1;
-  attempts.delete(key);
-  attempts.set(key, {
-    failures,
-    blockedUntil: failures >= ATTEMPT_LIMIT ? now + ATTEMPT_WINDOW_MS : 0,
-    touchedAt: now,
-  });
-  while (attempts.size > MAX_ATTEMPT_BUCKETS) attempts.delete(attempts.keys().next().value!);
+function delayMs(failures: number): number {
+  if (failures < ATTEMPT_LIMIT) return 0;
+  if (failures === 5) return 30_000;
+  if (failures === 6) return 60_000;
+  if (failures === 7) return 5 * 60_000;
+  if (failures === 8) return 15 * 60_000;
+  return 30 * 60_000;
+}
+
+async function failedAttempt(ctx: RequestContext, key: string, now: number): Promise<void> {
+  const [stored] = await ctx.app.db.all<{ failures: number }>(
+    `INSERT INTO login_throttles
+       (identity_hash, failures, blocked_until_ms, touched_at_ms)
+     VALUES (?, 1, 0, ?)
+     ON CONFLICT(identity_hash) DO UPDATE SET
+       failures = CASE
+         WHEN excluded.touched_at_ms - login_throttles.touched_at_ms >= ? THEN 1
+         ELSE login_throttles.failures + 1
+       END,
+       blocked_until_ms = 0,
+       touched_at_ms = excluded.touched_at_ms
+     RETURNING failures`,
+    [key, now, ATTEMPT_WINDOW_MS],
+  );
+  const failures = Number(stored?.failures ?? 1);
+  const blockedUntil = now + delayMs(failures);
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE login_throttles SET blocked_until_ms = ?
+             WHERE identity_hash = ? AND failures = ? AND touched_at_ms = ?`,
+      params: [blockedUntil, key, failures, now],
+    },
+    {
+      sql: `DELETE FROM login_throttles WHERE identity_hash IN (
+              SELECT identity_hash FROM login_throttles
+               ORDER BY touched_at_ms DESC, identity_hash DESC
+               LIMIT -1 OFFSET ?
+            )`,
+      params: [MAX_ATTEMPT_BUCKETS],
+    },
+  ]);
 }
 
 export async function newOperatorAccount(input: {
@@ -287,12 +321,17 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
   if (unknown) throw validationError(`Unknown dashboard session field "${unknown}".`);
   const login = username(body.username, false);
   const secret = password(body.password, true);
-  const key = attemptKey(login);
+  const key = await attemptKey(login);
   const now = ctx.app.now();
-  assertAttemptAllowed(key, now.getTime());
+  if (ctx.app.loginRateLimit && !(await ctx.app.loginRateLimit.limit({ identityHash: key, request: ctx.request })).success)
+    throw new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
+  await assertAttemptAllowed(ctx, key, now.getTime());
   const account = login ? await first<AccountRow>(ctx.app.db,
     `SELECT a.id, a.org_id, a.principal_id, a.password_verifier, a.scopes,
-            a.max_trust, a.must_change_password, m.role
+            a.max_trust, a.must_change_password, m.role,
+            (SELECT COUNT(*) FROM webauthn_credentials credential
+              WHERE credential.account_id = a.id AND credential.revoked_at_ms IS NULL)
+              AS webauthn_credentials
        FROM operator_accounts a
        JOIN memberships m ON m.org_id = a.org_id
         AND m.workspace_id IS NULL AND m.principal_id = a.principal_id
@@ -301,15 +340,19 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
   dummyVerifier ??= hashPassword(`${randomToken()}-dummy-password`);
   const valid = await verifyPassword(secret ?? "invalid password candidate", account?.password_verifier ?? await dummyVerifier);
   if (!account || !secret || !valid) {
-    failedAttempt(key, now.getTime());
-    if (ctx.app.loginRateLimit && !(await ctx.app.loginRateLimit.limit(key)).success)
-      throw new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
+    await failedAttempt(ctx, key, now.getTime());
     throw invalidLogin();
   }
-  attempts.delete(key);
+  await ctx.app.db.batch([{ sql: `DELETE FROM login_throttles WHERE identity_hash = ?`, params: [key] }]);
   const passwordChangeRequired = account.must_change_password === 1;
-  const expiresAt = new Date(now.getTime() + (passwordChangeRequired ? PASSWORD_CHANGE_TTL_MS : SESSION_TTL_MS));
-  const scopes = passwordChangeRequired ? [] : account.scopes.split(" ").filter(Boolean);
+  const secondFactorRequired = !passwordChangeRequired && account.webauthn_credentials > 0;
+  const authStage = passwordChangeRequired
+    ? "password_change"
+    : secondFactorRequired
+      ? "second_factor"
+      : "full";
+  const expiresAt = new Date(now.getTime() + (authStage === "full" ? SESSION_TTL_MS : PASSWORD_CHANGE_TTL_MS));
+  const scopes = authStage === "full" ? account.scopes.split(" ").filter(Boolean) : [];
   const created = await createApiKey({
     orgId: account.org_id,
     principalId: account.principal_id,
@@ -318,6 +361,7 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
     scopes,
     maxTrust: account.max_trust,
     expiresAt,
+    authStage,
   }, now);
   await ctx.app.db.batch([
     created.statement,
@@ -334,6 +378,8 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
     max_trust: account.max_trust,
     organization_role: account.role,
     password_change_required: passwordChangeRequired,
+    second_factor_required: secondFactorRequired,
+    auth_stage: authStage,
   } };
 }
 

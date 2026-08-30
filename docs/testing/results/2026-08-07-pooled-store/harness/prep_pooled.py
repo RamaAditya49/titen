@@ -1,8 +1,8 @@
 """Dump the pooled session order + question set for the Node MCP driver."""
 import sys, json
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import common
 from pooled_common import pooled_sessions
 

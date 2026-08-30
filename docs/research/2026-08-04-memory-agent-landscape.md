@@ -38,7 +38,7 @@ gh api repos/snap-research/locomo/contents/LICENSE.txt \
 passes LoCoMo; the restriction is only visible in the file. See
 [`docs/testing/EVALS.md`](../testing/EVALS.md#third-party-references-and-licenses).
 
-Our own measurements: `~/titen-bench-20260804/results/*.json` on `rama-tuf`, one
+Our own measurements: `~/titen-bench-20260804/results/*.json` on `benchmark-host`, one
 shared scorer, failures kept in the denominator.
 
 ## Zep is no longer self-hostable
@@ -140,7 +140,7 @@ error the paper is about.
 
 ### Our run reproduces the direction, and it is not flattering to Titen either
 
-2026-08-04, `rama-tuf`, LongMemEval-S, the same 60 instances for every lane
+2026-08-04, `benchmark-host`, LongMemEval-S, the same 60 instances for every lane
 (10 per question type, deterministically stratified), one shared scorer, zero
 failures anywhere. Session retrieval against `answer_session_ids`.
 

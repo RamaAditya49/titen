@@ -79,7 +79,7 @@ controls are oversized forms, and Memory Atlas has no topology/trace surface.
   session workspace only.
 - Build, browser/API tests, workflow checks, package verification, and a live
   dashboard smoke pass.
-- npm release and server-wulan update complete with rollback evidence.
+- npm release and deployment-host update complete with rollback evidence.
 - This spec and its paired plan move to `docs/specs/done/` and
   `docs/plans/done/` with all evidence recorded.
 
@@ -101,7 +101,7 @@ controls are oversized forms, and Memory Atlas has no topology/trace surface.
 - `titen-web` was synced to CLI `0.8.1`, built, pushed, and deployed to
   `titen.dev` and `www.titen.dev`; `/version.json`, `/releases/0.8.1`, and
   `/changelog` returned 200 in production.
-- server-wulan runs package `0.8.1` with revision `npm-0.8.1`; health is 200,
+- deployment-host runs package `0.8.1` with revision `npm-0.8.1`; health is 200,
   dashboard HTML is served, unauthenticated dashboard API is 401, and both
   Titen services are active. Rollback backups are retained under
   `/opt/titen/backups/`.

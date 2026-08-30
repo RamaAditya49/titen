@@ -5,8 +5,8 @@ npm tarball. No ingest. This is falsifier 1's anchor gate and the measured
 """
 import argparse, json, os, sys, time
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import common
 import tclient
 

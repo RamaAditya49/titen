@@ -140,7 +140,16 @@ TITEN_EXTRACT_RESPONSE_MODE=json_schema
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
+TITEN_WEBAUTHN_RP_ID=memory.example.com
+TITEN_WEBAUTHN_ORIGIN=https://memory.example.com
+TITEN_WEBAUTHN_RP_NAME=Titen
 ```
+
+WebAuthn is disabled when all three `TITEN_WEBAUTHN_*` values are absent. Set
+all three values to enable passkeys. `TITEN_WEBAUTHN_ORIGIN` must be one exact
+HTTPS origin, except for HTTP localhost development. The RP ID must equal the
+origin hostname or its registrable parent. Partial or invalid configuration
+returns `configured_error` and fails readiness.
 
 ### Embedding configuration
 
@@ -531,6 +540,9 @@ TITEN_DASHBOARD_LIVE=true \
 TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
 TITEN_DASHBOARD_ORIGIN=https://host.example.ts.net \
+TITEN_WEBAUTHN_RP_ID=host.example.ts.net \
+TITEN_WEBAUTHN_ORIGIN=https://host.example.ts.net \
+TITEN_WEBAUTHN_RP_NAME=Titen \
 pnpm dashboard:adapter
 ```
 
@@ -584,8 +596,8 @@ tmpfs the binding resource moves from CPU to `fsync` and ingest falls to 309 to
 against those numbers before adding a worker pool, read replicas, or sharding:
 [scale and concurrency](../testing/2026-08-04-scale-and-concurrency.md).
 
-Rate-limit at the authenticated ingress, not inside the Titen process. For
-example, Nginx provides the native [`limit_req`
+Titen applies its persistent account throttle before password verification.
+Also rate-limit broad abuse at the ingress. For example, Nginx provides the native [`limit_req`
 module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html). Apply a
 stricter burst budget to authenticated writes and return `429` (with a bounded
 `Retry-After` policy) before requests reach Titen. Do not use or log raw
@@ -669,7 +681,7 @@ locked multilingual evaluation and real VPS, Cloudflare Paid D1, and local
 computer smokes are recorded. Repository verification is manual/local. GitHub
 Actions remains disabled so the repository incurs no hosted automation cost.
 
-The approved `rama-tuf` reboot validation is complete: the boot ID changed,
+The approved `benchmark-host` reboot validation is complete: the boot ID changed,
 the rootless user service auto-started with `NRestarts=0`, canonical counts and
 the recorded event survived, and the real-model live verifier passed. A later
 service restart is not a substitute for repeating that host-level gate.

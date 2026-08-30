@@ -1,6 +1,6 @@
 # Pre-registration — evidence-aware ranking
 
-Written **before the first scored run**, 2026-08-07, on host `rama-tuf`, in the
+Written **before the first scored run**, 2026-08-07, on host `benchmark-host`, in the
 shape of `~/titen-bench-20260804/harness/PREREGISTRATION.md` (2026-08-04), which
 governs the corpus, the scorer, and the failure rules this run inherits.
 

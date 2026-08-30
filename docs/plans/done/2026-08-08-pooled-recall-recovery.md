@@ -13,7 +13,7 @@ spec: docs/specs/done/2026-08-08-pooled-recall-recovery.md
 # Plan — measure the two reachable losses, ship at most what clears its gate
 
 Harness-first throughout: nothing enters `src/core/**` until a variant has
-cleared AC-PRR-003 on the bench. Execution runs on `rama-tuf`, where the
+cleared AC-PRR-003 on the bench. Execution runs on `benchmark-host`, where the
 stores, venvs and lane runners already live.
 
 ## Sequence

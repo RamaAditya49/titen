@@ -101,7 +101,7 @@ beforeAll(async () => {
           ? body.password === (temporaryLogin ? temporaryPassword : permanentPassword)
           : body.password === "correct horse battery staple";
         if (!validPassword
-          || (!/^user_(?:a|b|temp)$/.test(username) && !/^cap_\d+$/.test(username)))
+          || (!/^user_(?:a|b|temp|mfa)$/.test(username) && !/^cap_\d+$/.test(username)))
           return Response.json({ error: { code: "INVALID_LOGIN" } }, { status: 401 });
         const raw = `titen_sk_login_${username}_${++loginSequence}`;
         revoked.delete(raw);
@@ -115,6 +115,17 @@ beforeAll(async () => {
               max_trust: "asserted",
               organization_role: "reader",
               password_change_required: temporaryLogin,
+            }
+          : username === "user_mfa" ? {
+              organization_id: "org_a",
+              principal_id: "user_mfa",
+              principal_kind: "human",
+              scopes: [],
+              max_trust: "verified",
+              organization_role: "admin",
+              password_change_required: false,
+              second_factor_required: true,
+              auth_stage: "second_factor",
             }
           : {
               organization_id: "org_cap",
@@ -132,6 +143,28 @@ beforeAll(async () => {
       }
       if (!principal || revoked.has(key))
         return Response.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+      if (url.pathname === "/v1/dashboard-sessions/current/passkey-options" && request.method === "POST")
+        return Response.json({ data: { challenge_id: "wch_adapter", options: { challenge: "adapter-challenge" } } }, { status: 201 });
+      if (url.pathname === "/v1/dashboard-sessions/current/passkey" && request.method === "POST") {
+        const body = await request.json() as Record<string, unknown>;
+        if (body.challenge_id !== "wch_adapter")
+          return Response.json({ error: { code: "SECOND_FACTOR_INVALID" } }, { status: 401 });
+        const raw = `titen_sk_mfa_complete_${++loginSequence}`;
+        principals[raw] = {
+          organization_id: "org_a",
+          principal_id: "user_mfa",
+          principal_kind: "human",
+          key_id: `key_mfa_complete_${loginSequence}`,
+          scopes: ["leases:read"],
+          max_trust: "verified",
+          organization_role: "admin",
+          password_change_required: false,
+          second_factor_required: false,
+          auth_stage: "full",
+        };
+        revoked.add(key);
+        return Response.json({ data: { ...principals[raw], api_key: raw } }, { status: 201 });
+      }
       if (url.pathname === "/v1/dashboard-sessions/current" && request.method === "DELETE") {
         revoked.add(key);
         return Response.json({ data: { logged_out: true } });
@@ -172,12 +205,12 @@ beforeAll(async () => {
       return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
     },
   });
-  upstreamPort = upstream.port;
+  upstreamPort = upstream.port!;
   // The adapter binds in a child process, so its port has to be known first.
   // Reserve one from the OS and release it: a narrow race, unlike guessing a
   // number inside the kernel's ephemeral range.
   const reservation = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("reserved") });
-  adapterPort = reservation.port;
+  adapterPort = reservation.port!;
   base = `http://127.0.0.1:${adapterPort}`;
   await reservation.stop(true);
   await startAdapter();
@@ -271,6 +304,36 @@ describe("dashboard per-principal sessions", () => {
     const established = await login("user_temp", permanentPassword);
     expect(established.status).toBe(201);
     expect((await established.json()).data.password_change_required).toBe(false);
+  });
+
+  test("keeps a staged passkey session sealed and replaces it after verification", async () => {
+    const initial = await login("user_mfa");
+    expect(initial.status).toBe(201);
+    const initialBody = await initial.json();
+    expect(initialBody.data.auth_stage).toBe("second_factor");
+    expect(initialBody.data.second_factor_required).toBe(true);
+    const stagedCookie = cookieFrom(initial);
+    const stagedSession = await fetch(`${base}/dashboard-api/session`, { headers: { cookie: stagedCookie } });
+    expect(stagedSession.status).toBe(200);
+    expect((await stagedSession.json()).data.auth_stage).toBe("second_factor");
+
+    const options = await fetch(`${base}/dashboard-api/session/passkey-options`, {
+      method: "POST",
+      headers: { cookie: stagedCookie, origin: base, "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(options.status).toBe(201);
+    expect((await options.json()).data.options.challenge).toBe("adapter-challenge");
+    const completed = await fetch(`${base}/dashboard-api/session/passkey`, {
+      method: "POST",
+      headers: { cookie: stagedCookie, origin: base, "content-type": "application/json" },
+      body: JSON.stringify({ challenge_id: "wch_adapter", response: { id: "credential" } }),
+    });
+    expect(completed.status).toBe(201);
+    expect(JSON.stringify(await completed.clone().json())).not.toContain("titen_sk_");
+    const fullCookie = cookieFrom(completed);
+    expect((await fetch(`${base}/dashboard-api/work/leases`, { headers: { cookie: fullCookie } })).status).toBe(200);
+    expect((await fetch(`${base}/dashboard-api/work/leases`, { headers: { cookie: stagedCookie } })).status).toBe(401);
   });
 
   test("rejects invalid, cross-origin, oversized, and revoked credentials without reflection", async () => {

@@ -1,7 +1,7 @@
 # Requirements and delivery workflow
 
 Titen uses the
-[EARS pattern](https://ramadigital.id/blog/acceptance-criteria-ears-pattern-cara-bikin-requirement-lebih-jelas)
+[EARS pattern](https://alistairmavin.com/ears/)
 to make complex requirements specific, reviewable, and testable. EARS means
 _Easy Approach to Requirements Syntax_. It is a sentence discipline, not a new
 project-management framework.

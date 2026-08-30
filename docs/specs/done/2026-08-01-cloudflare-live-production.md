@@ -12,7 +12,7 @@ owner: CADIS
 
 ## Problem
 
-The dashboard login form exposes a maintainer-specific `rama` placeholder, and
+The dashboard login form exposes a maintainer-specific username placeholder, and
 Titen's Cloudflare evidence stops at local workerd/D1 emulation. The repository
 therefore cannot truthfully claim a live D1, Vectorize, Workers AI, or Worker
 deployment.
@@ -21,9 +21,9 @@ deployment.
 
 - replace the maintainer-specific username placeholder with the canonical
   bootstrap username `owner` and keep its browser contract covered;
-- provision a persistent, isolated Cloudflare stack in the authenticated Rama
-  Digital account using the `titen-test-` prefix: Worker `titen-test-api`, D1
-  `titen-test-db`, and Vectorize index `titen-test-claims-v1`;
+- provision a persistent, isolated Cloudflare stack in the authenticated maintainer
+  account using the a deployment-specific prefix: Worker `deployment-worker`, D1
+  `deployment-database`, and Vectorize index `deployment-vector-index`;
 - bind D1, Vectorize, and Workers AI natively, with BGE-M3 embeddings and a Cron
   Trigger for bounded background index maintenance;
 - apply the canonical D1 schema, bootstrap a temporary-password owner account,
@@ -44,7 +44,7 @@ deployment.
 - Cloudflare Queue, KV, R2, Durable Objects, an ORM, a provider SDK, a custom
   deployment service, or GitHub Actions;
 - deleting or reusing existing `titen-qa-*` or other adjacent account resources;
-- claiming that an isolated `titen-test-*` verification is a customer traffic
+- claiming that an isolated the maintainer release stack verification is a customer traffic
   cutover, global availability result, or universal retrieval-quality threshold;
 - storing bootstrap credentials, passwords, API keys, prompts, memory content,
   or raw embeddings in Git, docs, logs, release assets, or chat.
@@ -69,12 +69,12 @@ deployment.
 - **AC-CFL-001 — Ubiquitous:** Titen shall show `owner`, not a maintainer name,
   as the username example on the login form, and its browser test shall submit
   the same canonical bootstrap username.
-- **AC-CFL-002 — Ubiquitous:** The checked-in Rama Digital deployment contract
-  shall name every provisioned resource with the `titen-test-` prefix, bind D1,
+- **AC-CFL-002 — Ubiquitous:** The checked-in maintainer-operated account deployment contract
+  shall name every provisioned resource with the a deployment-specific prefix, bind D1,
   Vectorize, Workers AI, and Cron natively, and contain no credential or account
   API token.
 - **AC-CFL-003 — Event-driven:** When the exact release candidate is deployed to
-  `titen-test-api`, `/healthz` shall return healthy and `/readyz` shall report the
+  `deployment-worker`, `/healthz` shall return healthy and `/readyz` shall report the
   deployed revision, current schema, and configured semantic capability without
   a partial-tuple or dependency error.
 - **AC-CFL-004 — Event-driven:** When an authorized principal writes evidence and
@@ -117,13 +117,13 @@ outside durable evidence, and the paired plan has no unchecked item.
 - **AC-CFL-001:** the dashboard source and Playwright contract use canonical
   username `owner`; the live browser smoke showed no private sidebar before
   login and all six authorized areas after login.
-- **AC-CFL-002:** `wrangler.titen-test.jsonc` binds Worker `titen-test-api`, D1
-  `titen-test-db`, Vectorize `titen-test-claims-v1`, Workers AI, and the one-minute
-  Cron in Rama Digital. The file contains no credential or account token.
+- **AC-CFL-002:** `protected deployment configuration` binds Worker `deployment-worker`, D1
+  `deployment-database`, Vectorize `deployment-vector-index`, Workers AI, and the one-minute
+  Cron in maintainer-operated account. The file contains no credential or account token.
 - **AC-CFL-003:** the cache-busted terminal smoke returned revision
   `2fddeede64aa770744e413da9594b9349a767af1`, runtime `cloudflare-d1`, schema 20,
   and enabled Vectorize/model readiness from
-  `https://titen-test-api.konektor.workers.dev`.
+  `https://worker.example.workers.dev`.
 - **AC-CFL-004:** the release verifier wrote two canonical claims, drained two
   BGE-M3 embeddings into the 1024-dimension cosine index, and retrieved the
   keyword-free intended claim first after 11 seconds of bounded Vectorize

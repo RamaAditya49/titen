@@ -120,7 +120,7 @@ readiness on both supported runtimes.
 - Manual workflow, route, dual-runtime, SDK, integration, browser, package, and
   disclosure checks pass, with unrelated baseline failures identified rather
   than hidden.
-- A patch release is published, the public release website and server-wulan are
+- A patch release is published, the public release website and deployment-host are
   updated, production smoke passes or a verified rollback is completed, and
   GitHub issues #300, #301, and #302 are closed with evidence.
 - The paired artifacts are moved to `done/` with no unchecked work.
@@ -142,7 +142,7 @@ readiness on both supported runtimes.
   Cloudflare Worker version `6a6e349c-4806-4d09-8ccd-9b3641c181dc` serves
   `titen.dev` and `www.titen.dev` with HTTP 200, `/version.json` reports 0.8.3,
   and `/releases/0.8.3` contains the release highlights.
-- server-wulan was backed up before upgrade, then installed from npm 0.8.3;
+- deployment-host was backed up before upgrade, then installed from npm 0.8.3;
   both systemd units are active, `/healthz` and `/readyz` return 200 with
   revision `npm-0.8.3`, the packaged dashboard returns 200, and an unauthenticated
   dashboard session returns 401. The rollback backup remains under the

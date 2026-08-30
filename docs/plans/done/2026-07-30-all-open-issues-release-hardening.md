@@ -52,7 +52,7 @@ spec: docs/specs/done/2026-07-30-all-open-issues-release-hardening.md
 - [x] Run focused adversarial/fault tests, `pnpm test:all`, browser on an available
   configured port, workflow checker+self-test, route/docs checks, Worker dry-run,
   normal/custom-prefix pack verification, and installed-tarball CLI/SDK smoke.
-- [x] Request and execute the explicit operator window for the `rama-tuf` reboot;
+- [x] Request and execute the explicit operator window for the `benchmark-host` reboot;
   capture boot, service, health, data-preservation, journal, and full live evidence.
 - [x] Commit the corrective diff with the required CADIS trailer, open, review,
   and merge the PR; enumerate exact branch/worktree cleanup targets and remove

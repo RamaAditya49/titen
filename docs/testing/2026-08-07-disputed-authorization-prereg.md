@@ -1,6 +1,6 @@
 # Pre-registration — authorization on the `disputed` flag (#291)
 
-Written **before the first scored run**, 2026-08-07, on host `rama-tuf`. It
+Written **before the first scored run**, 2026-08-07, on host `benchmark-host`. It
 inherits the corpus, the scorer, and the failure rules from
 `~/titen-bench-20260804/harness/PREREGISTRATION.md` (2026-08-04) and from
 [`EVALS.md`](./EVALS.md).

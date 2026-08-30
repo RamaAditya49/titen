@@ -12,7 +12,7 @@ and the date, and no gate moves after a number is seen.
 
 ## Fixed environment
 
-All cells run on `rama-tuf` against preserved stores. Nothing is rebuilt.
+All cells run on `benchmark-host` against preserved stores. Nothing is rebuilt.
 
 | Thing | Pinned value |
 | --- | --- |

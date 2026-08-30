@@ -49,7 +49,7 @@ canonical evidence and claims are never rewritten.
 - `pnpm test:all`: Bun/D1/SDK contracts passed, 229 integration tests passed,
   9 browser tests passed, 2 skipped; build and workflow self-checks passed.
 - `npm view titen-memory@0.8.5`: published with the expected package tarball.
-- server-wulan: `npm-0.8.5`, health/readiness/dashboard `200`, protected route
+- deployment-host: `npm-0.8.5`, health/readiness/dashboard `200`, protected route
   `401`, with a SQLite and package backup at the release backup path.
 - titen.dev: Cloudflare deployment `d6dbbfba-21d4-4820-afde-1551462c7598`,
   `/version.json` `0.8.5`, release and API docs smoke `200`.

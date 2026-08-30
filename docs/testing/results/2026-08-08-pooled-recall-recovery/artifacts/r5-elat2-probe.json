@@ -3,7 +3,7 @@
   "phase": "R5 E-LAT2 ceiling probe",
   "note": "raw SQL through bun:sqlite on a read-only store copy, not a served compile; the L1 ceiling is (product - no_access), because a hoist cannot beat deletion",
   "runtime": "bun 1.3.14, bun:sqlite 3.53.0",
-  "db": "/home/ramaaditya/titen-bench-20260808r/lanes/pooled.db",
+  "db": "/srv/titen-workspace/titen-bench-20260808r/lanes/pooled.db",
   "subject": "pooled-v1",
   "sample_instances": 100,
   "candidate_limit": 1000,

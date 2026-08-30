@@ -13,9 +13,9 @@ same scorer.
 import argparse, json, os, sys, threading, time, traceback
 from concurrent.futures import ThreadPoolExecutor
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/competitors/mem0")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/competitors/mem0")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import mem0_lib as L
 import common
 from pooled_common import pooled_sessions
@@ -33,7 +33,7 @@ OpenAILLM.generate_response = _no_llm
 
 from mem0 import Memory
 
-BASE = "/home/ramaaditya/titen-bench-20260804"
+BASE = "/srv/titen-workspace/titen-bench-20260804"
 SCRATCH = BASE + "/competitors/mem0/scratch/pooled"
 RESULTS = BASE + "/results"
 LOCK = threading.Lock()
@@ -189,7 +189,7 @@ def main():
         "telemetry": "MEM0_TELEMETRY=False",
         "bm25_hybrid": "DISABLED - fastembed not a base dependency, same as every "
                        "prior mem0 lane",
-        "host": "rama-tuf",
+        "host": "benchmark-host",
     }
     print(json.dumps({k: v for k, v in result.items() if k != "by_type"}, indent=2), flush=True)
     log("latency", meta["query_ms"], "embed_calls", L.COUNTER.embed, "llm_calls", L.COUNTER.llm)

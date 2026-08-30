@@ -63,6 +63,7 @@ export const SCOPES = [
   "import:write",
 ] as const;
 export type Scope = (typeof SCOPES)[number];
+export type AuthStage = "full" | "password_change" | "second_factor";
 
 export interface Principal {
   keyId: string;
@@ -74,6 +75,7 @@ export interface Principal {
   issuedBy?: string;
   dataTargetType?: "organization" | "project" | "subject" | null;
   dataTargetId?: string | null;
+  authStage?: AuthStage;
 }
 
 interface KeyRow {
@@ -89,6 +91,7 @@ interface KeyRow {
   issued_by: string | null;
   data_target_type: "organization" | "project" | "subject" | null;
   data_target_id: string | null;
+  auth_stage: AuthStage;
 }
 
 export function bearerToken(request: Request): string | undefined {
@@ -148,7 +151,7 @@ export async function authenticate(
         AND not_before <= ? AND (expires_at IS NULL OR expires_at > ?)
       RETURNING id, org_id, principal_id, principal_kind, scopes, max_trust,
                 not_before, expires_at, revoked_at, issued_by,
-                data_target_type, data_target_id`,
+                data_target_type, data_target_id, auth_stage`,
     [staleBefore, at, await sha256Hex(token), at, at],
   );
   const row = rows[0];
@@ -163,6 +166,7 @@ export async function authenticate(
     issuedBy: row.issued_by ?? row.principal_id,
     dataTargetType: row.data_target_type,
     dataTargetId: row.data_target_id,
+    authStage: row.auth_stage,
   };
 }
 
@@ -220,6 +224,7 @@ export interface NewKey {
   issuedBy?: string;
   dataTargetType?: "organization" | "project" | "subject" | null;
   dataTargetId?: string | null;
+  authStage?: AuthStage;
 }
 
 /**
@@ -242,8 +247,8 @@ export async function createApiKey(
     sql: `INSERT INTO api_keys
             (id, org_id, principal_id, principal_kind, key_hash, label, scopes, max_trust,
              created_at, not_before, expires_at, last_used_at, revoked_at,
-             issued_by, data_target_type, data_target_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`,
+             issued_by, data_target_type, data_target_id, auth_stage)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)`,
     params: [
       id,
       key.orgId,
@@ -259,6 +264,7 @@ export async function createApiKey(
       key.issuedBy ?? key.principalId,
       key.dataTargetType ?? null,
       key.dataTargetId ?? null,
+      key.authStage ?? "full",
     ],
   };
   return { id, key: raw, statement };

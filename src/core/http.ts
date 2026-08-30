@@ -32,6 +32,8 @@ export interface RouteDef {
   scope?: string;
   /** Authenticate without requiring an additional capability. */
   authenticated?: boolean;
+  /** Allowed dashboard-session stages. Authenticated routes default to full. */
+  authStages?: Array<"full" | "password_change" | "second_factor">;
   handler: (ctx: RequestContext) => Promise<Result>;
 }
 

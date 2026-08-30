@@ -27,7 +27,7 @@ spec: docs/specs/done/2026-08-15-dashboard-mockup-fidelity.md
 - [x] Run build, bundle, workflow checks, and inspect local screenshots; record
   the unrelated repository-wide `pnpm typecheck` baseline failure.
 - [x] Commit with the required CADIS trailer, push, publish the npm package,
-  update server-wulan, and smoke/rollback-check the deployed dashboard.
+  update deployment-host, and smoke/rollback-check the deployed dashboard.
 
 ## Acceptance evidence map
 

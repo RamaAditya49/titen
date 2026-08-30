@@ -109,7 +109,7 @@ spec: docs/specs/done/2026-08-01-zero-open-release-sweep.md
 - GitHub reports only `refs/heads/main` at that commit. All temporary local
   worktrees and non-main branches were retired after a verified recovery bundle
   and four WIP archives were written under
-  `/home/ramaaditya/Backups/titen-cleanup-20260801-1208`.
+  `/srv/titen-workspace/Backups/titen-cleanup-20260801-1208`.
 - The user's dirty primary checkout remains at `b19bd917e6dec493261109ad1693097fbb47d7dc`
   with its original modifications and untracked files untouched.
 - The separate `titen-web` authority still showed CLI `0.4.0` at the final Titen

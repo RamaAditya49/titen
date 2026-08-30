@@ -81,4 +81,4 @@ unsupported placeholder routes.
 - `GET /v1/memories` is implemented in the shared core and protected by the existing `views:compile` scope; Bun and D1 authorization, retention, FTS, validation, and keyset contracts pass.
 - The dashboard now has separate Memories and Atlas destinations. Memories loads real rows with search, filters, empty/error/loading states, and keyset pagination; Atlas remains the visual graph/inspector handoff.
 - Adapter, API, integration, and browser suites pass; route, workflow, package, and dashboard build checks pass.
-- npm `titen-memory@0.8.4`, GitHub release `v0.8.4`, `titen.dev`/`www.titen.dev`, and server-wulan all identify `0.8.4`. Server health/readiness and protected-route smoke passed after restart.
+- npm `titen-memory@0.8.4`, GitHub release `v0.8.4`, `titen.dev`/`www.titen.dev`, and deployment-host all identify `0.8.4`. Server health/readiness and protected-route smoke passed after restart.

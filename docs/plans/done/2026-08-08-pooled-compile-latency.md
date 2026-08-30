@@ -84,7 +84,7 @@ did not happen.
 
 ### L5 — Measure, publish, close
 
-- [x] All prereg cells on `rama-tuf`; artifacts + SHA256SUMS.
+- [x] All prereg cells on `benchmark-host`; artifacts + SHA256SUMS.
 - [x] Report `docs/testing/2026-08-08-pooled-compile-latency.md`: every gate
       verdict (AC-PCL-001 against the HEAD baseline; AC-PCL-003 against the
       measured anchor spread), the runtime EXPLAIN pair, and what the change

@@ -66,7 +66,7 @@ under concurrency.
 | Bun lanes | `tests/integration/durability.test.ts`, SHA-256 `46261bbbe7b8df44979547450294a2f257bd9f35fa247f80e447002c04ae0e43` |
 | D1 lane | `tests/contract/cloudflare-d1.test.ts`, last case, via `pnpm test:d1` |
 | Bun host | Bun 1.3.13, AMD Ryzen AI 9 HX 370, 24 threads, Linux 7.0.0-28-generic, NVMe |
-| D1 host | `rama-tuf`, Bun 1.3.14 / Node v24.18.0, workerd via Miniflare, AMD Ryzen 9 8945H, 16 threads, Linux 7.0.12-201.fc44 |
+| D1 host | `benchmark-host`, Bun 1.3.14 / Node v24.18.0, workerd via Miniflare, AMD Ryzen 9 8945H, 16 threads, Linux 7.0.12-201.fc44 |
 | lane | FTS-only. No embedding provider, no vector store, no extraction model. |
 
 The compatibility-surface finding was measured against the same checkout with

@@ -14385,5 +14385,5 @@
   "65240037": 25.847,
   "778164c6": 27.377
  },
- "items_note": "per-item rows omitted from the committed copy; the full capture is preserved on rama-tuf at ~/titen-bench-20260808r/results/cap-anchor-32k.json"
+ "items_note": "per-item rows omitted from the committed copy; the full capture is preserved on benchmark-host at ~/titen-bench-20260808r/results/cap-anchor-32k.json"
 }

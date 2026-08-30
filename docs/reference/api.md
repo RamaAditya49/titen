@@ -15,6 +15,7 @@ features explicitly listed as proposed are not routes.
 - `DELETE /v1/leases/:id`
 - `DELETE /v1/memberships/:id`
 - `DELETE /v1/observations/:id`
+- `DELETE /v1/operator-accounts/current/passkeys/:id`
 - `DELETE /v1/webhooks/:id`
 - `GET /healthz`
 - `GET /readyz`
@@ -41,6 +42,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/memberships`
 - `GET /v1/memories`
 - `GET /v1/models/config`
+- `GET /v1/operator-accounts/current/passkeys`
 - `GET /v1/policies`
 - `GET /v1/principal`
 - `GET /v1/principals`
@@ -68,6 +70,9 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/context/:id/feedback`
 - `POST /v1/context/compile`
 - `POST /v1/dashboard-sessions`
+- `POST /v1/dashboard-sessions/current/passkey-options`
+- `POST /v1/dashboard-sessions/current/passkey`
+- `POST /v1/dashboard-sessions/current/recovery-code`
 - `POST /v1/enrichment/drain`
 - `POST /v1/federation/peers`
 - `POST /v1/federation/peers/:id/filters`
@@ -83,6 +88,9 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/index/verify`
 - `POST /v1/keys`
 - `POST /v1/knowledge-releases`
+- `POST /v1/operator-accounts/current/passkeys/options`
+- `POST /v1/operator-accounts/current/passkeys`
+- `POST /v1/operator-accounts/current/recovery-codes`
 - `POST /v1/knowledge-releases/:id/activate`
 - `POST /v1/knowledge-releases/:id/approve`
 - `POST /v1/knowledge-releases/:id/revoke`
@@ -171,12 +179,14 @@ database.
 
 `POST /v1/dashboard-sessions` is the unauthenticated username/password exchange.
 A valid established account receives an eight-hour revocable API key for the
-same principal, scopes, trust ceiling, and organization role. A temporary
+same principal, scopes, trust ceiling, and organization role unless it has an
+active passkey. An account with a passkey receives a 15-minute
+`second_factor` key with no scopes. A temporary
 password receives a 15-minute key with no scopes and
-`password_change_required: true`; it can call only authenticated scope-free
-routes such as principal introspection and the password-change route. Unknown
-users and wrong passwords return the same `INVALID_LOGIN` response, and failed
-attempts are bounded.
+`password_change_required: true`. Central route authorization limits each
+staged key to its completion and logout routes. Unknown users and wrong
+passwords return the same `INVALID_LOGIN` response. A persistent hashed account
+bucket applies progressive delays before password verification.
 
 `PATCH /v1/operator-accounts/current/password` accepts only `password`. It is
 available to an authenticated operator session even when that session has no
@@ -189,6 +199,21 @@ list.
 `DELETE /v1/dashboard-sessions/current` revokes the bearer dashboard session.
 API keys created for agents, services, SDKs, CLI recovery, or other integrations
 are separate and unchanged.
+
+Passkey enrollment uses `POST /v1/operator-accounts/current/passkeys/options`
+and `POST /v1/operator-accounts/current/passkeys`. List or revoke credentials
+with `GET /v1/operator-accounts/current/passkeys` and
+`DELETE /v1/operator-accounts/current/passkeys/:id`. The first enrollment
+returns eight recovery codes once and revokes older dashboard sessions. Removing
+the last passkey requires a `password` confirmation.
+
+Regenerate recovery codes with
+`POST /v1/operator-accounts/current/recovery-codes`. The request invalidates all
+prior codes and returns the replacement set once. A staged session completes
+through passkey options and assertion routes, or through the one-time recovery
+route. Challenges bind to the account, staged session, purpose, and five-minute
+expiry. Staged sessions cannot call product routes. Recovery and passkey
+revocation remain available if RP configuration is later disabled.
 
 ## Directories and scoped access
 

@@ -23,7 +23,7 @@ The product map has fifteen live, capability-gated destinations:
 | Projects | inspect authorized project scopes and normalized references | `projects:read` |
 | Approvals | inspect policies and decide/revoke approvals with reasons | `governance:read` or `approvals:read` |
 | Releases | inspect and operate the release lifecycle | `releases:read` |
-| Profile | inspect the session principal and rotate its password | authenticated session |
+| Profile | inspect the principal and manage password, passkeys, and recovery codes | authenticated full session |
 
 The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
@@ -112,6 +112,17 @@ logout, revocation, password change, tampering, or key rotation. With no
 everyone out. Replicas may share a base64url-encoded 32-byte key through their
 secret manager when restart-stable sessions are required.
 
+Failed password exchanges use one persistent hashed account bucket. The fifth
+failure starts a 30-second delay. Later failures increase the delay to a maximum
+of 30 minutes. The state survives service restarts and coordinates through SQL.
+
+Where WebAuthn is configured, Profile can register and revoke passkeys. First
+enrollment shows eight recovery codes once and revokes older dashboard
+sessions. Later password logins create a 15-minute staged session. The private
+product shell stays hidden until a passkey or unused recovery code succeeds.
+Regeneration invalidates all prior recovery codes. Removing the last passkey
+requires the current password.
+
 `titen bootstrap` creates username `owner` and prints a random temporary
 password once. A temporary password opens only the **Set a new password** page;
 the private sidebar, topbar, and product routes remain unavailable. The change
@@ -126,6 +137,9 @@ TITEN_DASHBOARD_LIVE=true \
 TITEN_DASHBOARD_AUTH=session \
 TITEN_API_URL=http://127.0.0.1:8787 \
 TITEN_DASHBOARD_ORIGIN=https://memory.example.com \
+TITEN_WEBAUTHN_RP_ID=memory.example.com \
+TITEN_WEBAUTHN_ORIGIN=https://memory.example.com \
+TITEN_WEBAUTHN_RP_NAME=Titen \
 titen dashboard
 ```
 
@@ -145,8 +159,8 @@ admin cannot grant the owner role, scope/trust escalation is rejected, and a
 partial failure creates neither record. No raw API key is returned.
 
 Titen reuses its existing human principal, membership, scope, trust, and role
-contracts. Email delivery, recovery, self-registration, MFA, and SSO/SCIM remain
-out of scope; add them when a deployment has those identity requirements.
+contracts. Email delivery, self-registration, social login, and SSO/SCIM remain
+out of scope.
 
 ## Legacy server-key mode
 

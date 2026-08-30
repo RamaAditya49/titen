@@ -80,7 +80,7 @@ counts.
 - Bun/D1 contracts, integration, dashboard browser tests, package build, route
   docs, workflow checks, and ponytail debt checks pass; browser result is 9
   passed and 2 skipped.
-- npm `titen-memory@0.8.5` is published; server-wulan reports health 200,
+- npm `titen-memory@0.8.5` is published; deployment-host reports health 200,
   readiness 200 with schema 22/22, dashboard 200, and unauthenticated memory
   access 401.
 - `titen.dev` deployment `d6dbbfba-21d4-4820-afde-1551462c7598` serves

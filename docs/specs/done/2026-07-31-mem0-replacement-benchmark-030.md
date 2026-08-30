@@ -13,7 +13,7 @@ owner: CADIS
 ## Problem
 
 `titen-memory@0.3.0` is published and locally verified, but release tests do not
-prove that it can replace the production Mem0 service on `server-wulan`. The
+prove that it can replace the production Mem0 service on `deployment-host`. The
 comparison must cover automatic memory management, retrieval quality, evidence
 and scope safety, failure recovery, resource use, and migration rather than
 declaring a win from one latency number.
@@ -21,7 +21,7 @@ declaring a win from one latency number.
 ## In scope
 
 - Verify npm, tag, source, and package provenance for version `0.3.0`.
-- Install an isolated Titen sidecar on `server-wulan` without modifying Mem0.
+- Install an isolated Titen sidecar on `deployment-host` without modifying Mem0.
 - Configure the available `tuf/embeddinggemma` endpoint and retain the existing
   Luna/Terra/Sol endpoint for a controlled model-evaluation lane.
 - Run synthetic, versioned, repeatable Titen-versus-Mem0 functional, quality,
@@ -63,7 +63,7 @@ declaring a win from one latency number.
   integrity, peeled Git tag commit, runtime versions, package contents, host,
   configuration fingerprint, corpus revision, and raw artifact checksum.
 - **AC-MRB-002 — Event-driven:** When the Titen sidecar is installed on
-  `server-wulan`, it shall use a dedicated database, vector database, config,
+  `deployment-host`, it shall use a dedicated database, vector database, config,
   service name, user/path, and loopback port that do not modify or shadow Mem0.
 - **AC-MRB-003 — Optional feature:** Where embedding is enabled, Titen shall
   return a real 768-dimension `tuf/embeddinggemma` vector path, report vector

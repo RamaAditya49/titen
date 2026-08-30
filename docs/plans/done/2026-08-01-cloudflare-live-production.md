@@ -26,10 +26,10 @@ Spec: [cloudflare-live-production](../../specs/done/2026-08-01-cloudflare-live-p
       verifier contract.
 - [x] Run focused browser/config checks, the full local Cloudflare/Bun contracts,
       integration/browser suites, workflow checks, package install, and audit.
-- [x] Provision `titen-test-db` and `titen-test-claims-v1`, record a D1 Time
+- [x] Provision `deployment-database` and `deployment-vector-index`, record a D1 Time
       Travel bookmark, apply schema, and bootstrap credentials through mode-0600
       temporary files without printing secrets.
-- [x] Commit the exact candidate, stamp its revision, deploy `titen-test-api`,
+- [x] Commit the exact candidate, stamp its revision, deploy `deployment-worker`,
       and verify health, readiness, bundle size, and binding truth.
 - [x] Run live canonical write/read, Workers AI/Vectorize semantic retrieval,
       eventual-consistency retry, unauthenticated and cross-scope denials,
@@ -85,7 +85,7 @@ Spec: [cloudflare-live-production](../../specs/done/2026-08-01-cloudflare-live-p
 
 ## Rollback
 
-- Do not alter or delete any existing non-`titen-test-*` resource.
+- Do not alter or delete any existing non-the maintainer release stack resource.
 - Keep the D1 Time Travel bookmark and the previous Worker version. Roll back
   only code known to accept the current schema; do not restore D1 unless a
   separately verified data-loss condition requires the destructive operation.

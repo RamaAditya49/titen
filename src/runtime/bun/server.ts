@@ -15,6 +15,7 @@ import {
   type ExtractionCapability,
   type ExtractionConfigurationState,
 } from "../../core/extraction";
+import { createWebAuthnRuntime, parseWebAuthnConfig } from "../../core/webauthn";
 
 export interface ServeOptions {
   dbPath: string;
@@ -45,6 +46,9 @@ export interface ServeOptions {
   secretCipher?: SecretCipher;
   /** Exact public MCP origin when TLS terminates at a trusted reverse proxy. */
   mcpOrigin?: string;
+  webauthnRpId?: string;
+  webauthnOrigin?: string;
+  webauthnRpName?: string;
 }
 
 /**
@@ -146,6 +150,11 @@ export async function serve(options: ServeOptions) {
     webhookSecurity: options.webhookSecurity,
     secretCipher: options.secretCipher,
     mcpOrigin,
+    webauthn: createWebAuthnRuntime(parseWebAuthnConfig({
+      rpId: options.webauthnRpId,
+      origin: options.webauthnOrigin,
+      rpName: options.webauthnRpName,
+    })),
   });
 
   // Bun/SQLite is the documented one-process deployment profile. Horizontal

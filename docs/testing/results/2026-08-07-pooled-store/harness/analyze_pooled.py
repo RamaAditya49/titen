@@ -6,8 +6,8 @@ numbers the report quotes verbatim.
 """
 import json, os, sys
 
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness")
-sys.path.insert(0, "/home/ramaaditya/titen-bench-20260804/harness/titen-lane")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness")
+sys.path.insert(0, "/srv/titen-workspace/titen-bench-20260804/harness/titen-lane")
 import common
 
 RESULTS = os.path.expanduser("~/titen-bench-20260804/results")

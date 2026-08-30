@@ -1,7 +1,7 @@
 ---
 work_id: public-artifact-privacy-20260830
 status: active
-stage: plan
+stage: implement
 outcome: pending
 complexity: complex
 created: 2026-08-30

@@ -182,5 +182,5 @@ script — committed under
 [`results/2026-08-07-pooled-store/harness/`](./results/2026-08-07-pooled-store/harness/).
 Raw per-lane artifacts (`*.json`, `*.ranked.json` with per-qid latencies,
 manifests, `SHA256SUMS`) land under `~/titen-bench-20260804/results/` on
-`rama-tuf` before any summary number is written down; checksummed summaries
+`benchmark-host` before any summary number is written down; checksummed summaries
 are committed under `results/2026-08-07-pooled-store/`.

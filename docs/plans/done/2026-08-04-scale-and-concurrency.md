@@ -48,7 +48,7 @@ spec: docs/specs/done/2026-08-04-scale-and-concurrency.md
   isolation, prefix stability, nearest-rank percentiles, both branches of the
   ceiling rule, the error-code redaction, the presence of migration 11, and the
   environment strip.
-- [x] Run two independent full invocations on `rama-tuf` against the clean
+- [x] Run two independent full invocations on `benchmark-host` against the clean
   v0.5.7 clone, detached, and publish both.
 - [x] Notice that `/tmp` on that host is tmpfs before publishing an ingest
   number as a durable-write figure, and add a third invocation with `TMPDIR`
@@ -118,7 +118,7 @@ percent and both are in the raw artifact.
 ## Verification
 
 - `bun scripts/benchmark-scale.ts --self-test` passes on this workstation and
-  on `rama-tuf`.
+  on `benchmark-host`.
 - Three full invocations completed with exit 0 and zero request failures across
   36,000 measured compiles each.
 - `sha256sum -c SHA256SUMS` passes in every published result directory.

@@ -22,6 +22,7 @@ their inputs or capabilities are untrusted or unavailable.
 - provenance, source links, trust, and temporal history;
 - organization, workspace, project, subject, agent, and run boundaries;
 - API keys and authority mappings;
+- password verifiers, passkey public credentials, and recovery-code hashes;
 - checkpoints, leases, handoffs, and their ownership;
 - audit metadata and retention/legal-hold state;
 - authorized relationship topology, counts, and policy-preview results;
@@ -117,6 +118,10 @@ Rules at every boundary:
 - Human passwords exist only at the input boundary and as salted versioned
   verifiers. A generated temporary password is shown once, grants no product
   scope, and must be replaced before the private dashboard shell opens.
+- Login throttle rows contain only a hashed account bucket and bounded timing
+  state. Passkey challenges and recovery codes are stored only as hashes.
+- A staged dashboard key cannot call product routes. Concurrent challenge or
+  recovery claims produce at most one full session.
 
 ## Threat register
 
@@ -152,6 +157,7 @@ Rules at every boundary:
 | TM-28 | omitted project scope silently broadens context across otherwise-visible projects                              | treat omission as unscoped-only in FTS, vector filter, and hydration; require explicit `cross_project` plus `context:compile:all`; return effective scope and grant reason                            | two-org/two-project REST/MCP fixture proves omission, foreign substitution, visibility, membership, and broad-grant isolation |
 | TM-29 | dashboard login, cookie replay, CSRF, Host confusion, or stale browser state exposes another principal's data   | exact Host/Origin checks; HTTPS remote origin; AES-GCM-sealed HttpOnly SameSite cookie; absolute TTL; optional shared 32-byte key; clear state on denial/logout/rotation; fixed routes and bounded bodies | integration and browser tests prove isolation, tamper/expiry/revocation rejection, shared-key cross-process acceptance, origin/body limits, logout and stale-state clearing |
 | TM-30 | a public tunnel bypasses intended identity controls or exposes the loopback API                                  | keep API and adapter on loopback; Tailscale grants or Cloudflare Access default-deny before routing; separate API hostname/policy when required; retain Titen bearer auth; no Funnel                   | remote ingress reaches only the adapter hostname; direct ports deny; unauthenticated dashboard/API operations fail |
+| TM-31 | password spraying, restart bypass, passkey replay, or recovery-code reuse increases dashboard authority | persistent hashed account throttle; progressive delay before verification; staged keys; RP ID/origin and user verification; bound expiring challenges; atomic counter and recovery claims | dual-runtime restart, generic-error, staged-route, replay, cross-account, and concurrent one-winner tests; real browser WebAuthn flow |
 
 ## Memory-poisoning controls by lifecycle
 

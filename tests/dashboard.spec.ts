@@ -469,6 +469,145 @@ test("reports normal semantic projection lag as ready and syncing", async ({ pag
   await expect(page.locator("[data-service-notice]")).not.toContainText("Product requests may fail");
 });
 
+test("keeps second-factor sessions outside the product shell until recovery succeeds", async ({ page }) => {
+  let authenticated = false;
+  let staged = false;
+  const stagedPrincipal = {
+    organization_id: "org_mfa",
+    principal_id: "operator_mfa",
+    principal_kind: "human",
+    key_id: "key_staged",
+    scopes: [],
+    max_trust: "verified",
+    organization_role: "admin",
+    password_change_required: false,
+    second_factor_required: true,
+    auth_stage: "second_factor",
+  };
+  const fullPrincipal = {
+    ...stagedPrincipal,
+    key_id: "key_full",
+    scopes: ["views:compile"],
+    second_factor_required: false,
+    auth_stage: "full",
+  };
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: {
+    mode: "live", endpoint: "memory.example.com", authentication: "session", authenticated,
+  } }));
+  await page.route("**/dashboard-api/session", async (route) => {
+    if (route.request().method() === "POST") {
+      expect(route.request().postDataJSON()).toEqual({ username: "operator", password: "correct horse battery staple" });
+      authenticated = true;
+      staged = true;
+      return route.fulfill({ status: 201, json: { data: stagedPrincipal } });
+    }
+    return route.fulfill({ json: { data: staged ? stagedPrincipal : fullPrincipal } });
+  });
+  await page.route("**/dashboard-api/session/recovery-code", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ recovery_code: "once-only-recovery" });
+    staged = false;
+    return route.fulfill({ status: 201, json: { data: fullPrincipal } });
+  });
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true, capabilities: { webauthn: "enabled" } } } }));
+  await page.route("**/dashboard-api/memories**", (route) => route.fulfill({ json: { data: {
+    items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {}, facets: {},
+    authorization: { principal_id: "operator_mfa", access_mode: "principal" },
+  } } }));
+
+  await page.goto("/dashboard/");
+  await page.locator('[data-login-form] input[name="username"]').fill("operator");
+  await page.locator('[data-login-form] input[name="password"]').fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Verify identity" })).toBeVisible();
+  await expect(page.locator("[data-product-nav]")).toBeHidden();
+  await page.locator('[data-recovery-form] input[name="recovery_code"]').fill("once-only-recovery");
+  await page.getByRole("button", { name: "Use recovery code" }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
+  await expect(page.locator('[data-area="memories"]:not([hidden])').first()).toBeVisible();
+});
+
+test("registers a passkey and shows recovery codes once in Profile", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "PublicKeyCredential", { value: class PublicKeyCredential {} });
+    Object.defineProperty(navigator, "credentials", { value: {
+      async create() {
+        return {
+          id: "credential-browser",
+          rawId: new Uint8Array([1, 2, 3]).buffer,
+          type: "public-key",
+          authenticatorAttachment: "platform",
+          response: {
+            attestationObject: new Uint8Array([4, 5]).buffer,
+            clientDataJSON: new Uint8Array([6, 7]).buffer,
+            getTransports: () => ["internal"],
+          },
+          getClientExtensionResults: () => ({}),
+        };
+      },
+    } });
+  });
+  const principal = {
+    organization_id: "org_passkey",
+    principal_id: "operator_passkey",
+    principal_kind: "human",
+    key_id: "key_passkey",
+    scopes: ["views:compile"],
+    max_trust: "verified",
+    organization_role: "admin",
+    auth_stage: "full",
+  };
+  let registered = false;
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: {
+    mode: "live", endpoint: "memory.example.com", authentication: "session", authenticated: true,
+  } }));
+  await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: principal } }));
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok", runtime: "bun" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: {
+    ready: true, capabilities: { webauthn: "enabled" },
+  } } }));
+  await page.route("**/dashboard-api/memories**", (route) => route.fulfill({ json: { data: {
+    items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {}, facets: {},
+    authorization: { principal_id: "operator_passkey", access_mode: "principal" },
+  } } }));
+  await page.route("**/dashboard-api/profile/passkeys/options", (route) => route.fulfill({ status: 201, json: { data: {
+    challenge_id: "wch_browser",
+    options: {
+      challenge: "AQ",
+      rp: { id: "127.0.0.1", name: "Titen" },
+      user: { id: "Ag", name: "operator", displayName: "operator" },
+      pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+      timeout: 60_000,
+      attestation: "none",
+      authenticatorSelection: { userVerification: "required" },
+    },
+  } } }));
+  await page.route("**/dashboard-api/profile/passkeys", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { data: { credentials: registered ? [{
+      id: "wcr_browser", label: "Laptop", device_type: "singleDevice", backed_up: false,
+      created_at: "2026-08-30T00:00:00.000Z", last_used_at: null,
+    }] : [] } } });
+    const body = route.request().postDataJSON() as Record<string, any>;
+    expect(body.challenge_id).toBe("wch_browser");
+    expect(body.label).toBe("Laptop");
+    expect(body.response.id).toBe("credential-browser");
+    expect(body.response.response.attestationObject).toBe("BAU");
+    registered = true;
+    return route.fulfill({ status: 201, json: { data: {
+      credential: { id: "wcr_browser", label: "Laptop" },
+      recovery_codes: ["recovery-code-one", "recovery-code-two"],
+    } } });
+  });
+
+  await page.goto("/dashboard/");
+  await page.locator("[data-profile-open]").click();
+  await page.locator('[data-passkey-register-form] input[name="label"]').fill("Laptop");
+  await page.getByRole("button", { name: "Register passkey" }).click();
+  await expect(page.locator("[data-passkey-list]")).toContainText("Laptop");
+  await expect(page.locator("[data-recovery-codes]")).toContainText("recovery-code-one");
+  await expect(page.locator("[data-recovery-codes]")).toContainText("Shown once");
+});
+
 test("logs in per principal, wires all fifteen destinations, adds a user once, and logs out", async ({ page }) => {
   let loggedIn = false;
   let logoutFails = true;

@@ -377,7 +377,7 @@ setting can erase.
 
 ## Recorded Mem0 replacement cycle
 
-The first versioned side-by-side run against `server-wulan` is documented in
+The first versioned side-by-side run against `deployment-host` is documented in
 the [Titen 0.3.0 versus Mem0 cycle-1 report](./2026-07-31-mem0-replacement-cycle1.md).
 Its redacted raw trials, manifest, summary, report, and checksums are committed
 under [`results/2026-07-31-titen-030-vs-mem0-cycle1`](./results/2026-07-31-titen-030-vs-mem0-cycle1/).
@@ -823,7 +823,7 @@ all — see [third-party references and licenses](#third-party-references-and-li
 
 ### recall@10 is saturated on LongMemEval-S; k=1 and MRR@10 are the primary metrics
 
-Measured 2026-08-04 on `rama-tuf`, LongMemEval-S, all 500 instances, one shared
+Measured 2026-08-04 on `benchmark-host`, LongMemEval-S, all 500 instances, one shared
 scorer, failures kept in the denominator, zero failures in every lane. Artifacts
 are `~/titen-bench-20260804/results/*-500.json`; the overall and per-question-type
 figures below are read from the `by_type` block the scorer emits, and recomputing

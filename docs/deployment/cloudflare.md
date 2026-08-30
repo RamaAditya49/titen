@@ -1,10 +1,9 @@
 # Cloudflare deployment
 
-Status: **implemented, verified locally, and verified live** in the retained
-prefix-isolated Rama Digital `titen-test-*` stack. The live proof covers Worker,
-D1, Vectorize, Workers AI BGE-M3 embeddings, Cron repair, authorization,
-persistence, rollback, and dashboard-adapter behavior. It is not a customer
-traffic cutover or activation of model-assisted derivation/reflection.
+Status: **implemented and verified on Cloudflare**. The shared release gate
+covers Worker, D1, optional Vectorize and Workers AI bindings, Cron repair,
+authorization, persistence, rollback, and dashboard-adapter behavior. Each
+deployment must run its own readiness and rollback smoke.
 
 Cloudflare Tunnel is ingress for a self-hosted Bun/VPS origin, not a way to
 deploy this Worker runtime. See the [secure ingress guide](./secure-ingress.md)
@@ -95,30 +94,12 @@ deployment or restore, gate traffic on `/readyz`, not `/healthz`.
 - Data survives isolate disposal and fresh cold start.
 - No Vectorize, Workers AI, Cron, KV, R2, Queue, DO, or `nodejs_compat` required.
 
-## Reference live stack
+## Deployment-specific configuration
 
-The account-specific [`wrangler.titen-test.jsonc`](../../wrangler.titen-test.jsonc)
-keeps the generic OSS config reusable and contains no credential:
-
-| Resource | Retained live value |
-| --- | --- |
-| Account | Rama Digital |
-| Worker | `titen-test-api` |
-| D1 | `titen-test-db` in APAC |
-| Vectorize | `titen-test-claims-v1`, 1024 dimensions, cosine |
-| Workers AI | native `AI` binding, `@cf/baai/bge-m3` |
-| Cron | every minute, bounded maintenance |
-| URL | `https://titen-test-api.konektor.workers.dev` |
-
-The 2026-08-01 live gate observed a 600.17 KiB / 124.29 KiB gzip Worker,
-schema 20, one-read schema verification, enabled semantic readiness, 1024-value
-BGE-M3 output, scoped metadata filtering, and a keyword-free target recalled
-about two seconds after an explicit drain. A real Cron invocation indexed
-pending work; unauthenticated and foreign-organization probes returned `401`
-and non-disclosing `404`. Forced password replacement, fifteen dashboard destinations,
-Add User, logout, D1 persistence, and Worker rollback/redeploy also belong to
-the release gate; the exact terminal revision is recorded in the paired done
-spec.
+Keep account IDs, resource IDs, deployment hostnames, and private smoke evidence
+outside this public repository. Copy `wrangler.jsonc` to a protected operator
+location when a deployment needs account-specific bindings. Do not add that
+copy to a release artifact.
 
 ## Bindings
 
@@ -158,9 +139,9 @@ whether the Worker applies pending migrations on cold start.
 ## Optional capability truth
 
 The Worker contains vector and extraction adapters plus a `scheduled()`
-maintenance handler. The generic `wrangler.jsonc` configures only D1; the
-separate `wrangler.titen-test.jsonc` activates native AI, Vectorize, and Cron for
-the retained live reference stack. Extraction remains disabled.
+maintenance handler. The generic `wrangler.jsonc` configures only D1. A
+protected deployment configuration can activate native AI, Vectorize, and Cron.
+Extraction remains disabled.
 
 - **Vectorize** — rebuildable semantic index for vector retrieval.
 - **Workers AI** — embedding adapter support.
@@ -198,7 +179,7 @@ Cloudflare's observed catalog identity and date, not an independent weight
 attestation. The floor must come from a locked evaluation of that exact
 model/profile; Titen bundles no universal threshold.
 
-The live evidence for this path comes from `titen-test-*`, an isolated stack on
+The live evidence for this path comes from the maintainer release stack, an isolated stack on
 the maintainer's own Cloudflare account. It is test production and not a
 general-availability claim; a new account needs its own ready, drain, and query
 smoke.
@@ -298,13 +279,18 @@ Re-verified on 2026-08-01 from Cloudflare's official documentation:
 
 The public password-login route uses Cloudflare's native [Rate Limiting
 binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
-after each failed verifier check, keyed by the normalized account bucket rather
-than an IP address or password. The existing account throttle remains the
-canonical defense because binding counters are intentionally permissive and
-location-local. Keep `namespace_id` unique for this rule when copying the
-template. WAF Rate Limiting Rules may additionally reject broad write abuse at
+before account lookup and password verification. It uses a hashed normalized
+account bucket, not an IP address or password. The persistent SQL throttle is
+the canonical cross-replica defense because binding counters are location-local.
+Keep `namespace_id` unique for this rule when copying the template. WAF Rate
+Limiting Rules may additionally reject broad write abuse at
 the ingress. Never copy raw `Authorization` values into rule metadata, logs, or
 audits, and never trust forwarded-address headers for authorization.
+
+Set `TITEN_WEBAUTHN_RP_ID`, `TITEN_WEBAUTHN_ORIGIN`, and
+`TITEN_WEBAUTHN_RP_NAME` together to enable passkeys. The origin must be exact
+HTTPS and the RP ID must match its hostname boundary. Leave all three absent to
+disable WebAuthn. A partial or unsafe tuple fails `/readyz`.
 
 The checked-in `observability.enabled` setting uses [Workers
 Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/)

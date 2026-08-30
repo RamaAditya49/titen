@@ -9,6 +9,7 @@ import type { WebhookSecurity } from "../../core/webhook-security";
 import { configureHttpExtraction } from "../../core/extraction";
 import { withD1Budget } from "./d1-budget";
 import { newRequestId, success } from "../../core/http";
+import { createWebAuthnRuntime, parseWebAuthnConfig } from "../../core/webauthn";
 
 export interface Env {
   DB: D1Database;
@@ -41,6 +42,9 @@ export interface Env {
   /** Test-only fixed resolution; production has no generic address-pinned fetch. */
   TITEN_WEBHOOK_ALLOWED_HOSTNAMES?: string;
   TITEN_WEBHOOK_TEST_ADDRESSES?: string;
+  TITEN_WEBAUTHN_RP_ID?: string;
+  TITEN_WEBAUTHN_ORIGIN?: string;
+  TITEN_WEBAUTHN_RP_NAME?: string;
 }
 
 function extraction(env: Env): ReturnType<typeof configureHttpExtraction> {
@@ -179,8 +183,13 @@ export default {
       secretCipher,
       webhookSecurity: testWebhookSecurity(env),
       loginRateLimit: env.LOGIN_RATE_LIMITER
-        ? { limit: (key) => env.LOGIN_RATE_LIMITER!.limit({ key: `account:${key}` }) }
+        ? { limit: ({ identityHash }) => env.LOGIN_RATE_LIMITER!.limit({ key: `account:${identityHash}` }) }
         : undefined,
+      webauthn: createWebAuthnRuntime(parseWebAuthnConfig({
+        rpId: env.TITEN_WEBAUTHN_RP_ID,
+        origin: env.TITEN_WEBAUTHN_ORIGIN,
+        rpName: env.TITEN_WEBAUTHN_RP_NAME,
+      })),
     });
     return app(request);
   },

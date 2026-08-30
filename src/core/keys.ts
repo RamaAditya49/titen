@@ -42,6 +42,7 @@ export async function getPrincipal(ctx: RequestContext): Promise<Result> {
     data_target_id: principal.dataTargetType === "project" && principal.dataTargetId === "~"
       ? null : principal.dataTargetId ?? null,
     organization_role: principal.scopes.includes("*") ? "root" : membership?.role ?? null,
+    auth_stage: principal.authStage ?? "full",
   } };
 }
 

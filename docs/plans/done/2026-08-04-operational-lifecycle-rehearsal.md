@@ -33,14 +33,14 @@ spec: docs/specs/done/2026-08-04-operational-lifecycle-rehearsal.md
 - [x] Make the harness tolerant of routes an older release does not have, so a
   missing endpoint reports as "not measured" instead of aborting the migration
   measurement.
-- [x] Rehearse nine published releases on `rama-tuf`: 0.1.0, 0.1.1, 0.1.2,
+- [x] Rehearse nine published releases on `benchmark-host`: 0.1.0, 0.1.1, 0.1.2,
   0.2.0, 0.2.1, 0.3.0, 0.4.0, 0.4.1, 0.5.1.
 - [x] Run the backup drill by hand with literal shell commands and capture the
   transcript, so the runbook documents what was executed.
 - [x] Reproduce and fix the relative-path checksum defect the drill exposed in
   `deploy/backup.sh`, then verify the fix with a relative invocation checked
   from a different working directory.
-- [x] Start the soak on `rama-tuf` with a one-minute sampler and leave it
+- [x] Start the soak on `benchmark-host` with a one-minute sampler and leave it
   running.
 - [x] Write `docs/testing/2026-08-04-operational-lifecycle.md` and
   `docs/deployment/backup-restore.md`.
@@ -62,7 +62,7 @@ spec: docs/specs/done/2026-08-04-operational-lifecycle-rehearsal.md
 - AC-5: 0.2.0 and above round-tripped every source record with zero missing.
   The 0.1.x lanes exported 23 records the importer refused, which is reported
   rather than hidden.
-- AC-6: `/tmp/titen-soak-20260804/samples.tsv` on `rama-tuf`, one row per
+- AC-6: `/tmp/titen-soak-20260804/samples.tsv` on `benchmark-host`, one row per
   minute, running past handoff.
 - AC-7: the rehearsal keeps each bootstrap key in process memory and writes only
   identifiers, counts, and hashes. The soak stores its key in a mode-600 file
@@ -70,7 +70,7 @@ spec: docs/specs/done/2026-08-04-operational-lifecycle-rehearsal.md
 
 ## Verification
 
-Nine rehearsal lanes ran on `rama-tuf` with the working tree at commit
+Nine rehearsal lanes ran on `benchmark-host` with the working tree at commit
 `a0033389`; every lane wrote a machine-readable report and all nine completed.
 The backup drill ran by hand and its transcript is the runbook. The
 relative-path checksum defect was reproduced before the fix and re-verified

@@ -27,7 +27,7 @@ should be read as a hybrid-retrieval result.
 | runner as committed | SHA-256 `1d41ca9606780e0c5968c3b97c4e6a96ed3101b7b74ec9a85616504cc95ab6c0`; `diff` against the executed copy shows seven added header-comment lines recording the temporary-directory and `TMPDIR` behaviour and nothing else |
 | system under test | `titen-memory` 0.5.7, tag `v0.5.7`, commit `f226df0f04b7480b8ebf99df34f6378e5a5dfa88`, clean at run start |
 | runtime | Bun 1.3.14, `bun:sqlite`, `titen serve` on loopback |
-| host | `rama-tuf`, AMD Ryzen 9 8945H, 8 cores / 16 threads, 32.9 GB RAM, Linux 7.0.12-201.fc44.x86_64 |
+| host | `benchmark-host`, AMD Ryzen 9 8945H, 8 cores / 16 threads, 32.9 GB RAM, Linux 7.0.12-201.fc44.x86_64 |
 | lane | A — core: SQL + FTS5, no model and no vector backend |
 | fixture | SHA-256 `53fe9244840e2e38e44232f11c53941cf6c3fa56417db5c702dacc1f95f4c8ca` |
 

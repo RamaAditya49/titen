@@ -1495,6 +1495,67 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ) source`,
     ],
   },
+  {
+    version: 24,
+    statements: [
+      `CREATE TABLE login_throttles (
+         identity_hash TEXT PRIMARY KEY,
+         failures INTEGER NOT NULL CHECK (failures > 0),
+         blocked_until_ms INTEGER NOT NULL,
+         touched_at_ms INTEGER NOT NULL
+       )`,
+      `CREATE INDEX login_throttles_touched ON login_throttles (touched_at_ms)`,
+      `ALTER TABLE api_keys ADD COLUMN auth_stage TEXT NOT NULL DEFAULT 'full'
+         CHECK (auth_stage IN ('full', 'password_change', 'second_factor'))`,
+      `CREATE TABLE webauthn_credentials (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+         account_id TEXT NOT NULL REFERENCES operator_accounts(id) ON DELETE CASCADE,
+         credential_id TEXT NOT NULL UNIQUE,
+         public_key TEXT NOT NULL,
+         counter INTEGER NOT NULL CHECK (counter >= 0),
+         transports TEXT NOT NULL,
+         device_type TEXT NOT NULL CHECK (device_type IN ('singleDevice', 'multiDevice')),
+         backed_up INTEGER NOT NULL CHECK (backed_up IN (0, 1)),
+         label TEXT NOT NULL,
+         created_at_ms INTEGER NOT NULL,
+         last_used_at_ms INTEGER,
+         revoked_at_ms INTEGER
+       )`,
+      `CREATE INDEX webauthn_credentials_account
+         ON webauthn_credentials (org_id, account_id, revoked_at_ms)`,
+      `CREATE TABLE webauthn_challenges (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+         account_id TEXT NOT NULL REFERENCES operator_accounts(id) ON DELETE CASCADE,
+         session_key_id TEXT NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,
+         purpose TEXT NOT NULL CHECK (purpose IN ('registration', 'authentication')),
+         challenge_hash TEXT NOT NULL,
+         created_at_ms INTEGER NOT NULL,
+         expires_at_ms INTEGER NOT NULL,
+         used_at_ms INTEGER
+       )`,
+      `CREATE INDEX webauthn_challenges_session
+         ON webauthn_challenges (org_id, account_id, session_key_id, purpose, expires_at_ms)`,
+      `CREATE TABLE operator_recovery_generations (
+         account_id TEXT PRIMARY KEY REFERENCES operator_accounts(id) ON DELETE CASCADE,
+         generation_id TEXT NOT NULL UNIQUE,
+         generation INTEGER NOT NULL CHECK (generation > 0),
+         created_at_ms INTEGER NOT NULL
+       )`,
+      `CREATE TABLE operator_recovery_codes (
+         id TEXT PRIMARY KEY,
+         org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+         account_id TEXT NOT NULL REFERENCES operator_accounts(id) ON DELETE CASCADE,
+         generation_id TEXT NOT NULL REFERENCES operator_recovery_generations(generation_id) ON DELETE CASCADE,
+         code_hash TEXT NOT NULL UNIQUE,
+         created_at_ms INTEGER NOT NULL,
+         used_at_ms INTEGER
+       )`,
+      `CREATE INDEX operator_recovery_codes_account
+         ON operator_recovery_codes (org_id, account_id, generation_id, used_at_ms)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

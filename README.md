@@ -382,7 +382,7 @@ and the operator dashboard.
 
 You can run Titen on Bun with SQLite or on Cloudflare Workers with D1. Semantic
 retrieval is optional: use `sqlite-vec` on Bun, or Vectorize and Workers AI on
-Cloudflare — verified live only on the maintainer's isolated `titen-test-*`
+Cloudflare — verified live only on the maintainer's isolated the maintainer release stack
 stack, which is test production and not general availability
 ([scope note](#architecture)). Titen runs in your own infrastructure.
 
@@ -753,7 +753,7 @@ One Web-Standards TypeScript core serves both runtimes:
 | Background work | Startup and bounded timer | Scheduled handler; trigger provisioning varies |
 
 **Vectorize scope.** Vectorize and Workers AI are implemented and verified live
-on `titen-test-*`, an isolated stack on the maintainer's own Cloudflare account,
+on the maintainer release stack, an isolated stack on the maintainer's own Cloudflare account,
 with scoped BGE-M3 retrieval, bounded repair, Cron, persistence, and rollback.
 That is test production and **not a general-availability claim**: no customer
 deployment runs it, and your account needs its own ready, drain, and query
@@ -785,9 +785,11 @@ governance, and Profile. Each person signs
 in with a username/password; the loopback adapter keeps the resulting
 short-lived key behind an opaque HttpOnly session and never writes either secret
 to browser storage. Bootstrap creates `owner` with a random temporary password,
-and Add User follows the same forced-first-change flow. API keys remain for
-agents, services, SDKs, and recovery. There is no fixture fallback when the
-service is disconnected or denies a request.
+and Add User follows the same forced-first-change flow. A persistent SQL
+throttle limits password guessing across restarts. Optional WebAuthn passkeys
+use staged sessions and once-only recovery codes without blocking public API
+clients. API keys remain for agents, services, SDKs, and recovery. There is no
+fixture fallback when the service is disconnected or denies a request.
 
 Each data area uses a task-specific table, list, or fact view. Select a record
 to open its inspector. Row actions operate on that exact record. The full

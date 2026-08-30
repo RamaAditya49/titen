@@ -75,6 +75,6 @@
     "add_retries_total": 0,
     "telemetry": "MEM0_TELEMETRY=False",
     "bm25_hybrid": "DISABLED - fastembed not a base dependency, same as every prior mem0 lane",
-    "host": "rama-tuf"
+    "host": "benchmark-host"
   }
 }

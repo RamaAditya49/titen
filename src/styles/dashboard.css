@@ -158,6 +158,10 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .login-boundary { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .login-boundary strong { color: var(--ink-soft); font-weight: 620; }
 .login-panel form > span, .user-admin form > span { min-height: 1.4em; color: var(--danger); font-size: 11px; }
+.second-factor-panel { display: grid; gap: 14px; align-content: center; width: min(100%, 390px); margin: auto; padding: clamp(30px, 6vw, 64px); }
+.second-factor-panel > .primary-button { width: 100%; }
+.second-factor-panel > span, .second-factor-panel form > span { min-height: 1.4em; color: var(--danger); font-size: 11px; }
+.second-factor-panel form { width: 100%; margin: 0; padding: 16px 0 0; border-top: 1px solid var(--rule-soft); }
 
 .query-panel { margin: 18px 28px 0; padding: 18px 22px; background: var(--paper); border: 1px solid var(--rule); }
 .memory-controls { padding-block: 13px; }
@@ -246,6 +250,19 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .profile-password-form label span { font-size: 11px; font-weight: 600; }
 .profile-password-form input { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
 .profile-password-form > span { grid-column: 1 / -1; min-height: 1.4em; color: var(--danger); font-size: 11px; }
+.passkey-management { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(260px, 1.2fr); gap: 14px 20px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--rule-soft); }
+.passkey-management h3 { margin: 5px 0 4px; }
+.passkey-management p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.passkey-management .inline-form { margin: 0; }
+.passkey-confirmation { display: grid; gap: 6px; }
+.passkey-confirmation span { font-size: 11px; font-weight: 600; }
+.passkey-confirmation input { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
+.passkey-management [data-passkey-list], .passkey-management .one-time-credential { grid-column: 1 / -1; }
+.passkey-management [data-passkey-list] article { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--rule-soft); }
+.passkey-management [data-passkey-list] article > div { display: grid; gap: 3px; }
+.passkey-management [data-passkey-list] small { color: var(--muted); }
+.passkey-management > [role="status"] { min-height: 1.4em; color: var(--danger); font-size: 11px; }
+.passkey-management [data-recovery-code-values] { white-space: pre-wrap; }
 .live-output details { border-top: 1px solid var(--rule-soft); }
 .live-output summary { padding: 10px 2px; cursor: pointer; font-size: 12px; overflow-wrap: anywhere; }
 .live-output pre { max-height: 320px; margin: 0; padding: 14px; overflow: auto; color: var(--ink-soft); background: var(--paper-strong); border-top: 1px solid var(--rule-soft); font: 10px/1.55 "JetBrains Mono Variable", monospace; }
@@ -467,6 +484,8 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   .policy-details dd { padding-top: 0; }
   .profile-password-form { grid-template-columns: 1fr; align-items: stretch; }
   .profile-password-form > span { grid-column: auto; }
+  .passkey-management { grid-template-columns: 1fr; }
+  .passkey-management [data-passkey-list], .passkey-management .one-time-credential { grid-column: auto; }
   .operator-table-wrap { overflow: visible; border: 0; }
   .operator-table { min-width: 0; }
   .operator-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

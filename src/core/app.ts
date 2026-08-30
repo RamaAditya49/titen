@@ -1,5 +1,15 @@
 import { authenticate, requireScope } from "./auth";
 import { changeOperatorPassword, createDashboardSession, createOperatorAccount, revokeDashboardSession } from "./accounts";
+import {
+  completePasskeyAuthentication,
+  completeRecoveryAuthentication,
+  createPasskeyAuthenticationOptions,
+  createPasskeyRegistrationOptions,
+  listPasskeys,
+  regenerateRecoveryCodes,
+  registerPasskey,
+  removePasskey,
+} from "./account-security";
 import { saveCheckpoint, getCheckpoint, deleteCheckpoint } from "./checkpoints";
 import { claimEvidence } from "./evidence";
 import { compileContext, getContext, recordFeedback } from "./context";
@@ -59,6 +69,7 @@ import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
 import { snapshotExtractionCapability, type ExtractionCapability } from "./extraction";
 import { drainEnrichmentRoute } from "./enrichment";
+import { createWebAuthnRuntime, type WebAuthnRuntime } from "./webauthn";
 import {
   activateKnowledgeRelease,
   applyRetention,
@@ -114,7 +125,11 @@ export interface AppContext {
   webhookSecurity?: WebhookSecurity;
   secretCipher?: SecretCipher;
   /** Optional public-edge defense in depth; account throttling remains canonical. */
-  loginRateLimit?: { limit(key: string): Promise<{ success: boolean }> };
+  loginRateLimit?: {
+    limit(input: { identityHash: string; request: Request }): Promise<{ success: boolean }>;
+  };
+  /** Optional phishing-resistant dashboard authentication. */
+  webauthn: WebAuthnRuntime;
   /**
    * Appended to the MCP `initialize` instructions. Local stdio mode sets it so
    * the model is told which store answered; a served deployment leaves it unset.
@@ -147,6 +162,7 @@ export async function capabilities(
       staleAfterMs: app.backgroundRepair.staleAfterMs,
     }),
     export_import: "enabled",
+    webauthn: app.webauthn.configuration.state,
   } as const;
 }
 
@@ -271,11 +287,19 @@ export const ROUTES: RouteDef[] = [
   { method: "POST", path: "/v1/keys", scope: "keys:manage", handler: createKey },
   { method: "GET", path: "/v1/keys", scope: "keys:manage", handler: listKeys },
   { method: "DELETE", path: "/v1/keys/:id", scope: "keys:manage", handler: revokeKey },
-  { method: "GET", path: "/v1/principal", authenticated: true, handler: getPrincipal },
+  { method: "GET", path: "/v1/principal", authenticated: true, authStages: ["full", "password_change"], handler: getPrincipal },
   { method: "POST", path: "/v1/operator-accounts", scope: "keys:manage", handler: createOperatorAccount },
-  { method: "PATCH", path: "/v1/operator-accounts/current/password", authenticated: true, handler: changeOperatorPassword },
+  { method: "PATCH", path: "/v1/operator-accounts/current/password", authenticated: true, authStages: ["full", "password_change"], handler: changeOperatorPassword },
+  { method: "POST", path: "/v1/operator-accounts/current/passkeys/options", authenticated: true, handler: createPasskeyRegistrationOptions },
+  { method: "POST", path: "/v1/operator-accounts/current/passkeys", authenticated: true, handler: registerPasskey },
+  { method: "GET", path: "/v1/operator-accounts/current/passkeys", authenticated: true, handler: listPasskeys },
+  { method: "DELETE", path: "/v1/operator-accounts/current/passkeys/:id", authenticated: true, handler: removePasskey },
+  { method: "POST", path: "/v1/operator-accounts/current/recovery-codes", authenticated: true, handler: regenerateRecoveryCodes },
   { method: "POST", path: "/v1/dashboard-sessions", handler: createDashboardSession },
-  { method: "DELETE", path: "/v1/dashboard-sessions/current", authenticated: true, handler: revokeDashboardSession },
+  { method: "POST", path: "/v1/dashboard-sessions/current/passkey-options", authenticated: true, authStages: ["second_factor"], handler: createPasskeyAuthenticationOptions },
+  { method: "POST", path: "/v1/dashboard-sessions/current/passkey", authenticated: true, authStages: ["second_factor"], handler: completePasskeyAuthentication },
+  { method: "POST", path: "/v1/dashboard-sessions/current/recovery-code", authenticated: true, authStages: ["second_factor"], handler: completeRecoveryAuthentication },
+  { method: "DELETE", path: "/v1/dashboard-sessions/current", authenticated: true, authStages: ["full", "password_change", "second_factor"], handler: revokeDashboardSession },
   { method: "GET", path: "/v1/export", scope: "export:read", handler: exportRecords },
   { method: "POST", path: "/v1/import", scope: "import:write", handler: importRecords },
   { method: "POST", path: "/v1/workspaces", scope: "workspaces:write", handler: createWorkspace },
@@ -369,6 +393,10 @@ async function readiness(ctx: RequestContext): Promise<Result> {
   }
   checks.signing_secrets = ctx.app.secretStorageReady ? "ok" : "failed";
   if (!ctx.app.secretStorageReady) ready = false;
+  checks.webauthn = ctx.app.webauthn.configuration.state === "configured_error"
+    ? ctx.app.webauthn.configuration.diagnostic
+    : ctx.app.webauthn.configuration.state;
+  if (ctx.app.webauthn.configuration.state === "configured_error") ready = false;
 
   let semanticReadiness = ctx.app.semanticReadiness;
   if (canonicalReady && schemaReady && ctx.app.migrationsReady) {
@@ -479,6 +507,7 @@ export function createApp(context: {
   secretCipher?: SecretCipher;
   mcpOrigin?: string;
   loginRateLimit?: AppContext["loginRateLimit"];
+  webauthn?: WebAuthnRuntime;
   mcpInstructionsNote?: string;
 }): (request: Request) => Promise<Response> {
   const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
@@ -525,6 +554,7 @@ export function createApp(context: {
     webhookSecurity: context.webhookSecurity,
     secretCipher: context.secretCipher,
     loginRateLimit: context.loginRateLimit,
+    webauthn: context.webauthn ?? createWebAuthnRuntime({ state: "disabled" }),
     mcpInstructionsNote: context.mcpInstructionsNote,
   };
   let semanticPreparation: Promise<SemanticReadiness> | undefined;
@@ -611,6 +641,10 @@ export function createApp(context: {
 
       if (matched.route.scope || matched.route.authenticated) {
         ctx.principal = await authenticate(app.db, request, app.now());
+        const stage = ctx.principal.authStage ?? "full";
+        const allowedStages = matched.route.authStages ?? ["full"];
+        if (!allowedStages.includes(stage))
+          throw new ApiError(403, "STAGED_SESSION", "Complete the required authentication step before this operation.");
         if (matched.route.scope) requireScope(ctx.principal, matched.route.scope);
       }
 

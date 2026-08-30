@@ -1,6 +1,6 @@
 {
   "spec": "2026-08-08-pooled-recall-recovery",
-  "host": "rama-tuf",
+  "host": "benchmark-host",
   "note": "artifacts too large to commit, listed by checksum so a later run can verify it is reading the same bytes this report was written from",
   "artifacts": [
     {

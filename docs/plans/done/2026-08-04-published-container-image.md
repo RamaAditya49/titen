@@ -36,18 +36,18 @@ spec: docs/specs/done/2026-08-04-published-container-image.md
 - [x] Write `.github/workflows/container.yml`: tag trigger only, `packages:
   write` on the job, `GITHUB_TOKEN` as the only credential, a smoke run before
   the push, and a prerelease guard on `latest`.
-- [x] Build the image on `rama-tuf` with podman and run it: probe both
+- [x] Build the image on `benchmark-host` with podman and run it: probe both
   endpoints, check the uid, load `sqlite-vec`, restart it with a persisted
   volume, and wait for the health verdict.
 - [x] Run the unit under rootless `systemctl --user`, find the host-path
   ownership failure, fix it with `UserNS=keep-id`, and re-run.
 - [x] Write `docs/deployment/container.md` and point `deploy/README.md` at it.
 - [x] Remove every container, volume, image, unit and directory created on
-  `rama-tuf` during verification.
+  `benchmark-host` during verification.
 
 ## Acceptance evidence
 
-All container evidence was produced on `rama-tuf` with podman 5.8.2 on
+All container evidence was produced on `benchmark-host` with podman 5.8.2 on
 2026-08-04. Podman, not docker, is the runtime used for verification; the
 workflow itself builds with docker on a GitHub runner and has not run.
 
@@ -117,7 +117,7 @@ Not measured:
   cites about 239 MB for an earlier image and is owned by another change.
 
 Cleanup: every container, named volume, image, systemd unit, environment file
-and build directory created on `rama-tuf` for this work was removed and the
+and build directory created on `benchmark-host` for this work was removed and the
 removal was confirmed. No API key, database content or embedding was printed at
 any point; the bootstrap that produced persistence evidence had its output
 discarded before it left the remote host.

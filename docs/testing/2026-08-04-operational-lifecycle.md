@@ -2,7 +2,7 @@
 
 Date: 2026-08-04
 
-Host: `rama-tuf`, Linux 7.0.12, 16 cores, 30 GiB RAM, Bun 1.3.14, Node 24.18.0.
+Host: `benchmark-host`, Linux 7.0.12, 16 cores, 30 GiB RAM, Bun 1.3.14, Node 24.18.0.
 
 Working tree under test: branch `fix/go-public-hardening-20260804` at commit
 `a0033389`, reporting version 0.5.7, schema version 21. The tree carried 66
@@ -238,7 +238,7 @@ only the physical SQLite snapshot recovers it.
 ## 4. Long soak — running
 
 A soak was started and is deliberately still running. It is a single Titen
-process on `rama-tuf` under steady low-rate load: one observation every 2 s, a
+process on `benchmark-host` under steady low-rate load: one observation every 2 s, a
 compile every 4 s, a two-source consolidation every 10 s, and a checkpoint every
 2 min. Vectors, embeddings, extraction, and enrichment are all disabled — this
 is the self-host floor configuration.
@@ -247,18 +247,18 @@ Sampled every 60 s: process `VmRSS`, `VmSize`, thread count, open file
 descriptors, database bytes, WAL bytes, shared-memory bytes, and cumulative work
 counters.
 
-Log: `/tmp/titen-soak-20260804/samples.tsv` on `rama-tuf`, tab-separated with a
+Log: `/tmp/titen-soak-20260804/samples.tsv` on `benchmark-host`, tab-separated with a
 header row.
 
 ```bash
-ssh -o BatchMode=yes -o ControlPath=~/.ssh/cm/tuf.sock rama-tuf-lan \
+ssh -o BatchMode=yes -o ControlPath=~/.ssh/cm/tuf.sock benchmark-host-lan \
   'cat /tmp/titen-soak-20260804/samples.tsv; echo; cat /tmp/titen-soak-20260804/counters.json'
 ```
 
 Stop it with:
 
 ```bash
-ssh -o BatchMode=yes -o ControlPath=~/.ssh/cm/tuf.sock rama-tuf-lan \
+ssh -o BatchMode=yes -o ControlPath=~/.ssh/cm/tuf.sock benchmark-host-lan \
   'D=/tmp/titen-soak-20260804; for f in load sampler server; do kill "$(cat $D/$f.pid)"; done'
 ```
 

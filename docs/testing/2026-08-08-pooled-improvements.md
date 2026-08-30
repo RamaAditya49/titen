@@ -77,7 +77,7 @@ New cell: `snowflake/snowflake-arctic-embed-s` (fastembed 0.8.0, ONNX CPU, 384 d
 
 ## Evidence
 
-All raw artifacts on `rama-tuf` under `~/titen-bench-20260804/`; the verifier confirmed all listed files exist plus the one unlisted V5 artifact. Checksummed summaries land under `docs/testing/results/2026-08-08-pooled-improvements/` per the prereg.
+All raw artifacts on `benchmark-host` under `~/titen-bench-20260804/`; the verifier confirmed all listed files exist plus the one unlisted V5 artifact. Checksummed summaries land under `docs/testing/results/2026-08-08-pooled-improvements/` per the prereg.
 
 - E-LAT: `results/improve-20260808-elat.json` (sha256 `f9788c06…52b3`, verified; per-qid latencies, ranked lists, verbatim EXPLAIN, per-query scope timings), `results/improve-20260808-elat.cells.json`
 - E-RANK lexical: `results/improve-20260808-erank-lexical.json` + per-variant `.v{1,2,4,6}.{pooled,anchor}.ranked.json` (8 files), harness `harness/erank_lexical.py`

@@ -24,7 +24,7 @@ spec: docs/specs/done/2026-08-01-dashboard-password-accounts-release.md
 - [x] Run focused adversarial, shared D1/Bun, integration, browser, live adapter,
   build, package, route, dependency, and workflow checks.
 - [x] Build the exact container, take a verified production backup, run a
-  disposable restore canary, activate it on `rama-tuf`, and prove rollback.
+  disposable restore canary, activate it on `benchmark-host`, and prove rollback.
 - [x] Publish npm, annotated Git tag, GitHub Release, and titen.dev discovery
   manually; close repository and workflow hygiene; terminalize this pair.
 
@@ -44,7 +44,7 @@ spec: docs/specs/done/2026-08-01-dashboard-password-accounts-release.md
   suite, and real live-dashboard verifier.
 - AC-DPA-011: checksum-matched exact-image backup/restore canary and production
   readiness, auth, six-area, denial, restart, listener, image-label, and rollback
-  evidence on `rama-tuf`.
+  evidence on `benchmark-host`.
 - AC-DPA-012: npm metadata and clean install, tag/release/revision equality,
   deployed image label, manual titen-web sync/deploy, and dual-host HTTP smokes.
 - AC-DPA-013: workflow checker plus GitHub issue, PR, branch, Actions, worktree,

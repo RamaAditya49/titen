@@ -84,7 +84,7 @@ Rama authorized implementation, publication, and website synchronization on
 
 ## Pre-release evidence — 2026-08-13
 
-All commands below ran on `ssh rama-tuf`. Before each final gate, the changed
+All commands below ran on `ssh benchmark-host`. Before each final gate, the changed
 and untracked file list was synchronized and compared by per-file SHA-256; the
 final focused hardening edit was resynchronized and retested before packing:
 
@@ -121,12 +121,12 @@ final focused hardening edit was resynchronized and retested before packing:
 - Annotated tag `v0.8.0` peels to that exact commit. The published, non-draft,
   non-prerelease GitHub Release is
   `https://github.com/RamaAditya49/titen/releases/tag/v0.8.0`.
-- A fresh `npm install titen-memory@0.8.0` on `rama-tuf` passed version,
+- A fresh `npm install titen-memory@0.8.0` on `benchmark-host` passed version,
   target-free preview, local apply, exact replay, served apply, and claim/evidence
   compile recall. Disposable evidence remains at
   `/tmp/titen-registry-smoke-0.8.0-final.ThGS43` on that host.
 - `titen-web` commit `989aca2e1e39aeb6d1bb371bfd7252e0c9d4ed15`
-  was pushed after a clean candidate checkout on `rama-tuf` passed its frozen
+  was pushed after a clean candidate checkout on `benchmark-host` passed its frozen
   install, 55-page build, 84-route and 9-MCP-tool documentation checks,
   installer probes, release-sync check, and `git diff --check`. The two existing
   prose warnings remained non-errors.
@@ -135,7 +135,7 @@ final focused hardening edit was resynchronized and retested before packing:
   `73456ef1932ddbe43eece4a7640519b19f400cb179ea58d279b2216f701a98be`.
   Manual deployment from the clean pushed commit produced Cloudflare Worker
   Version ID `d7aae794-94f6-40b6-bcf5-dadda8f6eb48`.
-- Production smoke from `rama-tuf` passed on both `https://titen.dev` and
+- Production smoke from `benchmark-host` passed on both `https://titen.dev` and
   `https://www.titen.dev`: stable manifest `0.8.0`, release page, importer HTML
   and Markdown, CSP and nosniff headers, and exact installer bytes. Live
   `install.sh` SHA-256 is
@@ -149,7 +149,7 @@ final focused hardening edit was resynchronized and retested before packing:
 
 All focused, dual-runtime, integration, workflow, route, build, audit, package,
 registry-install, website, installer, deployment, and production-smoke evidence
-listed above passed on `rama-tuf`. The only non-passing repository command is the
+listed above passed on `benchmark-host`. The only non-passing repository command is the
 unchanged typecheck baseline: both clean `0.7.4` and `0.8.0` report the same 106
 historical errors, with zero errors in changed source files.
 
@@ -185,8 +185,8 @@ historical errors, with zero errors in changed source files.
 ## Test and verification plan
 
 Run every benchmark, test, build-validation, and package smoke on the dedicated
-`rama-tuf` SSH host. The current workstation is limited to editing, inspection,
-commit, and release orchestration. On `rama-tuf`, run the smallest focused tests
+`benchmark-host` SSH host. The current workstation is limited to editing, inspection,
+commit, and release orchestration. On `benchmark-host`, run the smallest focused tests
 while implementing, then the applicable manual repository gates:
 
 ```text
@@ -211,7 +211,7 @@ pnpm release:sync {version} --check
 
 The dashboard and browser suites are not required unless implementation touches
 their source or a broader regression requires them. No CI/CD workflow is added;
-all verification evidence is produced on `rama-tuf` and recorded in this plan.
+all verification evidence is produced on `benchmark-host` and recorded in this plan.
 
 ## Security, migration, deployment, smoke, and rollback
 
@@ -231,7 +231,7 @@ all verification evidence is produced on `rama-tuf` and recorded in this plan.
   preview through apply, exact replay, FTS-only recall, backup, restart, and
   recall. Exercise the same generated canonical result in the workerd/D1
   contract harness.
-- Publish only the exact tarball verified on `rama-tuf`; preserve it from
+- Publish only the exact tarball verified on `benchmark-host`; preserve it from
   `scripts/verify-pack.sh` with `TITEN_PACK_OUTPUT` and publish that artifact,
   not a repack. npm rollback is a new patch plus deprecation, not unpublish.
   Create the annotated tag and GitHub

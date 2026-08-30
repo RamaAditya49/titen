@@ -4,7 +4,7 @@ Date: 2026-07-31
 Verdict: **blocked; keep Mem0 active**
 
 This is the first side-by-side replacement evaluation against the current
-Mem0 service on `server-wulan`. It is not a cutover approval. The run used only
+Mem0 service on `deployment-host`. It is not a cutover approval. The run used only
 synthetic memory and left the production Mem0 containers, database, routes, and
 credentials unchanged.
 
