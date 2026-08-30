@@ -1,14 +1,13 @@
 ---
 work_id: public-artifact-privacy-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
-spec: docs/specs/active/2026-08-30-public-artifact-privacy.md
+spec: docs/specs/done/2026-08-30-public-artifact-privacy.md
 ---
 
 # Plan — Public artifact privacy
@@ -23,8 +22,8 @@ spec: docs/specs/active/2026-08-30-public-artifact-privacy.md
   release notes for private deployment details.
 - [x] Run checker fixtures, workflow checks, package smoke, and the complete test
   suite.
-- [ ] Move this pair to `done/` with evidence and no unchecked work.
-- [ ] Keep all private upgrade commands and evidence outside the Git worktree.
+- [x] Move this pair to `done/` with evidence and no unchecked work.
+- [x] Keep all private upgrade commands and evidence outside the Git worktree.
 
 ## Verification mapping
 
@@ -36,6 +35,17 @@ spec: docs/specs/active/2026-08-30-public-artifact-privacy.md
   and release-note review.
 - AC-PUBLIC-006: clean Git status after the private upgrade and a handoff that
   records private evidence only outside public artifacts.
+
+## Acceptance evidence map
+
+| Acceptance | Verified evidence |
+| --- | --- |
+| AC-PUBLIC-001 | Complete public-tree scan and reviewed replacement diff |
+| AC-PUBLIC-002 | Scanner fixture output with file and rule names |
+| AC-PUBLIC-003 | Positive and negative scanner exit-status fixtures |
+| AC-PUBLIC-004 | Neutral-example assertions and documentation review |
+| AC-PUBLIC-005 | Extracted npm tarball and release-note scans |
+| AC-PUBLIC-006 | Private operator evidence retained outside tracked files |
 
 ## Rollback
 
@@ -51,3 +61,7 @@ needs no data rollback.
 - The extracted 76-file npm tarball passes the same scanner.
 - The account-specific Cloudflare configuration is absent from the public tree.
 - Private runtime upgrade evidence remains outside the Git worktree.
+- The public release notes pass the scanner and contain only generic deployment
+  evidence.
+- The public site uses a sibling checkout default and no tracked Cloudflare
+  account identifier. Its repository and generated site pass the scanner.

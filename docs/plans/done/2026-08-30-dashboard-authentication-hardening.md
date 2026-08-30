@@ -1,14 +1,13 @@
 ---
 work_id: dashboard-authentication-hardening-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
-spec: docs/specs/active/2026-08-30-dashboard-authentication-hardening.md
+spec: docs/specs/done/2026-08-30-dashboard-authentication-hardening.md
 ---
 
 # Plan — Dashboard authentication hardening
@@ -34,10 +33,10 @@ spec: docs/specs/active/2026-08-30-dashboard-authentication-hardening.md
   build, browser tests, package smoke, public-artifact checks, and workflow checks.
 - [x] Complete a security-focused self-review because this task does not
   authorize delegated agents. Fix every confirmed critical or high finding.
-- [ ] Move this pair to `done/` with evidence and no unchecked work.
-- [ ] Commit and push with required attribution. Publish the exact npm tarball
+- [x] Move this pair to `done/` with evidence and no unchecked work.
+- [x] Commit and push with required attribution. Publish the exact npm tarball
   and verify registry metadata before any private runtime upgrade.
-- [ ] Create a private backup, upgrade the target runtime from the published
+- [x] Create a private backup, upgrade the target runtime from the published
   package, and verify health, readiness, schema, protected routes, dashboard,
   login controls, data integrity, and rollback readiness.
 
@@ -55,6 +54,33 @@ spec: docs/specs/active/2026-08-30-dashboard-authentication-hardening.md
 - AC-AUTH-030 through AC-AUTH-033: existing contract suite, MCP and SDK smoke,
   adapter route tests, packed-tarball install smoke, registry integrity check,
   deployed revision check, and runtime smoke or verified rollback.
+
+## Acceptance evidence map
+
+| Acceptance | Verified evidence |
+| --- | --- |
+| AC-AUTH-001 | Dual-runtime SQL throttle tests and schema inspection |
+| AC-AUTH-002 | Progressive delay schedule contract tests |
+| AC-AUTH-003 | Active-block tests before password verification |
+| AC-AUTH-004 | Successful-login throttle-clear tests |
+| AC-AUTH-005 | Generic-response tests and six-attempt runtime smoke |
+| AC-AUTH-006 | Edge-guard denial and failure contract tests |
+| AC-AUTH-010 | Configuration, readiness, integration, and deployed capability checks |
+| AC-AUTH-011 | Bound registration challenge and stored-credential tests |
+| AC-AUTH-012 | Dual-runtime staged-session contract tests |
+| AC-AUTH-013 | Central staged-route authorization tests |
+| AC-AUTH-014 | Assertion verification and atomic counter tests |
+| AC-AUTH-015 | Expiry, replay, purpose, and cross-account challenge tests |
+| AC-AUTH-016 | Partial and unsafe configuration readiness tests |
+| AC-AUTH-020 | First-enrollment recovery generation and hash-only tests |
+| AC-AUTH-021 | Concurrent one-time recovery consumption tests |
+| AC-AUTH-022 | Recovery regeneration invalidation tests |
+| AC-AUTH-023 | Last-passkey password confirmation tests |
+| AC-AUTH-024 | Metadata-only security audit assertions |
+| AC-AUTH-030 | Existing API, MCP, SDK, and disabled-feature contract suites |
+| AC-AUTH-031 | Complete D1 and Bun/SQLite contract suites |
+| AC-AUTH-032 | Fixed adapter route tests and live adapter smoke |
+| AC-AUTH-033 | npm metadata, exact deployed revision, backup, and rollback checks |
 
 ## Rollback
 
@@ -79,3 +105,18 @@ counts.
 - Global `pnpm typecheck` retains existing repository debt. Its output contains
   no error in a file changed by this work. SDK declaration checks pass in the
   package gate.
+
+## Release evidence
+
+- npm `latest` resolves to `titen-memory@0.10.0`. Its `gitHead` is
+  `aa709647365d2304ce0a62f451850981dd31d2d5`, and its registry shasum is
+  `3c07fe4ea669d1506e6e8031e549c0c4c9767529`.
+- Annotated tag `v0.10.0` and the non-draft GitHub Release resolve to the same
+  source commit.
+- The public release site reports `0.10.0`. Its release page and homepage pass
+  HTTP smoke checks on both product hostnames.
+- A private Bun deployment installed the published package after a verified
+  backup. It reports revision `npm-0.10.0`, schema 24, and enabled WebAuthn.
+- The private deployment preserved throttle state across restart. Database
+  integrity, protected routes, the dashboard adapter, public MCP auth, service
+  logs, and rollback snapshot verification passed.

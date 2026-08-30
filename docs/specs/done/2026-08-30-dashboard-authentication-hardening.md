@@ -1,12 +1,11 @@
 ---
 work_id: dashboard-authentication-hardening-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
 ---
 
