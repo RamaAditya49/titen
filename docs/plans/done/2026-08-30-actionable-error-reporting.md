@@ -1,14 +1,13 @@
 ---
 work_id: actionable-error-reporting-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
-spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
+spec: docs/specs/done/2026-08-30-actionable-error-reporting.md
 ---
 
 # Actionable Error Reporting Implementation Plan
@@ -21,7 +20,7 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 
 **Tech Stack:** TypeScript 5.9, Web Standards APIs, Bun 1.3, SQLite, Cloudflare D1, MCP JSON-RPC, pnpm 11, npm, GitHub CLI, and systemd.
 
-**Spec:** `docs/specs/active/2026-08-30-actionable-error-reporting.md`
+**Spec:** `docs/specs/done/2026-08-30-actionable-error-reporting.md`
 
 ## Global constraints
 
@@ -270,23 +269,23 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 
   Commit subject: `chore: siapkan rilis error actionable 0.9.1`
 
-- [ ] **Step 4: Start `npm publish` with the explicit npmjs registry.**
+- [x] **Step 4: Start `npm publish` with the explicit npmjs registry.**
 
   Run: `npm publish --registry https://registry.npmjs.org`
 
   Expected: npm requests browser approval or publishes after existing approval.
 
-- [ ] **Step 5: Wait for Rama's browser approval when requested.**
+- [x] **Step 5: Wait for Rama's browser approval when requested.**
 
   Poll the same live publish process. Do not restart it or claim publication
   before npm returns success.
 
-- [ ] **Step 6: Verify registry integrity and release date.**
+- [x] **Step 6: Verify registry integrity and release date.**
 
   Check npm `latest`, `gitHead`, integrity, shasum, file count, unpacked size,
   and the UTC changelog date.
 
-- [ ] **Step 7: Create and push the annotated tag and generated GitHub Release.**
+- [x] **Step 7: Create and push the annotated tag and generated GitHub Release.**
 
   Use `scripts/changelog-section.sh` for the release body.
 
@@ -302,21 +301,21 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 - Consumes: published npm release, Git tag, and GitHub Release.
 - Produces: live `titen.dev/version.json` and `/releases/0.9.1`.
 
-- [ ] **Step 1: Inspect and isolate the current `titen-web` worktree.**
+- [x] **Step 1: Inspect and isolate the current `titen-web` worktree.**
 
   Preserve unrelated work and branch from current `origin/main`.
 
-- [ ] **Step 2: Run release synchronization and build.**
+- [x] **Step 2: Run release synchronization and build.**
 
   Run: `pnpm release:sync 0.9.1 && pnpm release:sync 0.9.1 --check && pnpm build`
 
   Expected: PASS with matching npm, tag, release, and metadata.
 
-- [ ] **Step 3: Commit, push, and deploy manually.**
+- [x] **Step 3: Commit, push, and deploy manually.**
 
   Preserve the repository's commit attribution rules.
 
-- [ ] **Step 4: Smoke the public website.**
+- [x] **Step 4: Smoke the public website.**
 
   Verify both hostnames, `/version.json`, `/releases/0.9.1`, homepage badge, and
   changelog content.
@@ -326,41 +325,43 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 **Files:**
 
 - Remote package and service state under `/opt/titen` and `/etc/systemd/system`.
-- Backup under `/var/backups/titen/<timestamp>-pre-0.9.1`.
+- Backup under `/var/backups/titen/20260830T194247+0700-pre-0.9.1`.
 
 **Interfaces:**
 
 - Consumes: published `titen-memory@0.9.1`.
 - Produces: running API and dashboard services at revision `npm-0.9.1`.
 
-- [ ] **Step 1: Inspect current remote revision, service units, drop-ins, schema, and database counts.**
+- [x] **Step 1: Inspect current remote revision, service units, drop-ins, schema, and database counts.**
 
   Use direct `ssh server-wulan`. Fall back through `rama-tuf` only if direct
   access fails.
 
-- [ ] **Step 2: Create and verify a rollback backup.**
+- [x] **Step 2: Create and verify a rollback backup.**
 
   Include canonical database, vector projection, package files, environment,
   service units, drop-ins, modes, checksums, and a restore note.
 
-- [ ] **Step 3: Install exact package `0.9.1`.**
+- [x] **Step 3: Install exact package `0.9.1`.**
 
   Use `bun add --exact titen-memory@0.9.1 --registry https://registry.npmjs.org`.
 
-- [ ] **Step 4: Set the effective service revision and restart services.**
+- [x] **Step 4: Set the effective service revision and restart services.**
 
   Inspect `systemctl show`, `systemctl cat`, and `DropInPaths` before restart.
 
-- [ ] **Step 5: Run production smoke.**
+- [x] **Step 5: Run production smoke.**
 
   Verify service active state, CLI/package version, `/healthz`, `/readyz`, schema,
   SQLite quick check, preserved counts, dashboard/root 200, protected route 401,
   MCP unauthenticated 401, and recent error logs.
 
-- [ ] **Step 6: Roll back if any required smoke fails.**
+- [x] **Step 6: Roll back if any required smoke fails.**
 
   Restore `0.9.0`, the database and package backup, and the prior revision
   drop-in. Repeat the smoke and report the verified rollback.
+
+  Not triggered. All required smoke checks passed on `0.9.1`.
 
 ### Task 10: Close workflow evidence
 
@@ -373,27 +374,59 @@ spec: docs/specs/active/2026-08-30-actionable-error-reporting.md
 
 - Produces: terminal evidence for `AC-AER-001` through `AC-AER-018`.
 
-- [ ] **Step 1: Record exact test, npm, website, backup, and production evidence.**
+- [x] **Step 1: Record exact test, npm, website, backup, and production evidence.**
 
-- [ ] **Step 2: Check every plan item and acceptance mapping.**
+- [x] **Step 2: Check every plan item and acceptance mapping.**
 
-- [ ] **Step 3: Set `status: done`, `stage: done`, and `outcome: completed`.**
+- [x] **Step 3: Set `status: done`, `stage: done`, and `outcome: completed`.**
 
-- [ ] **Step 4: Move both artifacts to `done/` and update the plan spec path.**
+- [x] **Step 4: Move both artifacts to `done/` and update the plan spec path.**
 
-- [ ] **Step 5: Run final workflow and repository checks.**
+- [x] **Step 5: Run final workflow and repository checks.**
 
   Run: `node scripts/check-workflow-docs.mjs --self-test && node scripts/check-workflow-docs.mjs && git diff --check`
 
   Expected: PASS.
 
-- [ ] **Step 6: Commit and push closure evidence.**
+- [x] **Step 6: Commit and push closure evidence.**
 
   Commit subject: `docs: tutup rilis error actionable 0.9.1`
 
+## Verification
+
+- `pnpm test:all && bash scripts/verify-pack.sh` passed. D1 passed 128 tests,
+  integration passed 232 tests, and Playwright passed 15 tests with 5 expected
+  screenshot skips. Dashboard live and workflow checks also passed.
+- npm published `titen-memory@0.9.1` at `2026-08-30T12:45:25.113Z` from
+  `c2e1ce77ccdfa0f4f3cdda6971304f4b7776b507`. Registry integrity is
+  `sha512-y6w7i74FxIJKdM3J18zPhXr0lbPIZ2+lze5/qNDo8j5zUox9C7BZP53xOVh7Uz+Q6FZVg8Xtv81FdwqaFNmJXg==`.
+  The shasum is `d1facdf8d594d7119b12073b223011191a413618`, with 74 files
+  and 1,463,971 unpacked bytes.
+- Annotated tag `v0.9.1` points to the npm commit. The non-draft GitHub Release
+  is `https://github.com/RamaAditya49/titen/releases/tag/v0.9.1`.
+- `titen-web` commit `cb77bf769dd37784bb0ad0ea6c48611095470431`
+  deployed as Cloudflare version `56429876-32e7-43c3-b593-bbee5fe1754e`.
+  Both hostnames and all release surfaces returned 200 with matching versions.
+- The website smoke found a bare `stable` label. A failing regression check
+  reproduced it, and commit `cb77bf7` changed it to `stable channel`.
+- Backup `/var/backups/titen/20260830T194247+0700-pre-0.9.1` contains both
+  SQLite stores, package files, configuration, systemd state, modes, checksums,
+  and restore instructions. Both backup stores passed `PRAGMA quick_check`.
+- `server-wulan` runs package and CLI `0.9.1` at revision `npm-0.9.1`.
+  Services are active and enabled with zero restarts. Readiness verifies schema
+  23 of 23. Protected REST and MCP calls return 401 with safe support guidance.
+  Recent error-log count is zero.
+- Canonical counts stayed at 818 observations, 1,583 claims, 11 projects, and
+  23 migrations before and after the upgrade. Mem0 files and services were not
+  removed or disabled.
+- Live resolver request `req_ef887de43b0f416d9498622ac13a1a47` returned
+  `project_not_registered`, the normalized caller reference, `can_create:true`,
+  expected classification, approved recovery guidance, and the public docs URL.
+  No issue was created because this is expected setup behavior.
+
 ## Acceptance evidence map
 
-| Acceptance | Planned evidence |
+| Acceptance | Verified evidence |
 | --- | --- |
 | AC-AER-001 | Dual-runtime missing-project contract test |
 | AC-AER-002 | Dual-runtime normalized reference and capability assertions |

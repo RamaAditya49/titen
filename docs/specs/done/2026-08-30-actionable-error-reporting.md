@@ -1,12 +1,11 @@
 ---
 work_id: actionable-error-reporting-20260830
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-08-30
 updated: 2026-08-30
-review_after: 2026-09-13
 owner: CADIS
 ---
 
@@ -187,3 +186,19 @@ drop-in if any production smoke fails.
 - npm, tag, GitHub Release, and titen.dev report the same release.
 - `server-wulan` runs the new package revision or a verified rollback.
 - The spec and plan move to `docs/specs/done/` and `docs/plans/done/`.
+
+## Completion evidence
+
+- Commit `c2e1ce77ccdfa0f4f3cdda6971304f4b7776b507` passed the complete
+  release gate and became npm package `titen-memory@0.9.1`.
+- npm `latest`, annotated tag `v0.9.1`, and the non-draft GitHub Release all
+  identify version `0.9.1` from that commit.
+- Cloudflare deployment `56429876-32e7-43c3-b593-bbee5fe1754e` serves the
+  release metadata, notes, changelog, resolver guidance, and error triage on
+  both public hostnames.
+- Backup `/var/backups/titen/20260830T194247+0700-pre-0.9.1` passed checksums
+  and SQLite integrity checks before the VPS upgrade.
+- `server-wulan` runs package, CLI, API, and dashboard revision `0.9.1` with
+  schema 23 of 23 and unchanged canonical counts.
+- A live authenticated missing-project resolve returned safe expected guidance.
+  It created no project and required explicit approved `create:true` recovery.
