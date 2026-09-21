@@ -238,7 +238,7 @@ export function fakeVectors(): VectorCapability & {
       async upsert(records) {
         if (storeBroken) throw new Error("vector store is unavailable");
         for (const record of records) {
-          metadata.set(record.id, record.metadata);
+          metadata.set(record.id, { ...record.metadata });
           if (!scores.has(record.id)) scores.set(record.id, 0.5);
         }
       },

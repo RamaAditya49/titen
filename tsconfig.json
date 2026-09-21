@@ -1,5 +1,14 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"]
+  "include": [
+    ".astro/types.d.ts",
+    "**/*"
+  ],
+  "exclude": [
+    "dist",
+    "docs/testing/results/2026-08-08-interpretable-score/harness/probe_relevance.ts",
+    "docs/testing/results/2026-08-08-pooled-candidate-generation/harness/c1_depth.ts",
+    "docs/testing/results/2026-08-08-pooled-compile-latency/harness/h0_probe.ts",
+    "docs/testing/results/2026-08-08-pooled-recall-recovery/harness/elat2_probe.ts"
+  ]
 }

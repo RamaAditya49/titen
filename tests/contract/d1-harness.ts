@@ -222,7 +222,7 @@ function redactLine(
   value: string,
   secrets: readonly string[],
   pendingSensitiveLabel: PendingSensitiveLabel,
-) {
+): { safe: string; pending: PendingSensitiveLabel } {
   const carriage = value.endsWith("\r") ? "\r" : "";
   const body = carriage ? value.slice(0, -1) : value;
   if (pendingSensitiveLabel && /^[ \t]/.test(body)) {

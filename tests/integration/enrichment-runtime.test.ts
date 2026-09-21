@@ -1,3 +1,4 @@
+import { fakeFetch } from "../helpers/fetch";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -128,7 +129,7 @@ test("Bun readiness exposes the configured extraction response mode", async () =
       model: "compat",
       modelFingerprint: "f".repeat(64),
       responseMode: "json_object",
-      fetch: (async () => { throw new Error("readiness must not call the provider"); }) as typeof fetch,
+      fetch: fakeFetch((async () => { throw new Error("readiness must not call the provider"); })),
     }),
     extractionState: "enabled",
     secretCipher: TEST_SECRET_CIPHER,
@@ -158,12 +159,12 @@ test("an incomplete HTTP completion leaves no durable semantic output", async ()
       baseUrl: "https://models.example.test/v1",
       model: "incomplete",
       modelFingerprint: "a".repeat(64),
-      fetch: (async () => Response.json({
+      fetch: fakeFetch((async () => Response.json({
         choices: [{
           finish_reason: "length",
           message: { content: '{"action":"add","claims":[]}' },
         }],
-      })) as typeof fetch,
+      }))),
     }),
     extractionState: "enabled",
     secretCipher: TEST_SECRET_CIPHER,
@@ -279,9 +280,9 @@ test("the Bun drain returns a retryable result at the extraction timeout", async
       model: "timeout",
       modelFingerprint: "d".repeat(64),
       timeoutMs: 1_000,
-      fetch: (async (_input, init) => new Promise<Response>((_resolve, reject) => {
+      fetch: fakeFetch((async (_input, init) => new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
-      })) as typeof fetch,
+      }))),
     }),
     extractionState: "enabled",
     secretCipher: TEST_SECRET_CIPHER,

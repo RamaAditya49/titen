@@ -2854,7 +2854,7 @@ export const CASES: Case[] = [
           last_used_at: null,
           revoked_at: null,
         },
-      ].map(JSON.stringify).join("\n");
+      ].map((value) => JSON.stringify(value)).join("\n");
 
       expectError(await fx.callRaw("POST", "/v1/import", { key: limited.key, body }), 403, "FORBIDDEN");
       expectError(await fx.call("GET", "/v1/audit", { key: forgedKey }), 401, "UNAUTHENTICATED");
@@ -3109,7 +3109,7 @@ export const CASES: Case[] = [
         visibility: "private", occurred_at: "2026-07-30T00:00:00.000Z", ingested_at: "2026-07-30T00:00:00.000Z",
       };
       const header = { type: "titen.export.header", format_version: 1, record_type: "observations" };
-      const body = [header, observationRow, project].map(JSON.stringify).join("\n") + "\n";
+      const body = [header, observationRow, project].map((value) => JSON.stringify(value)).join("\n") + "\n";
       expectOk(await fx.callRaw("POST", "/v1/import", { key: target.key, body }));
       expectOk(await fx.callRaw("POST", "/v1/import", { key: target.key, body }));
       const counts = await fx.query<{ projects: number; observations: number }>(
@@ -3236,7 +3236,7 @@ export const CASES: Case[] = [
       };
       const invalidInterval = await fx.callRaw("POST", "/v1/import", {
         key: target.key,
-        body: [header, baseObservation, invalidClaim].map(JSON.stringify).join("\n") + "\n",
+        body: [header, baseObservation, invalidClaim].map((value) => JSON.stringify(value)).join("\n") + "\n",
       });
       expectError(invalidInterval, 400, "VALIDATION_ERROR");
       assert.deepEqual(await counts(), { observations: 0, claims: 0 });
@@ -3264,12 +3264,12 @@ export const CASES: Case[] = [
       };
       expectError(await fx.callRaw("POST", "/v1/import", {
         key: target.key,
-        body: [header, { ...redactedClaim, status: "active" }, redacted].map(JSON.stringify).join("\n") + "\n",
+        body: [header, { ...redactedClaim, status: "active" }, redacted].map((value) => JSON.stringify(value)).join("\n") + "\n",
       }), 400, "VALIDATION_ERROR");
       assert.deepEqual(await counts(), { observations: 0, claims: 0 });
       expectOk(await fx.callRaw("POST", "/v1/import", {
         key: target.key,
-        body: [header, redactedClaim, redacted].map(JSON.stringify).join("\n") + "\n",
+        body: [header, redactedClaim, redacted].map((value) => JSON.stringify(value)).join("\n") + "\n",
       }));
       const stored = await fx.query<{ content: string; content_hash: string }>(
         `SELECT content, content_hash FROM observations WHERE id = ? AND org_id = ?`,
@@ -6667,7 +6667,7 @@ export const CASES: Case[] = [
       expectOk(await fx.callRaw("POST", "/v1/import", { key: agent.key, body: `${JSON.stringify(existing)}\n` }));
       const projects = Array.from({ length: 51 }, (_, index) => ({ type: "project", id: `project_atomic_${String(index).padStart(3, "0")}`, reference: `rama/atomic-${index}`, created_at: "2026-07-30T00:00:00.000Z" }));
       projects.push({ ...existing, reference: "rama/conflict" });
-      expectError(await fx.callRaw("POST", "/v1/import", { key: agent.key, body: `${projects.map(JSON.stringify).join("\n")}\n` }), 409);
+      expectError(await fx.callRaw("POST", "/v1/import", { key: agent.key, body: `${projects.map((value) => JSON.stringify(value)).join("\n")}\n` }), 409);
       const counts = await fx.query<{ count: number }>(`SELECT COUNT(*) AS count FROM projects WHERE org_id = ?`, [agent.orgId]);
       assert.equal(Number(counts[0]!.count), 1);
       const orphan = {
@@ -7153,7 +7153,11 @@ CASES.push({
       fx.call("GET", "/v1/federation/peers", { key: owner.key }),
     ]);
     for (const result of lists) expectOk(result);
-    assert.deepEqual(lists.map((result) => Object.values(result.body.data)[0].length),
+    assert.deepEqual(lists.map((result) => {
+      const rows = Object.values(result.body.data)[0];
+      assert.ok(Array.isArray(rows), "list responses must contain an array");
+      return rows.length;
+    }),
       [500, 500, 500, 500, 500, 500]);
   },
 });

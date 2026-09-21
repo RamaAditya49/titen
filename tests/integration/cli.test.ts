@@ -1,3 +1,4 @@
+import { fakeFetch } from "../helpers/fetch";
 import { afterAll, test } from "bun:test";
 import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -115,10 +116,10 @@ test("version check validates and reports the stable CLI and plugin release", as
 
   let requestInit: RequestInit | undefined;
   assert.deepEqual(
-    await fetchStableRelease(async (_input, init) => {
+    await fetchStableRelease(fakeFetch(async (_input, init) => {
       requestInit = init;
       return new Response(JSON.stringify(release));
-    }),
+    })),
     { cliVersion: nextStable, pluginVersion: "0.2.0" },
   );
   assert.equal(requestInit?.redirect, "error", "the fixed release URL must not follow redirects");
@@ -132,7 +133,7 @@ test("version check validates and reports the stable CLI and plugin release", as
     [new Response(JSON.stringify({ ...release, plugin: { version: "latest" } })), /invalid stable release manifest/],
   ] as const;
   for (const [response, message] of rejected)
-    await assert.rejects(fetchStableRelease(async () => response), message);
+    await assert.rejects(fetchStableRelease(fakeFetch(async () => response)), message);
 
   assert.equal(stableVersionStatus("0.5.0", "0.5.0"), "current");
   assert.equal(stableVersionStatus("0.6.0", "0.5.0"), "ahead");
@@ -368,8 +369,7 @@ test("backup refuses a missing source and atomically refreshes a fixed target", 
   try {
     source.run(
       "INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)",
-      SCHEMA_VERSION + 1,
-      "2026-07-31T00:00:00.000Z",
+      [SCHEMA_VERSION + 1, "2026-07-31T00:00:00.000Z"],
     );
   } finally {
     source.close();
@@ -386,7 +386,7 @@ test("backup refuses a missing source and atomically refreshes a fixed target", 
   }
   const repaired = openDatabase(sourcePath, { create: false });
   try {
-    repaired.run("DELETE FROM titen_migrations WHERE version = ?", SCHEMA_VERSION + 1);
+    repaired.run("DELETE FROM titen_migrations WHERE version = ?", [SCHEMA_VERSION + 1]);
   } finally {
     repaired.close();
   }

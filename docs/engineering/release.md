@@ -156,6 +156,9 @@ gh release create "v$(node -p 'require("./package.json").version')" \
   --notes-file <(scripts/changelog-section.sh)
 ```
 
+The complete gate starts with `pnpm typecheck`. It checks maintained sources and then verifies the frozen historical harnesses.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-stage) for the two check contracts.
+
 `npm publish` is the right command even though the repo uses pnpm: `pnpm
 publish` refuses a dirty tree and re-runs the workspace lifecycle, which buys
 nothing here. Either works.

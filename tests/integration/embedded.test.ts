@@ -1,3 +1,4 @@
+import { fakeFetch } from "../helpers/fetch";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -23,7 +24,7 @@ test("the returned app answers the client without a loopback round trip", async 
     const titen = new TitenClient({
       url: "http://embedded.invalid",
       key: provisioned.key,
-      fetch: (input, init) => running.app(new Request(input, init)),
+      fetch: fakeFetch((input, init) => running.app(new Request(input, init))),
     });
 
     const observation = await titen.observe({

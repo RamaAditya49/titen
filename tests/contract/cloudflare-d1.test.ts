@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Miniflare } from "miniflare";
+import { Miniflare, type Request as MiniflareRequest } from "miniflare";
 import { createD1Db } from "../../src/runtime/cloudflare/d1";
 import type { Db } from "../../src/core/db";
 import type { Stmt } from "../../src/core/db";
@@ -190,7 +190,7 @@ d1Test("workerd dispatches JSON-object extraction without following redirects", 
       TITEN_EXTRACT_RESPONSE_MODE: "json_object",
       TITEN_SECRET_KEYS: JSON.stringify({ active: "test-v1", keys: { "test-v1": TEST_SECRET_KEY } }),
     },
-    outboundService: async (request) => {
+    outboundService: async (request: MiniflareRequest) => {
       providerRequests += 1;
       if (new URL(request.url).hostname === "redirected.example.test") {
         redirectedRequests += 1;
@@ -237,10 +237,11 @@ d1Test("workerd dispatches JSON-object extraction without following redirects", 
       });
       assert.equal(response.status, 201);
     };
-    const schedule = () => (extractionRuntime.getWorker()).then((worker) => worker.scheduled({
-      cron: "* * * * *",
-      scheduledTime: Date.now(),
-    }));
+    const schedule = async () => {
+      const worker = await extractionRuntime.getWorker();
+      assert.ok("scheduled" in worker && typeof worker.scheduled === "function");
+      return worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() });
+    };
 
     await observe("complete");
 

@@ -108,6 +108,7 @@ beforeAll(async () => {
       return new Response(rejectNext ? "no" : "ok", { status: rejectNext ? 500 : 200 });
     },
   });
+  assert.ok(server.port, "the HTTP receiver must have a TCP port");
   receiver = { stop: () => server.stop(true), port: server.port };
 });
 
