@@ -454,9 +454,7 @@ test("D1 diagnostics redact sensitive stderr at every chunk split", async () => 
   ];
 
   for (const fixture of cases) {
-    const expectedLine = "redacted" in fixture
-      ? fixture.redacted
-      : fixture.input
+    const expectedLine = fixture.redacted ?? fixture.input
           .replace(fixture.forbidden[0], "[redacted]")
           .replace("Bearer [redacted]", "[redacted]");
     for (let split = 0; split <= fixture.input.length; split++) {

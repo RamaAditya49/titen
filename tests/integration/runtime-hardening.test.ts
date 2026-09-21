@@ -416,8 +416,8 @@ test("background repair reports enabled, stale, and disabled from canonical evid
 test("the explicit WAL checkpoint policy stays bounded and survives restart", async () => {
   const path = join(temporary(), "titen.db");
   const database = openDatabase(path);
-  assert.equal(database.query("PRAGMA wal_autocheckpoint").get()?.wal_autocheckpoint, 1_000);
-  assert.equal(database.query("PRAGMA synchronous").get()?.synchronous, 2);
+  assert.equal(database.query<{ wal_autocheckpoint: number }, []>("PRAGMA wal_autocheckpoint").get()?.wal_autocheckpoint, 1_000);
+  assert.equal(database.query<{ synchronous: number }, []>("PRAGMA synchronous").get()?.synchronous, 2);
   database.run("CREATE TABLE writes (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
   const insert = database.query("INSERT INTO writes(value) VALUES (?)");
   const writeBatch = database.transaction((start: number) => {

@@ -1,3 +1,4 @@
+import { fakeFetch } from "../helpers/fetch";
 import { afterAll, beforeAll, test } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -277,7 +278,7 @@ test("constructor configuration fails early with stable field errors", () => {
 
 test("requests compose caller cancellation with a timeout and never auto-retry", async () => {
   let calls = 0;
-  const waitingFetch: typeof fetch = async (_input, init) => {
+  const waitingFetch: typeof fetch = fakeFetch(async (_input, init) => {
     calls += 1;
     const signal = init?.signal;
     return new Promise<Response>((_resolve, reject) => {
@@ -285,7 +286,7 @@ test("requests compose caller cancellation with a timeout and never auto-retry",
       if (signal?.aborted) abort();
       else signal?.addEventListener("abort", abort, { once: true });
     });
-  };
+  });
   const local = new TitenClient({
     url: "http://example.test",
     key: "test",
@@ -316,13 +317,13 @@ test("requests compose caller cancellation with a timeout and never auto-retry",
   const unavailable = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () => {
+    fetch: fakeFetch(async () => {
       unavailableCalls += 1;
       return Response.json(
         { error: { code: "UNAVAILABLE", message: "Try later." } },
         { status: 503 },
       );
-    },
+    }),
   });
   await assert.rejects(
     () => unavailable.health(),
@@ -336,10 +337,10 @@ test("object-style consolidate misuse fails locally before fetch", async () => {
   const local = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () => {
+    fetch: fakeFetch(async () => {
       called = true;
       return Response.json({ data: {} });
-    },
+    }),
   });
   const consolidate = local.consolidate.bind(local) as unknown as (
     value: unknown,
@@ -374,7 +375,7 @@ test("TitenError preserves safe metadata and request ids", async () => {
   const local = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () => Response.json(
+    fetch: fakeFetch(async () => Response.json(
       {
         error: {
           code: "UNAVAILABLE",
@@ -384,7 +385,7 @@ test("TitenError preserves safe metadata and request ids", async () => {
         meta: { request_id: "req_body", dependency: "embedder", retryable: true },
       },
       { status: 503, headers: { "x-request-id": "req_header" } },
-    ),
+    )),
   });
   await assert.rejects(
     () => local.health(),
@@ -404,10 +405,10 @@ test("TitenError preserves safe metadata and request ids", async () => {
   const headerOnly = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () => Response.json(
+    fetch: fakeFetch(async () => Response.json(
       { error: { code: "FORBIDDEN", message: "No." } },
       { status: 403, headers: { "x-request-id": "req_header_only" } },
-    ),
+    )),
   });
   await assert.rejects(
     () => headerOnly.health(),
@@ -425,7 +426,7 @@ test("empty and non-JSON responses never leak parser or gateway details", async 
     new TitenClient({
       url: "http://example.test",
       key: "test",
-      fetch: async () => response,
+      fetch: fakeFetch(async () => response),
     }).health();
 
   assert.equal(await call(new Response(null, { status: 204 })), undefined);
@@ -505,8 +506,8 @@ test("successful JSON responses require an object envelope", async () => {
       const client = new TitenClient({
         url: "http://example.test",
         key: "test",
-        fetch: async () =>
-          Response.json(value, { headers: { "x-request-id": requestId } }),
+        fetch: fakeFetch(async () =>
+          Response.json(value, { headers: { "x-request-id": requestId } })),
       });
       await assert.rejects(
         () => call(client),
@@ -525,14 +526,14 @@ test("successful JSON responses require an object envelope", async () => {
   const client = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () =>
+    fetch: fakeFetch(async () =>
       Response.json(
         {
           data: { status: "ok", runtime: "test", revision: "valid" },
           meta: { replayed: true },
         },
         { headers: { "x-request-id": "req-valid" } },
-      ),
+      )),
   });
   assert.deepEqual(await client.requestWithMeta("GET", "/healthz"), {
     data: { status: "ok", runtime: "test", revision: "valid" },
@@ -595,10 +596,10 @@ test("generic JSON and raw access preserve auth without allowing overrides", asy
   const local = new TitenClient({
     url: "http://example.test",
     key: "configured-key",
-    fetch: async () => {
+    fetch: fakeFetch(async () => {
       called = true;
       return Response.json({ data: {} });
-    },
+    }),
   });
   await assert.rejects(
     () =>
@@ -639,7 +640,7 @@ test("typed event iteration stops on empty pages and rejects broken cursors", as
   const local = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () => Response.json({ data: pages[calls++] }),
+    fetch: fakeFetch(async () => Response.json({ data: pages[calls++] })),
   });
   assert.deepEqual((await collect(local)).map(({ id }) => id), ["evt_1", "evt_2"]);
   assert.equal(calls, 3, "an exact page boundary needs one terminal empty poll");
@@ -648,10 +649,10 @@ test("typed event iteration stops on empty pages and rejects broken cursors", as
   const empty = new TitenClient({
     url: "http://example.test",
     key: "test",
-    fetch: async () => {
+    fetch: fakeFetch(async () => {
       emptyCalls += 1;
       return Response.json({ data: { events: [], cursor: null } });
-    },
+    }),
   });
   assert.deepEqual(await collect(empty), []);
   assert.equal(emptyCalls, 1);
@@ -666,7 +667,7 @@ test("typed event iteration stops on empty pages and rejects broken cursors", as
     const broken = new TitenClient({
       url: "http://example.test",
       key: "test",
-      fetch: async () => Response.json({ data: brokenPages[index++] }),
+      fetch: fakeFetch(async () => Response.json({ data: brokenPages[index++] })),
     });
     await assert.rejects(
       () => collect(broken),
@@ -688,10 +689,10 @@ test("typed mutation sends one idempotency header and the capability matrix stay
   const local = new TitenClient({
     url: "http://example.test",
     key: "configured-key",
-    fetch: async (_input, init) => {
+    fetch: fakeFetch(async (_input, init) => {
       headers = new Headers(init?.headers);
       return Response.json({ data: { observation_id: "obs_test" } });
-    },
+    }),
   });
   await local.observe(
     {

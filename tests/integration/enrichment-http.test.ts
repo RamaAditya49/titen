@@ -1,3 +1,4 @@
+import { fakeFetch } from "../helpers/fetch";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import {
@@ -16,12 +17,12 @@ test("HTTP extraction is explicit, bounded, and schema-shaped", async () => {
     model: "sol-locked",
     modelFingerprint: fingerprint,
     apiKey: "test-secret",
-    fetch: (async (input, init) => {
+    fetch: fakeFetch((async (input, init) => {
       request = { input: String(input), init };
       return Response.json({
         choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ action: "abstain" }) } }],
       });
-    }) as typeof fetch,
+    })),
   });
   const proposal = await capability.generate({
     lane: "derivation",
@@ -50,12 +51,12 @@ test("HTTP extraction exposes explicit JSON-object compatibility without weakeni
     model: "compat",
     modelFingerprint: fingerprint,
     responseMode: "json_object",
-    fetch: (async (_input, init) => {
+    fetch: fakeFetch((async (_input, init) => {
       body = JSON.parse(String(init?.body));
       return Response.json({
         choices: [{ finish_reason: "stop", message: { content: '{"action":"abstain"}' } }],
       });
-    }) as typeof fetch,
+    })),
   });
 
   assert.deepEqual(await capability.generate({
@@ -80,13 +81,13 @@ test("HTTP extraction rejects redirects before reading their body", async () => 
     baseUrl: "https://models.example.test/v1",
     model: "redirect",
     modelFingerprint: fingerprint,
-    fetch: (async (_input, init) => {
+    fetch: fakeFetch((async (_input, init) => {
       redirect = init?.redirect;
       return new Response(new ReadableStream({ cancel() { cancelled = true; } }), {
         status: 302,
         headers: { location: "https://elsewhere.example.test/" },
       });
-    }) as typeof fetch,
+    })),
   });
   await assert.rejects(
     () => capability.generate({ lane: "derivation", system: "contract", input: {}, schema: {} }),
@@ -109,12 +110,12 @@ test("HTTP extraction accepts only explicitly complete derivation and reflection
         baseUrl: "https://models.example.test/v1",
         model: "completion-state",
         modelFingerprint: fingerprint,
-        fetch: (async () => Response.json({
+        fetch: fakeFetch((async () => Response.json({
           choices: [{
             ...(reason === null ? {} : { finish_reason: reason }),
             message: { content: '{"action":"abstain"}' },
           }],
-        })) as typeof fetch,
+        }))),
       });
       await assert.rejects(
         () => capability.generate({ lane, system: "contract", input: {}, schema: {} }),
@@ -179,9 +180,9 @@ test("HTTP extraction classifies provider failures without response text", async
     baseUrl: "http://127.0.0.1:11434/v1",
     model: "sol",
     modelFingerprint: fingerprint,
-    fetch: (async () => new Response(new ReadableStream({
+    fetch: fakeFetch((async () => new Response(new ReadableStream({
       cancel() { cancelled = true; },
-    }), { status: 429 })) as typeof fetch,
+    }), { status: 429 }))),
   });
   await assert.rejects(
     () => capability.generate({
@@ -207,9 +208,9 @@ test("HTTP extraction cancels a response whose declared size exceeds the ceiling
     baseUrl: "http://127.0.0.1:11434/v1",
     model: "sol",
     modelFingerprint: fingerprint,
-    fetch: (async () => new Response(new ReadableStream({
+    fetch: fakeFetch((async () => new Response(new ReadableStream({
       cancel() { cancelled = true; },
-    }), { headers: { "content-length": String(128 * 1024 + 1) } })) as typeof fetch,
+    }), { headers: { "content-length": String(128 * 1024 + 1) } }))),
   });
   await assert.rejects(
     () => capability.generate({ lane: "derivation", system: "contract", input: {}, schema: {} }),
@@ -228,13 +229,13 @@ test("HTTP extraction stops a chunked response at the byte ceiling", async () =>
     baseUrl: "http://127.0.0.1:11434/v1",
     model: "sol",
     modelFingerprint: fingerprint,
-    fetch: (async () => new Response(new ReadableStream({
+    fetch: fakeFetch((async () => new Response(new ReadableStream({
       start(controller) {
         controller.enqueue(chunk);
         controller.enqueue(chunk);
         controller.close();
       },
-    }))) as typeof fetch,
+    })))),
   });
   await assert.rejects(
     () => capability.generate({

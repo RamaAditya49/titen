@@ -241,6 +241,7 @@ test("the graph is readable as a resource, the way the reference server serves i
   assert.deepEqual(JSON.parse(contents[0]!.text), await readGraph());
 
   const unknown = await rpc("resources/read", { uri: "memory://nope" });
+  assert.ok(unknown.error, "an unknown resource must return an error");
   assert.equal(unknown.error.code, -32602, "an unknown uri is a params error, not a 404");
 });
 

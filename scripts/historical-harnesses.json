@@ -1,0 +1,62 @@
+[
+  {
+    "path": "docs/testing/results/2026-08-08-interpretable-score/harness/probe_relevance.ts",
+    "sha256": "6f23534481ddacd4dd5f9d492ffb2dd9d6aff48cf04031816c7858458e11d247",
+    "diagnostics": [
+      {
+        "code": 1375,
+        "line": 16,
+        "character": 28,
+        "message": "'await' expressions are only allowed at the top level of a file when that file is a module, but this file has no imports or exports. Consider adding an empty 'export {}' to make this file a module."
+      }
+    ]
+  },
+  {
+    "path": "docs/testing/results/2026-08-08-pooled-candidate-generation/harness/c1_depth.ts",
+    "sha256": "39a9a6c14fa5ed922f54caa56f5afe2fa6e1f902b1c9f49731a77cd4cc475c04",
+    "diagnostics": [
+      {
+        "code": 2307,
+        "line": 19,
+        "character": 30,
+        "message": "Cannot find module '../src/core/retrieval.ts' or its corresponding type declarations."
+      }
+    ]
+  },
+  {
+    "path": "docs/testing/results/2026-08-08-pooled-compile-latency/harness/h0_probe.ts",
+    "sha256": "6b3762c2d59980da9440bb89bd65ec8357ab227b62dfa7a077b5c5686fc03af8",
+    "diagnostics": [
+      {
+        "code": 2307,
+        "line": 20,
+        "character": 55,
+        "message": "Cannot find module '../src/core/retrieval.ts' or its corresponding type declarations."
+      },
+      {
+        "code": 2307,
+        "line": 21,
+        "character": 32,
+        "message": "Cannot find module '../src/core/auth.ts' or its corresponding type declarations."
+      }
+    ]
+  },
+  {
+    "path": "docs/testing/results/2026-08-08-pooled-recall-recovery/harness/elat2_probe.ts",
+    "sha256": "f5e350769afed18a2126b295d7c11a6e6dc1464d9c5878da8b5e3b4f7692fdc3",
+    "diagnostics": [
+      {
+        "code": 2307,
+        "line": 19,
+        "character": 30,
+        "message": "Cannot find module '../../titen-recovery/src/core/retrieval' or its corresponding type declarations."
+      },
+      {
+        "code": 2554,
+        "line": 36,
+        "character": 8,
+        "message": "Expected 0 arguments, but got 1."
+      }
+    ]
+  }
+]

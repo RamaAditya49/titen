@@ -54,10 +54,22 @@ Install and verify the current repository with:
 
 ```bash
 pnpm install
+pnpm typecheck
 pnpm test
 pnpm check:workflow
 git diff --check
 ```
+
+`pnpm typecheck` runs two explicit checks:
+
+- `typecheck:maintained` checks production code, SDK code, tests, scripts, and examples with the strict repository configuration.
+- `typecheck:historical` verifies four frozen experiment probes against their SHA-256 hashes and six exact compiler diagnostics.
+
+The archive manifest is `scripts/historical-harnesses.json`. Its probes retain imports and execution assumptions from their original experiment locations.
+The historical check preserves that evidence. It does not certify those probes against the current runtime.
+Changed content, missing files, and changed diagnostics fail the check. Do not add maintained sources to this manifest.
+
+`pnpm test:all` runs both checks before the complete manual release gate.
 
 Run the local workerd/D1 gate with `pnpm build:worker && pnpm test:d1`. It
 reserves one loopback lane across worktrees and fails immediately with the

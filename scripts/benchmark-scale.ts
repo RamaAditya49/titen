@@ -502,11 +502,11 @@ async function runDecade(options: Options, size: number, secrets: string[]) {
   record.storage = {
     db_bytes_after_sweep: statSync(dbPath).size,
     wal_bytes: fileBytes(`${dbPath}-wal`),
-    claims: Number(post.query("SELECT count(*) AS n FROM claims").get()?.n ?? 0),
-    observations: Number(post.query("SELECT count(*) AS n FROM observations").get()?.n ?? 0),
-    claims_fts: Number(post.query("SELECT count(*) AS n FROM claims_fts").get()?.n ?? 0),
-    context_runs: Number(post.query("SELECT count(*) AS n FROM context_runs").get()?.n ?? 0),
-    context_run_items: Number(post.query("SELECT count(*) AS n FROM context_run_items").get()?.n ?? 0),
+    claims: Number(post.query<{ n: number }, []>("SELECT count(*) AS n FROM claims").get()?.n ?? 0),
+    observations: Number(post.query<{ n: number }, []>("SELECT count(*) AS n FROM observations").get()?.n ?? 0),
+    claims_fts: Number(post.query<{ n: number }, []>("SELECT count(*) AS n FROM claims_fts").get()?.n ?? 0),
+    context_runs: Number(post.query<{ n: number }, []>("SELECT count(*) AS n FROM context_runs").get()?.n ?? 0),
+    context_run_items: Number(post.query<{ n: number }, []>("SELECT count(*) AS n FROM context_run_items").get()?.n ?? 0),
   };
   // FTS is derived data written inline with the canonical row, so there is no
   // separate build step during ingest. The build cost that exists is the

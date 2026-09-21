@@ -133,7 +133,7 @@ test("Bun refuses canonical database aliases before vector schema mutation", () 
 
   const reopened = openDatabase(canonicalPath);
   assert.equal(
-    reopened.query("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'vec_claims'").get()?.count,
+    reopened.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'vec_claims'").get()?.count,
     0,
   );
   reopened.close();
@@ -160,7 +160,7 @@ test("Bun rejects plain and wrong-module vec_claims lookalikes", () => {
       sqliteVec.load(handle);
     }
     handle.run(schema);
-    const before = handle.query("SELECT sql FROM sqlite_master WHERE name = 'vec_claims'").get()?.sql;
+    const before = handle.query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE name = 'vec_claims'").get()?.sql;
     handle.close();
 
     const result = tryCreateVectors({
@@ -175,7 +175,7 @@ test("Bun rejects plain and wrong-module vec_claims lookalikes", () => {
 
     const reopened = openDatabase(vecDbPath);
     assert.equal(
-      reopened.query("SELECT sql FROM sqlite_master WHERE name = 'vec_claims'").get()?.sql,
+      reopened.query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE name = 'vec_claims'").get()?.sql,
       before,
     );
     reopened.close();

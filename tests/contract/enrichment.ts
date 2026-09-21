@@ -58,6 +58,12 @@ function observationContent(request: ExtractionRequest): string {
   return (request.input as any).observation.content as string;
 }
 
+function requiredId(ids: ReadonlyMap<string, string>, id: string): string {
+  const mapped = ids.get(id);
+  assert.ok(mapped, "exported fixture IDs must have an import mapping");
+  return mapped;
+}
+
 function proposalFor(request: ExtractionRequest): unknown {
   if (request.lane === "reflection") {
     const premises = (request.input as any).premises as Array<{
@@ -563,7 +569,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       destination_actor_id: importedPrincipal.principalId,
     },
     importedObservation,
-  ].map(JSON.stringify).join("\n");
+  ].map((value) => JSON.stringify(value)).join("\n");
   assert.equal((await importedClient.callRaw("POST", "/v1/import", {
     key: importedPrincipal.key,
     body: `${importedBody}\n`,
@@ -781,6 +787,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   });
   const sameOrgActor = {
     ...sameOrgPrincipal,
+    vectors: undefined,
     client: clientVia(createApp({
       db,
       runtime,
@@ -889,8 +896,8 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   });
   assert.equal(exportedObservations.status, 200);
   assert.equal(exportedClaims.status, 200);
-  const observationRows = String(exportedObservations.body).trim().split("\n").map(JSON.parse);
-  const claimRows = String(exportedClaims.body).trim().split("\n").map(JSON.parse);
+  const observationRows = String(exportedObservations.body).trim().split("\n").map((value) => JSON.parse(value));
+  const claimRows = String(exportedClaims.body).trim().split("\n").map((value) => JSON.parse(value));
   assert.equal(claimRows[0]!.format_version, 4);
   assert.equal(claimRows.length, 2);
   assert.match(claimRows[1]!.enrichment_job_id, /^enr_/u);
@@ -973,12 +980,12 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     source_actor_id: duplicate.principalId,
     destination_actor_id: restoreTarget.principalId,
   };
-  const restoredBody = `${restoredObservations.map(JSON.stringify).join("\n")}\n${JSON.stringify(actorMap)}\n${restoredClaims.map(JSON.stringify).join("\n")}\n`;
+  const restoredBody = `${restoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${JSON.stringify(actorMap)}\n${restoredClaims.map((value) => JSON.stringify(value)).join("\n")}\n`;
   const missingPrimary = structuredClone(restoredClaim);
   missingPrimary.enrichments = [];
   const rejectedMissing = await restoreTarget.client.callRaw("POST", "/v1/import", {
     key: restoreTarget.key,
-    body: `${restoredObservations.map(JSON.stringify).join("\n")}\n${JSON.stringify(actorMap)}\n${JSON.stringify(claimRows[0])}\n${JSON.stringify(missingPrimary)}\n`,
+    body: `${restoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${JSON.stringify(actorMap)}\n${JSON.stringify(claimRows[0])}\n${JSON.stringify(missingPrimary)}\n`,
   });
   assert.equal(rejectedMissing.status, 400);
   assert.equal(Number((await db.all<{ count: number }>(
@@ -992,7 +999,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   wrongSourceClaim.sources[0].observation_id = unrelatedEvidence.id;
   const rejectedWrongSource = await restoreTarget.client.callRaw("POST", "/v1/import", {
     key: restoreTarget.key,
-    body: `${[...restoredObservations, unrelatedEvidence].map(JSON.stringify).join("\n")}\n${
+    body: `${[...restoredObservations, unrelatedEvidence].map((value) => JSON.stringify(value)).join("\n")}\n${
       JSON.stringify(actorMap)
     }\n${JSON.stringify(claimRows[0])}\n${JSON.stringify(wrongSourceClaim)}\n`,
   });
@@ -1013,7 +1020,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   });
   const rejectedUnsupportedFuture = await restoreTarget.client.callRaw("POST", "/v1/import", {
     key: restoreTarget.key,
-    body: `${restoredObservations.map(JSON.stringify).join("\n")}\n${
+    body: `${restoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${
       JSON.stringify(actorMap)
     }\n${JSON.stringify(claimRows[0])}\n${JSON.stringify(unsupportedFutureClaim)}\n`,
   });
@@ -1024,7 +1031,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     invalidArchiveClaim.enrichment_key_archived = invalidArchiveFlag;
     const rejectedArchiveFlag = await restoreTarget.client.callRaw("POST", "/v1/import", {
       key: restoreTarget.key,
-      body: `${restoredObservations.map(JSON.stringify).join("\n")}\n${
+      body: `${restoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${
         JSON.stringify(actorMap)
       }\n${JSON.stringify(claimRows[0])}\n${JSON.stringify(invalidArchiveClaim)}\n`,
     });
@@ -1037,7 +1044,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   supersededWithoutReplacement.superseded_by = null;
   const rejectedMissingReplacement = await restoreTarget.client.callRaw("POST", "/v1/import", {
     key: restoreTarget.key,
-    body: `${restoredObservations.map(JSON.stringify).join("\n")}\n${
+    body: `${restoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${
       JSON.stringify(actorMap)
     }\n${JSON.stringify(claimRows[0])}\n${JSON.stringify(supersededWithoutReplacement)}\n`,
   });
@@ -1086,9 +1093,9 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   assert.equal(privateObservationExport.status, 200);
   assert.equal(privateClaimExport.status, 200);
   const privateObservationRows = String(privateObservationExport.body)
-    .trim().split("\n").map(JSON.parse);
+    .trim().split("\n").map((value) => JSON.parse(value));
   const privateClaimRows = String(privateClaimExport.body)
-    .trim().split("\n").map(JSON.parse);
+    .trim().split("\n").map((value) => JSON.parse(value));
   const privateRemapper = portableRemapper(
     privateObservationRows.slice(1),
     privateClaimRows.slice(1),
@@ -1107,7 +1114,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     {
       key: privateReplacementImporter.key,
       body: `${JSON.stringify(privateObservationRows[0])}\n${
-        mappedPrivateObservations.map(JSON.stringify).join("\n")
+        mappedPrivateObservations.map((value) => JSON.stringify(value)).join("\n")
       }\n${JSON.stringify(privateClaimRows[0])}\n${JSON.stringify(mappedPrivateClaim)}\n`,
     },
   );
@@ -1323,7 +1330,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   });
   assert.equal(reflectedObservationExport.status, 200);
   assert.equal(reflectedClaimExport.status, 200);
-  const reflectedClaimLines = String(reflectedClaimExport.body).trim().split("\n").map(JSON.parse);
+  const reflectedClaimLines = String(reflectedClaimExport.body).trim().split("\n").map((value) => JSON.parse(value));
   const reflectedClaimHeader = reflectedClaimLines[0]!;
   const reflectedClaimRows = reflectedClaimLines.slice(1);
   const portableReflection = reflectedClaimRows.find((row) => row.id === reflected[0]!.id);
@@ -1500,7 +1507,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   );
   assert.equal(lifecycleOrdinaryClaimExport.status, 200);
   const lifecycleOrdinaryClaims = String(lifecycleOrdinaryClaimExport.body)
-    .trim().split("\n").slice(1).map(JSON.parse);
+    .trim().split("\n").slice(1).map((value) => JSON.parse(value));
   assert.ok(lifecycleOrdinaryClaims.some((claim) => claim.id === lifecycleResult),
     "authorized logical export must retain non-current reflection provenance");
   assert.ok(lifecycleOrdinaryClaims.some((claim) => claim.enrichments.some(
@@ -1519,9 +1526,9 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   assert.equal(lifecycleObservationExport.status, 200);
   assert.equal(lifecycleClaimExport.status, 200);
   const lifecycleObservationRows = String(lifecycleObservationExport.body)
-    .trim().split("\n").map(JSON.parse);
+    .trim().split("\n").map((value) => JSON.parse(value));
   const lifecycleClaimRows = String(lifecycleClaimExport.body)
-    .trim().split("\n").map(JSON.parse);
+    .trim().split("\n").map((value) => JSON.parse(value));
   assert.equal(lifecycleClaimRows.find((row) => row.id === lifecycleResult)!.status, "revoked");
   const lifecycleIds = [
     ...lifecycleObservationRows.slice(1).map((row) => row.id),
@@ -1570,20 +1577,20 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   activeLifecycleInput.version += 1;
   const lifecycleTamperRejected = await lifecycleRestoreTarget.client.callRaw("POST", "/v1/import", {
     key: lifecycleRestoreTarget.key,
-    body: `${lifecycleRestoredObservations.map(JSON.stringify).join("\n")}\n${
+    body: `${lifecycleRestoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${
       JSON.stringify(lifecycleActorMap)
-    }\n${lifecycleTamperedClaims.map(JSON.stringify).join("\n")}\n`,
+    }\n${lifecycleTamperedClaims.map((value) => JSON.stringify(value)).join("\n")}\n`,
   });
   assert.equal(lifecycleTamperRejected.status, 400,
     "an active premise cannot masquerade as a historical higher version");
   const lifecycleRestored = await lifecycleRestoreTarget.client.callRaw("POST", "/v1/import", {
     key: lifecycleRestoreTarget.key,
-    body: `${lifecycleRestoredObservations.map(JSON.stringify).join("\n")}\n${
+    body: `${lifecycleRestoredObservations.map((value) => JSON.stringify(value)).join("\n")}\n${
       JSON.stringify(lifecycleActorMap)
-    }\n${lifecycleRestoredClaims.map(JSON.stringify).join("\n")}\n`,
+    }\n${lifecycleRestoredClaims.map((value) => JSON.stringify(value)).join("\n")}\n`,
   });
   assert.equal(lifecycleRestored.status, 200, JSON.stringify(lifecycleRestored.body));
-  const restoredLifecycleResult = lifecycleIdMap.get(lifecycleResult)!;
+  const restoredLifecycleResult = requiredId(lifecycleIdMap, lifecycleResult)!;
   assert.deepEqual(await db.all<{ status: string; version: number }>(
     `SELECT status, version FROM claims WHERE id = ? AND org_id = ?`,
     [restoredLifecycleResult, lifecycleRestoreTarget.orgId],
@@ -1596,8 +1603,8 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     `SELECT COUNT(*) AS count FROM claim_links
       WHERE id = ? AND job_id = ? AND org_id = ?`,
     [
-      lifecycleIdMap.get(lifecycleLink.id),
-      lifecycleIdMap.get(lifecycleLink.job_id),
+      requiredId(lifecycleIdMap, lifecycleLink.id),
+      requiredId(lifecycleIdMap, lifecycleLink.job_id),
       lifecycleRestoreTarget.orgId,
     ],
   ))[0]!.count), 1, "historical LINK provenance must survive lifecycle restore");
@@ -1627,7 +1634,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       );
       assert.equal(page.status, 200);
       const lines = typeof page.body === "string"
-        ? page.body.trim().split("\n").map(JSON.parse)
+        ? page.body.trim().split("\n").map((value) => JSON.parse(value))
         : [page.body];
       const header = lines[0]!;
       const records = lines.slice(1).map(remapPaged);
@@ -1640,7 +1647,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
         const importedPage = await pagedRestoreTarget.client.callRaw("POST", "/v1/import", {
           key: pagedRestoreTarget.key,
           body: `${JSON.stringify(header)}\n${JSON.stringify(pagedActorMap)}\n${
-            records.map(JSON.stringify).join("\n")
+            records.map((value) => JSON.stringify(value)).join("\n")
           }\n`,
         });
         assert.equal(importedPage.status, 200, JSON.stringify(importedPage.body));
@@ -1655,14 +1662,14 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   assert.ok(await importPaged("claims") >= 3);
   assert.deepEqual(await db.all<{ status: string }>(
     `SELECT status FROM claims WHERE id = ? AND org_id = ?`,
-    [pagedIdMap.get(lifecycleResult), pagedRestoreTarget.orgId],
+    [requiredId(pagedIdMap, lifecycleResult), pagedRestoreTarget.orgId],
   ), [{ status: "revoked" }]);
   assert.equal(Number((await db.all<{ count: number }>(
     `SELECT COUNT(*) AS count FROM claim_links
       WHERE id = ? AND job_id = ? AND org_id = ?`,
     [
-      pagedIdMap.get(lifecycleLink.id),
-      pagedIdMap.get(lifecycleLink.job_id),
+      requiredId(pagedIdMap, lifecycleLink.id),
+      requiredId(pagedIdMap, lifecycleLink.job_id),
       pagedRestoreTarget.orgId,
     ],
   ))[0]!.count), 1, "limit=1 paging must preserve deterministic LINK ownership");
@@ -1701,7 +1708,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     { key: orderedSupersession.key },
   );
   assert.equal(orderedFirst.status, 200);
-  const orderedFirstLines = String(orderedFirst.body).trim().split("\n").map(JSON.parse);
+  const orderedFirstLines = String(orderedFirst.body).trim().split("\n").map((value) => JSON.parse(value));
   assert.equal(orderedFirstLines[1]!.id, lexicalReplacement!.id,
     "the replacement must precede a lexically earlier dependent claim");
   const orderedSecond = await orderedSupersession.client.call(
@@ -1712,7 +1719,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     { key: orderedSupersession.key },
   );
   assert.equal(orderedSecond.status, 200);
-  const orderedSecondLines = String(orderedSecond.body).trim().split("\n").map(JSON.parse);
+  const orderedSecondLines = String(orderedSecond.body).trim().split("\n").map((value) => JSON.parse(value));
   assert.equal(orderedSecondLines[1]!.id, lexicalOriginal!.id);
   const unavailableCursor = await orderedSupersession.client.call(
     "GET",
@@ -1729,7 +1736,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   );
   assert.equal(orderedObservationExport.status, 200);
   const orderedObservationLines = String(orderedObservationExport.body)
-    .trim().split("\n").map(JSON.parse);
+    .trim().split("\n").map((value) => JSON.parse(value));
   const orderedClaimRecords = [orderedFirstLines[1], orderedSecondLines[1]];
   const orderedRemapper = portableRemapper(
     orderedObservationLines.slice(1),
@@ -1749,7 +1756,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   const orderedObservationsImported = await orderedRestore.client.callRaw("POST", "/v1/import", {
     key: orderedRestore.key,
     body: `${JSON.stringify(orderedObservationLines[0])}\n${JSON.stringify(orderedActorMap)}\n${
-      mappedOrderedObservations.map(JSON.stringify).join("\n")
+      mappedOrderedObservations.map((value) => JSON.stringify(value)).join("\n")
     }\n`,
   });
   assert.equal(orderedObservationsImported.status, 200, JSON.stringify(orderedObservationsImported.body));
@@ -1766,10 +1773,10 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   }
   assert.deepEqual(await db.all<{ status: string; superseded_by: string }>(
     `SELECT status, superseded_by FROM claims WHERE id = ? AND org_id = ?`,
-    [orderedRemapper.idMap.get(lexicalOriginal!.id), orderedRestore.orgId],
+    [requiredId(orderedRemapper.idMap, lexicalOriginal!.id), orderedRestore.orgId],
   ), [{
     status: "superseded",
-    superseded_by: orderedRemapper.idMap.get(lexicalReplacement!.id)!,
+    superseded_by: requiredId(orderedRemapper.idMap, lexicalReplacement!.id)!,
   }]);
 
   const portableCycle = await createClient();
@@ -1815,7 +1822,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     { key: portableCycle.key },
   );
   assert.equal(completeCycle.status, 200);
-  const completeCycleLines = String(completeCycle.body).trim().split("\n").map(JSON.parse);
+  const completeCycleLines = String(completeCycle.body).trim().split("\n").map((value) => JSON.parse(value));
   assert.deepEqual(
     new Set(completeCycleLines.slice(1).map((row) => row.id)),
     new Set([cyclePremise.id, cycleResult.id]),
@@ -1841,7 +1848,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   );
   assert.equal(cycleObservationExport.status, 200);
   const cycleObservationLines = String(cycleObservationExport.body)
-    .trim().split("\n").map(JSON.parse);
+    .trim().split("\n").map((value) => JSON.parse(value));
   const cycleClaimRecords = completeCycleLines.slice(1);
   const cycleRemapper = portableRemapper(
     cycleObservationLines.slice(1),
@@ -1861,7 +1868,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   const cycleObservationsImported = await cycleRestore.client.callRaw("POST", "/v1/import", {
     key: cycleRestore.key,
     body: `${JSON.stringify(cycleObservationLines[0])}\n${JSON.stringify(cycleActorMap)}\n${
-      mappedCycleObservations.map(JSON.stringify).join("\n")
+      mappedCycleObservations.map((value) => JSON.stringify(value)).join("\n")
     }\n`,
   });
   assert.equal(cycleObservationsImported.status, 200, JSON.stringify(cycleObservationsImported.body));
@@ -1869,22 +1876,22 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   const cycleClaimsImported = await cycleRestore.client.callRaw("POST", "/v1/import", {
     key: cycleRestore.key,
     body: `${JSON.stringify(completeCycleLines[0])}\n${JSON.stringify(cycleActorMap)}\n${
-      mappedCycleClaims.map(JSON.stringify).join("\n")
+      mappedCycleClaims.map((value) => JSON.stringify(value)).join("\n")
     }\n`,
   });
   assert.equal(cycleClaimsImported.status, 200, JSON.stringify(cycleClaimsImported.body));
   assert.deepEqual(await db.all<{ status: string; superseded_by: string }>(
     `SELECT status, superseded_by FROM claims WHERE id = ? AND org_id = ?`,
-    [cycleRemapper.idMap.get(cyclePremise.id), cycleRestore.orgId],
+    [requiredId(cycleRemapper.idMap, cyclePremise.id), cycleRestore.orgId],
   ), [{
     status: "superseded",
-    superseded_by: cycleRemapper.idMap.get(cycleResult.id)!,
+    superseded_by: requiredId(cycleRemapper.idMap, cycleResult.id)!,
   }]);
   assert.equal(Number((await db.all<{ count: number }>(
     `SELECT COUNT(*) AS count FROM enrichment_jobs
       WHERE id = ? AND org_id = ? AND state = 'done'`,
     [
-      cycleRemapper.idMap.get(
+      requiredId(cycleRemapper.idMap,
         cycleClaimRecords.find((row) => row.id === cycleResult.id)!.enrichment_job_id,
       ),
       cycleRestore.orgId,
@@ -2226,6 +2233,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     limit: 10,
     orgId: staleScheduler.orgId,
     vectors: {
+      fingerprint: { ...fakeVectors().fingerprint, dimensions: 1, model: "fixture-vector" },
       embedder: {
         dimensions: 1,
         model: "fixture-vector",
@@ -2299,7 +2307,8 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   }
   await db.batch(relatedStatements);
   let relatedEmbedCalls = 0;
-  const relatedVectors = {
+  const relatedVectors: VectorCapability = {
+    fingerprint: { ...fakeVectors().fingerprint, dimensions: 1, model: "fixture-vector" },
     embedder: {
       dimensions: 1,
       model: "fixture-vector",
