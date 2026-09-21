@@ -1,14 +1,13 @@
 ---
 work_id: typecheck-baseline-306
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-09-21
 updated: 2026-09-21
-review_after: 2026-10-05
 owner: maintainer
-spec: docs/specs/active/2026-09-21-typecheck-baseline.md
+spec: docs/specs/done/2026-09-21-typecheck-baseline.md
 ---
 
 # Typecheck baseline implementation plan
@@ -32,23 +31,23 @@ Use current Miniflare public types for outbound requests and scheduled dispatch.
 - [x] Correct fixture and script types; keep runtime assertions intact.
 - [x] Update `CONTRIBUTING.md` and the release guide with both lane contracts.
 - [x] Run typecheck, the full release gate, SDK builds, package verification, and workflow checks.
-- [ ] Review the diff and commit only scoped changes with the required attribution.
-- [ ] Push the fix branch, merge its pull request, and verify the remote main commit.
-- [ ] Back up the canonical database, installed package, and service configuration; verify the backup.
-- [ ] Install the checked candidate and set its revision; restart the service and dashboard.
-- [ ] Verify readiness, schema, dashboard, unauthenticated rejection, and authenticated MCP discovery.
-- [ ] Close issue #306 and move both workflow files to done with evidence.
+- [x] Review the diff and commit only scoped changes with the required attribution.
+- [x] Push the fix branch, merge its pull request, and verify the remote main commit.
+- [x] Back up the canonical database, installed package, and service configuration; verify the backup.
+- [x] Install the checked candidate and set its revision; restart the service and dashboard.
+- [x] Verify readiness, schema, dashboard, unauthenticated rejection, and authenticated MCP discovery.
+- [x] Close issue #306 and move both workflow files to done with evidence.
 
-## Verification map
+## Acceptance evidence
 
 | Criterion | Evidence |
 | --- | --- |
-| AC-TC-001 | Baseline compiler log; clean `pnpm typecheck`; maintained source input inspection |
-| AC-TC-002 | Archive SHA-256 manifest and zero diff for archived probes |
-| AC-TC-003 | Archive checker regression tests and exact diagnostic comparison |
-| AC-TC-004 | `pnpm test:all`, including D1, Bun, integration, dashboard, and browser checks |
-| AC-TC-005 | `pnpm build:npm` and `bash scripts/verify-pack.sh` |
-| AC-TC-006 | Private backup record, deployed revision, readiness, dashboard, and MCP smoke |
+| AC-TC-001 | `pnpm typecheck` passed in the isolated checkout and again on clean main. |
+| AC-TC-002 | All four archive hashes matched, and their Git diff stayed empty. |
+| AC-TC-003 | Five regression tests and exact diagnostic comparison passed. |
+| AC-TC-004 | `pnpm test:all` passed, including D1, Bun, integration, dashboard, and browser checks. |
+| AC-TC-005 | `pnpm build:npm` and all nine `scripts/verify-pack.sh` checks passed. |
+| AC-TC-006 | A verified backup preceded deployment; readiness, dashboard, integrity, and authenticated MCP checks passed afterward. |
 
 ## Rollback
 
@@ -66,3 +65,13 @@ The schema stays unchanged. Preserve the canonical backup; restore it only if in
 - `pnpm build:npm` and all nine `scripts/verify-pack.sh` checks passed.
 - Workflow checks, public artifact checks, and `git diff --check` passed.
 - Independent review approved the change after checking types, archive coverage, fetch doubles, and scheduled dispatch.
+
+- PR #308 merged the checked source as `905d865a3332e748755134f4825201cb3a9da8d8`.
+- The existing Bun service and packaged dashboard now serve revision `git-905d865a3332`.
+- Canonical backup integrity, backup checksums, and the previous package/configuration archive passed before deployment.
+- Installed candidate SHA-256: `a1b1df195b39f937b42b6ce3ec1db154511a4ab633499372ae63765c3f7a4223`.
+- Local and public readiness returned the candidate revision with schema 24 verified. Both services remained active.
+- Public MCP rejected unauthenticated requests with 401 and returned all nine canonical and nine compatibility tools with authentication.
+- An authenticated project resolution returned the existing project identity. Canonical integrity and foreign-key checks passed after restart.
+- Issue #306 closed after production smoke. The package version remains 0.10.0 under the internal-change release policy.
+- No schema migration or rollback was required. The verified rollback snapshot remains available to the operator.
