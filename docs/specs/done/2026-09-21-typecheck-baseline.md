@@ -1,12 +1,11 @@
 ---
 work_id: typecheck-baseline-306
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-09-21
 updated: 2026-09-21
-review_after: 2026-10-05
 owner: maintainer
 ---
 
@@ -55,3 +54,17 @@ No database migration is required. Keep private deployment details outside publi
 
 All acceptance criteria have reproducible evidence. The fix is on main and the deployed revision passes production smoke.
 The issue is closed. This spec and its paired plan move to their matching done paths.
+
+## Acceptance evidence
+
+| Criterion | Result |
+| --- | --- |
+| AC-TC-001 | `pnpm typecheck` passed with zero maintained-source diagnostics. |
+| AC-TC-002 | All four archive hashes matched, and their Git diff stayed empty. |
+| AC-TC-003 | Five checker regression tests passed after an observed failing baseline. |
+| AC-TC-004 | The complete release gate passed with 559 tests and five optional screenshot skips. |
+| AC-TC-005 | SDK builds and all nine package checks passed. Eight additional MCP compatibility tests passed. |
+| AC-TC-006 | Revision `git-905d865a3332` passed readiness, dashboard, integrity, and authenticated MCP smoke after a verified backup. |
+
+PR #308 merged the implementation. Issue #306 closed after production verification.
+The paired plan records the command results and deployment evidence.
