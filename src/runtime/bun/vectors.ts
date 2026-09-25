@@ -1,5 +1,6 @@
 // @ts-ignore - bun:sqlite types ship with the Bun runtime, not with this package.
 import { Database } from "bun:sqlite";
+import { providerAttribution } from "../../core/extraction";
 import { createHash } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -201,7 +202,10 @@ export function createHttpEmbedder(config: {
     dimensions: config.dimensions,
     model: config.model,
     async embed(texts: string[]): Promise<Float32Array[]> {
-      const headers: Record<string, string> = { "content-type": "application/json" };
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+        ...providerAttribution(config.baseUrl),
+      };
       if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
       const res = await fetch(`${config.baseUrl}/embeddings`, {
         method: "POST",

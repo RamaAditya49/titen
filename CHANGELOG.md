@@ -26,6 +26,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Changed
+
+- Requests to OpenRouter for extraction, embeddings, and the System One gate now
+  carry app attribution: `HTTP-Referer: https://titen.dev` and the app name
+  `Titen.dev`. Other providers receive no extra headers.
+
 ## [0.10.2] — 2026-09-25
 
 Jev now decides reflection links. On a live store it handled 87% of reflection

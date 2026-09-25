@@ -81,6 +81,14 @@ export class ExtractionProviderError extends Error {
   }
 }
 
+/** OpenRouter app attribution; other providers receive no extra headers. */
+export function providerAttribution(url: string): Record<string, string> {
+  const host = new URL(url).hostname;
+  return host === "openrouter.ai" || host.endsWith(".openrouter.ai")
+    ? { "http-referer": "https://titen.dev", "x-openrouter-title": "Titen.dev", "x-title": "Titen.dev" }
+    : {};
+}
+
 const MAX_PROVIDER_BYTES = 128 * 1024;
 const DEFAULT_TIMEOUT_MS = 30_000;
 // Leaves deterministic validation and commit headroom inside the 60s job lease.
@@ -180,7 +188,7 @@ export function createHttpExtraction(config: {
     responseMode,
     providerIdentity: baseUrl,
     async generate(request) {
-      const headers: Record<string, string> = { "content-type": "application/json" };
+      const headers: Record<string, string> = { "content-type": "application/json", ...providerAttribution(baseUrl) };
       if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
       let response: Response;
       try {
@@ -337,7 +345,7 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
   const dispatch = config.fetch ?? fetch;
 
   async function ask(state: unknown, questions: Record<string, unknown>): Promise<Record<string, any>> {
-    const headers: Record<string, string> = { "content-type": "application/json" };
+    const headers: Record<string, string> = { "content-type": "application/json", ...providerAttribution(url) };
     if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
     const response = await dispatch(url, {
       method: "POST",

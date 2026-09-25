@@ -6,6 +6,7 @@ import {
   configureHttpExtraction,
   createHttpDecisionGate,
   createHttpExtraction,
+  providerAttribution,
   type ExtractionCapability,
 } from "../../src/core/extraction";
 import { backgroundEnrichment } from "../../src/runtime/cloudflare/worker";
@@ -467,4 +468,28 @@ test("Reflection gate configuration fails closed", () => {
     { ...base, gateLinkMinConfidence: 1 },
     { gateLanes: "reflection" },
   ]) assert.deepEqual(configureHttpExtraction(config), { state: "configured_error" }, JSON.stringify(config));
+});
+
+test("OpenRouter calls carry Titen.dev app attribution and other providers get none", async () => {
+  assert.deepEqual(providerAttribution("https://models.example.test/v1"), {});
+  assert.deepEqual(providerAttribution("https://openrouter.example.test/api/v1"), {});
+  const expected = { "http-referer": "https://titen.dev", "x-openrouter-title": "Titen.dev", "x-title": "Titen.dev" };
+  assert.deepEqual(providerAttribution("https://openrouter.ai/api/v1/embeddings"), expected);
+  let headers: Record<string, string> = {};
+  const capture = fakeFetch((async (_input, init) => {
+    headers = init!.headers as Record<string, string>;
+    return Response.json({ choices: [{ finish_reason: "stop", message: { content: '{"action":"abstain"}' } }] });
+  }));
+  await createHttpExtraction({ baseUrl: "https://openrouter.ai/api/v1", model: "sol", modelFingerprint: fingerprint, fetch: capture })
+    .generate(derivation);
+  assert.equal(headers["x-openrouter-title"], "Titen.dev");
+  assert.equal(headers["http-referer"], "https://titen.dev");
+  const gate = createHttpDecisionGate(countingInner(), {
+    url: "https://openrouter.ai/api/v1/systemone", model: "typesafe/jev-1.13", fetch: capture,
+  });
+  await gate.generate(derivation);
+  assert.equal(headers["x-openrouter-title"], "Titen.dev");
+  await createHttpExtraction({ baseUrl: "https://models.example.test/v1", model: "sol", modelFingerprint: fingerprint, fetch: capture })
+    .generate(derivation);
+  assert.equal("x-openrouter-title" in headers, false);
 });
