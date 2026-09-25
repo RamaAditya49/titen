@@ -312,6 +312,17 @@ never adds or links claims, and a `latest` model alias reports
 Enable it only when that provider may receive the data. A gate change re-keys
 the enrichment pipeline fingerprint.
 
+Set `TITEN_EXTRACT_GATE_LANES=reflection` (or `derivation,reflection`) to let the
+gate decide reflection links. The default is `derivation`. For each reflection
+job, the gate asks one choice question per premise pair in a single request.
+Pairs with a relation at or above `TITEN_EXTRACT_GATE_LINK_MIN_CONFIDENCE`
+(default `0.8`, `0.5` to below `1`) become a link-only proposal. A conflict
+needs at least `0.9`. Code, not the model, puts the newer claim first in a
+supersession link. The job uses at most eight links, ordered conflict,
+supersession, duplicate, then related. When no pair is confident, or the gate
+fails, the job continues to the generative call. Claim synthesis always stays
+with the generative model.
+
 Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
 is the exact external origin (scheme, host, and optional port), with no trailing
 slash. Titen deliberately ignores forwarded-protocol headers, so an untrusted

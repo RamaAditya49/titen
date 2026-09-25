@@ -26,6 +26,16 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- The decision gate can now decide reflection links. Set
+  `TITEN_EXTRACT_GATE_LANES=reflection` to ask one choice question per premise
+  pair in a single request. Confident relations become a link-only proposal
+  that passes the usual validator. Code orders supersession links by date.
+  Claim synthesis, uncertain answers, and gate failures continue to the
+  generative call. `TITEN_EXTRACT_GATE_LINK_MIN_CONFIDENCE` (default `0.8`) sets
+  the threshold, and a conflict needs at least `0.9`.
+
 ## [0.10.1] — 2026-09-25
 
 Titen is now Jev-ready. An optional decision gate lets a structured decision

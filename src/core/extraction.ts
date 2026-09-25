@@ -268,11 +268,45 @@ const GATE_QUESTION = {
   },
 } as const;
 
+const LINK_CRITERIA = {
+  duplicate: "Both claims state the same fact, even in different words",
+  supersession: "One claim updates or replaces the other: a newer value, a changed decision, or a correction",
+  conflict: "The claims contradict each other and cannot both be true",
+  related: "Same topic, but each claim adds a different fact",
+  none: "Different topics, or no useful connection",
+} as const;
+type LinkChoice = Exclude<keyof typeof LINK_CRITERIA, "none">;
+const LINK_RELATION: Record<LinkChoice, string> = {
+  conflict: "conflict_candidate",
+  supersession: "supersession_candidate",
+  duplicate: "duplicate_candidate",
+  related: "related_to",
+};
+// Array order is link priority when a job has more candidates than slots.
+const LINK_PRIORITY: LinkChoice[] = ["conflict", "supersession", "duplicate", "related"];
+const GATE_DEFAULT_LINK_MIN_CONFIDENCE = 0.8;
+// A false contradiction misleads more than a missed one, so it needs more certainty.
+const GATE_CONFLICT_MIN_CONFIDENCE = 0.9;
+const GATE_MAX_LINKS = 8;
+export type DecisionGateLane = "derivation" | "reflection";
+
+interface Premise { claim_id: string; statement: string; kind?: unknown; valid_from?: unknown; valid_to?: unknown; status?: unknown }
+
+function premisesOf(input: unknown): Premise[] | undefined {
+  const premises = (input as { premises?: unknown })?.premises;
+  if (!Array.isArray(premises) || premises.length < 2 || premises.length > GATE_MAX_LINKS) return undefined;
+  return premises.every((p) => typeof p?.claim_id === "string" && typeof p?.statement === "string")
+    ? premises as Premise[]
+    : undefined;
+}
+
 /**
- * Structured yes/no decision (System One wire format: TypeSafe
- * `/v1/systemone`, OpenRouter `/api/v1/systemone` or `/api/alpha/decisions`)
- * in front of derivation. Only a confident "no" skips the generative call and
- * becomes an ordinary abstain; the gate can never add, link, or raise trust.
+ * Structured decisions in the System One wire format (TypeSafe
+ * `/v1/systemone`, OpenRouter `/api/v1/systemone` or `/api/alpha/decisions`).
+ * Derivation: only a confident "no" skips the generative call and becomes an
+ * ordinary abstain. Reflection: confident pairwise relations become a link-only
+ * proposal; claim synthesis always stays with the generative model. The gate
+ * never adds claims or raises trust, and its output passes the same validator.
  */
 export function createHttpDecisionGate(inner: ExtractionCapability, config: {
   url: string;
@@ -280,6 +314,8 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
   apiKey?: string;
   abstainBelow?: number;
   timeoutMs?: number;
+  lanes?: DecisionGateLane[];
+  linkMinConfidence?: number;
   fetch?: typeof fetch;
 }): ExtractionCapability {
   const url = endpoint(config.url);
@@ -292,9 +328,15 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
   const timeoutMs = config.timeoutMs ?? GATE_DEFAULT_TIMEOUT_MS;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 500 || timeoutMs > GATE_MAX_TIMEOUT_MS)
     throw new Error(`Decision gate timeout must be between 500 and ${GATE_MAX_TIMEOUT_MS} milliseconds.`);
+  const lanes = new Set(config.lanes ?? ["derivation"]);
+  if (!lanes.size || [...lanes].some((lane) => lane !== "derivation" && lane !== "reflection"))
+    throw new Error("Decision gate lanes must be derivation, reflection, or both.");
+  const linkMin = config.linkMinConfidence ?? GATE_DEFAULT_LINK_MIN_CONFIDENCE;
+  if (!(linkMin >= 0.5 && linkMin < 1))
+    throw new Error("Decision gate link confidence must be at least 0.5 and below 1.");
   const dispatch = config.fetch ?? fetch;
 
-  async function probabilityYes(state: unknown): Promise<number> {
+  async function ask(state: unknown, questions: Record<string, unknown>): Promise<Record<string, any>> {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
     const response = await dispatch(url, {
@@ -302,15 +344,62 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
       redirect: "manual",
       headers,
       signal: AbortSignal.timeout(timeoutMs),
-      body: JSON.stringify({ model, state, questions: { durable: GATE_QUESTION } }),
+      body: JSON.stringify({ model, state, questions }),
     });
     if (!response.ok || Number(response.headers.get("content-length") ?? "0") > MAX_PROVIDER_BYTES) {
       await response.body?.cancel().catch(() => undefined);
       throw new Error("gate_rejected");
     }
-    const yes = (JSON.parse(await boundedResponseText(response)) as any)?.answers?.durable?.noul;
+    const answers = (JSON.parse(await boundedResponseText(response)) as any)?.answers;
+    if (!answers || typeof answers !== "object") throw new Error("gate_protocol");
+    return answers;
+  }
+
+  async function probabilityYes(state: unknown): Promise<number> {
+    const yes = (await ask(state, { durable: GATE_QUESTION })).durable?.noul;
     if (typeof yes !== "number" || !(yes >= 0 && yes <= 1)) throw new Error("gate_protocol");
     return yes;
+  }
+
+  async function reflectionLinks(premises: Premise[]) {
+    const state: Record<string, unknown> = {};
+    premises.forEach(({ kind, statement, valid_from, valid_to, status }, index) => {
+      state[`P${index + 1}`] = { kind, statement, valid_from, valid_to, status };
+    });
+    const pairs: Array<[number, number]> = [];
+    const questions: Record<string, unknown> = {};
+    for (let a = 0; a < premises.length; a += 1) for (let b = a + 1; b < premises.length; b += 1) {
+      pairs.push([a, b]);
+      questions[`pair_${a + 1}_${b + 1}`] = {
+        type: "choice",
+        instructions: `How does claim \`P${a + 1}\` relate to claim \`P${b + 1}\`?`,
+        criteria: LINK_CRITERIA,
+      };
+    }
+    const answers = await ask(state, questions);
+    const candidates = pairs.flatMap(([a, b]) => {
+      const answer = answers[`pair_${a + 1}_${b + 1}`];
+      const choice = answer?.choice as LinkChoice;
+      const confidence = answer?.confidence;
+      if (!LINK_PRIORITY.includes(choice) || typeof confidence !== "number") return [];
+      if (confidence < Math.max(linkMin, choice === "conflict" ? GATE_CONFLICT_MIN_CONFIDENCE : 0)) return [];
+      let [source, target] = [premises[a]!, premises[b]!];
+      if (choice === "supersession") {
+        // Code, not the model, orders supersession: the newer claim is the source.
+        const [older, newer] = [String(source.valid_from ?? ""), String(target.valid_from ?? "")];
+        if (!older || !newer || older === newer) return [];
+        if (older > newer) [source, target] = [target, source];
+      }
+      return [{ choice, confidence, source: source.claim_id, target: target.claim_id }];
+    });
+    return candidates
+      .sort((x, y) => LINK_PRIORITY.indexOf(x.choice) - LINK_PRIORITY.indexOf(y.choice) || y.confidence - x.confidence)
+      .slice(0, GATE_MAX_LINKS)
+      .map((link) => ({
+        source_claim_id: link.source,
+        target_claim_id: link.target,
+        relation: LINK_RELATION[link.choice],
+      }));
   }
 
   return {
@@ -318,13 +407,21 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
     modelFingerprint: inner.modelFingerprint,
     ...(inner.responseMode === undefined ? {} : { responseMode: inner.responseMode }),
     // Folded into the job model fingerprint, so gate changes re-key the pipeline.
-    providerIdentity: `${inner.providerIdentity ?? "native"} gate=${url}#${model}<${abstainBelow}`,
+    providerIdentity: `${inner.providerIdentity ?? "native"} gate=${url}#${model}<${abstainBelow}`
+      + ` lanes=${[...lanes].sort().join(",")} links>=${linkMin}`,
     async generate(request) {
-      if (request.lane === "derivation") {
-        // ponytail: any gate failure falls through to the generative call; an
-        // optional cost optimization never stalls or drops enrichment.
+      // ponytail: any gate failure falls through to the generative call; an
+      // optional cost optimization never stalls or drops enrichment.
+      if (request.lane === "derivation" && lanes.has("derivation")) {
         const yes = await probabilityYes(request.input).catch(() => undefined);
         if (yes !== undefined && yes < abstainBelow) return { action: "abstain", claims: null };
+      }
+      const premises = request.lane === "reflection" && lanes.has("reflection")
+        ? premisesOf(request.input)
+        : undefined;
+      if (premises) {
+        const links = await reflectionLinks(premises).catch(() => undefined);
+        if (links?.length) return { action: "link", claims: null, links };
       }
       return inner.generate(request);
     },
@@ -344,11 +441,14 @@ export function configureHttpExtraction(config: {
   gateApiKey?: string;
   gateAbstainBelow?: number;
   gateTimeoutMs?: number;
+  gateLanes?: string;
+  gateLinkMinConfidence?: number;
   fetch?: typeof fetch;
 }): { capability?: ExtractionCapability; state: ExtractionConfigurationState } {
   const given = (value: unknown) => value !== undefined && value !== "";
   const required = [config.baseUrl, config.model, config.modelFingerprint];
-  const gate = [config.gateUrl, config.gateModel, config.gateApiKey, config.gateAbstainBelow, config.gateTimeoutMs]
+  const gate = [config.gateUrl, config.gateModel, config.gateApiKey, config.gateAbstainBelow, config.gateTimeoutMs,
+    config.gateLanes, config.gateLinkMinConfidence]
     .some(given);
   const supplied = gate
     || [...required, config.apiKey, config.timeoutMs, config.responseMode].some(given);
@@ -375,6 +475,10 @@ export function configureHttpExtraction(config: {
             apiKey: config.gateApiKey,
             abstainBelow: config.gateAbstainBelow,
             timeoutMs: config.gateTimeoutMs,
+            lanes: config.gateLanes === undefined
+              ? undefined
+              : config.gateLanes.split(",").map((lane) => lane.trim()) as DecisionGateLane[],
+            linkMinConfidence: config.gateLinkMinConfidence,
             fetch: config.fetch,
           })
         : capability,

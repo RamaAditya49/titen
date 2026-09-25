@@ -359,3 +359,112 @@ test("Decision gate configuration fails closed and never enables without extract
     { ...extraction, ...gate, gateTimeoutMs: 45_000 },
   ]) assert.deepEqual(configureHttpExtraction(config), { state: "configured_error" }, JSON.stringify(config));
 });
+
+const reflection = {
+  lane: "reflection" as const,
+  system: "system contract",
+  schema: { type: "object" },
+  input: {
+    premises: [
+      { claim_id: "clm_old", version: 1, kind: "fact", statement: "Floor is 50000 tokens.", valid_from: "2026-09-01T00:00:00.000Z", valid_to: null, status: "active" },
+      { claim_id: "clm_new", version: 1, kind: "fact", statement: "Floor is 75000 tokens.", valid_from: "2026-09-20T00:00:00.000Z", valid_to: null, status: "active" },
+      { claim_id: "clm_dup", version: 1, kind: "fact", statement: "The floor is 75000 tokens.", valid_from: "2026-09-21T00:00:00.000Z", valid_to: null, status: "active" },
+    ],
+    bounds: { max_claims: 1, max_links: 8 },
+  },
+};
+
+function linkAnswers(answers: Record<string, { choice: string; confidence: number }>, seen: any[] = []) {
+  return fakeFetch((async (_input, init) => {
+    seen.push(JSON.parse(String(init?.body)));
+    return Response.json({ answers });
+  }));
+}
+
+test("Reflection gate turns confident pair choices into an ordered link-only proposal", async () => {
+  const inner = countingInner();
+  const seen: any[] = [];
+  const gated = createHttpDecisionGate(inner, {
+    url: "https://api.typesafe.example.test/v1/systemone",
+    model: "jev-1.13.0",
+    lanes: ["reflection"],
+    fetch: linkAnswers({
+      pair_1_2: { choice: "supersession", confidence: 0.95 },
+      pair_1_3: { choice: "conflict", confidence: 0.85 },
+      pair_2_3: { choice: "duplicate", confidence: 0.9 },
+    }, seen),
+  });
+  assert.deepEqual(await gated.generate(reflection), {
+    action: "link",
+    claims: null,
+    links: [
+      // The newer claim is the source even though the pair lists it second.
+      { source_claim_id: "clm_new", target_claim_id: "clm_old", relation: "supersession_candidate" },
+      { source_claim_id: "clm_new", target_claim_id: "clm_dup", relation: "duplicate_candidate" },
+    ],
+  });
+  assert.deepEqual(inner.calls, []);
+  assert.deepEqual(Object.keys(seen[0].questions), ["pair_1_2", "pair_1_3", "pair_2_3"]);
+  assert.equal(seen[0].questions.pair_1_2.type, "choice");
+  assert.equal(seen[0].state.P2.statement, "Floor is 75000 tokens.");
+  assert.equal("claim_id" in seen[0].state.P1, false);
+  // Derivation is not gated unless its lane is listed.
+  await gated.generate(derivation);
+  assert.deepEqual(inner.calls, ["derivation"]);
+  assert.equal(seen.length, 1);
+});
+
+test("Reflection gate leaves synthesis and uncertain or failed answers to the model", async () => {
+  for (const fetch of [
+    linkAnswers({
+      pair_1_2: { choice: "related", confidence: 0.79 },
+      pair_1_3: { choice: "none", confidence: 0.99 },
+      pair_2_3: { choice: "conflict", confidence: 0.89 },
+    }),
+    linkAnswers({ pair_1_2: { choice: "merge", confidence: 0.99 } }),
+    fakeFetch((async () => new Response("down", { status: 503 }))),
+    fakeFetch((async () => { throw new TypeError("offline"); })),
+  ]) {
+    const inner = countingInner();
+    const gated = createHttpDecisionGate(inner, {
+      url: "https://api.typesafe.example.test/v1/systemone",
+      model: "jev-1.13.0",
+      lanes: ["derivation", "reflection"],
+      fetch,
+    });
+    assert.deepEqual(await gated.generate(reflection), { action: "add", claims: [] });
+    assert.deepEqual(inner.calls, ["reflection"]);
+  }
+  let calls = 0;
+  const inner = countingInner();
+  const gated = createHttpDecisionGate(inner, {
+    url: "https://api.typesafe.example.test/v1/systemone",
+    model: "jev-1.13.0",
+    lanes: ["reflection"],
+    fetch: fakeFetch((async () => { calls += 1; return Response.json({}); })),
+  });
+  await gated.generate({ ...reflection, input: { premises: [reflection.input.premises[0]] } });
+  assert.equal(calls, 0);
+  assert.deepEqual(inner.calls, ["reflection"]);
+});
+
+test("Reflection gate configuration fails closed", () => {
+  const base = {
+    baseUrl: "https://models.example.test/v1",
+    model: "sol",
+    modelFingerprint: fingerprint,
+    gateUrl: "https://api.typesafe.example.test/v1/systemone",
+    gateModel: "jev-1.13.0",
+  };
+  const on = configureHttpExtraction({ ...base, gateLanes: "reflection", gateLinkMinConfidence: 0.9 });
+  assert.equal(on.state, "enabled");
+  assert.match(on.capability!.providerIdentity!, /lanes=reflection links>=0.9/u);
+  assert.match(configureHttpExtraction(base).capability!.providerIdentity!, /lanes=derivation /u);
+  for (const config of [
+    { ...base, gateLanes: "summary" },
+    { ...base, gateLanes: "reflection,summary" },
+    { ...base, gateLinkMinConfidence: 0.4 },
+    { ...base, gateLinkMinConfidence: 1 },
+    { gateLanes: "reflection" },
+  ]) assert.deepEqual(configureHttpExtraction(config), { state: "configured_error" }, JSON.stringify(config));
+});

@@ -20,7 +20,7 @@ is local and requires no hosted automation.
   shutdown wiring out of `serve()` into their own factory — a ~75-line move for
   a listener nobody uses. Upgrade when an embedded consumer objects to the bound
   port; until then the unused socket is cheaper than the refactor.
-- `src/core/extraction.ts:324` — any decision-gate failure falls through to the
+- `src/core/extraction.ts:413` — any decision-gate failure falls through to the
   generative call. A gate outage silently raises extraction cost, and nothing
   counts gate skips or failures. Upgrade by adding gate outcome counters to the
   drain result when an operator enables the gate and needs cost evidence.

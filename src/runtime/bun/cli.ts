@@ -398,6 +398,10 @@ switch (command) {
       gateTimeoutMs: process.env.TITEN_EXTRACT_GATE_TIMEOUT_MS === undefined
         ? undefined
         : Number(process.env.TITEN_EXTRACT_GATE_TIMEOUT_MS),
+      gateLanes: process.env.TITEN_EXTRACT_GATE_LANES,
+      gateLinkMinConfidence: process.env.TITEN_EXTRACT_GATE_LINK_MIN_CONFIDENCE === undefined
+        ? undefined
+        : Number(process.env.TITEN_EXTRACT_GATE_LINK_MIN_CONFIDENCE),
     });
     let started: Awaited<ReturnType<typeof serve>>;
     try {
