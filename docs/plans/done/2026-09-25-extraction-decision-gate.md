@@ -36,4 +36,6 @@ No migration. The gate stays off until an operator sets its URL and model. Rollb
 - `pnpm test:api` on `rama-tuf`: 157 pass, 0 fail.
 - `pnpm build:worker` dry-run: PASS.
 - `node scripts/check-workflow-docs.mjs` and `node scripts/check-ponytail-debt.mjs`: PASS.
-- No live TypeSafe or OpenRouter call ran. Real-provider smoke stays open until an operator supplies a key.
+- Live TypeSafe smoke on 2026-09-25 through `createHttpDecisionGate` and real `fetch`: 3/3 correct. A durable preference scored 0.92 and went to the model. Shell output scored 0.08 and chatter scored 0.05. Both abstained. Latency was 266–679 ms.
+- The first live run found that TypeSafe rejects `jev-1.13` (`Unknown model`). The pinned ID is `jev-1.13.0`. The gate fell through to the model on all three answers, as AC-EDG-002 requires. The docs and changelog now name `jev-1.13.0`.
+- OpenRouter was not tested live. Its row follows OpenRouter's documentation.

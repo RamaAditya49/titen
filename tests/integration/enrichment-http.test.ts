@@ -288,7 +288,7 @@ test("Decision gate turns only a confident no into an abstain without the genera
   const seen: { url?: string; init?: RequestInit }[] = [];
   const gated = createHttpDecisionGate(inner, {
     url: "https://api.typesafe.example.test/v1/systemone",
-    model: "jev-1.13",
+    model: "jev-1.13.0",
     apiKey: "gate-secret",
     fetch: gateAnswering(0.02, seen),
   });
@@ -298,7 +298,7 @@ test("Decision gate turns only a confident no into an abstain without the genera
   assert.equal(seen[0]!.init!.redirect, "manual");
   assert.equal((seen[0]!.init!.headers as Record<string, string>).authorization, "Bearer gate-secret");
   const body = JSON.parse(String(seen[0]!.init!.body));
-  assert.equal(body.model, "jev-1.13");
+  assert.equal(body.model, "jev-1.13.0");
   assert.deepEqual(body.state, derivation.input);
   assert.equal(body.questions.durable.type, "noul");
   assert.doesNotMatch(String(seen[0]!.init!.body), /gate-secret/u);
@@ -328,7 +328,7 @@ test("Decision gate delegates uncertain yes answers, reflection, and every gate 
   let gateCalls = 0;
   const gated = createHttpDecisionGate(inner, {
     url: "https://api.typesafe.example.test/v1/systemone",
-    model: "jev-1.13",
+    model: "jev-1.13.0",
     fetch: fakeFetch((async () => { gateCalls += 1; return Response.json({}); })),
   });
   await gated.generate({ ...derivation, lane: "reflection" });
@@ -342,7 +342,7 @@ test("Decision gate configuration fails closed and never enables without extract
     model: "sol",
     modelFingerprint: fingerprint,
   };
-  const gate = { gateUrl: "https://api.typesafe.example.test/v1/systemone", gateModel: "jev-1.13" };
+  const gate = { gateUrl: "https://api.typesafe.example.test/v1/systemone", gateModel: "jev-1.13.0" };
   assert.equal(configureHttpExtraction({ ...extraction, ...gate }).state, "enabled");
   assert.match(configureHttpExtraction({ ...extraction, ...gate }).capability!.providerIdentity!, /gate=/u);
   assert.doesNotMatch(configureHttpExtraction(extraction).capability!.providerIdentity!, /gate=/u);

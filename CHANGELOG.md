@@ -36,7 +36,7 @@ fact.
 
 - An optional decision gate runs before derivation. It asks one yes/no question
   in the System One wire format. It works with TypeSafe Jev
-  (`https://api.typesafe.ai/v1/systemone`, `jev-1.13`) and with Jev on
+  (`https://api.typesafe.ai/v1/systemone`, `jev-1.13.0`) and with Jev on
   OpenRouter (`https://openrouter.ai/api/v1/systemone`, `typesafe/jev-1.13`).
   Set `TITEN_EXTRACT_GATE_URL`, `TITEN_EXTRACT_GATE_MODEL`, and the secret
   `TITEN_EXTRACT_GATE_API_KEY` on Bun or Cloudflare.

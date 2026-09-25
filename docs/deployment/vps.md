@@ -298,7 +298,7 @@ speaks the System One wire format:
 
 | Provider | `TITEN_EXTRACT_GATE_URL` | `TITEN_EXTRACT_GATE_MODEL` |
 | --- | --- | --- |
-| TypeSafe | `https://api.typesafe.ai/v1/systemone` | `jev-1.13` |
+| TypeSafe | `https://api.typesafe.ai/v1/systemone` | `jev-1.13.0` |
 | OpenRouter | `https://openrouter.ai/api/v1/systemone` | `typesafe/jev-1.13` |
 
 Store `TITEN_EXTRACT_GATE_API_KEY` as a secret. The gate asks one yes/no
