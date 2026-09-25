@@ -26,6 +26,34 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-09-25
+
+Titen is now Jev-ready. An optional decision gate lets a structured decision
+model skip the generative extraction call when an observation holds no durable
+fact.
+
+### Added
+
+- An optional decision gate runs before derivation. It asks one yes/no question
+  in the System One wire format. It works with TypeSafe Jev
+  (`https://api.typesafe.ai/v1/systemone`, `jev-1.13`) and with Jev on
+  OpenRouter (`https://openrouter.ai/api/v1/systemone`, `typesafe/jev-1.13`).
+  Set `TITEN_EXTRACT_GATE_URL`, `TITEN_EXTRACT_GATE_MODEL`, and the secret
+  `TITEN_EXTRACT_GATE_API_KEY` on Bun or Cloudflare.
+- Only a yes probability below `TITEN_EXTRACT_GATE_ABSTAIN_BELOW` (default
+  `0.1`) records an abstain without the generative call. Every other answer,
+  and every gate failure, continues to the generative call. The gate never runs
+  for reflection and never adds, links, or raises trust.
+- Partial gate configuration, a `latest` model alias, a gate without complete
+  extraction, or an out-of-range threshold or timeout reports
+  `configured_error`. A gate change re-keys the enrichment pipeline
+  fingerprint.
+
+### Security
+
+- The gate sends observation content to the gate provider. It stays off until
+  an operator sets its URL and model.
+
 ## [0.10.0] — 2026-08-30
 
 ### Added
@@ -1497,7 +1525,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.1
 [0.10.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.0
 [0.9.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.1
 [0.9.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.0
