@@ -253,6 +253,84 @@ export function createHttpExtraction(config: {
   };
 }
 
+const GATE_DEFAULT_ABSTAIN_BELOW = 0.1;
+const GATE_DEFAULT_TIMEOUT_MS = 3_000;
+// Gate plus the 45s extraction ceiling must stay inside the 60s job lease.
+const GATE_MAX_TIMEOUT_MS = 5_000;
+
+const GATE_QUESTION = {
+  type: "noul",
+  instructions: "Does `observation.content` state a durable fact that a later session should recall: "
+    + "a preference, an accepted decision, a verified fact, a reusable procedure, or a correction?",
+  criteria: {
+    true: "A durable fact that a later session should recall",
+    false: "Routine tool output, chatter, a transient status, or no fact",
+  },
+} as const;
+
+/**
+ * Structured yes/no decision (System One wire format: TypeSafe
+ * `/v1/systemone`, OpenRouter `/api/v1/systemone` or `/api/alpha/decisions`)
+ * in front of derivation. Only a confident "no" skips the generative call and
+ * becomes an ordinary abstain; the gate can never add, link, or raise trust.
+ */
+export function createHttpDecisionGate(inner: ExtractionCapability, config: {
+  url: string;
+  model: string;
+  apiKey?: string;
+  abstainBelow?: number;
+  timeoutMs?: number;
+  fetch?: typeof fetch;
+}): ExtractionCapability {
+  const url = endpoint(config.url);
+  const model = config.model.trim();
+  if (!model || model.length > 200 || /latest/iu.test(model))
+    throw new Error("Decision gate model must be a pinned model ID, not a latest alias.");
+  const abstainBelow = config.abstainBelow ?? GATE_DEFAULT_ABSTAIN_BELOW;
+  if (!(abstainBelow > 0 && abstainBelow < 0.5))
+    throw new Error("Decision gate abstain threshold must be above 0 and below 0.5.");
+  const timeoutMs = config.timeoutMs ?? GATE_DEFAULT_TIMEOUT_MS;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 500 || timeoutMs > GATE_MAX_TIMEOUT_MS)
+    throw new Error(`Decision gate timeout must be between 500 and ${GATE_MAX_TIMEOUT_MS} milliseconds.`);
+  const dispatch = config.fetch ?? fetch;
+
+  async function probabilityYes(state: unknown): Promise<number> {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
+    const response = await dispatch(url, {
+      method: "POST",
+      redirect: "manual",
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({ model, state, questions: { durable: GATE_QUESTION } }),
+    });
+    if (!response.ok || Number(response.headers.get("content-length") ?? "0") > MAX_PROVIDER_BYTES) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error("gate_rejected");
+    }
+    const yes = (JSON.parse(await boundedResponseText(response)) as any)?.answers?.durable?.noul;
+    if (typeof yes !== "number" || !(yes >= 0 && yes <= 1)) throw new Error("gate_protocol");
+    return yes;
+  }
+
+  return {
+    modelId: inner.modelId,
+    modelFingerprint: inner.modelFingerprint,
+    ...(inner.responseMode === undefined ? {} : { responseMode: inner.responseMode }),
+    // Folded into the job model fingerprint, so gate changes re-key the pipeline.
+    providerIdentity: `${inner.providerIdentity ?? "native"} gate=${url}#${model}<${abstainBelow}`,
+    async generate(request) {
+      if (request.lane === "derivation") {
+        // ponytail: any gate failure falls through to the generative call; an
+        // optional cost optimization never stalls or drops enrichment.
+        const yes = await probabilityYes(request.input).catch(() => undefined);
+        if (yes !== undefined && yes < abstainBelow) return { action: "abstain", claims: null };
+      }
+      return inner.generate(request);
+    },
+  };
+}
+
 /** Partial or invalid opt-in never crashes the canonical service. */
 export function configureHttpExtraction(config: {
   baseUrl?: string;
@@ -261,27 +339,45 @@ export function configureHttpExtraction(config: {
   apiKey?: string;
   timeoutMs?: number;
   responseMode?: ExtractionResponseMode | string;
+  gateUrl?: string;
+  gateModel?: string;
+  gateApiKey?: string;
+  gateAbstainBelow?: number;
+  gateTimeoutMs?: number;
   fetch?: typeof fetch;
 }): { capability?: ExtractionCapability; state: ExtractionConfigurationState } {
+  const given = (value: unknown) => value !== undefined && value !== "";
   const required = [config.baseUrl, config.model, config.modelFingerprint];
-  const supplied = [...required, config.apiKey, config.timeoutMs, config.responseMode]
-    .some((value) => value !== undefined && value !== "");
+  const gate = [config.gateUrl, config.gateModel, config.gateApiKey, config.gateAbstainBelow, config.gateTimeoutMs]
+    .some(given);
+  const supplied = gate
+    || [...required, config.apiKey, config.timeoutMs, config.responseMode].some(given);
   if (!supplied)
     return { state: "disabled" };
-  if (required.some((value) => value === undefined || value === ""))
+  if (!required.every(given) || (gate && !(given(config.gateUrl) && given(config.gateModel))))
     return { state: "configured_error" };
   try {
+    const capability = createHttpExtraction({
+      baseUrl: config.baseUrl!,
+      model: config.model!,
+      modelFingerprint: config.modelFingerprint!,
+      apiKey: config.apiKey,
+      timeoutMs: config.timeoutMs,
+      responseMode: config.responseMode as ExtractionResponseMode | undefined,
+      fetch: config.fetch,
+    });
     return {
       state: "enabled",
-      capability: createHttpExtraction({
-        baseUrl: config.baseUrl!,
-        model: config.model!,
-        modelFingerprint: config.modelFingerprint!,
-        apiKey: config.apiKey,
-        timeoutMs: config.timeoutMs,
-        responseMode: config.responseMode as ExtractionResponseMode | undefined,
-        fetch: config.fetch,
-      }),
+      capability: gate
+        ? createHttpDecisionGate(capability, {
+            url: config.gateUrl!,
+            model: config.gateModel!,
+            apiKey: config.gateApiKey,
+            abstainBelow: config.gateAbstainBelow,
+            timeoutMs: config.gateTimeoutMs,
+            fetch: config.fetch,
+          })
+        : capability,
     };
   } catch {
     return { state: "configured_error" };

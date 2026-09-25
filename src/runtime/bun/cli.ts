@@ -389,6 +389,15 @@ switch (command) {
         ? undefined
         : Number(process.env.TITEN_EXTRACT_TIMEOUT_MS),
       responseMode: process.env.TITEN_EXTRACT_RESPONSE_MODE,
+      gateUrl: process.env.TITEN_EXTRACT_GATE_URL,
+      gateModel: process.env.TITEN_EXTRACT_GATE_MODEL,
+      gateApiKey: process.env.TITEN_EXTRACT_GATE_API_KEY,
+      gateAbstainBelow: process.env.TITEN_EXTRACT_GATE_ABSTAIN_BELOW === undefined
+        ? undefined
+        : Number(process.env.TITEN_EXTRACT_GATE_ABSTAIN_BELOW),
+      gateTimeoutMs: process.env.TITEN_EXTRACT_GATE_TIMEOUT_MS === undefined
+        ? undefined
+        : Number(process.env.TITEN_EXTRACT_GATE_TIMEOUT_MS),
     });
     let started: Awaited<ReturnType<typeof serve>>;
     try {

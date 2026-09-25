@@ -230,6 +230,10 @@ endpoint or secret. `TITEN_D1_PLAN=paid` is required, and background execution a
 requires `TITEN_ENRICHMENT_BACKGROUND=1` plus an actual Cron Trigger. Local
 schema and ID validation remains mandatory for every provider response.
 
+The optional decision gate uses the same `TITEN_EXTRACT_GATE_*` variables as
+the VPS runtime; see `docs/deployment/vps.md`. Store
+`TITEN_EXTRACT_GATE_API_KEY` as a Worker secret.
+
 Cloudflare Queue is not required. Add it only as an opaque job-ID wake-up path
 after measured backlog age or semantic-ready latency exceeds the accepted
 objective; D1 remains authoritative and Cron remains the reconciler.

@@ -137,6 +137,9 @@ TITEN_EXTRACT_MODEL_FINGERPRINT=<64-lowercase-hex-revision>
 TITEN_EXTRACT_API_KEY=<optional-bearer-key>
 TITEN_EXTRACT_TIMEOUT_MS=30000
 TITEN_EXTRACT_RESPONSE_MODE=json_schema
+TITEN_EXTRACT_GATE_URL=<optional-systemone-endpoint>
+TITEN_EXTRACT_GATE_MODEL=<pinned-gate-model>
+TITEN_EXTRACT_GATE_API_KEY=<optional-bearer-key>
 TITEN_MAINTENANCE_INTERVAL_MS=15000
 TITEN_SECRET_KEYS={"active":"v1","keys":{"v1":"<32-byte-base64url-key>"}}
 TITEN_WEBHOOK_ALLOWED_HOSTNAMES=hooks.example.com
@@ -287,6 +290,27 @@ shared bounded queue in the background, while `POST /v1/enrichment/drain`
 provides an authorized manual path. The Bun server's 60-second idle bound stays
 above the supported 45-second extraction timeout, leaving bounded response
 headroom. Do not expose credentials through readiness.
+
+An optional decision gate can skip the generative call for observations that
+hold no durable fact. Set `TITEN_EXTRACT_GATE_URL` and a pinned
+`TITEN_EXTRACT_GATE_MODEL`; the gate is off while both are absent. The gate
+speaks the System One wire format:
+
+| Provider | `TITEN_EXTRACT_GATE_URL` | `TITEN_EXTRACT_GATE_MODEL` |
+| --- | --- | --- |
+| TypeSafe | `https://api.typesafe.ai/v1/systemone` | `jev-1.13` |
+| OpenRouter | `https://openrouter.ai/api/v1/systemone` | `typesafe/jev-1.13` |
+
+Store `TITEN_EXTRACT_GATE_API_KEY` as a secret. The gate asks one yes/no
+question about the derivation input. Only a probability below
+`TITEN_EXTRACT_GATE_ABSTAIN_BELOW` (default `0.1`, below `0.5`) records an
+abstain without the generative call. Every other answer, and every gate
+failure, continues to the generative call. `TITEN_EXTRACT_GATE_TIMEOUT_MS`
+defaults to 3000 and may not exceed 5000. The gate never runs for reflection,
+never adds or links claims, and a `latest` model alias reports
+`configured_error`. The gate sends observation content to the gate provider.
+Enable it only when that provider may receive the data. A gate change re-keys
+the enrichment pipeline fingerprint.
 
 Set `TITEN_MCP_ORIGIN` only when a TLS reverse proxy exposes `/mcp`. Its value
 is the exact external origin (scheme, host, and optional port), with no trailing

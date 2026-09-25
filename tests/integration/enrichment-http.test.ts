@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import {
   ExtractionProviderError,
   configureHttpExtraction,
+  createHttpDecisionGate,
   createHttpExtraction,
+  type ExtractionCapability,
 } from "../../src/core/extraction";
 import { backgroundEnrichment } from "../../src/runtime/cloudflare/worker";
 
@@ -251,4 +253,109 @@ test("HTTP extraction stops a chunked response at the byte ceiling", async () =>
       return true;
     },
   );
+});
+
+function countingInner(): ExtractionCapability & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    modelId: "sol-locked",
+    modelFingerprint: fingerprint,
+    providerIdentity: "https://models.example.test/v1",
+    async generate(request) {
+      calls.push(request.lane);
+      return { action: "add", claims: [] };
+    },
+  };
+}
+
+function gateAnswering(yes: unknown, seen: { url?: string; init?: RequestInit }[] = []) {
+  return fakeFetch((async (input, init) => {
+    seen.push({ url: String(input), init });
+    return Response.json({ answers: { durable: { type: "noul", noul: yes } } });
+  }));
+}
+
+const derivation = {
+  lane: "derivation" as const,
+  system: "system contract",
+  input: { observation: { observation_id: "obs_1", content: "untrusted" } },
+  schema: { type: "object" },
+};
+
+test("Decision gate turns only a confident no into an abstain without the generative call", async () => {
+  const inner = countingInner();
+  const seen: { url?: string; init?: RequestInit }[] = [];
+  const gated = createHttpDecisionGate(inner, {
+    url: "https://api.typesafe.example.test/v1/systemone",
+    model: "jev-1.13",
+    apiKey: "gate-secret",
+    fetch: gateAnswering(0.02, seen),
+  });
+  assert.deepEqual(await gated.generate(derivation), { action: "abstain", claims: null });
+  assert.deepEqual(inner.calls, []);
+  assert.equal(seen[0]!.url, "https://api.typesafe.example.test/v1/systemone");
+  assert.equal(seen[0]!.init!.redirect, "manual");
+  assert.equal((seen[0]!.init!.headers as Record<string, string>).authorization, "Bearer gate-secret");
+  const body = JSON.parse(String(seen[0]!.init!.body));
+  assert.equal(body.model, "jev-1.13");
+  assert.deepEqual(body.state, derivation.input);
+  assert.equal(body.questions.durable.type, "noul");
+  assert.doesNotMatch(String(seen[0]!.init!.body), /gate-secret/u);
+  assert.notEqual(gated.providerIdentity, inner.providerIdentity);
+});
+
+test("Decision gate delegates uncertain yes answers, reflection, and every gate failure", async () => {
+  for (const fetch of [
+    gateAnswering(0.1),
+    gateAnswering(0.5),
+    gateAnswering("0.01"),
+    gateAnswering(-0.1),
+    fakeFetch((async () => new Response("down", { status: 503 }))),
+    fakeFetch((async () => new Response("not json"))),
+    fakeFetch((async () => { throw new TypeError("offline"); })),
+  ]) {
+    const inner = countingInner();
+    const gated = createHttpDecisionGate(inner, {
+      url: "https://openrouter.example.test/api/v1/systemone",
+      model: "typesafe/jev-1.13",
+      fetch,
+    });
+    assert.deepEqual(await gated.generate(derivation), { action: "add", claims: [] });
+    assert.deepEqual(inner.calls, ["derivation"]);
+  }
+  const inner = countingInner();
+  let gateCalls = 0;
+  const gated = createHttpDecisionGate(inner, {
+    url: "https://api.typesafe.example.test/v1/systemone",
+    model: "jev-1.13",
+    fetch: fakeFetch((async () => { gateCalls += 1; return Response.json({}); })),
+  });
+  await gated.generate({ ...derivation, lane: "reflection" });
+  assert.equal(gateCalls, 0);
+  assert.deepEqual(inner.calls, ["reflection"]);
+});
+
+test("Decision gate configuration fails closed and never enables without extraction", () => {
+  const extraction = {
+    baseUrl: "https://models.example.test/v1",
+    model: "sol",
+    modelFingerprint: fingerprint,
+  };
+  const gate = { gateUrl: "https://api.typesafe.example.test/v1/systemone", gateModel: "jev-1.13" };
+  assert.equal(configureHttpExtraction({ ...extraction, ...gate }).state, "enabled");
+  assert.match(configureHttpExtraction({ ...extraction, ...gate }).capability!.providerIdentity!, /gate=/u);
+  assert.doesNotMatch(configureHttpExtraction(extraction).capability!.providerIdentity!, /gate=/u);
+  for (const config of [
+    gate,
+    { gateApiKey: "orphan-secret" },
+    { ...extraction, gateUrl: gate.gateUrl },
+    { ...extraction, gateApiKey: "orphan-secret" },
+    { ...extraction, ...gate, gateModel: "jev-latest" },
+    { ...extraction, ...gate, gateModel: "~typesafe/jev-latest" },
+    { ...extraction, ...gate, gateUrl: "http://api.typesafe.example.test/v1/systemone" },
+    { ...extraction, ...gate, gateAbstainBelow: 0.5 },
+    { ...extraction, ...gate, gateAbstainBelow: Number.NaN },
+    { ...extraction, ...gate, gateTimeoutMs: 45_000 },
+  ]) assert.deepEqual(configureHttpExtraction(config), { state: "configured_error" }, JSON.stringify(config));
 });

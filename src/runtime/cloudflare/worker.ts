@@ -33,6 +33,12 @@ export interface Env {
   TITEN_EXTRACT_API_KEY?: string;
   TITEN_EXTRACT_TIMEOUT_MS?: string;
   TITEN_EXTRACT_RESPONSE_MODE?: string;
+  TITEN_EXTRACT_GATE_URL?: string;
+  TITEN_EXTRACT_GATE_MODEL?: string;
+  /** Secret; keep in a Worker secret, never vars. */
+  TITEN_EXTRACT_GATE_API_KEY?: string;
+  TITEN_EXTRACT_GATE_ABSTAIN_BELOW?: string;
+  TITEN_EXTRACT_GATE_TIMEOUT_MS?: string;
   /** Explicit declared D1 plan required before enrichment can mutate. */
   TITEN_D1_PLAN?: string;
   /** Set to "1" only when an enrichment Cron Trigger is provisioned. */
@@ -57,6 +63,15 @@ function extraction(env: Env): ReturnType<typeof configureHttpExtraction> {
       ? undefined
       : Number(env.TITEN_EXTRACT_TIMEOUT_MS),
     responseMode: env.TITEN_EXTRACT_RESPONSE_MODE,
+    gateUrl: env.TITEN_EXTRACT_GATE_URL,
+    gateModel: env.TITEN_EXTRACT_GATE_MODEL,
+    gateApiKey: env.TITEN_EXTRACT_GATE_API_KEY,
+    gateAbstainBelow: env.TITEN_EXTRACT_GATE_ABSTAIN_BELOW === undefined
+      ? undefined
+      : Number(env.TITEN_EXTRACT_GATE_ABSTAIN_BELOW),
+    gateTimeoutMs: env.TITEN_EXTRACT_GATE_TIMEOUT_MS === undefined
+      ? undefined
+      : Number(env.TITEN_EXTRACT_GATE_TIMEOUT_MS),
   });
   if (
     configured.state === "enabled"
