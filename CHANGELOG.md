@@ -26,6 +26,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-09-25
+
+Jev now decides reflection links. On a live store it handled 87% of reflection
+jobs without the generative model and found more duplicates.
+
 ### Added
 
 - The decision gate can now decide reflection links. Set
@@ -1535,7 +1540,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.2
 [0.10.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.1
 [0.10.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.0
 [0.9.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.9.1
