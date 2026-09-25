@@ -26,6 +26,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.3] — 2026-09-25
+
 ### Changed
 
 - Requests to OpenRouter for extraction, embeddings, and the System One gate now
@@ -1546,7 +1548,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.3
 [0.10.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.2
 [0.10.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.1
 [0.10.0]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.0
