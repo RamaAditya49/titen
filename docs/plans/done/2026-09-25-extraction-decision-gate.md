@@ -31,4 +31,9 @@ No migration. The gate stays off until an operator sets its URL and model. Rollb
 
 ## Verification evidence
 
-See the pull request or commit for the recorded runs.
+- `tsc --noEmit`: PASS.
+- `bun test tests/integration/enrichment-http.test.ts tests/integration/enrichment-runtime.test.ts` on `rama-tuf`: 18 pass, 0 fail.
+- `pnpm test:api` on `rama-tuf`: 157 pass, 0 fail.
+- `pnpm build:worker` dry-run: PASS.
+- `node scripts/check-workflow-docs.mjs` and `node scripts/check-ponytail-debt.mjs`: PASS.
+- No live TypeSafe or OpenRouter call ran. Real-provider smoke stays open until an operator supplies a key.
