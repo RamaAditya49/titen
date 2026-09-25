@@ -356,7 +356,7 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
   }
 
   async function probabilityYes(state: unknown): Promise<number> {
-    const yes = (await ask(state, { durable: GATE_QUESTION })).durable?.noul;
+    const yes = (await ask(state, { durable: GATE_QUESTION }))["durable"]?.noul;
     if (typeof yes !== "number" || !(yes >= 0 && yes <= 1)) throw new Error("gate_protocol");
     return yes;
   }
