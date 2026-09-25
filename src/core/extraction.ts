@@ -386,9 +386,9 @@ export function createHttpDecisionGate(inner: ExtractionCapability, config: {
       let [source, target] = [premises[a]!, premises[b]!];
       if (choice === "supersession") {
         // Code, not the model, orders supersession: the newer claim is the source.
-        const [older, newer] = [String(source.valid_from ?? ""), String(target.valid_from ?? "")];
-        if (!older || !newer || older === newer) return [];
-        if (older > newer) [source, target] = [target, source];
+        const [first, second] = [String(source.valid_from ?? ""), String(target.valid_from ?? "")];
+        if (!first || !second || first === second) return [];
+        if (first < second) [source, target] = [target, source];
       }
       return [{ choice, confidence, source: source.claim_id, target: target.claim_id }];
     });
