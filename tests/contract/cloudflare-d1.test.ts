@@ -1,6 +1,6 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Miniflare, type Request as MiniflareRequest } from "miniflare";
@@ -24,6 +24,7 @@ import {
   assertSemanticIndexWriteRepair,
   assertSemanticReadiness,
 } from "./semantic-readiness";
+import { assertLoginSecurity } from "./login-security";
 import { assertWebAuthnContract } from "./webauthn";
 
 const scriptPath = join(process.cwd(), "dist/worker/worker.js");
@@ -570,3 +571,29 @@ d1Test("D1 holds the durability invariants under concurrent writers", async () =
   assert.equal(report.claim_rows, 1);
   assert.equal(report.partial_rows, 0);
 }, 60_000);
+
+test("D1 protects login clients and storage", async () => { await assertLoginSecurity(db, "cloudflare-d1"); });
+
+test("Worker password admission is shared across request contexts", { timeout: CASE_TIMEOUT }, async () => {
+  const admissionPersist = mkdtempSync(join(tmpdir(), "titen-d1-admission-"));
+  // Delay password work so request overlap does not depend on host crypto speed.
+  const passwordDelay = `const deriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
+    crypto.subtle.deriveBits = async (...args) => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return deriveBits(...args);
+    };`;
+  const admission = runtime({ modules: true, script: passwordDelay + readFileSync(scriptPath, "utf8"),
+    compatibilityDate: "2026-07-01", d1Databases: { DB: "titen-admission" }, d1Persist: admissionPersist,
+    bindings: { TITEN_AUTO_MIGRATE: "1", TITEN_REVISION: "test",
+      TITEN_SECRET_KEYS: JSON.stringify({ active: "test-v1", keys: { "test-v1": TEST_SECRET_KEY } }) } });
+  try {
+    await admission.ready;
+    await admission.dispatchFetch(`${origin}/readyz`);
+    const responses = await Promise.all(Array.from({ length: 16 }, (_, index) => admission.dispatchFetch(`${origin}/v1/dashboard-sessions`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: `worker-concurrent-${index}`, password: "incorrect horse battery staple" }),
+    })));
+    assert.ok(responses.some((response) => response.status === 429), "one isolate must share its password check limit");
+    assert.ok(responses.every((response) => [401, 429].includes(response.status)));
+  } finally { await dispose(admission); rmSync(admissionPersist, { recursive: true, force: true }); }
+});

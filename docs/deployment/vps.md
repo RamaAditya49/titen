@@ -593,6 +593,38 @@ hostname must match `TITEN_DASHBOARD_ORIGIN`; port `8787` remains private. Stop
 the adapter and remove the ingress mapping to roll back without touching
 canonical data.
 
+## Sign-in protection
+
+Register a passkey for every operator. Save the one-time recovery codes outside the server.
+Configure an edge rate-limit rule for dashboard sign-in and recovery routes.
+Bun permits 20 attempts per client per minute and four concurrent sign-in password checks.
+The SQL throttle permits five failures per client and 50 failures per account within 15 minutes.
+Active blocks are never evicted. A full throttle table returns HTTP 429 before password work.
+
+Bun uses the socket address. Configure `TITEN_LOGIN_CLIENT_IP_HEADER` only for a trusted loopback proxy.
+The proxy must replace that header with one verified client IP. Direct remote clients cannot override socket identity.
+For the dashboard adapter, set `TITEN_DASHBOARD_CLIENT_IP_HEADER` to the ingress header containing one verified IP.
+Set the API's `TITEN_LOGIN_CLIENT_IP_HEADER=x-titen-client-ip` for that adapter.
+Keep both listeners on loopback. Do not copy untrusted inbound headers through the proxy.
+
+## Locked out
+
+Use **Use passkey or recovery code** on the sign-in page. Enter the account username before selecting it.
+A valid passkey or unused recovery code can authenticate during a password block.
+If neither proof is available, use shell access on the host:
+
+```bash
+sudo -u titen bun /opt/titen/src/runtime/bun/cli.ts account list --db /var/lib/titen/titen.db
+sudo -u titen bun /opt/titen/src/runtime/bun/cli.ts account unlock --db /var/lib/titen/titen.db --username owner
+sudo -u titen bun /opt/titen/src/runtime/bun/cli.ts account reset-password --db /var/lib/titen/titen.db --username owner
+```
+
+Use the installed CLI path for your host. `unlock` clears only the selected account's throttle rows.
+`reset-password` prints a random temporary password once. Keep that output private.
+The operator must replace it before accessing organization data. Reset revokes dashboard sessions and preserves agent keys.
+Neither command enables a disabled account. `list` shows usernames, disabled timestamps, password-change flags, and active passkey counts.
+Review `operator_account.login_block` audit entries after a block. The next successful sign-in shows the preceding failure count.
+
 ## Service hardening
 
 The production unit should use:

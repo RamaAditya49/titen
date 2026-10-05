@@ -141,6 +141,11 @@ beforeAll(async () => {
         latestKey.set(username, raw);
         return Response.json({ data: { ...sessionPrincipal, api_key: raw } }, { status: 201 });
       }
+      if (url.pathname === "/v1/dashboard-sessions/recovery" && request.method === "POST") {
+        const raw = `titen_sk_recovery_${++loginSequence}`;
+        principals[raw] = { ...principals.titen_sk_session_a, scopes: [], auth_stage: "second_factor", second_factor_required: true };
+        return Response.json({ data: { api_key: raw, expires_at: new Date(Date.now() + 900_000).toISOString(), auth_stage: "second_factor" } }, { status: 201 });
+      }
       if (!principal || revoked.has(key))
         return Response.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
       if (url.pathname === "/v1/dashboard-sessions/current/passkey-options" && request.method === "POST")
@@ -467,4 +472,18 @@ describe("dashboard per-principal sessions", () => {
     await startAdapter(false);
     expect((await fetch(`${base}/dashboard-api/session`, { headers: { cookie } })).status).toBe(401);
   });
+});
+
+
+test("password-independent recovery seals a restricted key and checks same-origin requests", async () => {
+  const request = (origin: string) => fetch(`${base}/dashboard-api/session/recovery`, { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify({ username: "user_a" }) });
+  expect((await request("https://evil.example")).status).toBe(403);
+  const recovery = await request(base);
+  expect(recovery.status).toBe(201);
+  const body = await recovery.json();
+  expect(body.data.auth_stage).toBe("second_factor");
+  expect(body.data.scopes).toEqual([]);
+  expect(JSON.stringify(body)).not.toContain("titen_sk_");
+  const cookie = cookieFrom(recovery);
+  expect((await fetch(`${base}/dashboard-api/work/leases`, { headers: { cookie } })).status).toBe(403);
 });

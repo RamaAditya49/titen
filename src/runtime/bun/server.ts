@@ -1,4 +1,8 @@
-import { createApp, parseMcpOrigin } from "../../core/app";
+import { ApiError } from "../../core/errors";
+import { failure, newRequestId } from "../../core/http";
+import { assertCanonicalPath } from "../../core/login-security";
+import { createClientLoginLimit, loginClientAddress } from "./login-rate-limit";
+import { createApp, parseMcpOrigin, ROUTES } from "../../core/app";
 import { migrate, schemaState } from "../../core/migrations";
 import { runMaintenance } from "../../core/maintenance";
 import {
@@ -19,6 +23,8 @@ import { createWebAuthnRuntime, parseWebAuthnConfig } from "../../core/webauthn"
 
 export interface ServeOptions {
   dbPath: string;
+  loginClientIpHeader?: string;
+  passwordCheckLimit?: number;
   port: number;
   hostname: string;
   revision?: string;
@@ -107,7 +113,14 @@ export async function serve(options: ServeOptions) {
     ? "configured_error"
     : options.extractionState ?? (options.extraction ? "enabled" : "disabled");
   const extraction = extractionState === "enabled" ? extractionSnapshot : undefined;
+  if (options.loginClientIpHeader && !/^[a-z0-9-]+$/iu.test(options.loginClientIpHeader))
+    throw new Error("Invalid login client header.");
+  const clientAddresses = new WeakMap<Request, string>();
+  const loginClient = (request: Request) => clientAddresses.get(request) ?? "unknown-client";
   const app = createApp({
+    loginClient,
+    loginRateLimit: createClientLoginLimit(loginClient),
+    passwordCheckLimit: options.passwordCheckLimit,
     db,
     revision: options.revision ?? "dev",
     runtime: "bun-sqlite",
@@ -157,6 +170,33 @@ export async function serve(options: ServeOptions) {
     })),
   });
 
+  const handleRequest = async (request: Request, listener: Bun.Server<undefined>) => {
+    try {
+      const segments = Object.values((request as Request & { params: Record<string, string> }).params);
+      if (segments.some((segment) => /[\/\\]/u.test(segment)))
+        throw new ApiError(400, "NON_CANONICAL_PATH", "Request path must be canonical.");
+      assertCanonicalPath(`http://native/${segments.join("/")}`);
+    } catch (error) { return failure(error, newRequestId()); }
+    clientAddresses.set(request, loginClientAddress(listener.requestIP(request)?.address, request, options.loginClientIpHeader));
+    const started = Date.now();
+    const response = await app(request);
+    if (!options.quiet) {
+      const url = new URL(request.url);
+      // Path and status only: never query values, bodies, or credentials.
+      console.log(
+        `${request.method} ${url.pathname} ${response.status} ${Date.now() - started}ms ${
+          response.headers.get("x-request-id") ?? "-"
+        }`,
+      );
+    }
+    return response;
+  };
+  const maxSegments = Math.max(...ROUTES.map((route) => route.path.split("/").filter(Boolean).length));
+  const nativeRoutes = Object.fromEntries(Array.from({ length: maxSegments }, (_, index) => [
+    "/" + Array.from({ length: index + 1 }, (_, part) => `:segment${part}`).join("/"), handleRequest,
+  ]));
+  nativeRoutes["/"] = handleRequest;
+
   // Bun/SQLite is the documented one-process deployment profile. Horizontal
   // scaling uses the Cloudflare runtime so this adapter needs no coordinator.
   // @ts-ignore - Bun global is provided by the runtime.
@@ -168,20 +208,8 @@ export async function serve(options: ServeOptions) {
       hostname: options.hostname,
       // Extraction may wait up to 45s; keep bounded response headroom above it.
       idleTimeout: 60,
-      async fetch(request: Request) {
-        const started = Date.now();
-        const response = await app(request);
-        if (!options.quiet) {
-          const url = new URL(request.url);
-          // Path and status only: never query values, bodies, or credentials.
-          console.log(
-            `${request.method} ${url.pathname} ${response.status} ${Date.now() - started}ms ${
-              response.headers.get("x-request-id") ?? "-"
-            }`,
-          );
-        }
-        return response;
-      },
+      routes: nativeRoutes,
+      fetch: () => failure(new ApiError(400, "NON_CANONICAL_PATH", "Request path must be canonical."), newRequestId()),
     });
   } catch (error) {
     database.close();

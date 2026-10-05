@@ -897,3 +897,32 @@ test("remains keyboard and mobile usable with live product navigation", async ({
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, body: document.body.scrollWidth }));
   expect(width.body).toBeLessThanOrEqual(width.viewport);
 });
+
+
+test("starts password-independent recovery and shows preceding failed attempts", async ({ page }) => {
+  let authenticated = false;
+  let stage = "second_factor";
+  const principal = () => ({ organization_id: "org_rescue", principal_id: "owner", principal_kind: "human", key_id: "key_rescue", scopes: stage === "full" ? ["views:compile"] : [], max_trust: "asserted", organization_role: "owner", auth_stage: stage, second_factor_required: stage === "second_factor", failed_attempts: stage === "full" ? 50 : 0 });
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", authentication: "session", authenticated } }));
+  await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: principal() } }));
+  await page.route("**/dashboard-api/session/recovery", (route) => {
+    expect(route.request().postDataJSON()).toEqual({ username: "owner" });
+    authenticated = true;
+    return route.fulfill({ status: 201, json: { data: principal() } });
+  });
+  await page.route("**/dashboard-api/session/recovery-code", (route) => {
+    expect(route.request().postDataJSON()).toEqual({ recovery_code: "unused-recovery-code" });
+    stage = "full";
+    return route.fulfill({ status: 201, json: { data: principal() } });
+  });
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+  await page.goto("/dashboard/");
+  await page.locator('[data-login-form] input[name="username"]').fill("owner");
+  await page.getByRole("button", { name: "Use passkey or recovery code" }).click();
+  await expect(page.getByRole("heading", { name: "Verify identity" })).toBeVisible();
+  await page.locator('[data-recovery-form] input[name="recovery_code"]').fill("unused-recovery-code");
+  await page.getByRole("button", { name: "Use recovery code", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
+  await expect(page.locator("[data-login-attempt-notice]")).toContainText("50 failed sign-in attempts");
+});

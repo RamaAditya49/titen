@@ -247,6 +247,71 @@ export async function assertWebAuthnContract(db: Db, runtime: string) {
   )));
   assert.deepEqual(concurrent.map((response) => response.status).sort(), [201, 401]);
 
+  const accountKey = await sha256Hex(`dashboard-login:${account.username}`);
+  await db.batch([{ sql: "INSERT OR REPLACE INTO login_throttles VALUES (?, 50, ?, ?)", params: [accountKey, now.getTime() + 60_000, now.getTime()] }]);
+  const blockedPassword = await call("POST", "/v1/dashboard-sessions", { body: { username: account.username, password } });
+  assert.equal(blockedPassword.status, 401);
+  const startRecovery = async (username = account.username) => call("POST", "/v1/dashboard-sessions/recovery", { body: { username } });
+  const rescue = await startRecovery();
+  assert.equal(rescue.status, 201);
+  assert.deepEqual(Object.keys(rescue.body.data).sort(), ["api_key", "auth_stage", "expires_at"]);
+  const unknownRescue = await startRecovery("unknown-rescue-user");
+  assert.equal(unknownRescue.status, 201);
+  assert.deepEqual(Object.keys(unknownRescue.body.data).sort(), Object.keys(rescue.body.data).sort());
+  assert.equal((await call("GET", "/v1/memories", { key: rescue.body.data.api_key })).status, 403);
+  const rescueOptions = await call("POST", "/v1/dashboard-sessions/current/passkey-options", { key: rescue.body.data.api_key, body: {} });
+  const rescued = await call("POST", "/v1/dashboard-sessions/current/passkey", {
+    key: rescue.body.data.api_key,
+    body: { challenge_id: rescueOptions.body.data.challenge_id, response: { id: "credential-primary", challenge: rescueOptions.body.data.options.challenge, counter: 2 } },
+  });
+  assert.equal(rescued.status, 201);
+  assert.equal(rescued.body.data.failed_attempts, 50);
+  await db.batch([{ sql: "INSERT OR REPLACE INTO login_throttles VALUES (?, 50, ?, ?)", params: [accountKey, now.getTime() + 60_000, now.getTime()] }]);
+  const rescueCodeSession = await startRecovery();
+  assert.equal((await call("POST", "/v1/dashboard-sessions/current/recovery-code", { key: rescueCodeSession.body.data.api_key, body: { recovery_code: "invalid-recovery-code" } })).status, 401);
+  const rescueCode = registration.body.data.recovery_codes[3] as string;
+  const codeRescued = await call("POST", "/v1/dashboard-sessions/current/recovery-code", { key: rescueCodeSession.body.data.api_key, body: { recovery_code: rescueCode } });
+  assert.equal(codeRescued.status, 201);
+  assert.equal(codeRescued.body.data.auth_stage, "full");
+  const replayRescue = await startRecovery();
+  assert.equal((await call("POST", "/v1/dashboard-sessions/current/recovery-code", { key: replayRescue.body.data.api_key, body: { recovery_code: rescueCode } })).status, 401);
+  const expiredRescue = await startRecovery();
+  now = new Date(now.getTime() + 16 * 60_000);
+  assert.equal((await call("POST", "/v1/dashboard-sessions/current/recovery-code", { key: expiredRescue.body.data.api_key, body: { recovery_code: registration.body.data.recovery_codes[4] } })).status, 401);
+  const disabledRescue = await startRecovery();
+  await db.batch([{ sql: "UPDATE operator_accounts SET disabled_at = ? WHERE id = ?", params: [now.toISOString(), account.accountId] }]);
+  assert.equal((await call("POST", "/v1/dashboard-sessions/current/recovery-code", { key: disabledRescue.body.data.api_key, body: { recovery_code: registration.body.data.recovery_codes[4] } })).status, 401);
+  await db.batch([{ sql: "UPDATE operator_accounts SET disabled_at = NULL, must_change_password = 1 WHERE id = ?", params: [account.accountId] }]);
+  const rotateRescue = await startRecovery();
+  const rotateSession = await call("POST", "/v1/dashboard-sessions/current/recovery-code", { key: rotateRescue.body.data.api_key, body: { recovery_code: registration.body.data.recovery_codes[4] } });
+  assert.equal(rotateSession.status, 201);
+  assert.equal(rotateSession.body.data.auth_stage, "password_change");
+  assert.deepEqual(rotateSession.body.data.scopes, []);
+  await db.batch([{ sql: "UPDATE operator_accounts SET must_change_password = 0 WHERE id = ?", params: [account.accountId] }]);
+
+  const racedRecoveryStage = await startRecovery();
+  let resetDuringRecovery = false;
+  const racedRecoveryDb: Db = {
+    ...db,
+    async all<Row>(sql: string, params?: import("../../src/core/db").Param[]) {
+      const rows = await db.all<Row>(sql, params);
+      if (!resetDuringRecovery && sql.includes("a.must_change_password, m.role")) {
+        resetDuringRecovery = true;
+        await db.batch([
+          { sql: "UPDATE operator_accounts SET must_change_password = 1 WHERE id = ?", params: [account.accountId] },
+          { sql: "UPDATE api_keys SET revoked_at = ? WHERE principal_id = ? AND label = 'Dashboard session'", params: [now.toISOString(), account.principalId] },
+        ]);
+      }
+      return rows;
+    },
+  };
+  const raceCall = clientVia(createApp({ db: racedRecoveryDb, runtime, now: () => now }), "https://memory.example.com").call;
+  assert.equal((await raceCall("POST", "/v1/dashboard-sessions/current/recovery-code", {
+    key: racedRecoveryStage.body.data.api_key, body: { recovery_code: registration.body.data.recovery_codes[5] },
+  })).status, 401, "reset must prevent stale recovery proof from issuing a session");
+  assert.equal(resetDuringRecovery, true);
+  await db.batch([{ sql: "UPDATE operator_accounts SET must_change_password = 0 WHERE id = ?", params: [account.accountId] }]);
+
   const disabledCall = clientVia(createApp({
     db,
     runtime: `webauthn-disabled-${runtime}`,

@@ -69,6 +69,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/consolidations`
 - `POST /v1/context/:id/feedback`
 - `POST /v1/context/compile`
+- `POST /v1/dashboard-sessions/recovery`
 - `POST /v1/dashboard-sessions`
 - `POST /v1/dashboard-sessions/current/passkey-options`
 - `POST /v1/dashboard-sessions/current/passkey`
@@ -186,7 +187,16 @@ password receives a 15-minute key with no scopes and
 `password_change_required: true`. Central route authorization limits each
 staged key to its completion and logout routes. Unknown users and wrong
 passwords return the same `INVALID_LOGIN` response. A persistent hashed account
-bucket applies progressive delays before password verification.
+and client buckets apply progressive delays before password verification.
+Five failures block the client bucket. Fifty failures block the account across clients within a 15-minute window.
+Active blocks remain stored. Full throttle storage and full password-check capacity return HTTP 429.
+Successful authentication returns `failed_attempts`. Block transitions write metadata-only `operator_account.login_block` audit records.
+
+`POST /v1/dashboard-sessions/recovery` accepts only `username` without a password.
+It returns `api_key`, `expires_at`, and `auth_stage: second_factor` in the same envelope for known and unknown accounts.
+The key has no product scopes. Complete an existing passkey challenge or submit an unused recovery code.
+An unknown account receives an unusable token. A valid recovery can complete authentication during a password block.
+Recovery preserves `must_change_password`; such accounts receive a restricted `password_change` session after proof.
 
 `PATCH /v1/operator-accounts/current/password` accepts only `password`. It is
 available to an authenticated operator session even when that session has no

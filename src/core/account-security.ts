@@ -1,3 +1,4 @@
+import { accountAttemptKey, failedLoginCount, guardedSessionInsert, conditionalInsert, sessionExists } from "./login-security";
 import { createApiKey } from "./auth";
 import { auditStatement } from "./audit";
 import { first, type Stmt } from "./db";
@@ -26,6 +27,7 @@ interface SecurityAccountRow {
   scopes: string;
   max_trust: Trust;
   role: string;
+  must_change_password: number;
 }
 
 interface CredentialRow {
@@ -63,7 +65,7 @@ async function accountForPrincipal(ctx: RequestContext): Promise<SecurityAccount
   const principal = ctx.principal!;
   const account = await first<SecurityAccountRow>(ctx.app.db,
     `SELECT a.id, a.org_id, a.principal_id, a.username, a.password_verifier,
-            a.scopes, a.max_trust, m.role
+            a.scopes, a.max_trust, a.must_change_password, m.role
        FROM operator_accounts a
        JOIN memberships m ON m.org_id = a.org_id
         AND m.workspace_id IS NULL AND m.principal_id = a.principal_id
@@ -71,7 +73,7 @@ async function accountForPrincipal(ctx: RequestContext): Promise<SecurityAccount
       WHERE a.org_id = ? AND a.principal_id = ? AND a.disabled_at IS NULL
       LIMIT 1`,
     [principal.orgId, principal.principalId]);
-  if (!account) throw notFound();
+  if (!account) throw ctx.principal?.authStage === "second_factor" ? secondFactorInvalid() : notFound();
   return account;
 }
 
@@ -187,8 +189,14 @@ function recoverySet(account: SecurityAccountRow, generationId: string, now: num
 
 async function completeFullSession(ctx: RequestContext, account: SecurityAccountRow): Promise<Result> {
   const now = ctx.app.now();
-  const expiresAt = new Date(now.getTime() + FULL_SESSION_TTL_MS);
-  const scopes = account.scopes.split(" ").filter(Boolean);
+  const expiresAt = new Date(now.getTime() + (account.must_change_password === 1 ? 15 * 60_000 : FULL_SESSION_TTL_MS));
+  const passwordChangeRequired = account.must_change_password === 1;
+  const authStage = passwordChangeRequired ? "password_change" : "full";
+  const scopes = passwordChangeRequired ? [] : account.scopes.split(" ").filter(Boolean);
+  const accountKey = await accountAttemptKey(account.username);
+  const prior = await first<{ detail: string | null }>(ctx.app.db, "SELECT detail FROM audit_log WHERE resource_id = ? AND action = 'dashboard_session.create'", [ctx.principal!.keyId]);
+  const previousFailures = prior?.detail ? Number(JSON.parse(prior.detail).failed_attempts ?? 0) : 0;
+  const failedAttempts = Math.max(previousFailures, await failedLoginCount(ctx.app.db, accountKey));
   const created = await createApiKey({
     orgId: account.org_id,
     principalId: account.principal_id,
@@ -197,19 +205,23 @@ async function completeFullSession(ctx: RequestContext, account: SecurityAccount
     scopes,
     maxTrust: account.max_trust,
     expiresAt,
-    authStage: "full",
+    authStage,
   }, now);
   await ctx.app.db.batch([
-    created.statement,
+    guardedSessionInsert(created.statement, account, { id: ctx.principal!.keyId, now: now.toISOString() }),
+    { sql: `DELETE FROM login_throttles WHERE (identity_hash = ? OR identity_hash LIKE ?) AND ${sessionExists()}`,
+      params: [accountKey, `${accountKey}.%`, created.id] },
     {
       sql: `UPDATE api_keys SET revoked_at = ?
              WHERE id = ? AND org_id = ? AND auth_stage = 'second_factor'
-               AND revoked_at IS NULL`,
-      params: [now.toISOString(), ctx.principal!.keyId, account.org_id],
+               AND revoked_at IS NULL AND ${sessionExists()}`,
+      params: [now.toISOString(), ctx.principal!.keyId, account.org_id, created.id],
     },
-    auditStatement(account.org_id, account.principal_id, "dashboard_session.second_factor_complete", "api_key", now.toISOString(), created.id),
+    conditionalInsert(auditStatement(account.org_id, account.principal_id, "dashboard_session.second_factor_complete", "api_key", now.toISOString(), created.id), sessionExists(), [created.id]),
   ]);
+  if (!await first(ctx.app.db, "SELECT id FROM api_keys WHERE id = ? AND revoked_at IS NULL", [created.id])) throw secondFactorInvalid();
   return { status: 201, data: {
+    failed_attempts: failedAttempts,
     api_key: created.key,
     expires_at: expiresAt.toISOString(),
     organization_id: account.org_id,
@@ -219,9 +231,9 @@ async function completeFullSession(ctx: RequestContext, account: SecurityAccount
     scopes,
     max_trust: account.max_trust,
     organization_role: account.role,
-    password_change_required: false,
+    password_change_required: passwordChangeRequired,
     second_factor_required: false,
-    auth_stage: "full",
+    auth_stage: authStage,
   } };
 }
 
