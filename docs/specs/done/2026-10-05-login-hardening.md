@@ -1,12 +1,11 @@
 ---
 work_id: login-hardening-310-311
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-10-05
 updated: 2026-10-05
-review_after: 2026-10-19
 owner: maintainers
 ---
 # Dashboard sign-in protection and recovery
@@ -54,3 +53,9 @@ Check account state and staged-session authority inside session issuance transac
 Back up the live database and unit paths before deployment. Restore prior service paths for rollback.
 Done requires passing manual gates, reviewed merges, production readiness, dashboard checks, and authenticated MCP smoke.
 Move both artifacts to done only after evidence exists.
+
+## Delivery
+
+PR #307 updates Astro to 7.2.8. PR #312 delivers these sign-in changes.
+All acceptance criteria pass their contract, integration, browser, or real-host checks.
+The paired plan records test counts, backup evidence, and production verification.
