@@ -26,6 +26,15 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.4] — 2026-10-05
+
+Protect dashboard sign-in and provide account recovery during password blocks.
+
+### Upgrade notes
+
+- No schema migration is required.
+- Configure verified client headers only through a trusted loopback proxy. See the VPS sign-in runbook.
+
 ### Added
 
 - Host account list, unlock, and password-reset commands support operator recovery.
@@ -38,6 +47,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 - Persistent client and account throttles preserve active blocks and reject full storage before password work.
 - The API rejects ambiguous raw paths before route matching.
 
+### Security
+
+- Session transactions reject stale account or revoked-session state after a host password reset.
 
 ## [0.10.3] — 2026-09-25
 
@@ -1561,7 +1573,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.3...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.4...HEAD
+[0.10.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.4
 [0.10.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.3
 [0.10.2]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.2
 [0.10.1]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.1
