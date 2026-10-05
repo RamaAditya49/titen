@@ -12,6 +12,7 @@ import {
   assertSemanticIndexWriteRepair,
   assertSemanticReadiness,
 } from "./semantic-readiness";
+import { assertLoginSecurity } from "./login-security";
 import { assertWebAuthnContract } from "./webauthn";
 
 const directory = mkdtempSync(join(tmpdir(), "titen-bun-"));
@@ -90,3 +91,5 @@ for (const contractCase of CASES)
   test(`bun-sqlite: ${contractCase.name}`, async () => {
     await contractCase.run(fixture);
   });
+
+test("bun:sqlite protects login clients and storage", async () => { await assertLoginSecurity(db, "bun-sqlite"); });

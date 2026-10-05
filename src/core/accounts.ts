@@ -1,8 +1,9 @@
+import { admitPasswordAttempt, loginAttemptKeys, recordLoginFailure, failedLoginCount, guardedSessionInsert, conditionalInsert, sessionExists } from "./login-security";
 import { createApiKey, requestedScopes, requireScope } from "./auth";
 import { auditStatement } from "./audit";
 import { first, type Stmt } from "./db";
 import { ApiError, forbidden, notFound, validationError } from "./errors";
-import { newId, randomToken, sha256Hex } from "./ids";
+import { newId, randomToken } from "./ids";
 import { requireOrgRole } from "./governance";
 import type { RequestContext, Result } from "./http";
 import {
@@ -23,9 +24,6 @@ const PASSWORD_MIN_LENGTH = 15;
 const PASSWORD_MAX_LENGTH = 128;
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const PASSWORD_CHANGE_TTL_MS = 15 * 60 * 1000;
-const ATTEMPT_LIMIT = 5;
-const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPT_BUCKETS = 4_096;
 const MEMBER_ROLES = ["owner", "admin", "member", "reader"] as const;
 const encoder = new TextEncoder();
 const COMMON_PASSWORDS = new Set([
@@ -161,66 +159,6 @@ function invalidLogin(): ApiError {
   return new ApiError(401, "INVALID_LOGIN", "Username or password is invalid.");
 }
 
-async function attemptKey(value: string | undefined): Promise<string> {
-  return sha256Hex(`dashboard-login:${value ?? "__invalid_username__"}`);
-}
-
-async function assertAttemptAllowed(ctx: RequestContext, key: string, now: number): Promise<void> {
-  const bucket = await first<{ blocked_until_ms: number; touched_at_ms: number }>(
-    ctx.app.db,
-    `SELECT blocked_until_ms, touched_at_ms FROM login_throttles WHERE identity_hash = ?`,
-    [key],
-  );
-  if (!bucket) return;
-  if (bucket.blocked_until_ms > now)
-    throw invalidLogin();
-  if (now - bucket.touched_at_ms >= ATTEMPT_WINDOW_MS)
-    await ctx.app.db.batch([{ sql: `DELETE FROM login_throttles WHERE identity_hash = ? AND touched_at_ms = ?`, params: [key, bucket.touched_at_ms] }]);
-}
-
-function delayMs(failures: number): number {
-  if (failures < ATTEMPT_LIMIT) return 0;
-  if (failures === 5) return 30_000;
-  if (failures === 6) return 60_000;
-  if (failures === 7) return 5 * 60_000;
-  if (failures === 8) return 15 * 60_000;
-  return 30 * 60_000;
-}
-
-async function failedAttempt(ctx: RequestContext, key: string, now: number): Promise<void> {
-  const [stored] = await ctx.app.db.all<{ failures: number }>(
-    `INSERT INTO login_throttles
-       (identity_hash, failures, blocked_until_ms, touched_at_ms)
-     VALUES (?, 1, 0, ?)
-     ON CONFLICT(identity_hash) DO UPDATE SET
-       failures = CASE
-         WHEN excluded.touched_at_ms - login_throttles.touched_at_ms >= ? THEN 1
-         ELSE login_throttles.failures + 1
-       END,
-       blocked_until_ms = 0,
-       touched_at_ms = excluded.touched_at_ms
-     RETURNING failures`,
-    [key, now, ATTEMPT_WINDOW_MS],
-  );
-  const failures = Number(stored?.failures ?? 1);
-  const blockedUntil = now + delayMs(failures);
-  await ctx.app.db.batch([
-    {
-      sql: `UPDATE login_throttles SET blocked_until_ms = ?
-             WHERE identity_hash = ? AND failures = ? AND touched_at_ms = ?`,
-      params: [blockedUntil, key, failures, now],
-    },
-    {
-      sql: `DELETE FROM login_throttles WHERE identity_hash IN (
-              SELECT identity_hash FROM login_throttles
-               ORDER BY touched_at_ms DESC, identity_hash DESC
-               LIMIT -1 OFFSET ?
-            )`,
-      params: [MAX_ATTEMPT_BUCKETS],
-    },
-  ]);
-}
-
 export async function newOperatorAccount(input: {
   orgId: string;
   createdBy: string;
@@ -321,11 +259,10 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
   if (unknown) throw validationError(`Unknown dashboard session field "${unknown}".`);
   const login = username(body.username, false);
   const secret = password(body.password, true);
-  const key = await attemptKey(login);
+  const keys = await loginAttemptKeys(ctx, login);
+  const key = keys.account;
   const now = ctx.app.now();
-  if (ctx.app.loginRateLimit && !(await ctx.app.loginRateLimit.limit({ identityHash: key, request: ctx.request })).success)
-    throw new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
-  await assertAttemptAllowed(ctx, key, now.getTime());
+  await admitPasswordAttempt(ctx, keys, now.getTime());
   const account = login ? await first<AccountRow>(ctx.app.db,
     `SELECT a.id, a.org_id, a.principal_id, a.password_verifier, a.scopes,
             a.max_trust, a.must_change_password, m.role,
@@ -337,13 +274,15 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
         AND m.workspace_id IS NULL AND m.principal_id = a.principal_id
         AND m.principal_kind = 'human' AND m.removed_at IS NULL
       WHERE a.username = ? AND a.disabled_at IS NULL LIMIT 1`, [login]) : undefined;
-  dummyVerifier ??= hashPassword(`${randomToken()}-dummy-password`);
-  const valid = await verifyPassword(secret ?? "invalid password candidate", account?.password_verifier ?? await dummyVerifier);
+  const valid = await ctx.app.checkPassword(async () => {
+    dummyVerifier ??= hashPassword(`${randomToken()}-dummy-password`);
+    return verifyPassword(secret ?? "invalid password candidate", account?.password_verifier ?? await dummyVerifier);
+  });
   if (!account || !secret || !valid) {
-    await failedAttempt(ctx, key, now.getTime());
+    await recordLoginFailure(ctx, keys, now.getTime(), account);
     throw invalidLogin();
   }
-  await ctx.app.db.batch([{ sql: `DELETE FROM login_throttles WHERE identity_hash = ?`, params: [key] }]);
+  const failedAttempts = await failedLoginCount(ctx.app.db, key);
   const passwordChangeRequired = account.must_change_password === 1;
   const secondFactorRequired = !passwordChangeRequired && account.webauthn_credentials > 0;
   const authStage = passwordChangeRequired
@@ -364,10 +303,14 @@ export async function createDashboardSession(ctx: RequestContext): Promise<Resul
     authStage,
   }, now);
   await ctx.app.db.batch([
-    created.statement,
-    auditStatement(account.org_id, account.principal_id, "dashboard_session.create", "api_key", now.toISOString(), created.id),
+    guardedSessionInsert(created.statement, account),
+    { sql: `DELETE FROM login_throttles WHERE identity_hash IN (?, ?) AND ${sessionExists()}`, params: [key, keys.client, created.id] },
+    conditionalInsert(auditStatement(account.org_id, account.principal_id, "dashboard_session.create", "api_key", now.toISOString(), created.id,
+      JSON.stringify({ failed_attempts: failedAttempts })), sessionExists(), [created.id]),
   ]);
+  if (!await first(ctx.app.db, "SELECT id FROM api_keys WHERE id = ? AND revoked_at IS NULL", [created.id])) throw invalidLogin();
   return { status: 201, data: {
+    failed_attempts: failedAttempts,
     api_key: created.key,
     expires_at: expiresAt.toISOString(),
     organization_id: account.org_id,
@@ -398,21 +341,33 @@ export async function changeOperatorPassword(ctx: RequestContext): Promise<Resul
     throw validationError('Field "password" must differ from the temporary or current password.');
   const now = ctx.app.now().toISOString();
   const verifier = await hashPassword(secret);
+  const liveCaller = `EXISTS (SELECT 1 FROM api_keys WHERE id = ? AND org_id = ?
+    AND principal_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?))`;
+  const callerParams = [principal.keyId, principal.orgId, principal.principalId, now];
+  const audit = auditStatement(principal.orgId, principal.principalId,
+    "operator_account.password_change", "operator_account", now, account.id);
+  const auditId = audit.params![0]!;
   await ctx.app.db.batch([
     {
       sql: `UPDATE operator_accounts
                SET password_verifier = ?, must_change_password = 0, password_changed_at = ?
-             WHERE id = ? AND org_id = ? AND disabled_at IS NULL`,
-      params: [verifier, now, account.id, principal.orgId],
+             WHERE id = ? AND org_id = ? AND disabled_at IS NULL
+               AND password_verifier = ? AND ${liveCaller}`,
+      params: [verifier, now, account.id, principal.orgId, account.password_verifier, ...callerParams],
     },
+    conditionalInsert(audit, `EXISTS (SELECT 1 FROM operator_accounts WHERE id = ?
+      AND org_id = ? AND password_verifier = ? AND must_change_password = 0
+      AND password_changed_at = ? AND disabled_at IS NULL) AND ${liveCaller}`,
+      [account.id, principal.orgId, verifier, now, ...callerParams]),
     {
       sql: `UPDATE api_keys SET revoked_at = ?
              WHERE org_id = ? AND principal_id = ? AND label = 'Dashboard session'
-               AND revoked_at IS NULL`,
-      params: [now, principal.orgId, principal.principalId],
+               AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM audit_log WHERE id = ?)`,
+      params: [now, principal.orgId, principal.principalId, auditId],
     },
-    auditStatement(principal.orgId, principal.principalId, "operator_account.password_change", "operator_account", now, account.id),
   ]);
+  if (!await first(ctx.app.db, "SELECT id FROM audit_log WHERE id = ?", [auditId]))
+    throw new ApiError(401, "UNAUTHENTICATED", "The session is no longer valid.");
   return { data: { password_changed: true, login_required: true } };
 }
 
@@ -424,4 +379,28 @@ export async function revokeDashboardSession(ctx: RequestContext): Promise<Resul
     auditStatement(principal.orgId, principal.principalId, "dashboard_session.revoke", "api_key", now, principal.keyId),
   ]);
   return { data: { logged_out: true, key_id: principal.keyId, revoked_at: now } };
+}
+
+
+export async function createDashboardRecoverySession(ctx: RequestContext): Promise<Result> {
+  const body = requireObject(await ctx.json());
+  if (Object.keys(body).some((field) => field !== "username"))
+    throw validationError("Recovery fields do not match the operation schema.");
+  const login = username(body.username, false);
+  const now = ctx.app.now();
+  const expiresAt = new Date(now.getTime() + PASSWORD_CHANGE_TTL_MS);
+  const account = login ? await first<{ org_id: string; principal_id: string }>(ctx.app.db,
+    `SELECT a.org_id, a.principal_id FROM operator_accounts a JOIN memberships m
+      ON m.org_id = a.org_id AND m.principal_id = a.principal_id AND m.principal_kind = 'human'
+      AND m.workspace_id IS NULL AND m.removed_at IS NULL
+      WHERE a.username = ? AND a.disabled_at IS NULL LIMIT 1`, [login]) : undefined;
+  let key = `titen_sk_${randomToken(32)}`;
+  if (account) {
+    const created = await createApiKey({ orgId: account.org_id, principalId: account.principal_id,
+      principalKind: "human", label: "Dashboard session", scopes: [], maxTrust: "unverified",
+      expiresAt, authStage: "second_factor" }, now);
+    await ctx.app.db.batch([created.statement]);
+    key = created.key;
+  }
+  return { status: 201, data: { api_key: key, expires_at: expiresAt.toISOString(), auth_stage: "second_factor" } };
 }

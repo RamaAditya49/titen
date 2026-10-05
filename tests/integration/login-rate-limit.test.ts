@@ -77,8 +77,8 @@ test("a progressive account throttle survives app reconstruction and clears afte
       identity_hash: string;
       failures: number;
       blocked_until_ms: number;
-    }>("SELECT identity_hash, failures, blocked_until_ms FROM login_throttles");
-    assert.match(stored!.identity_hash, /^[a-f0-9]{64}$/);
+    }>("SELECT identity_hash, failures, blocked_until_ms FROM login_throttles WHERE identity_hash LIKE '%.%'");
+    assert.match(stored!.identity_hash, /^[a-f0-9]{64}\.[a-f0-9]{64}$/);
     assert.equal(stored!.failures, 5);
     assert.equal(stored!.blocked_until_ms, now.getTime() + 30_000);
 
@@ -96,4 +96,76 @@ test("a progressive account throttle survives app reconstruction and clears afte
   } finally {
     handle.close();
   }
+});
+
+
+test("concurrent password admission rejects work beyond the configured limit", async () => {
+  const handle = openDatabase(":memory:");
+  const db = createSqliteDb(handle);
+  try {
+    await migrate(db);
+    const app = createApp({ db, runtime: "test", passwordCheckLimit: 1 });
+    const attempts = await Promise.all(Array.from({ length: 8 }, (_, index) => app(new Request("http://titen.test/v1/dashboard-sessions", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: `concurrent-${index}`, password: "incorrect horse battery staple" }),
+    }))));
+    assert.equal(attempts.filter((response) => response.status === 401).length, 1);
+    assert.equal(attempts.filter((response) => response.status === 429).length, 7);
+  } finally { handle.close(); }
+});
+
+test("raw paths reject dot segments and encoded separators before routing", async () => {
+  const handle = openDatabase(":memory:");
+  try {
+    const app = createApp({ db: createSqliteDb(handle), runtime: "test" });
+    for (const path of ["/v1/../healthz", "/./healthz", "/v1%2fhealthz", "/v1%252fhealthz", "/v1%5chealthz"]) {
+      const request = new Request("http://titen.test/healthz");
+      Object.defineProperty(request, "url", { value: `http://titen.test${path}` });
+      assert.equal((await app(request)).status, 400, path);
+    }
+  } finally { handle.close(); }
+});
+
+test("the Bun listener limits a client before password work", async () => {
+  const { serve } = await import("../../src/runtime/bun/server");
+  const running = await serve({ dbPath: ":memory:", hostname: "127.0.0.1", port: 0, maintenanceIntervalMs: 0, quiet: true,
+    loginClientIpHeader: "x-test-client-ip" });
+  try {
+    for (let i = 0; i < 20; i++) {
+      const response = await fetch(`${running.url}/v1/dashboard-sessions`, { method: "POST", headers: { "content-type": "application/json", "x-test-client-ip": "192.0.2.1" }, body: JSON.stringify({ username: `rate-${i}`, password: "incorrect horse battery staple" }) });
+      assert.equal(response.status, 401);
+    }
+    const attempt = (ip: string) => fetch(`${running.url}/v1/dashboard-sessions`, { method: "POST", headers: { "content-type": "application/json", "x-test-client-ip": ip }, body: JSON.stringify({ username: "rate-other", password: "incorrect horse battery staple" }) });
+    assert.equal((await attempt("192.0.2.1")).status, 429);
+    assert.equal((await attempt("192.0.2.2")).status, 401);
+  } finally { await running.stop(); }
+});
+
+
+test("the Bun listener rejects raw dot segments and encoded slash paths", async () => {
+  const { serve } = await import("../../src/runtime/bun/server");
+  const { createConnection } = await import("node:net");
+  const running = await serve({ dbPath: ":memory:", hostname: "127.0.0.1", port: 0, maintenanceIntervalMs: 0, quiet: true });
+  try {
+    for (const path of ["/v1/../healthz", "/./healthz", "/v1%2fhealthz", "/%252e%252e/healthz"]) {
+      const status = await new Promise<number>((resolve, reject) => {
+        const url = new URL(running.url);
+        const socket = createConnection({ host: url.hostname, port: Number(url.port) });
+        let response = "";
+        socket.on("connect", () => socket.write(`GET ${path} HTTP/1.1\r\nHost: ${url.host}\r\nConnection: close\r\n\r\n`));
+        socket.on("data", (chunk) => { response += chunk.toString(); });
+        socket.on("end", () => resolve(Number(response.match(/^HTTP\/1.1 (\d+)/)?.[1])));
+        socket.on("error", reject);
+      });
+      assert.equal(status, 400, path);
+    }
+  } finally { await running.stop(); }
+});
+
+test("untrusted client headers cannot replace direct socket identity", async () => {
+  const { loginClientAddress } = await import("../../src/runtime/bun/login-rate-limit");
+  const request = new Request("http://test", { headers: { "x-client-ip": "192.0.2.1" } });
+  assert.equal(loginClientAddress("198.51.100.1", request, "x-client-ip"), "198.51.100.1");
+  assert.equal(loginClientAddress("127.0.0.1", request), "127.0.0.1");
+  assert.equal(loginClientAddress("127.0.0.1", request, "x-client-ip"), "192.0.2.1");
 });

@@ -12,6 +12,7 @@ import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, type Trust } from "../../core/validate";
 import { createSqliteDb, openDatabase } from "./sqlite";
+import { listHostAccounts, recoverHostAccount } from "./accounts";
 import { serve } from "./server";
 import { configureHttpExtraction } from "../../core/extraction";
 import { parseSecretCipher } from "../../core/secrets";
@@ -45,6 +46,9 @@ Usage:
                    [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
   titen key list   [--db <path>]
   titen key revoke [--db <path>] --id <key id>
+  titen account list [--db <path>]
+  titen account unlock [--db <path>] --username <name>
+  titen account reset-password [--db <path>] --username <name>
   titen backup     [--db <path>] --out <file>   verified online copy
   titen schema     print every migration statement (for "wrangler d1 execute --file")
   titen audit      <path> [--json]   offline write-hygiene report for a Titen
@@ -102,6 +106,9 @@ const COMMAND_FLAGS: Record<
     ],
     booleans: ["print-sql"],
   },
+  "account list": { values: ["db"] },
+  "account unlock": { values: ["db", "username"] },
+  "account reset-password": { values: ["db", "username"] },
   "key list": { values: ["db"] },
   "key revoke": { values: ["db", "id"] },
   backup: { values: ["db", "out"] },
@@ -124,7 +131,7 @@ function parseArgs(argv: string[]) {
     return { command: undefined, action: undefined, flags, positional: undefined };
 
   const command = argv[0]!;
-  const action = command === "key" ? argv[1] : undefined;
+  const action = ["key", "account"].includes(command) ? argv[1] : undefined;
   const name = action ? `${command} ${action}` : command;
   const schema = COMMAND_FLAGS[name];
   if (!schema) fail(command === "key" ? "key needs create, list, or revoke" : `unknown command "${command}"`);
@@ -261,7 +268,7 @@ const dbPath = requestedDbPath === ":memory:" || requestedDbPath.startsWith("fil
   ? requestedDbPath
   : resolve(requestedDbPath);
 const legacyDbPath = resolve("titen.db");
-const localDatabaseCommand = ["serve", "migrate", "bootstrap", "key", "backup"].includes(command ?? "")
+const localDatabaseCommand = ["serve", "migrate", "bootstrap", "key", "account", "backup"].includes(command ?? "")
   && !(flags["print-sql"] === true && (command === "bootstrap" || action === "create"));
 if (
   !explicitDb
@@ -432,6 +439,7 @@ switch (command) {
         webauthnRpId: process.env.TITEN_WEBAUTHN_RP_ID,
         webauthnOrigin: process.env.TITEN_WEBAUTHN_ORIGIN,
         webauthnRpName: process.env.TITEN_WEBAUTHN_RP_NAME,
+        loginClientIpHeader: process.env.TITEN_LOGIN_CLIENT_IP_HEADER,
       });
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error
@@ -593,6 +601,24 @@ switch (command) {
       break;
     }
     fail("key needs create, list, or revoke");
+    break;
+  }
+
+  case "account": {
+    if (action === "list") {
+      const accounts = await existingDatabase(dbPath, (_handle, db) => listHostAccounts(db), true);
+      console.log(JSON.stringify({ accounts }, null, 2));
+    } else {
+      const username = text(flags.username, "");
+      if (!username) fail("--username is required");
+      const recovered = await existingDatabase(dbPath, (_handle, db) => recoverHostAccount(db, username, action === "reset-password"));
+      console.log(`username: ${recovered.username}`);
+      console.log("unlocked: true");
+      if (recovered.temporaryPassword) {
+        console.log(`temporary_password: ${recovered.temporaryPassword}`);
+        console.log("password_change_required: true");
+      }
+    }
     break;
   }
 

@@ -1,5 +1,7 @@
+import { sha256Hex } from "./ids";
+import { accountAttemptKey, assertCanonicalPath, passwordCheckGuard } from "./login-security";
 import { authenticate, requireScope } from "./auth";
-import { changeOperatorPassword, createDashboardSession, createOperatorAccount, revokeDashboardSession } from "./accounts";
+import { changeOperatorPassword, createDashboardRecoverySession, createDashboardSession, createOperatorAccount, revokeDashboardSession } from "./accounts";
 import {
   completePasskeyAuthentication,
   completeRecoveryAuthentication,
@@ -128,6 +130,8 @@ export interface AppContext {
   loginRateLimit?: {
     limit(input: { identityHash: string; request: Request }): Promise<{ success: boolean }>;
   };
+  loginClient?: (request: Request) => string;
+  checkPassword: <T>(run: () => Promise<T>) => Promise<T>;
   /** Optional phishing-resistant dashboard authentication. */
   webauthn: WebAuthnRuntime;
   /**
@@ -295,6 +299,7 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/operator-accounts/current/passkeys", authenticated: true, handler: listPasskeys },
   { method: "DELETE", path: "/v1/operator-accounts/current/passkeys/:id", authenticated: true, handler: removePasskey },
   { method: "POST", path: "/v1/operator-accounts/current/recovery-codes", authenticated: true, handler: regenerateRecoveryCodes },
+  { method: "POST", path: "/v1/dashboard-sessions/recovery", handler: createDashboardRecoverySession },
   { method: "POST", path: "/v1/dashboard-sessions", handler: createDashboardSession },
   { method: "POST", path: "/v1/dashboard-sessions/current/passkey-options", authenticated: true, authStages: ["second_factor"], handler: createPasskeyAuthenticationOptions },
   { method: "POST", path: "/v1/dashboard-sessions/current/passkey", authenticated: true, authStages: ["second_factor"], handler: completePasskeyAuthentication },
@@ -507,6 +512,9 @@ export function createApp(context: {
   secretCipher?: SecretCipher;
   mcpOrigin?: string;
   loginRateLimit?: AppContext["loginRateLimit"];
+  loginClient?: AppContext["loginClient"];
+  passwordCheckLimit?: number;
+  checkPassword?: AppContext["checkPassword"];
   webauthn?: WebAuthnRuntime;
   mcpInstructionsNote?: string;
 }): (request: Request) => Promise<Response> {
@@ -554,6 +562,8 @@ export function createApp(context: {
     webhookSecurity: context.webhookSecurity,
     secretCipher: context.secretCipher,
     loginRateLimit: context.loginRateLimit,
+    loginClient: context.loginClient,
+    checkPassword: context.checkPassword ?? passwordCheckGuard(context.passwordCheckLimit),
     webauthn: context.webauthn ?? createWebAuthnRuntime({ state: "disabled" }),
     mcpInstructionsNote: context.mcpInstructionsNote,
   };
@@ -579,6 +589,7 @@ export function createApp(context: {
   return async function handle(request: Request): Promise<Response> {
     const requestId = newRequestId();
     try {
+      assertCanonicalPath(request.url);
       const url = new URL(request.url);
       if (url.pathname === "/mcp") {
         const rawOrigin = request.headers.get("origin");
@@ -648,6 +659,18 @@ export function createApp(context: {
         if (matched.route.scope) requireScope(ctx.principal, matched.route.scope);
       }
 
+      if (request.method === "POST" && matched.route.path.startsWith("/v1/dashboard-sessions") && app.loginRateLimit) {
+        const identityHash = await (async () => {
+          if (matched.route.path === "/v1/dashboard-sessions") {
+            const body = await ctx.json<Record<string, unknown>>();
+            const value = typeof body?.username === "string" ? body.username.normalize("NFC").toLowerCase() : undefined;
+            return accountAttemptKey(value);
+          }
+          return sha256Hex(`dashboard-stage:${ctx.principal?.keyId ?? "recovery"}`);
+        })();
+        if (!(await app.loginRateLimit.limit({ identityHash, request })).success)
+          throw new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
+      }
       const result = await matched.route.handler(ctx);
       return result.raw ?? success(result, requestId);
     } catch (error) {

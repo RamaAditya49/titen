@@ -26,6 +26,19 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- Host account list, unlock, and password-reset commands support operator recovery.
+- Password-independent passkey and recovery-code sign-in remains available during password blocks.
+- Sign-in audit records and successful-session failure counts show preceding failed attempts.
+
+### Fixed
+
+- Bun limits client attempts and concurrent sign-in password checks.
+- Persistent client and account throttles preserve active blocks and reject full storage before password work.
+- The API rejects ambiguous raw paths before route matching.
+
+
 ## [0.10.3] — 2026-09-25
 
 ### Changed

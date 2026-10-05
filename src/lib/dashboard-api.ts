@@ -70,6 +70,7 @@ export interface DashboardPrincipal {
   scopes: string[];
   max_trust: string;
   organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
+  failed_attempts?: number;
   password_change_required?: boolean;
   second_factor_required?: boolean;
   auth_stage?: "full" | "password_change" | "second_factor";
@@ -139,6 +140,11 @@ export async function login(username: string, password: string): Promise<Dashboa
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ username, password }),
   }));
+}
+
+export async function startRecovery(username: string): Promise<DashboardPrincipal> {
+  return principal(await request("/dashboard-api/session/recovery", { method: "POST",
+    headers: { "content-type": "application/json" }, body: JSON.stringify({ username }) }));
 }
 
 export async function getSession(): Promise<DashboardPrincipal> {

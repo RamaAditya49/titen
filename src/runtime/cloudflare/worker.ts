@@ -1,3 +1,4 @@
+import { passwordCheckGuard } from "../../core/login-security";
 import { createApp } from "../../core/app";
 import { migrate, schemaState } from "../../core/migrations";
 import { createD1Db, type D1Database } from "./d1";
@@ -10,6 +11,8 @@ import { configureHttpExtraction } from "../../core/extraction";
 import { withD1Budget } from "./d1-budget";
 import { newRequestId, success } from "../../core/http";
 import { createWebAuthnRuntime, parseWebAuthnConfig } from "../../core/webauthn";
+
+const workerPasswordChecks = passwordCheckGuard();
 
 export interface Env {
   DB: D1Database;
@@ -170,6 +173,7 @@ export default {
       secretCipher = undefined;
     }
     const app = createApp({
+      checkPassword: workerPasswordChecks,
       db,
       revision: env.TITEN_REVISION ?? "dev",
       runtime: "cloudflare-d1",
@@ -203,8 +207,9 @@ export default {
       secretStorageReady,
       secretCipher,
       webhookSecurity: testWebhookSecurity(env),
+      loginClient: (request) => request.headers.get("CF-Connecting-IP") ?? "unknown-client",
       loginRateLimit: env.LOGIN_RATE_LIMITER
-        ? { limit: ({ identityHash }) => env.LOGIN_RATE_LIMITER!.limit({ key: `account:${identityHash}` }) }
+        ? { limit: ({ request }) => env.LOGIN_RATE_LIMITER!.limit({ key: `client:${request.headers.get("CF-Connecting-IP") ?? "unknown-client"}` }) }
         : undefined,
       webauthn: createWebAuthnRuntime(parseWebAuthnConfig({
         rpId: env.TITEN_WEBAUTHN_RP_ID,

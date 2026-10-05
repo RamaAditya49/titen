@@ -201,6 +201,7 @@ const lenses = [
               <input name="password" type="password" autocomplete="current-password" maxlength="128" required />
             </label>
             <button class="primary-button" type="submit">Continue</button>
+            <button class="secondary-button" type="button" data-start-recovery>Use passkey or recovery code</button>
             <p class="login-boundary"><strong>Kept off this device.</strong> The adapter exchanges your account for an HttpOnly session and clears both fields after submission.</p>
             <span data-login-status role="status" aria-live="polite"></span>
           </form>
@@ -252,6 +253,7 @@ const lenses = [
         </section>
 
         <div class="notice" data-service-notice role="alert" hidden></div>
+        <div class="notice" data-login-attempt-notice role="status" hidden></div>
 
         <section class="area-panel query-panel status-panel" data-area-panel="system" hidden aria-labelledby="system-heading">
           <div class="section-heading">
@@ -629,7 +631,7 @@ const lenses = [
         compileView,
         deleteArea,
         getArea,
-        getDashboardStatus,
+        getDashboardStatus, startRecovery,
         getPasskeyAuthenticationOptions,
         getPasskeyRegistrationOptions,
         getPasskeys,
@@ -1272,6 +1274,7 @@ const lenses = [
         one<HTMLElement>("[data-relationships]").replaceChildren();
       }
       function clearPrivateState() {
+        setNotice(one("[data-login-attempt-notice]"));
         clearMemory();
         workspaceMenu.open = false;
         workspacePicker.replaceChildren(new Option("Unscoped memory", ""));
@@ -1678,6 +1681,8 @@ const lenses = [
           if (principal.auth_stage === "second_factor" || principal.second_factor_required)
             return showSecondFactor();
           showPrivateSurface();
+          setNotice(one("[data-login-attempt-notice]"), principal?.failed_attempts
+            ? `${principal.failed_attempts} failed sign-in attempts occurred before this sign-in.` : undefined);
           renderAccessPolicy();
           text("[data-principal]", principal?.principal_id ?? "Server key");
           text("[data-role]", principal ? `${principal.organization_role ?? "no org role"} · ${principal.principal_kind}` : "adapter authority");
@@ -1761,6 +1766,17 @@ const lenses = [
           password.value = "";
           text("[data-login-status]", errorMessage(error));
         }
+      });
+      one<HTMLButtonElement>("[data-start-recovery]").addEventListener("click", async () => {
+        const form = one<HTMLFormElement>("[data-login-form]");
+        const username = form.elements.namedItem("username") as HTMLInputElement;
+        if (!username.reportValidity()) return;
+        const password = form.elements.namedItem("password") as HTMLInputElement;
+        password.value = "";
+        try {
+          principal = await startRecovery(username.value);
+          await refreshService();
+        } catch (error) { text("[data-login-status]", errorMessage(error)); }
       });
       one<HTMLFormElement>("[data-password-form]").addEventListener("submit", async (event) => {
         event.preventDefault();

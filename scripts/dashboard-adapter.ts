@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { isIP } from "node:net";
 /** Loopback-only static dashboard, per-principal sessions, and fixed API routes. */
 import { realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -97,6 +98,7 @@ interface DashboardPrincipal {
   scopes: string[];
   max_trust: "unverified" | "asserted" | "verified" | "policy_approved";
   organization_role: "root" | "owner" | "admin" | "member" | "reader" | null;
+  failed_attempts?: number;
   password_change_required?: boolean;
   second_factor_required?: boolean;
   auth_stage?: "full" | "password_change" | "second_factor";
@@ -148,6 +150,8 @@ function safePrincipal(value: unknown): DashboardPrincipal | undefined {
     scopes: row.scopes,
     max_trust: trust as DashboardPrincipal["max_trust"],
     organization_role: role as DashboardPrincipal["organization_role"],
+    ...(typeof row.failed_attempts === "number" && Number.isSafeInteger(row.failed_attempts) && row.failed_attempts >= 0
+      ? { failed_attempts: row.failed_attempts } : {}),
     ...(typeof row.password_change_required === "boolean"
       ? { password_change_required: row.password_change_required } : {}),
     ...(typeof row.second_factor_required === "boolean"
@@ -229,6 +233,13 @@ async function bodyObject(request: Request, limit = BODY_LIMIT): Promise<Record<
     const parsed: unknown = JSON.parse(text);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
   } catch { return; }
+}
+function loginHeaders(request: Request): Record<string, string> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const configured = process.env.TITEN_DASHBOARD_CLIENT_IP_HEADER;
+  const ip = configured ? request.headers.get(configured)?.trim() : undefined;
+  if (ip && isIP(ip)) headers["x-titen-client-ip"] = ip;
+  return headers;
 }
 async function upstreamRequest(path: string, key: string, init?: RequestInit): Promise<Response> {
   return fetch(`${upstream!.replace(/\/+$/, "")}${path}`, {
@@ -326,6 +337,30 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
   if (url.pathname === "/dashboard-api/health" && request.method === "GET") return serviceCheck("/healthz");
   if (url.pathname === "/dashboard-api/readiness" && request.method === "GET") return serviceCheck("/readyz");
 
+  if (url.pathname === "/dashboard-api/session/recovery" && request.method === "POST") {
+    if (!sessionMode) return error(404, "NOT_FOUND", "Dashboard session mode is not enabled.");
+    if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
+    const body = await bodyObject(request, 2048);
+    if (!body || Object.keys(body).some((field) => field !== "username")
+      || typeof body.username !== "string" || body.username.length > 64)
+      return error(400, "INVALID_REQUEST", "A bounded username is required.");
+    try {
+      const response = await fetch(`${upstream!.replace(/\/+$/, "")}/v1/dashboard-sessions/recovery`, {
+        method: "POST", headers: loginHeaders(request), body: JSON.stringify(body), signal: AbortSignal.timeout(5000),
+      });
+      const payload = await response.json().catch(() => null) as { data?: Record<string, unknown> } | null;
+      const data = payload?.data;
+      if (!response.ok) return error(response.status === 429 ? 429 : 502, "UPSTREAM_UNAVAILABLE", upstreamMessage(response.status));
+      const key = typeof data?.api_key === "string" && data.api_key.startsWith("titen_sk_") ? data.api_key : undefined;
+      if (!key || data?.auth_stage !== "second_factor")
+        return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid recovery session.");
+      const principal: DashboardPrincipal = { organization_id: "pending", principal_id: "pending", principal_kind: "human",
+        key_id: "pending", scopes: [], max_trust: "unverified", organization_role: null,
+        auth_stage: "second_factor", second_factor_required: true, password_change_required: false };
+      const sealed = await rememberSession(key, principal, data.expires_at);
+      return json({ data: principal }, 201, { "set-cookie": cookie(sealed.id, sealed.maxAge) });
+    } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
+  }
   if (url.pathname === "/dashboard-api/session" && request.method === "POST") {
     if (!sessionMode) return error(404, "NOT_FOUND", "Dashboard session mode is not enabled.");
     if (!mutationAuthorized(request)) return error(403, "FORBIDDEN", "A same-origin request is required.");
@@ -336,7 +371,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     try {
       const response = await fetch(`${upstream!.replace(/\/+$/, "")}/v1/dashboard-sessions`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: loginHeaders(request),
         body: JSON.stringify({ username, password }),
         signal: AbortSignal.timeout(5000),
       });
@@ -368,6 +403,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       if (!response.ok || !principal) return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid principal.");
       if (found) {
         principal.password_change_required = found.principal.password_change_required;
+        principal.failed_attempts = found.principal.failed_attempts;
       }
       return json({ data: principal });
     } catch { return error(502, "UPSTREAM_UNAVAILABLE", "Titen is unreachable."); }
@@ -428,7 +464,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     try {
       const response = await upstreamRequest(stagedCompletionPath, found.key, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: loginHeaders(request),
         body: JSON.stringify(body),
       });
       const payload = await response.json().catch(() => null) as { data?: unknown } | null;
@@ -440,7 +476,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
       }
       const key = typeof data.api_key === "string" && data.api_key.startsWith("titen_sk_") ? data.api_key : undefined;
       const principal = safePrincipal(data);
-      if (!key || !principal || principal.auth_stage !== "full")
+      if (!key || !principal || !["full", "password_change"].includes(principal.auth_stage ?? ""))
         return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned an invalid completed session.");
       const sealed = await rememberSession(key, principal, data.expires_at);
       return json({ data: principal }, 201, { "set-cookie": cookie(sealed.id, sealed.maxAge) });
@@ -453,7 +489,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
     if (!body || Object.keys(body).length > 0)
       return error(400, "INVALID_REQUEST", "Passkey options do not accept fields.");
     return proxyJson(request, "/v1/dashboard-sessions/current/passkey-options", {
-      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+      method: "POST", headers: loginHeaders(request), body: "{}",
     });
   }
 
