@@ -128,7 +128,9 @@ export async function retrieveClaimsByIds(
 ): Promise<ClaimCandidate[]> {
   if (ids.length === 0) return [];
   const found: ClaimCandidate[] = [];
-  for (const group of chunk(ids, MAX_BOUND_PARAMS - 10)) {
+  // Two recordAccessParams copies (disputed, then WHERE) each gained five
+  // read-fence binds. Shrink the id list so the statement stays under D1's cap.
+  for (const group of chunk(ids, MAX_BOUND_PARAMS - 20)) {
     const rows = await db.all<ClaimCandidate>(
       `SELECT c.id,
               c.kind,
