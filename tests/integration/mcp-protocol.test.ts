@@ -87,6 +87,8 @@ test("initialize negotiates a protocol revision and names the server", async () 
   assert.match(current.body.result.instructions, /new task or repository scope/);
   assert.match(current.body.result.instructions, /untrusted reference data/);
   assert.match(current.body.result.instructions, /never capture transcripts or secrets/);
+  assert.match(current.body.result.instructions, /pass consolidate: true on titen_remember/);
+  assert.match(current.body.result.instructions, /titen_compile omits a titen_remember write until titen_consolidate/);
   assert.ok(current.body.result.instructions.length <= 512);
 
   const latest = await rpc({
@@ -175,6 +177,8 @@ test("ping answers, and the full handshake completes in order", async () => {
     false,
     "remember is idempotent only when the optional idempotency key is present",
   );
+  assert.equal(remember.inputSchema.properties.consolidate.type, "boolean");
+  assert.match(remember.inputSchema.properties.consolidate.description, /claims:write/);
   const consolidate = tools.body.result.tools.find((tool: any) => tool.name === "titen_consolidate");
   assert.equal(consolidate.inputSchema.properties.claims.type, "array");
   assert.equal(consolidate.inputSchema.properties.claims.items.additionalProperties, false);

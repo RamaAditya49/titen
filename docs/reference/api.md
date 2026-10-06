@@ -406,6 +406,17 @@ Visibility defaults to `private`. `team` requires `workspace_id` and an active
 non-reader membership; this predicate is applied before retrieval, export,
 events, Atlas limits/counts, and webhook delivery.
 
+Optional `consolidate: true` records the observation and one supporting claim
+in the same commit. The claim statement is the observation content, so content
+longer than 4,000 characters is rejected. Trust and visibility are copied onto
+the claim and are not widened. `decision` observations become `decision`
+claims; every other observation kind becomes `semantic_fact`. The call also
+needs `claims:write`. A recalled observation cannot be claimed. When the flag
+is omitted, the route stores only the observation, exactly as before, and
+`titen_compile` will not return it until a later consolidation. The response
+then adds `consolidated`, `claim_id`, and `claim`, and `meta.model` is
+`disabled` because this path does not call an enrichment model.
+
 `source.type` and `source.ref` are both **required**. `source.ref` became
 mandatory in 0.6.0, matching the obligation the MCP `titen_remember` tool spec
 already stated; a write without it returns `400 VALIDATION_ERROR`. Existing rows
@@ -1212,6 +1223,13 @@ conservative when a tool can mutate or is idempotent only with an optional key.
 credential needs ordinary `mcp:call` authority and the separate
 `context:compile:all` capability for that flag; omitting the flag and
 `project_id` remains unscoped-only.
+
+`titen_remember` accepts optional `consolidate` (boolean). When it is true, the
+tool records the observation and a claim in one call, with the same provenance,
+trust, and visibility as `POST /v1/observations`. When no enrichment model is
+configured, `initialize` instructions say to call `titen_consolidate` after
+`titen_remember`, or to pass `consolidate: true`, because compile does not
+return an unconsolidated observation.
 
 ### Reference memory-server compatibility
 

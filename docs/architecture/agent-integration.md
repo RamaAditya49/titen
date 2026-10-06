@@ -494,7 +494,10 @@ or before the host session terminates.
 An observation is evidence, not yet a recallable claim. When a durable signal
 must be returned by `titen_compile`, the agent calls `titen_consolidate` with
 the observation ID and a bounded claim that preserves its scope, trust, and
-visibility.
+visibility. With no enrichment model configured, `titen_remember` can do both
+steps: pass `consolidate: true`. That flag copies the observation text, trust,
+and visibility into one supporting claim. Omitting it leaves the observation
+unconsolidated, and compile will not return it.
 
 ### 4. Checkpoint and coordinate
 

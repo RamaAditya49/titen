@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- `titen_remember` accepts optional `consolidate: true`, which records an observation and one supporting claim in the same call. Trust and visibility are copied. MCP `initialize` instructions say to consolidate after remember, or to pass that flag, when no enrichment model is configured.
+
 ## [0.10.4] — 2026-10-05
 
 Protect dashboard sign-in and provide account recovery during password blocks.

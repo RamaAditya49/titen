@@ -1,4 +1,4 @@
-import { assertTrustCeiling, type Principal } from "./auth";
+import { assertTrustCeiling, requireScope, type Principal } from "./auth";
 import { first, type Db, type Stmt } from "./db";
 import { eventStatement } from "./events";
 import { conflict, notFound, validationError } from "./errors";
@@ -16,6 +16,7 @@ import {
   RECALLED_SOURCE_TYPE,
   TRUST_LEVELS,
   VISIBILITIES,
+  optionalBoolean,
   optionalEnum,
   optionalString,
   optionalTimestamp,
@@ -74,6 +75,177 @@ export function isRedactedObservation(content: string, contentHash: string): boo
  */
 const DEFAULT_VISIBILITY = "private";
 
+/** Same default a manual consolidation uses when confidence is omitted. */
+const AUTO_CLAIM_CONFIDENCE = 0.8;
+
+interface AutoClaimView {
+  claim_id: string;
+  kind: string;
+  statement: string;
+  trust: string;
+  visibility: string;
+  confidence: number;
+  status: string;
+}
+
+function autoClaimKind(observationKind: string): string {
+  return observationKind === "decision" ? "decision" : "semantic_fact";
+}
+
+function claimPayload(data: ReturnType<typeof replayData>, claim: AutoClaimView | null) {
+  if (!claim) return data;
+  return { ...data, consolidated: true, claim_id: claim.claim_id, claim };
+}
+
+async function loadSupportingClaim(
+  db: Db,
+  orgId: string,
+  observationId: string,
+): Promise<AutoClaimView | undefined> {
+  const row = await first<{
+    id: string;
+    kind: string;
+    statement: string;
+    trust: string;
+    visibility: string;
+    confidence: number;
+    status: string;
+  }>(
+    db,
+    `SELECT c.id, c.kind, c.statement, c.trust, c.visibility, c.confidence, c.status
+       FROM claims c
+       JOIN claim_sources s ON s.claim_id = c.id
+      WHERE c.org_id = ? AND s.observation_id = ? AND s.relation = 'supports'
+      ORDER BY c.created_at, c.id
+      LIMIT 1`,
+    [orgId, observationId],
+  );
+  if (!row) return undefined;
+  return {
+    claim_id: row.id,
+    kind: row.kind,
+    statement: row.statement,
+    trust: row.trust,
+    visibility: row.visibility,
+    confidence: row.confidence,
+    status: row.status,
+  };
+}
+
+/**
+ * One claim whose statement is the observation content, citing that observation
+ * as support. Trust and visibility are copied, never widened.
+ */
+async function planAutoClaim(
+  ctx: RequestContext,
+  principal: Principal,
+  input: {
+    observationId: string;
+    subjectId: string;
+    projectId: string | null;
+    workspaceId: string | null;
+    observationKind: string;
+    statement: string;
+    trust: string;
+    visibility: string;
+    at: string;
+  },
+): Promise<{ claim: AutoClaimView; statements: Stmt[] }> {
+  const kind = autoClaimKind(input.observationKind);
+  const claimId = newId("claim");
+  const canonicalHash = await sha256Hex(canonicalJson({
+    actor_id: principal.principalId,
+    subject_id: input.subjectId,
+    project_id: input.projectId,
+    workspace_id: input.workspaceId,
+    kind,
+    statement: input.statement,
+    confidence: AUTO_CLAIM_CONFIDENCE,
+    trust: input.trust,
+    visibility: input.visibility,
+    observer_id: null,
+    valid_from: null,
+    valid_to: null,
+    position: 0,
+    sources: [{ observation_id: input.observationId, relation: "supports" }],
+  }));
+  const claim: AutoClaimView = {
+    claim_id: claimId,
+    kind,
+    statement: input.statement,
+    trust: input.trust,
+    visibility: input.visibility,
+    confidence: AUTO_CLAIM_CONFIDENCE,
+    status: "active",
+  };
+  const statements: Stmt[] = [
+    {
+      sql: `INSERT INTO claims
+              (id, org_id, subject_id, project_id, workspace_id, observer_id, actor_id, kind, statement,
+               confidence, trust, visibility, status, version, valid_from, valid_to,
+               canonical_hash, created_at)
+            VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'active', 1, ?, NULL, ?, ?)`,
+      params: [
+        claimId,
+        principal.orgId,
+        input.subjectId,
+        input.projectId,
+        input.workspaceId,
+        principal.principalId,
+        kind,
+        input.statement,
+        AUTO_CLAIM_CONFIDENCE,
+        input.trust,
+        input.visibility,
+        input.at,
+        canonicalHash,
+        input.at,
+      ],
+    },
+    {
+      sql: `INSERT INTO claims_fts
+              (statement, claim_id, org_scope, subject_scope)
+            VALUES (?, ?, lower(hex(?)) || '0', lower(hex(?)) || '0')`,
+      params: [input.statement, claimId, principal.orgId, input.subjectId],
+    },
+    {
+      sql: `INSERT INTO claim_sources (claim_id, observation_id, relation, created_at)
+            VALUES (?, ?, 'supports', ?)`,
+      params: [claimId, input.observationId, input.at],
+    },
+    historyStatement(
+      principal.orgId,
+      "claim",
+      claimId,
+      1,
+      "materialize",
+      principal.principalId,
+      await sha256Hex(`${input.statement}|active|${input.trust}`),
+      input.at,
+    ),
+    ...(ctx.app.vectors
+      ? [outboxStatement(principal.orgId, "claim", claimId, "upsert", input.at)]
+      : []),
+    eventStatement(
+      principal.orgId,
+      "claim.materialized",
+      principal.principalId,
+      "claim",
+      claimId,
+      {
+        subject_id: input.subjectId,
+        workspace_id: input.workspaceId,
+        kind,
+        status: "active",
+        trust: input.trust,
+        visibility: input.visibility,
+      },
+      input.at,
+    ),
+  ];
+  return { claim, statements };
+}
+
 /**
  * A context token is the identifier `POST /v1/context/compile` issued for a run
  * the caller is entitled to read, so it is verified against the same boundary
@@ -118,6 +290,14 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const content = requireString(body, "content", LIMITS.content);
   const trust = optionalEnum(body, "trust", TRUST_LEVELS, "asserted");
   const visibility = optionalEnum(body, "visibility", VISIBILITIES, DEFAULT_VISIBILITY);
+  const wantsClaim = optionalBoolean(body, "consolidate");
+  if (wantsClaim) {
+    requireScope(principal, "claims:write");
+    if (content.length > LIMITS.statement)
+      throw validationError(
+        `Field "content" exceeds ${LIMITS.statement} characters, so consolidate cannot copy it into a claim.`,
+      );
+  }
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   const agentId = optionalString(body, "agent_id", LIMITS.identifier);
   const runId = optionalString(body, "run_id", LIMITS.identifier);
@@ -155,6 +335,8 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   if (contextToken !== null && !(await isIssuedContextToken(ctx.app.db, principal, contextToken)))
     throw validationError('Field "context_token" is not a context token issued to this principal.');
   const sourceType = contextToken === null ? declaredSourceType : RECALLED_SOURCE_TYPE;
+  if (wantsClaim && sourceType === RECALLED_SOURCE_TYPE)
+    throw validationError('Field "consolidate" cannot claim an observation Titen marked as recalled.');
 
   // Trust is authority, not a payload field: a key cannot promote its evidence.
   assertTrustCeiling(principal, trust);
@@ -191,7 +373,24 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
        FROM observations
       WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
     [principal.orgId, principal.principalId, canonicalHash]) : undefined;
-  if (existing) return { status: 200, data: replayData(existing), meta: { replayed: true } };
+  if (existing) {
+    if (!wantsClaim) return { status: 200, data: replayData(existing), meta: { replayed: true } };
+    const claim = await reuseOrCreateAutoClaim(ctx, principal, {
+      observationId: existing.id,
+      subjectId: existing.subject_id,
+      projectId: existing.project_id,
+      workspaceId: existing.workspace_id,
+      observationKind: existing.kind,
+      statement: content,
+      trust: existing.trust,
+      visibility: existing.visibility,
+    });
+    return {
+      status: 200,
+      data: claimPayload(replayData(existing), claim),
+      meta: { replayed: true, model: "disabled" },
+    };
+  }
 
   try {
     const result = await commitIdempotent(
@@ -220,7 +419,20 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             at: ingestedAt,
           })]
         : [];
-      const data = {
+      const planned = wantsClaim
+        ? await planAutoClaim(ctx, principal, {
+            observationId: id,
+            subjectId,
+            projectId,
+            workspaceId,
+            observationKind: kind,
+            statement: content,
+            trust,
+            visibility,
+            at: ingestedAt,
+          })
+        : null;
+      const data = claimPayload({
         observation_id: id,
         subject_id: subjectId,
         project_id: projectId,
@@ -233,7 +445,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         content_hash: contentHash,
         occurred_at: occurredAt,
         ingested_at: ingestedAt,
-      };
+      }, planned?.claim ?? null);
       return {
         status: 201,
         data,
@@ -299,6 +511,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
             { subject_id: subjectId, workspace_id: workspaceId, kind, trust, visibility },
             ingestedAt,
           ),
+          ...(planned?.statements ?? []),
         ],
       };
     },
@@ -307,7 +520,9 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     return {
       status: result.replayed ? 200 : result.status,
       data: result.data,
-      meta: { replayed: result.replayed },
+      meta: wantsClaim
+        ? { replayed: result.replayed, model: "disabled" }
+        : { replayed: result.replayed },
     };
   } catch (error) {
     if (canonicalHash && error instanceof Error && /UNIQUE.*canonical_hash/i.test(error.message)) {
@@ -317,10 +532,55 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
            FROM observations
           WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
         [principal.orgId, principal.principalId, canonicalHash]);
-      if (raced) return { status: 200, data: replayData(raced), meta: { replayed: true } };
+      if (raced) {
+        if (!wantsClaim) return { status: 200, data: replayData(raced), meta: { replayed: true } };
+        const claim = await reuseOrCreateAutoClaim(ctx, principal, {
+          observationId: raced.id,
+          subjectId: raced.subject_id,
+          projectId: raced.project_id,
+          workspaceId: raced.workspace_id,
+          observationKind: raced.kind,
+          statement: content,
+          trust: raced.trust,
+          visibility: raced.visibility,
+        });
+        return {
+          status: 200,
+          data: claimPayload(replayData(raced), claim),
+          meta: { replayed: true, model: "disabled" },
+        };
+      }
     }
     throw error;
   }
+}
+
+async function reuseOrCreateAutoClaim(
+  ctx: RequestContext,
+  principal: Principal,
+  input: {
+    observationId: string;
+    subjectId: string;
+    projectId: string | null;
+    workspaceId: string | null;
+    observationKind: string;
+    statement: string;
+    trust: string;
+    visibility: string;
+  },
+): Promise<AutoClaimView> {
+  const existing = await loadSupportingClaim(ctx.app.db, principal.orgId, input.observationId);
+  if (existing) return existing;
+  const at = ctx.app.now().toISOString();
+  const planned = await planAutoClaim(ctx, principal, { ...input, at });
+  try {
+    await ctx.app.db.batch(planned.statements);
+  } catch (error) {
+    const raced = await loadSupportingClaim(ctx.app.db, principal.orgId, input.observationId);
+    if (raced) return raced;
+    throw error;
+  }
+  return planned.claim;
 }
 
 /** Irreversibly removes readable evidence while retaining provenance hashes. */

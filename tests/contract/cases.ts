@@ -4363,6 +4363,144 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "remember consolidate true is recallable when the model is disabled",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const mcp = (id: number, name: string, args: Record<string, unknown>) =>
+        fx.call("POST", "/mcp", {
+          key: agent.key,
+          body: {
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: { name, arguments: args },
+          },
+        });
+      const remembered = await mcp(1, "titen_remember", {
+        subject_id: "subject_auto_claim",
+        kind: "decision",
+        content: "Shared deploy window is Tuesday 06:00 UTC.",
+        source_type: "chat",
+        source_ref: "auto-claim#1",
+        trust: "asserted",
+        visibility: "organization",
+        consolidate: true,
+      });
+      assert.equal(remembered.status, 200);
+      assert.equal(remembered.body.result.isError, undefined);
+      const payload = JSON.parse(remembered.body.result.content[0].text);
+      assert.equal(payload.meta.model, "disabled");
+      assert.equal(payload.data.consolidated, true);
+      assert.equal(payload.data.trust, "asserted");
+      assert.equal(payload.data.visibility, "organization");
+      assert.equal(payload.data.claim.kind, "decision");
+      assert.equal(payload.data.claim.statement, "Shared deploy window is Tuesday 06:00 UTC.");
+      assert.equal(payload.data.claim.trust, "asserted");
+      assert.equal(payload.data.claim.visibility, "organization");
+      assert.match(payload.data.claim.claim_id, /^claim_/);
+
+      const compiled = await mcp(2, "titen_compile", {
+        subject_id: "subject_auto_claim",
+        task: "shared deploy window",
+        max_tokens: 900,
+      });
+      const pack = JSON.parse(compiled.body.result.content[0].text);
+      assert.equal(pack.data.items.length, 1);
+      assert.equal(pack.data.items[0].claim_id, payload.data.claim.claim_id);
+      assert.equal(pack.data.budget.unconsolidated_observations, 0);
+
+      const plain = await mcp(3, "titen_remember", {
+        subject_id: "subject_auto_claim",
+        kind: "user_statement",
+        content: "An unconsolidated note stays out of compile.",
+        source_type: "chat",
+        source_ref: "auto-claim#2",
+        trust: "asserted",
+        visibility: "private",
+      });
+      const plainPayload = JSON.parse(plain.body.result.content[0].text);
+      assert.equal(plainPayload.data.consolidated, undefined);
+      assert.equal(plainPayload.data.claim, undefined);
+      const pending = await mcp(4, "titen_compile", {
+        subject_id: "subject_auto_claim",
+        task: "unconsolidated note stays out",
+        max_tokens: 900,
+      });
+      const pendingPack = JSON.parse(pending.body.result.content[0].text);
+      assert.equal(pendingPack.data.budget.unconsolidated_observations, 1);
+      assert.ok(
+        pendingPack.data.items.every((item: { claim_id: string }) => item.claim_id !== plainPayload.data.observation_id),
+      );
+
+      const writer = await fx.provision({
+        orgId: agent.orgId,
+        scopes: ["observations:write", "context:compile"],
+      });
+      const refused = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "This write must not land without claims:write.",
+          source: { type: "chat", ref: "auto-claim#3" },
+          consolidate: true,
+        },
+      });
+      expectError(refused, 403, "FORBIDDEN");
+      const stored = await fx.query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM observations WHERE org_id = ? AND content = ?`,
+        [agent.orgId, "This write must not land without claims:write."],
+      );
+      assert.equal(Number(stored[0]?.n ?? 0), 0);
+
+      const recalled = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "Recalled text cannot be claimed from remember.",
+          source: { type: "recalled", ref: "auto-claim#4" },
+          consolidate: true,
+        },
+      });
+      expectError(recalled, 400, "VALIDATION_ERROR");
+
+      const oversized = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "x".repeat(4001),
+          source: { type: "chat", ref: "auto-claim#5" },
+          consolidate: true,
+        },
+      });
+      expectError(oversized, 400, "VALIDATION_ERROR");
+      const oversizedRows = await fx.query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM observations WHERE org_id = ? AND source_ref = ?`,
+        [agent.orgId, "auto-claim#5"],
+      );
+      assert.equal(Number(oversizedRows[0]?.n ?? 0), 0);
+
+      const fact = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "A non-decision observation becomes a semantic fact.",
+          source: { type: "chat", ref: "auto-claim#6" },
+          trust: "verified",
+          visibility: "private",
+          consolidate: true,
+        },
+      });
+      expectOk(fact, 201);
+      assert.equal(fact.body.data.claim.kind, "semantic_fact");
+      assert.equal(fact.body.data.claim.trust, "verified");
+      assert.equal(fact.body.data.claim.visibility, "private");
+    },
+  },
+  {
     name: "MCP delegates to the REST domain contract",
     async run(fx) {
       const agent = await fx.provision({ scopes: ["*"] });
