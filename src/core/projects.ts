@@ -1,8 +1,17 @@
+import { auditStatement } from "./audit";
 import { first, type Db } from "./db";
 import { notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import { hasScope, type Principal } from "./auth";
-import { LIMITS, requireObject, requireString, optionalBoolean } from "./validate";
+import {
+  LIMITS,
+  VISIBILITIES,
+  optionalBoolean,
+  requireEnum,
+  requireObject,
+  requireString,
+  type Visibility,
+} from "./validate";
 import type { RequestContext, Result } from "./http";
 
 /** Hosts whose origins collapse to an unambiguous lowercase `owner/repo`. */
@@ -65,14 +74,22 @@ export async function resolveProject(ctx: RequestContext): Promise<Result> {
   const reference = normalizeProjectReference(requireString(body, "reference", LIMITS.identifier));
   const wantsCreate = optionalBoolean(body, "create");
 
-  const existing = await first<{ id: string; created_at: string }>(
+  const defaultVisibility = body.default_visibility === undefined || body.default_visibility === null
+    ? null
+    : requireEnum(body, "default_visibility", VISIBILITIES);
+  const existing = await first<{ id: string; created_at: string; default_visibility: string | null }>(
     ctx.app.db,
-    `SELECT id, created_at FROM projects WHERE org_id = ? AND reference = ?`,
+    `SELECT id, created_at, default_visibility FROM projects WHERE org_id = ? AND reference = ?`,
     [principal.orgId, reference],
   );
   if (existing)
     return {
-      data: { project_id: existing.id, reference, created: false },
+      data: {
+        project_id: existing.id,
+        reference,
+        created: false,
+        default_visibility: existing.default_visibility ?? "private",
+      },
     };
 
   // Resolution alone never creates scope; creating a project is a capability.
@@ -84,13 +101,108 @@ export async function resolveProject(ctx: RequestContext): Promise<Result> {
     });
 
   const id = newId("project");
+  const at = ctx.app.now().toISOString();
   await ctx.app.db.batch([
     {
-      sql: `INSERT INTO projects (id, org_id, reference, created_at) VALUES (?, ?, ?, ?)`,
-      params: [id, principal.orgId, reference, ctx.app.now().toISOString()],
+      sql: `INSERT INTO projects (id, org_id, reference, created_at, default_visibility)
+            VALUES (?, ?, ?, ?, ?)`,
+      params: [id, principal.orgId, reference, at, defaultVisibility],
     },
+    auditStatement(
+      principal.orgId,
+      principal.principalId,
+      "project.create",
+      "project",
+      at,
+      id,
+      JSON.stringify({ reference, default_visibility: defaultVisibility ?? "private" }),
+    ),
   ]);
-  return { status: 201, data: { project_id: id, reference, created: true } };
+  return {
+    status: 201,
+    data: {
+      project_id: id,
+      reference,
+      created: true,
+      default_visibility: defaultVisibility ?? "private",
+    },
+  };
+}
+
+export async function updateProject(ctx: RequestContext): Promise<Result> {
+  const principal = ctx.principal!;
+  const projectId = ctx.params.id!;
+  const body = requireObject(await ctx.json());
+  const unknown = Object.keys(body).find((field) => field !== "default_visibility");
+  if (unknown) throw validationError(`Unknown project field "${unknown}".`);
+  const defaultVisibility = requireEnum(body, "default_visibility", VISIBILITIES);
+  const existing = await first<{ id: string; reference: string }>(
+    ctx.app.db,
+    `SELECT id, reference FROM projects WHERE id = ? AND org_id = ?`,
+    [projectId, principal.orgId],
+  );
+  if (!existing) throw notFound();
+  const at = ctx.app.now().toISOString();
+  await ctx.app.db.batch([
+    {
+      sql: `UPDATE projects SET default_visibility = ? WHERE id = ? AND org_id = ?`,
+      params: [defaultVisibility, projectId, principal.orgId],
+    },
+    auditStatement(
+      principal.orgId,
+      principal.principalId,
+      "project.update",
+      "project",
+      at,
+      projectId,
+      JSON.stringify({ default_visibility: defaultVisibility }),
+    ),
+  ]);
+  return {
+    data: {
+      project_id: projectId,
+      reference: existing.reference,
+      default_visibility: defaultVisibility,
+    },
+  };
+}
+
+/** Null means the historical private default: the column is unset. */
+export async function projectDefaultVisibility(
+  db: Db,
+  orgId: string,
+  projectId: string | null,
+): Promise<Visibility | null> {
+  if (!projectId) return null;
+  const row = await first<{ default_visibility: string | null }>(
+    db,
+    `SELECT default_visibility FROM projects WHERE id = ? AND org_id = ?`,
+    [projectId, orgId],
+  );
+  const value = row?.default_visibility;
+  if (value === "private" || value === "team" || value === "organization") return value;
+  return null;
+}
+
+/**
+ * Omitted visibility uses the project default when one is stored. Private stays
+ * the fallback for projects that have no default and for unscoped writes.
+ * An explicit private write into a wider project reports a warning and is stored
+ * as private.
+ */
+export async function resolveWriteVisibility(
+  db: Db,
+  orgId: string,
+  projectId: string | null,
+  explicit: Visibility | null,
+): Promise<{ visibility: Visibility; warning: string | null }> {
+  const projectDefault = await projectDefaultVisibility(db, orgId, projectId);
+  const fallback = projectDefault ?? "private";
+  const visibility = explicit ?? fallback;
+  const warning = visibility === "private" && (fallback === "team" || fallback === "organization")
+    ? `Recorded visibility "private" is narrower than this project's default_visibility "${fallback}".`
+    : null;
+  return { visibility, warning };
 }
 
 /** Confirms a caller-supplied project belongs to the authenticated scope. */

@@ -7,7 +7,7 @@ import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { isRedactedObservation } from "./observations";
 import { historyStatement, outboxStatement, purgedEvidenceGuardStatement } from "./writes";
 export { purgedEvidenceGuardStatement } from "./writes";
-import { requireProject } from "./projects";
+import { projectDefaultVisibility, requireProject } from "./projects";
 import {
   authorizeRecordWorkspace,
   authorizeRecordTarget,
@@ -125,6 +125,8 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
   );
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   await authorizeRecordTarget(ctx.app.db, principal, subjectId, projectId);
+  const projectDefault = await projectDefaultVisibility(ctx.app.db, principal.orgId, projectId);
+  let visibilityWarning: string | null = null;
   const claims = body.claims;
   if (claims === undefined) throw validationError('Field "claims" is required.');
   if (!Array.isArray(claims) || claims.length === 0)
@@ -198,6 +200,8 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
     const visibility = optionalEnum(claim, "visibility", VISIBILITIES, narrowest, `${path}.visibility`);
     if (VISIBILITY_RANK[visibility] > VISIBILITY_RANK[narrowest])
       throw validationError("Claim visibility may not exceed the visibility of its evidence.");
+    if (visibility === "private" && (projectDefault === "team" || projectDefault === "organization"))
+      visibilityWarning = `Recorded visibility "private" is narrower than this project's default_visibility "${projectDefault}".`;
     await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
 
     const seen = new Set<string>();
@@ -379,6 +383,7 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
         replayed: result.replayed || canonicalReplay,
         canonical_replays: prepared.filter((claim) => claim.existing).length,
         model: "disabled",
+        ...(visibilityWarning ? { visibility_warning: visibilityWarning } : {}),
       },
     };
   } catch (error) {
@@ -402,7 +407,12 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
       return {
         status: 200,
         data: responseData(),
-        meta: { replayed: true, canonical_replays: prepared.length, model: "disabled" },
+        meta: {
+          replayed: true,
+          canonical_replays: prepared.length,
+          model: "disabled",
+          ...(visibilityWarning ? { visibility_warning: visibilityWarning } : {}),
+        },
       };
     }
     if (error instanceof Error && /FOREIGN KEY/i.test(error.message)) {

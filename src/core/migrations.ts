@@ -1556,6 +1556,16 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          ON operator_recovery_codes (org_id, account_id, generation_id, used_at_ms)`,
     ],
   },
+  {
+    version: 25,
+    statements: [
+      // NULL keeps the historical private default for every project created
+      // before this column existed. Writers that omit visibility still use private
+      // until an operator sets a wider default.
+      `ALTER TABLE projects ADD COLUMN default_visibility TEXT
+         CHECK (default_visibility IN ('private', 'team', 'organization'))`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

@@ -4,7 +4,7 @@ import { eventStatement } from "./events";
 import { conflict, notFound, validationError } from "./errors";
 import { newId, sha256Hex } from "./ids";
 import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
-import { requireProject } from "./projects";
+import { requireProject, resolveWriteVisibility } from "./projects";
 import { authorizeRecordTarget, authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import type { RequestContext, Result } from "./http";
 import { derivationJobStatement } from "./enrichment";
@@ -68,12 +68,6 @@ export function isRedactedObservation(content: string, contentHash: string): boo
   return /^[a-f0-9]{64}$/u.test(contentHash)
     && content === redactedObservationContent(contentHash);
 }
-
-/**
- * Private is the only safe implicit visibility. Team records require an
- * explicit workspace and active writer membership.
- */
-const DEFAULT_VISIBILITY = "private";
 
 /** Same default a manual consolidation uses when confidence is omitted. */
 const AUTO_CLAIM_CONFIDENCE = 0.8;
@@ -289,7 +283,9 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const kind = requireEnum(body, "kind", OBSERVATION_KINDS);
   const content = requireString(body, "content", LIMITS.content);
   const trust = optionalEnum(body, "trust", TRUST_LEVELS, "asserted");
-  const visibility = optionalEnum(body, "visibility", VISIBILITIES, DEFAULT_VISIBILITY);
+  const explicitVisibility = body.visibility === undefined || body.visibility === null
+    ? null
+    : requireEnum(body, "visibility", VISIBILITIES);
   const wantsClaim = optionalBoolean(body, "consolidate");
   if (wantsClaim) {
     requireScope(principal, "claims:write");
@@ -347,6 +343,19 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     principal.orgId,
     optionalString(body, "project_id", LIMITS.identifier),
   );
+  const resolvedVisibility = await resolveWriteVisibility(
+    ctx.app.db,
+    principal.orgId,
+    projectId,
+    explicitVisibility,
+  );
+  const visibility = resolvedVisibility.visibility;
+  const visibilityWarning = resolvedVisibility.warning;
+  const observationMeta = (replayed: boolean) => ({
+    replayed,
+    ...(wantsClaim ? { model: "disabled" } : {}),
+    ...(visibilityWarning ? { visibility_warning: visibilityWarning } : {}),
+  });
   await authorizeRecordTarget(ctx.app.db, principal, subjectId, projectId);
   await authorizeRecordWorkspace(ctx.app.db, principal, workspaceId, visibility);
 
@@ -374,7 +383,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
       WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
     [principal.orgId, principal.principalId, canonicalHash]) : undefined;
   if (existing) {
-    if (!wantsClaim) return { status: 200, data: replayData(existing), meta: { replayed: true } };
+    if (!wantsClaim) return { status: 200, data: replayData(existing), meta: observationMeta(true) };
     const claim = await reuseOrCreateAutoClaim(ctx, principal, {
       observationId: existing.id,
       subjectId: existing.subject_id,
@@ -388,7 +397,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     return {
       status: 200,
       data: claimPayload(replayData(existing), claim),
-      meta: { replayed: true, model: "disabled" },
+      meta: observationMeta(true),
     };
   }
 
@@ -520,9 +529,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     return {
       status: result.replayed ? 200 : result.status,
       data: result.data,
-      meta: wantsClaim
-        ? { replayed: result.replayed, model: "disabled" }
-        : { replayed: result.replayed },
+      meta: observationMeta(result.replayed),
     };
   } catch (error) {
     if (canonicalHash && error instanceof Error && /UNIQUE.*canonical_hash/i.test(error.message)) {
@@ -533,7 +540,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
           WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
         [principal.orgId, principal.principalId, canonicalHash]);
       if (raced) {
-        if (!wantsClaim) return { status: 200, data: replayData(raced), meta: { replayed: true } };
+        if (!wantsClaim) return { status: 200, data: replayData(raced), meta: observationMeta(true) };
         const claim = await reuseOrCreateAutoClaim(ctx, principal, {
           observationId: raced.id,
           subjectId: raced.subject_id,
@@ -547,7 +554,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         return {
           status: 200,
           data: claimPayload(replayData(raced), claim),
-          meta: { replayed: true, model: "disabled" },
+          meta: observationMeta(true),
         };
       }
     }

@@ -105,6 +105,7 @@ features explicitly listed as proposed are not routes.
 - `POST /v1/observations`
 - `POST /v1/operator-accounts`
 - `POST /v1/policies`
+- `PATCH /v1/projects/:id`
 - `POST /v1/projects/resolve`
 - `POST /v1/retention/apply`
 - `POST /v1/webhooks`
@@ -377,6 +378,14 @@ The caller supplied the reference. `can_create` reports only the caller's
 operator approves project creation. Other not-found routes do not return this
 route-specific metadata.
 
+`create: true` accepts optional `default_visibility` (`private`, `team`, or
+`organization`). Omitted means the historical private default. Resolving a
+project that already exists does not change its default. `PATCH /v1/projects/:id`
+with `{ "default_visibility": "organization" }` updates an existing project and
+requires `projects:create`. The CLI equivalents are `titen project create` and
+`titen project update`. A null stored value and an omitted field both mean
+`private`, so databases created before this column keep their current writes.
+
 ### `POST /v1/observations`
 
 Append evidence.
@@ -402,9 +411,14 @@ Append evidence.
 Only authorized service/agent identities may assert `verified` trust.
 Observations cannot assert `policy_approved`; that trust exists only on claims
 promoted by the approval workflow.
-Visibility defaults to `private`. `team` requires `workspace_id` and an active
-non-reader membership; this predicate is applied before retrieval, export,
-events, Atlas limits/counts, and webhook delivery.
+Visibility defaults to `private` when the write omits `visibility` and the
+project has no `default_visibility`. A project default, set at create or with
+`PATCH /v1/projects/:id`, applies only when the write omits `visibility`.
+`team` still requires `workspace_id` and an active non-reader membership. An
+explicit `private` write into a project whose default is `team` or
+`organization` is stored as private and returns `meta.visibility_warning`.
+This predicate is applied before retrieval, export, events, Atlas limits/counts,
+and webhook delivery.
 
 Optional `consolidate: true` records the observation and one supporting claim
 in the same commit. The claim statement is the observation content, so content

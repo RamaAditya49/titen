@@ -539,6 +539,184 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "project default visibility shares an omitted write inside the organization",
+    async run(fx) {
+      const scopes = [
+        "projects:resolve", "projects:create", "observations:write", "claims:write",
+        "context:compile", "mcp:call",
+      ];
+      const writer = await fx.provision({ scopes });
+      const reader = await fx.provision({ orgId: writer.orgId, scopes });
+      const created = await fx.call("POST", "/v1/projects/resolve", {
+        key: writer.key,
+        body: { reference: "castle/shared", create: true, default_visibility: "organization" },
+      });
+      expectOk(created, 201);
+      assert.equal(created.body.data.default_visibility, "organization");
+      const projectId = created.body.data.project_id as string;
+
+      const remembered = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          kind: "decision",
+          content: "Shared cutover is Friday.",
+          source: { type: "chat", ref: "shared#1" },
+          trust: "asserted",
+        },
+      });
+      expectOk(remembered, 201);
+      assert.equal(remembered.body.data.visibility, "organization");
+      assert.equal(remembered.body.meta.visibility_warning, undefined);
+
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          claims: [{
+            kind: "decision",
+            statement: "Shared cutover is Friday.",
+            sources: [{ observation_id: remembered.body.data.observation_id, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(consolidated, 201);
+      assert.equal(consolidated.body.data.claims[0].visibility, "organization");
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: reader.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          task: "shared cutover Friday",
+          max_tokens: 900,
+        },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.data.items[0].claim_id, consolidated.body.data.claims[0].claim_id);
+
+      const viaMcp = await fx.call("POST", "/mcp", {
+        key: writer.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 7,
+          method: "tools/call",
+          params: {
+            name: "titen_remember",
+            arguments: {
+              subject_id: "castle:shared",
+              project_id: projectId,
+              kind: "user_statement",
+              content: "MCP omitted visibility follows the project default.",
+              source_type: "chat",
+              source_ref: "shared#mcp",
+              consolidate: true,
+            },
+          },
+        },
+      });
+      assert.equal(viaMcp.body.result.isError, undefined);
+      const mcpPayload = JSON.parse(viaMcp.body.result.content[0].text);
+      assert.equal(mcpPayload.data.visibility, "organization");
+      assert.equal(mcpPayload.data.claim.visibility, "organization");
+      const mcpCompiled = await fx.call("POST", "/mcp", {
+        key: reader.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 8,
+          method: "tools/call",
+          params: {
+            name: "titen_compile",
+            arguments: {
+              subject_id: "castle:shared",
+              project_id: projectId,
+              task: "MCP omitted visibility follows the project default",
+              max_tokens: 900,
+            },
+          },
+        },
+      });
+      const mcpPack = JSON.parse(mcpCompiled.body.result.content[0].text);
+      assert.equal(mcpPack.data.items.some((item: { claim_id: string }) => item.claim_id === mcpPayload.data.claim_id), true);
+
+      const hidden = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          kind: "user_statement",
+          content: "This private note stays with the writer.",
+          source: { type: "chat", ref: "shared#2" },
+          visibility: "private",
+          consolidate: true,
+        },
+      });
+      expectOk(hidden, 201);
+      assert.equal(hidden.body.data.visibility, "private");
+      assert.match(String(hidden.body.meta.visibility_warning), /default_visibility "organization"/);
+      const readerPack = await fx.call("POST", "/v1/context/compile", {
+        key: reader.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          task: "private note stays with the writer",
+          max_tokens: 900,
+        },
+      });
+      expectOk(readerPack);
+      assert.equal(
+        readerPack.body.data.items.some((item: { claim_id: string }) => item.claim_id === hidden.body.data.claim_id),
+        false,
+      );
+
+      const plain = await fx.call("POST", "/v1/projects/resolve", {
+        key: writer.key,
+        body: { reference: "castle/plain", create: true },
+      });
+      expectOk(plain, 201);
+      assert.equal(plain.body.data.default_visibility, "private");
+      const unchanged = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:plain",
+          project_id: plain.body.data.project_id,
+          kind: "user_statement",
+          content: "No default still means private.",
+          source: { type: "chat", ref: "plain#1" },
+        },
+      });
+      expectOk(unchanged, 201);
+      assert.equal(unchanged.body.data.visibility, "private");
+      assert.equal(unchanged.body.meta.visibility_warning, undefined);
+
+      const patched = await fx.call("PATCH", `/v1/projects/${plain.body.data.project_id}`, {
+        key: writer.key,
+        body: { default_visibility: "organization" },
+      });
+      expectOk(patched);
+      assert.equal(patched.body.data.default_visibility, "organization");
+
+      const teamProject = await fx.call("POST", "/v1/projects/resolve", {
+        key: writer.key,
+        body: { reference: "castle/team", create: true, default_visibility: "team" },
+      });
+      expectOk(teamProject, 201);
+      const missingWorkspace = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:team",
+          project_id: teamProject.body.data.project_id,
+          kind: "user_statement",
+          content: "Team default still needs a workspace.",
+          source: { type: "chat", ref: "team#1" },
+        },
+      });
+      expectError(missingWorkspace, 400, "VALIDATION_ERROR");
+    },
+  },
+  {
     name: "resolution never creates a project without the create capability",
     async run(fx) {
       const owner = await fx.provision();

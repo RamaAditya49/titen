@@ -212,6 +212,11 @@ missing project requires an explicit capability. Migration 23 creates one
 canonical reference for every existing project and the insert trigger keeps new
 projects aligned.
 
+`projects.default_visibility` is optional. Null means private, which is the
+value every project had before migration 25. A write that omits `visibility`
+uses this default when the column is `team` or `organization`. An explicit
+visibility on the write still wins.
+
 ## Evidence and memory
 
 ### `observations`

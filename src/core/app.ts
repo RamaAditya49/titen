@@ -29,7 +29,7 @@ import { listAudit, exportAudit } from "./audit";
 import { registerPeer, listPeers, suspendPeer, addFilter, listFilters, pullEvents, pushEvents, federationLog } from "./federation";
 import { registerWebhook, listWebhooks, deleteWebhook, pauseWebhook, resumeWebhook, listDeliveries, drainWebhooks } from "./webhooks";
 import { appendObservation, purgeObservation } from "./observations";
-import { resolveProject } from "./projects";
+import { resolveProject, updateProject } from "./projects";
 import {
   createGrant,
   listGrants,
@@ -189,6 +189,7 @@ export const ROUTES: RouteDef[] = [
   },
   { method: "GET", path: "/v1/projects", scope: "projects:read", handler: listProjects },
   { method: "GET", path: "/v1/projects/:id/references", scope: "projects:read", handler: listProjectReferences },
+  { method: "PATCH", path: "/v1/projects/:id", scope: "projects:create", handler: updateProject },
   { method: "GET", path: "/v1/subjects", scope: "subjects:read", handler: listSubjects },
   { method: "GET", path: "/v1/subjects/:id/references", scope: "subjects:read", handler: listSubjectReferences },
   { method: "GET", path: "/v1/principals", scope: "principals:read", handler: listPrincipals },

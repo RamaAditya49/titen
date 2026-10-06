@@ -59,6 +59,8 @@ test("help is side-effect free for every documented command", () => {
     ["key-create", ["key", "create", "--help"]],
     ["key-list", ["key", "list", "--help"]],
     ["key-revoke", ["key", "revoke", "--help"]],
+    ["project-create", ["project", "create", "--help"]],
+    ["project-update", ["project", "update", "--help"]],
     ["backup", ["backup", "--help"]],
     ["schema", ["schema", "--help"]],
   ] as const;
@@ -187,6 +189,8 @@ test("malformed flags fail before side effects for every command", () => {
     ["key-create", ["key", "create", "--org-id"]],
     ["key-list", ["key", "list", "--db"]],
     ["key-revoke", ["key", "revoke", "--id"]],
+    ["project-create", ["project", "create", "--org-id"]],
+    ["project-update", ["project", "update", "--default-visibility"]],
     ["backup", ["backup", "--out"]],
     ["schema", ["schema", "--unknown"]],
   ] as const;
@@ -608,4 +612,47 @@ test("host account recovery clears only its account and forces password rotation
   handle.close();
   assert.equal(run(cwdName, ["account", "unlock", "--db", dbPath, "--username", "missing-user"]).exitCode, 1);
   assert.equal(run(cwdName, ["account", "list", "--db", join(root, "absent-account.db")]).exitCode, 1);
+});
+
+test("project commands set default visibility on a new and an existing project", () => {
+  const boot = run("project-visibility", ["bootstrap", "--db", "service.db", "--org", "Castle"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const orgId = /^organization: (org_[^ ]+)/m.exec(boot.output)?.[1];
+  assert.ok(orgId);
+  const created = run("project-visibility", [
+    "project", "create", "--db", "service.db", "--org-id", orgId,
+    "--reference", "github.com/Castle/Shared.git",
+    "--default-visibility", "organization",
+  ]);
+  assert.equal(created.exitCode, 0, created.output);
+  assert.match(created.output, /reference: castle\/shared/);
+  assert.match(created.output, /default_visibility: organization/);
+  const projectId = /^project_id: (project_\S+)/m.exec(created.output)?.[1];
+  assert.ok(projectId);
+
+  const plain = run("project-visibility", [
+    "project", "create", "--db", "service.db", "--org-id", orgId, "--reference", "castle/plain",
+  ]);
+  assert.equal(plain.exitCode, 0, plain.output);
+  assert.match(plain.output, /default_visibility: private/);
+  const plainId = /^project_id: (project_\S+)/m.exec(plain.output)?.[1];
+  assert.ok(plainId);
+  const updated = run("project-visibility", [
+    "project", "update", "--db", "service.db", "--org-id", orgId,
+    "--reference", "castle/plain", "--default-visibility", "organization",
+  ]);
+  assert.equal(updated.exitCode, 0, updated.output);
+  assert.match(updated.output, new RegExp(`project_id: ${plainId}`));
+  assert.match(updated.output, /default_visibility: organization/);
+
+  const database = openDatabase(join(root, "project-visibility", "service.db"));
+  const shared = database.query(
+    "SELECT default_visibility FROM projects WHERE id = ?",
+  ).get(projectId) as { default_visibility: string };
+  const changed = database.query(
+    "SELECT default_visibility FROM projects WHERE id = ?",
+  ).get(plainId) as { default_visibility: string };
+  assert.equal(shared.default_visibility, "organization");
+  assert.equal(changed.default_visibility, "organization");
+  database.close();
 });

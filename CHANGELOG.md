@@ -29,6 +29,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 ### Added
 
 - `titen_remember` accepts optional `consolidate: true`, which records an observation and one supporting claim in the same call. Trust and visibility are copied. MCP `initialize` instructions say to consolidate after remember, or to pass that flag, when no enrichment model is configured.
+- Projects accept `default_visibility` at create and through `PATCH /v1/projects/:id` or `titen project update`. A write that omits `visibility` uses that default. Existing projects stay private until an operator sets one. An explicit private write into a wider project returns `visibility_warning`.
+
+### Upgrade notes
+
+- Migration 25 adds nullable `projects.default_visibility`. Null keeps the private default, so a v0.10.4 database can migrate in place. Set a shared project with `titen project update --db <path> --org-id <org> --reference <owner/repo> --default-visibility organization`.
 
 ## [0.10.4] — 2026-10-05
 

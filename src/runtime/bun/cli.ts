@@ -10,7 +10,8 @@ import { createApiKey, keyLifecycleStatus, SCOPES } from "../../core/auth";
 import type { Stmt } from "../../core/db";
 import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
-import { TRUST_LEVELS, type Trust } from "../../core/validate";
+import { TRUST_LEVELS, VISIBILITIES, type Trust, type Visibility } from "../../core/validate";
+import { normalizeProjectReference } from "../../core/projects";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { listHostAccounts, recoverHostAccount } from "./accounts";
 import { serve } from "./server";
@@ -46,6 +47,10 @@ Usage:
                    [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
   titen key list   [--db <path>]
   titen key revoke [--db <path>] --id <key id>
+  titen project create [--db <path>] --org-id <id> --reference <owner/repo>
+                   [--default-visibility private|team|organization]
+  titen project update [--db <path>] --org-id <id> --default-visibility <value>
+                   (--id <project id> | --reference <owner/repo>)
   titen account list [--db <path>]
   titen account unlock [--db <path>] --username <name>
   titen account reset-password [--db <path>] --username <name>
@@ -111,6 +116,12 @@ const COMMAND_FLAGS: Record<
   "account reset-password": { values: ["db", "username"] },
   "key list": { values: ["db"] },
   "key revoke": { values: ["db", "id"] },
+  "project create": {
+    values: ["db", "org-id", "reference", "default-visibility"],
+  },
+  "project update": {
+    values: ["db", "org-id", "id", "reference", "default-visibility"],
+  },
   backup: { values: ["db", "out"] },
   schema: { values: [] },
 };
@@ -131,10 +142,16 @@ function parseArgs(argv: string[]) {
     return { command: undefined, action: undefined, flags, positional: undefined };
 
   const command = argv[0]!;
-  const action = ["key", "account"].includes(command) ? argv[1] : undefined;
+  const action = ["key", "account", "project"].includes(command) ? argv[1] : undefined;
   const name = action ? `${command} ${action}` : command;
   const schema = COMMAND_FLAGS[name];
-  if (!schema) fail(command === "key" ? "key needs create, list, or revoke" : `unknown command "${command}"`);
+  if (!schema) {
+    fail(command === "key"
+      ? "key needs create, list, or revoke"
+      : command === "project"
+        ? "project needs create or update"
+        : `unknown command "${command}"`);
+  }
 
   const values = new Set(schema.values);
   const booleans = new Set(schema.booleans ?? []);
@@ -601,6 +618,64 @@ switch (command) {
       break;
     }
     fail("key needs create, list, or revoke");
+    break;
+  }
+
+  case "project": {
+    const orgId = text(flags["org-id"], "");
+    if (!orgId) fail("--org-id is required");
+    if (action === "update" && !flags["default-visibility"]) fail("--default-visibility is required");
+    if (typeof flags["default-visibility"] === "string" && !VISIBILITIES.includes(flags["default-visibility"] as Visibility))
+      fail(`--default-visibility must be one of ${VISIBILITIES.join(", ")}`);
+    const defaultVisibility = typeof flags["default-visibility"] === "string"
+      ? flags["default-visibility"] as Visibility
+      : null;
+    try {
+      if (action === "create") {
+        const reference = normalizeProjectReference(text(flags.reference, ""));
+        const id = newId("project");
+        const at = new Date().toISOString();
+        await existingDatabase(dbPath, (database) => {
+          const organization = database.query("SELECT 1 FROM organizations WHERE id = ?").get(orgId);
+          if (!organization) throw new CliFailure(`organization not found: ${orgId}`);
+          const taken = database.query("SELECT id FROM projects WHERE org_id = ? AND reference = ?").get(orgId, reference) as { id: string } | null;
+          if (taken) throw new CliFailure(`project already exists: ${taken.id}`);
+          database.query(
+            `INSERT INTO projects (id, org_id, reference, created_at, default_visibility) VALUES (?, ?, ?, ?, ?)`,
+          ).run(id, orgId, reference, at, defaultVisibility);
+        });
+        console.log(`project_id: ${id}`);
+        console.log(`reference: ${reference}`);
+        console.log(`default_visibility: ${defaultVisibility ?? "private"}`);
+        break;
+      }
+      if (action === "update") {
+        const projectId = text(flags.id, "");
+        const referenceInput = text(flags.reference, "");
+        if (!projectId && !referenceInput) fail("--id or --reference is required");
+        if (projectId && referenceInput) fail("pass only one of --id or --reference");
+        const reference = referenceInput ? normalizeProjectReference(referenceInput) : "";
+        const updated = await existingDatabase(dbPath, (database) => {
+          const row = (projectId
+            ? database.query("SELECT id, reference FROM projects WHERE id = ? AND org_id = ?").get(projectId, orgId)
+            : database.query("SELECT id, reference FROM projects WHERE org_id = ? AND reference = ?").get(orgId, reference)) as
+            | { id: string; reference: string }
+            | null;
+          if (!row) throw new CliFailure("project not found");
+          database.query(
+            `UPDATE projects SET default_visibility = ? WHERE id = ? AND org_id = ?`,
+          ).run(defaultVisibility, row.id, orgId);
+          return row;
+        });
+        console.log(`project_id: ${updated.id}`);
+        console.log(`reference: ${updated.reference}`);
+        console.log(`default_visibility: ${defaultVisibility}`);
+        break;
+      }
+      fail("project needs create or update");
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "project command failed");
+    }
     break;
   }
 
