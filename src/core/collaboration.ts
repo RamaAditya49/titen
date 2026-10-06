@@ -4,6 +4,7 @@ import { auditStatement } from "./audit";
 import type { Principal } from "./auth";
 import type { Db, Stmt } from "./db";
 import { notFound, validationError, conflict, forbidden } from "./errors";
+import { assertWriteFence } from "./key-fences";
 import { eventStatement } from "./events";
 import { newId } from "./ids";
 import { POLICY_SNAPSHOT } from "./context";
@@ -375,6 +376,7 @@ export async function createHandoff(ctx: RequestContext): Promise<Result> {
   const body = requireObject(await ctx.json());
   const toPrincipal = requireString(body, "to_principal", LIMITS.identifier);
   const subjectId = requireString(body, "subject_id", LIMITS.identifier);
+  assertWriteFence(ctx.principal!.fences, subjectId, null);
   const contextId = optionalString(body, "context_id", LIMITS.identifier);
   const checkpointId = optionalString(body, "checkpoint_id", LIMITS.identifier);
   const message = optionalString(body, "message", LIMITS.statement);

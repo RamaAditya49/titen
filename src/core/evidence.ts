@@ -1,4 +1,4 @@
-import { chunk, first, type Db } from "./db";
+import { chunk, first, MAX_BOUND_PARAMS, type Db } from "./db";
 import { notFound } from "./errors";
 import type { RequestContext, Result } from "./http";
 import type { Principal } from "./auth";
@@ -173,7 +173,9 @@ export async function loadAuthorizedSources(
   organizationWide = false,
 ): Promise<Map<string, AuthorizedSource[]>> {
   const grouped = new Map<string, AuthorizedSource[]>();
-  for (const group of chunk(claimIds)) {
+  // Five read-fence binds sit on recordAccessParams. Keep the statement at the
+  // same 97-parameter total the 90-id chunk had before those binds existed.
+  for (const group of chunk(claimIds, MAX_BOUND_PARAMS - 5)) {
     if (group.length === 0) continue;
     const rows = await db.all<{
       claim_id: string;

@@ -308,7 +308,7 @@ export async function exportRecords(ctx: RequestContext): Promise<Result> {
     };
     const ids = rows.map((row) => String(row.id));
     const sources: Record<string, unknown>[] = [];
-    for (const group of chunk(ids, MAX_BOUND_PARAMS - 2)) {
+    for (const group of chunk(ids, MAX_BOUND_PARAMS - 7)) {
       if (!group.length) continue;
       sources.push(...await ctx.app.db.all<Record<string, unknown>>(
         `SELECT s.claim_id, s.observation_id, s.relation, s.created_at
@@ -382,7 +382,10 @@ async function exportableEnrichmentJobIds(
   const targetAccess = wholeDeployment
     ? "1 = 1"
     : recordAccessSql("c").replaceAll("c.", "link_target.");
-  for (const group of chunk(ids, MAX_BOUND_PARAMS - 9)) {
+  // Four recordAccessParams copies (observation, claim, link source, link
+  // target) each carry the read-fence binds. 1 org id + 53 job ids + 44
+  // access binds stays at 98, under D1's 100-variable cap.
+  for (const group of chunk(ids, MAX_BOUND_PARAMS - 37)) {
     if (!group.length) continue;
     const rows = await ctx.app.db.all<{ id: string }>(
       `SELECT j.id FROM enrichment_jobs j
@@ -1768,7 +1771,7 @@ async function loadEvidence(
 ): Promise<Map<string, Prepared>> {
   const result = new Map(observations);
   const refs = [...claims.values()].flatMap((claim) => claim.sources.map((source) => source.observation_id)).filter((id) => !result.has(id));
-  for (const group of chunk([...new Set(refs)], MAX_BOUND_PARAMS - 2)) {
+  for (const group of chunk([...new Set(refs)], MAX_BOUND_PARAMS - 7)) {
     if (!group.length) continue;
     const rows = await ctx.app.db.all<Prepared>(
       `SELECT o.id, o.subject_id, o.project_id, o.workspace_id, o.content, o.content_hash, o.trust, o.visibility
@@ -1814,7 +1817,7 @@ async function loadAuthorizedPortableRecords(
   const result = new Map<string, Prepared>();
   const administrative = hasScope(ctx.principal!, "keys:manage");
   const alias = table === "observations" ? "o" : "c";
-  for (const group of chunk([...new Set(ids)], MAX_BOUND_PARAMS - 3)) {
+  for (const group of chunk([...new Set(ids)], MAX_BOUND_PARAMS - 8)) {
     if (!group.length) continue;
     const rows = await ctx.app.db.all<Prepared>(
       `SELECT ${alias}.* FROM ${table} ${alias}

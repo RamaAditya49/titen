@@ -5,6 +5,15 @@ import { forbidden, notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import { requireOrgRole } from "./governance";
 import { requireDelegableTarget } from "./directory";
+import {
+  fenceAuditDetail,
+  fenceStatements,
+  fencesFromRows,
+  parseFenceList,
+  UNRESTRICTED_FENCES,
+  type FenceRow,
+  type KeyFences,
+} from "./key-fences";
 import type { RequestContext, Result } from "./http";
 import {
   LIMITS,
@@ -43,6 +52,7 @@ export async function getPrincipal(ctx: RequestContext): Promise<Result> {
       ? null : principal.dataTargetId ?? null,
     organization_role: principal.scopes.includes("*") ? "root" : membership?.role ?? null,
     auth_stage: principal.authStage ?? "full",
+    fences: principal.fences ?? UNRESTRICTED_FENCES,
   } };
 }
 
@@ -53,6 +63,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
     "label", "scopes", "max_trust", "principal_kind", "principal_id",
     "not_before", "expires_at", "membership_role",
     "data_target_type", "data_target_id",
+    "read_projects", "read_subjects", "write_projects", "write_subjects",
   ]);
   const unknown = Object.keys(body).find((field) => !allowed.has(field));
   if (unknown) throw validationError(`Unknown key creation field "${unknown}".`);
@@ -90,6 +101,12 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   if (scopes.includes("grants:write")) dataPermissions.push("admin");
   if (body.data_target_type !== undefined || body.data_target_id !== undefined)
     await requireDelegableTarget(ctx, dataTargetType, dataTargetType === "organization" ? "*" : dataTargetId!, dataPermissions);
+  const fences: KeyFences = {
+    read_projects: parseFenceList(body.read_projects, "read_projects", "project"),
+    read_subjects: parseFenceList(body.read_subjects, "read_subjects", "subject"),
+    write_projects: parseFenceList(body.write_projects, "write_projects", "project"),
+    write_subjects: parseFenceList(body.write_subjects, "write_subjects", "subject"),
+  };
   let membershipId: string | null = null;
   if (membershipRole) {
     requireScope(principal, "memberships:write");
@@ -122,6 +139,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   );
   await ctx.app.db.batch([
     created.statement,
+    ...fenceStatements(created.id, fences),
     ...(membershipId ? [{
       sql: `INSERT INTO memberships
               (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
@@ -135,7 +153,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       "api_key",
       now.toISOString(),
       created.id,
-      JSON.stringify({ not_before: notBefore, expires_at: expiresAt }),
+      fenceAuditDetail({ not_before: notBefore, expires_at: expiresAt }, fences),
     ),
     ...(membershipId ? [auditStatement(
       principal.orgId,
@@ -162,6 +180,7 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
       expires_at: expiresAt,
       data_target_type: dataTargetType,
       data_target_id: dataTargetType === "project" && dataTargetId === "~" ? null : dataTargetId,
+      fences,
       last_used_at: null,
       ...(membershipId ? { membership_id: membershipId, membership_role: membershipRole } : {}),
       warning: "Store this key now. Titen keeps only its hash and cannot show it again.",
@@ -178,6 +197,19 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
        FROM api_keys WHERE org_id = ? ORDER BY created_at, id LIMIT 500`,
     [principal.orgId],
   );
+  const fenceRows = await ctx.app.db.all<FenceRow & { key_id: string }>(
+    `SELECT f.key_id, f.access, f.target_type, f.pattern
+       FROM api_key_fences f
+       JOIN api_keys k ON k.id = f.key_id
+      WHERE k.org_id = ?`,
+    [principal.orgId],
+  );
+  const fencesByKey = new Map<string, FenceRow[]>();
+  for (const fence of fenceRows) {
+    const group = fencesByKey.get(fence.key_id) ?? [];
+    group.push(fence);
+    fencesByKey.set(fence.key_id, group);
+  }
   return {
     data: {
       keys: rows.map((row) => ({
@@ -196,6 +228,7 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
         data_target_type: row.data_target_type ?? "organization",
         data_target_id: row.data_target_type === "project" && row.data_target_id === "~"
           ? null : row.data_target_id,
+        fences: fencesFromRows(fencesByKey.get(String(row.id)) ?? []) ?? UNRESTRICTED_FENCES,
         status: keyLifecycleStatus({
           notBefore: String(row.not_before),
           expiresAt: row.expires_at === null ? null : String(row.expires_at),

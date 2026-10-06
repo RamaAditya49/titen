@@ -129,6 +129,22 @@ Rules:
 - central route authorization limits staged dashboard keys before scope checks;
 - portability excludes transient dashboard sessions.
 
+### `api_key_fences`
+
+Optional target fences for one API key. Migration 26 creates the table and
+does not backfill rows. No rows means the key is unrestricted, which is the
+behavior of every key created before the table existed.
+
+Each row is `key_id`, `access` (`read` or `write`), `target_type` (`project`
+or `subject`), and `pattern`. The primary key is those four columns. A project
+pattern is an exact project id. A subject pattern is exact, or a prefix ending
+in one `*`. Read fences filter canonical reads. Write fences reject the write
+with `403` and do not change read visibility. `data_target_type` and
+`data_target_id` remain a separate single-target gate.
+
+JSONL export of `api_keys` does not include this table. A SQLite backup does.
+After a JSONL import, create restricted keys again.
+
 ### `access_grants`
 
 Append-and-revoke additive authority rows. Each row binds one organization and
@@ -211,6 +227,11 @@ absolute path. Resolving a reference never creates membership; creating a
 missing project requires an explicit capability. Migration 23 creates one
 canonical reference for every existing project and the insert trigger keeps new
 projects aligned.
+
+`projects.default_visibility` is optional. Null means private, which is the
+value every project had before migration 25. A write that omits `visibility`
+uses this default when the column is `team` or `organization`. An explicit
+visibility on the write still wins.
 
 ## Evidence and memory
 

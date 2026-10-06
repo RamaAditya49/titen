@@ -1,5 +1,6 @@
 import { first } from "./db";
 import { notFound, validationError } from "./errors";
+import { assertReadFence, assertWriteFence } from "./key-fences";
 import { newId, sha256Hex } from "./ids";
 import type { RequestContext, Result } from "./http";
 import {
@@ -38,6 +39,7 @@ export async function saveCheckpoint(ctx: RequestContext): Promise<Result> {
   if (serialized.length > MAX_STATE_BYTES)
     throw validationError(`Checkpoint state exceeds ${MAX_STATE_BYTES} bytes.`);
   const ttlSeconds = requireInteger(body, "ttl_seconds", MIN_TTL, MAX_TTL);
+  assertWriteFence(principal.fences, subjectId, null);
 
   const now = ctx.app.now();
   const at = now.toISOString();
@@ -118,6 +120,7 @@ export async function getCheckpoint(ctx: RequestContext): Promise<Result> {
     ],
   );
   if (!row) throw notFound();
+  assertReadFence(principal.fences, row.subject_id, null);
 
   if (row.agent_id !== principal.principalId) {
     const delegated = await first<{ present: number }>(
@@ -152,12 +155,13 @@ export async function deleteCheckpoint(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const checkpointId = ctx.params.id!;
 
-  const row = await first<{ id: string }>(
+  const row = await first<{ id: string; subject_id: string }>(
     ctx.app.db,
-    `SELECT id FROM checkpoints WHERE id = ? AND org_id = ? AND agent_id = ?`,
+    `SELECT id, subject_id FROM checkpoints WHERE id = ? AND org_id = ? AND agent_id = ?`,
     [checkpointId, principal.orgId, principal.principalId],
   );
   if (!row) throw notFound();
+  assertWriteFence(principal.fences, row.subject_id, null);
 
   await ctx.app.db.batch([
     {

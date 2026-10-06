@@ -197,7 +197,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   // citations, so the widening buys the promotion for no extra read.
   //
   // Two costs, stated rather than implied. `loadAuthorizedSources` chunks at
-  // `MAX_BOUND_PARAMS`, so the widened lookup is one round trip per 90
+  // `MAX_BOUND_PARAMS - 5`, so the widened lookup is one round trip per 85
   // candidates — twelve serial hops at `max_candidates: 1000`, not one. And with
   // `top_k` omitted, the default, both branches ask for the same ids, because
   // every candidate is returned and therefore already needs citations; there the

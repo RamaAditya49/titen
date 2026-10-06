@@ -26,6 +26,17 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Added
+
+- `titen_remember` accepts optional `consolidate: true`, which records an observation and one supporting claim in the same call. Trust and visibility are copied. MCP `initialize` instructions say to consolidate after remember, or to pass that flag, when no enrichment model is configured.
+- Projects accept `default_visibility` at create and through `PATCH /v1/projects/:id` or `titen project update`. A write that omits `visibility` uses that default. Existing projects stay private until an operator sets one. An explicit private write into a wider project returns `visibility_warning`.
+- API keys accept optional read and write fences for project ids and subject patterns at `POST /v1/keys` and `titen key create` (`--subjects`, `--projects`, and the explicit `--read-*` / `--write-*` flags). A write outside the fence returns 403, including through MCP as a tool error. `titen key list`, key creation, `GET /v1/principal`, and the `key.create` audit detail show the fences. Keys with no fence rows stay unrestricted.
+
+### Upgrade notes
+
+- Migration 25 adds nullable `projects.default_visibility`. Null keeps the private default, so a v0.10.4 database can migrate in place. Set a shared project with `titen project update --db <path> --org-id <org> --reference <owner/repo> --default-visibility organization`.
+- Migration 26 adds `api_key_fences` and does not rewrite existing keys. Restart the v0.10.4 process on this build so migrate runs, or run `titen migrate --db <path>`. Existing keys remain unrestricted. The raw secret cannot be shown again, so revoke a key and create a replacement: `titen key create --db <path> --org-id <org> --principal <agent> --subjects castle:profile:alice,castle:shared`. JSONL export does not carry fences; a SQLite backup does.
+
 ## [0.10.4] — 2026-10-05
 
 Protect dashboard sign-in and provide account recovery during password blocks.

@@ -59,6 +59,8 @@ test("help is side-effect free for every documented command", () => {
     ["key-create", ["key", "create", "--help"]],
     ["key-list", ["key", "list", "--help"]],
     ["key-revoke", ["key", "revoke", "--help"]],
+    ["project-create", ["project", "create", "--help"]],
+    ["project-update", ["project", "update", "--help"]],
     ["backup", ["backup", "--help"]],
     ["schema", ["schema", "--help"]],
   ] as const;
@@ -187,6 +189,8 @@ test("malformed flags fail before side effects for every command", () => {
     ["key-create", ["key", "create", "--org-id"]],
     ["key-list", ["key", "list", "--db"]],
     ["key-revoke", ["key", "revoke", "--id"]],
+    ["project-create", ["project", "create", "--org-id"]],
+    ["project-update", ["project", "update", "--default-visibility"]],
     ["backup", ["backup", "--out"]],
     ["schema", ["schema", "--unknown"]],
   ] as const;
@@ -293,6 +297,63 @@ test("key lifecycle flags survive listing and verified backup", async () => {
   } finally {
     handle.close();
   }
+});
+
+test("key create stores subject and project fences and key list prints them", () => {
+  const boot = run("key-fences", ["bootstrap", "--db", "source.db"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const orgId = /^organization: (org_[^ ]+)/m.exec(boot.output)?.[1];
+  assert.ok(orgId);
+  const created = run("key-fences", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--subjects", "castle:profile:alice,castle:shared",
+    "--projects", "project_alice",
+    "--read-subjects", "castle:profile:*",
+  ]);
+  assert.equal(created.exitCode, 0, created.output);
+  const keyId = /^key_id: (key_[^\s]+)/m.exec(created.output)?.[1];
+  assert.ok(keyId);
+  const listed = run("key-fences", ["key", "list", "--db", "source.db"]);
+  assert.match(listed.output, new RegExp(
+    `${keyId} .* read_projects=-  read_subjects=castle:profile:\\*  write_projects=project_alice  write_subjects=castle:profile:alice,castle:shared`,
+  ));
+  const database = openDatabase(join(root, "key-fences", "source.db"), { create: false, readonly: true });
+  try {
+    const fences = database.query(
+      `SELECT access, target_type, pattern FROM api_key_fences WHERE key_id = ? ORDER BY access, target_type, pattern`,
+    ).all(keyId) as { access: string; target_type: string; pattern: string }[];
+    assert.deepEqual(fences, [
+      { access: "read", target_type: "subject", pattern: "castle:profile:*" },
+      { access: "write", target_type: "project", pattern: "project_alice" },
+      { access: "write", target_type: "subject", pattern: "castle:profile:alice" },
+      { access: "write", target_type: "subject", pattern: "castle:shared" },
+    ]);
+    const audit = database.query(
+      `SELECT actor_id, detail FROM audit_log WHERE action = 'key.create' AND resource_id = ?`,
+    ).get(keyId) as { actor_id: string; detail: string };
+    assert.equal(audit.actor_id, "cli");
+    const detail = JSON.parse(audit.detail) as { write_subjects: string[]; write_projects: string[] };
+    assert.deepEqual(detail.write_subjects, ["castle:profile:alice", "castle:shared"]);
+    assert.deepEqual(detail.write_projects, ["project_alice"]);
+  } finally {
+    database.close();
+  }
+
+  const conflict = run("key-fences", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--subjects", "castle:shared", "--write-subjects", "castle:shared",
+  ]);
+  assert.notEqual(conflict.exitCode, 0);
+  assert.match(conflict.output, /pass only one of --write-subjects and --subjects/);
+
+  const printed = run("key-fence-sql", [
+    "key", "create", "--print-sql", "--org-id", "org_remote",
+    "--subjects", "castle:profile:alice",
+  ]);
+  assert.equal(printed.exitCode, 0, printed.output);
+  assert.match(printed.output, /INSERT INTO api_key_fences/);
+  assert.match(printed.output, /castle:profile:alice/);
+  assert.deepEqual(printed.files, []);
 });
 
 test("local key administration fails closed for missing organizations and keys", () => {
@@ -608,4 +669,47 @@ test("host account recovery clears only its account and forces password rotation
   handle.close();
   assert.equal(run(cwdName, ["account", "unlock", "--db", dbPath, "--username", "missing-user"]).exitCode, 1);
   assert.equal(run(cwdName, ["account", "list", "--db", join(root, "absent-account.db")]).exitCode, 1);
+});
+
+test("project commands set default visibility on a new and an existing project", () => {
+  const boot = run("project-visibility", ["bootstrap", "--db", "service.db", "--org", "Castle"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const orgId = /^organization: (org_[^ ]+)/m.exec(boot.output)?.[1];
+  assert.ok(orgId);
+  const created = run("project-visibility", [
+    "project", "create", "--db", "service.db", "--org-id", orgId,
+    "--reference", "github.com/Castle/Shared.git",
+    "--default-visibility", "organization",
+  ]);
+  assert.equal(created.exitCode, 0, created.output);
+  assert.match(created.output, /reference: castle\/shared/);
+  assert.match(created.output, /default_visibility: organization/);
+  const projectId = /^project_id: (project_\S+)/m.exec(created.output)?.[1];
+  assert.ok(projectId);
+
+  const plain = run("project-visibility", [
+    "project", "create", "--db", "service.db", "--org-id", orgId, "--reference", "castle/plain",
+  ]);
+  assert.equal(plain.exitCode, 0, plain.output);
+  assert.match(plain.output, /default_visibility: private/);
+  const plainId = /^project_id: (project_\S+)/m.exec(plain.output)?.[1];
+  assert.ok(plainId);
+  const updated = run("project-visibility", [
+    "project", "update", "--db", "service.db", "--org-id", orgId,
+    "--reference", "castle/plain", "--default-visibility", "organization",
+  ]);
+  assert.equal(updated.exitCode, 0, updated.output);
+  assert.match(updated.output, new RegExp(`project_id: ${plainId}`));
+  assert.match(updated.output, /default_visibility: organization/);
+
+  const database = openDatabase(join(root, "project-visibility", "service.db"));
+  const shared = database.query(
+    "SELECT default_visibility FROM projects WHERE id = ?",
+  ).get(projectId) as { default_visibility: string };
+  const changed = database.query(
+    "SELECT default_visibility FROM projects WHERE id = ?",
+  ).get(plainId) as { default_visibility: string };
+  assert.equal(shared.default_visibility, "organization");
+  assert.equal(changed.default_visibility, "organization");
+  database.close();
 });

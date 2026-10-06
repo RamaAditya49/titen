@@ -144,11 +144,14 @@ export async function listProjects(ctx: RequestContext): Promise<Result> {
        SELECT project_id, COUNT(*) AS record_count, COUNT(DISTINCT subject_id) AS subject_count,
               MAX(created_at) AS last_write FROM authorized GROUP BY project_id
      ), directory AS (
-       SELECT p.id AS project_id, p.reference, p.created_at FROM projects p WHERE p.org_id = ?
+       SELECT p.id AS project_id, p.reference, p.created_at, p.default_visibility
+         FROM projects p WHERE p.org_id = ?
        UNION ALL
-       SELECT NULL, '(unscoped)', NULL WHERE EXISTS (SELECT 1 FROM counts WHERE project_id IS NULL)
+       SELECT NULL, '(unscoped)', NULL, NULL WHERE EXISTS (SELECT 1 FROM counts WHERE project_id IS NULL)
      )
      SELECT d.project_id, d.reference, d.created_at,
+            CASE WHEN d.project_id IS NULL THEN NULL
+                 ELSE COALESCE(d.default_visibility, 'private') END AS default_visibility,
             COALESCE(c.record_count, 0) AS record_count,
             COALESCE(c.subject_count, 0) AS subject_count, c.last_write
        FROM directory d JOIN counts c ON c.project_id IS d.project_id

@@ -7,10 +7,21 @@
 // comment to TypeScript and the whole check to `sh`, which never reaches line 3
 // because it has already exec'd Bun or exited. One entry, one guard.
 import { createApiKey, keyLifecycleStatus, SCOPES } from "../../core/auth";
+import { auditStatement } from "../../core/audit";
 import type { Stmt } from "../../core/db";
+import {
+  fenceAuditDetail,
+  fenceStatements,
+  fencesAreRestricted,
+  fencesFromRows,
+  parseFenceCsv,
+  type FenceRow,
+  type KeyFences,
+} from "../../core/key-fences";
 import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
-import { TRUST_LEVELS, type Trust } from "../../core/validate";
+import { TRUST_LEVELS, VISIBILITIES, type Trust, type Visibility } from "../../core/validate";
+import { normalizeProjectReference } from "../../core/projects";
 import { createSqliteDb, openDatabase } from "./sqlite";
 import { listHostAccounts, recoverHostAccount } from "./accounts";
 import { serve } from "./server";
@@ -44,8 +55,15 @@ Usage:
   titen key create [--db <path>] --org-id <id> [--principal <id>] [--kind agent]
                    [--scopes "a,b"] [--trust asserted] [--label name]
                    [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
+                   [--subjects <pattern,...>] [--projects <id,...>]
+                   [--write-subjects <pattern,...>] [--write-projects <id,...>]
+                   [--read-subjects <pattern,...>] [--read-projects <id,...>]
   titen key list   [--db <path>]
   titen key revoke [--db <path>] --id <key id>
+  titen project create [--db <path>] --org-id <id> --reference <owner/repo>
+                   [--default-visibility private|team|organization]
+  titen project update [--db <path>] --org-id <id> --default-visibility <value>
+                   (--id <project id> | --reference <owner/repo>)
   titen account list [--db <path>]
   titen account unlock [--db <path>] --username <name>
   titen account reset-password [--db <path>] --username <name>
@@ -75,6 +93,12 @@ Notes:
   --print-sql emits SQL for a remote database (Cloudflare D1) instead of writing
   locally. A raw key and temporary dashboard password are printed once and are
   never recoverable afterwards.
+  --subjects and --projects are write fences. --write-subjects and
+  --write-projects are the same fences. Subject patterns are exact or a single
+  trailing *. Project values are project ids. Omit a list to leave that
+  dimension unrestricted. A key with no fences behaves as before. Existing
+  keys stay unrestricted; revoke one and create a replacement to add a fence.
+  JSONL export does not carry fences. A SQLite backup does.
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
 
@@ -103,6 +127,8 @@ const COMMAND_FLAGS: Record<
     values: [
       "db", "org-id", "principal", "kind", "scopes", "trust", "label",
       "not-before", "expires-at",
+      "subjects", "projects", "write-subjects", "write-projects",
+      "read-subjects", "read-projects",
     ],
     booleans: ["print-sql"],
   },
@@ -111,6 +137,12 @@ const COMMAND_FLAGS: Record<
   "account reset-password": { values: ["db", "username"] },
   "key list": { values: ["db"] },
   "key revoke": { values: ["db", "id"] },
+  "project create": {
+    values: ["db", "org-id", "reference", "default-visibility"],
+  },
+  "project update": {
+    values: ["db", "org-id", "id", "reference", "default-visibility"],
+  },
   backup: { values: ["db", "out"] },
   schema: { values: [] },
 };
@@ -131,10 +163,16 @@ function parseArgs(argv: string[]) {
     return { command: undefined, action: undefined, flags, positional: undefined };
 
   const command = argv[0]!;
-  const action = ["key", "account"].includes(command) ? argv[1] : undefined;
+  const action = ["key", "account", "project"].includes(command) ? argv[1] : undefined;
   const name = action ? `${command} ${action}` : command;
   const schema = COMMAND_FLAGS[name];
-  if (!schema) fail(command === "key" ? "key needs create, list, or revoke" : `unknown command "${command}"`);
+  if (!schema) {
+    fail(command === "key"
+      ? "key needs create, list, or revoke"
+      : command === "project"
+        ? "project needs create or update"
+        : `unknown command "${command}"`);
+  }
 
   const values = new Set(schema.values);
   const booleans = new Set(schema.booleans ?? []);
@@ -174,6 +212,38 @@ function port(value: string | boolean | undefined): number {
   if (!/^\d+$/.test(raw) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
     fail("--port must be an integer between 1 and 65535");
   return parsed;
+}
+
+function formatFence(patterns: string[] | null): string {
+  return patterns && patterns.length ? patterns.join(",") : "-";
+}
+
+function optionalFence(
+  flags: Record<string, string | boolean>,
+  flag: string,
+  alias: string | undefined,
+  kind: "project" | "subject",
+): string[] | null {
+  const primary = flags[flag];
+  const aliased = alias ? flags[alias] : undefined;
+  if (typeof primary === "string" && typeof aliased === "string")
+    fail(`pass only one of --${flag} and --${alias}`);
+  const value = typeof primary === "string" ? primary : typeof aliased === "string" ? aliased : undefined;
+  if (value === undefined) return null;
+  try {
+    return parseFenceCsv(value, flag, kind);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : `invalid --${flag}`);
+  }
+}
+
+function keyFencesFromFlags(flags: Record<string, string | boolean>): KeyFences {
+  return {
+    read_projects: optionalFence(flags, "read-projects", undefined, "project"),
+    read_subjects: optionalFence(flags, "read-subjects", undefined, "subject"),
+    write_projects: optionalFence(flags, "write-projects", "projects", "project"),
+    write_subjects: optionalFence(flags, "write-subjects", "subjects", "subject"),
+  };
 }
 
 function timestamp(value: string | boolean | undefined, flag: string): Date | undefined {
@@ -525,6 +595,7 @@ switch (command) {
       const expiresAt = timestamp(flags["expires-at"], "expires-at");
       if (expiresAt && notBefore.getTime() >= expiresAt.getTime())
         fail("--not-before must be earlier than --expires-at");
+      const fences = keyFencesFromFlags(flags);
       const key = await createApiKey({
         orgId,
         principalId: text(flags.principal, newId("agent")),
@@ -535,8 +606,25 @@ switch (command) {
         notBefore,
         ...(expiresAt ? { expiresAt } : {}),
       }, issuedAt);
+      const fenceSql = fenceStatements(key.id, fences);
+      const audit = fencesAreRestricted(fences)
+        ? auditStatement(
+          orgId,
+          "cli",
+          "key.create",
+          "api_key",
+          issuedAt.toISOString(),
+          key.id,
+          fenceAuditDetail({
+            not_before: notBefore.toISOString(),
+            expires_at: expiresAt ? expiresAt.toISOString() : null,
+          }, fences),
+        )
+        : null;
       if (flags["print-sql"]) {
         console.log(renderStatement(key.statement));
+        for (const statement of fenceSql) console.log(renderStatement(statement));
+        if (audit) console.log(renderStatement(audit));
         console.error(`key_id: ${key.id}`);
         console.error(`api_key: ${key.key}`);
         break;
@@ -546,29 +634,45 @@ switch (command) {
         if (!organization) throw new CliFailure(`organization not found: ${orgId}`);
         database.transaction(() => {
           database.query(key.statement.sql).run(...key.statement.params);
+          for (const statement of fenceSql)
+            database.query(statement.sql).run(...(statement.params ?? []));
+          if (audit) database.query(audit.sql).run(...(audit.params ?? []));
         })();
       });
       printKey(key.key, key.id);
       break;
     }
     if (action === "list") {
-      const rows = await existingDatabase(dbPath, (_database, db) =>
-        db.all<{
-          id: string;
-          org_id: string;
-          label: string;
-          principal_id: string;
-          scopes: string;
-          max_trust: string;
-          not_before: string;
-          expires_at: string | null;
-          last_used_at: string | null;
-          revoked_at: string | null;
-        }>(
-          `SELECT id, org_id, label, principal_id, scopes, max_trust,
-                  not_before, expires_at, last_used_at, revoked_at
-             FROM api_keys ORDER BY created_at`,
-        ), true);
+      const listedKeys = await existingDatabase(dbPath, (_database, db) =>
+        Promise.all([
+          db.all<{
+            id: string;
+            org_id: string;
+            label: string;
+            principal_id: string;
+            scopes: string;
+            max_trust: string;
+            not_before: string;
+            expires_at: string | null;
+            last_used_at: string | null;
+            revoked_at: string | null;
+          }>(
+            `SELECT id, org_id, label, principal_id, scopes, max_trust,
+                    not_before, expires_at, last_used_at, revoked_at
+               FROM api_keys ORDER BY created_at`,
+          ),
+          db.all<FenceRow & { key_id: string }>(
+            `SELECT key_id, access, target_type, pattern FROM api_key_fences`,
+          ),
+        ]), true);
+      const rows = listedKeys[0];
+      const fenceRows = listedKeys[1];
+      const fencesByKey = new Map<string, FenceRow[]>();
+      for (const fence of fenceRows) {
+        const group = fencesByKey.get(fence.key_id) ?? [];
+        group.push(fence);
+        fencesByKey.set(fence.key_id, group);
+      }
       const at = new Date().toISOString();
       for (const row of rows) {
         const status = keyLifecycleStatus({
@@ -576,8 +680,9 @@ switch (command) {
           expiresAt: row.expires_at,
           revokedAt: row.revoked_at,
         }, at);
+        const fences = fencesFromRows(fencesByKey.get(row.id) ?? []);
         console.log(
-          `${row.id}  ${status.padEnd(7)}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}`,
+          `${row.id}  ${status.padEnd(7)}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}  read_projects=${formatFence(fences.read_projects)}  read_subjects=${formatFence(fences.read_subjects)}  write_projects=${formatFence(fences.write_projects)}  write_subjects=${formatFence(fences.write_subjects)}`,
         );
       }
       if (!rows.length) console.log("no keys");
@@ -601,6 +706,64 @@ switch (command) {
       break;
     }
     fail("key needs create, list, or revoke");
+    break;
+  }
+
+  case "project": {
+    const orgId = text(flags["org-id"], "");
+    if (!orgId) fail("--org-id is required");
+    if (action === "update" && !flags["default-visibility"]) fail("--default-visibility is required");
+    if (typeof flags["default-visibility"] === "string" && !VISIBILITIES.includes(flags["default-visibility"] as Visibility))
+      fail(`--default-visibility must be one of ${VISIBILITIES.join(", ")}`);
+    const defaultVisibility = typeof flags["default-visibility"] === "string"
+      ? flags["default-visibility"] as Visibility
+      : null;
+    try {
+      if (action === "create") {
+        const reference = normalizeProjectReference(text(flags.reference, ""));
+        const id = newId("project");
+        const at = new Date().toISOString();
+        await existingDatabase(dbPath, (database) => {
+          const organization = database.query("SELECT 1 FROM organizations WHERE id = ?").get(orgId);
+          if (!organization) throw new CliFailure(`organization not found: ${orgId}`);
+          const taken = database.query("SELECT id FROM projects WHERE org_id = ? AND reference = ?").get(orgId, reference) as { id: string } | null;
+          if (taken) throw new CliFailure(`project already exists: ${taken.id}`);
+          database.query(
+            `INSERT INTO projects (id, org_id, reference, created_at, default_visibility) VALUES (?, ?, ?, ?, ?)`,
+          ).run(id, orgId, reference, at, defaultVisibility);
+        });
+        console.log(`project_id: ${id}`);
+        console.log(`reference: ${reference}`);
+        console.log(`default_visibility: ${defaultVisibility ?? "private"}`);
+        break;
+      }
+      if (action === "update") {
+        const projectId = text(flags.id, "");
+        const referenceInput = text(flags.reference, "");
+        if (!projectId && !referenceInput) fail("--id or --reference is required");
+        if (projectId && referenceInput) fail("pass only one of --id or --reference");
+        const reference = referenceInput ? normalizeProjectReference(referenceInput) : "";
+        const updated = await existingDatabase(dbPath, (database) => {
+          const row = (projectId
+            ? database.query("SELECT id, reference FROM projects WHERE id = ? AND org_id = ?").get(projectId, orgId)
+            : database.query("SELECT id, reference FROM projects WHERE org_id = ? AND reference = ?").get(orgId, reference)) as
+            | { id: string; reference: string }
+            | null;
+          if (!row) throw new CliFailure("project not found");
+          database.query(
+            `UPDATE projects SET default_visibility = ? WHERE id = ? AND org_id = ?`,
+          ).run(defaultVisibility, row.id, orgId);
+          return row;
+        });
+        console.log(`project_id: ${updated.id}`);
+        console.log(`reference: ${updated.reference}`);
+        console.log(`default_visibility: ${defaultVisibility}`);
+        break;
+      }
+      fail("project needs create or update");
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "project command failed");
+    }
     break;
   }
 

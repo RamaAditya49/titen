@@ -539,6 +539,184 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "project default visibility shares an omitted write inside the organization",
+    async run(fx) {
+      const scopes = [
+        "projects:resolve", "projects:create", "observations:write", "claims:write",
+        "context:compile", "mcp:call",
+      ];
+      const writer = await fx.provision({ scopes });
+      const reader = await fx.provision({ orgId: writer.orgId, scopes });
+      const created = await fx.call("POST", "/v1/projects/resolve", {
+        key: writer.key,
+        body: { reference: "castle/shared", create: true, default_visibility: "organization" },
+      });
+      expectOk(created, 201);
+      assert.equal(created.body.data.default_visibility, "organization");
+      const projectId = created.body.data.project_id as string;
+
+      const remembered = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          kind: "decision",
+          content: "Shared cutover is Friday.",
+          source: { type: "chat", ref: "shared#1" },
+          trust: "asserted",
+        },
+      });
+      expectOk(remembered, 201);
+      assert.equal(remembered.body.data.visibility, "organization");
+      assert.equal(remembered.body.meta.visibility_warning, undefined);
+
+      const consolidated = await fx.call("POST", "/v1/consolidations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          claims: [{
+            kind: "decision",
+            statement: "Shared cutover is Friday.",
+            sources: [{ observation_id: remembered.body.data.observation_id, relation: "supports" }],
+          }],
+        },
+      });
+      expectOk(consolidated, 201);
+      assert.equal(consolidated.body.data.claims[0].visibility, "organization");
+
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: reader.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          task: "shared cutover Friday",
+          max_tokens: 900,
+        },
+      });
+      expectOk(compiled);
+      assert.equal(compiled.body.data.items[0].claim_id, consolidated.body.data.claims[0].claim_id);
+
+      const viaMcp = await fx.call("POST", "/mcp", {
+        key: writer.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 7,
+          method: "tools/call",
+          params: {
+            name: "titen_remember",
+            arguments: {
+              subject_id: "castle:shared",
+              project_id: projectId,
+              kind: "user_statement",
+              content: "MCP omitted visibility follows the project default.",
+              source_type: "chat",
+              source_ref: "shared#mcp",
+              consolidate: true,
+            },
+          },
+        },
+      });
+      assert.equal(viaMcp.body.result.isError, undefined);
+      const mcpPayload = JSON.parse(viaMcp.body.result.content[0].text);
+      assert.equal(mcpPayload.data.visibility, "organization");
+      assert.equal(mcpPayload.data.claim.visibility, "organization");
+      const mcpCompiled = await fx.call("POST", "/mcp", {
+        key: reader.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 8,
+          method: "tools/call",
+          params: {
+            name: "titen_compile",
+            arguments: {
+              subject_id: "castle:shared",
+              project_id: projectId,
+              task: "MCP omitted visibility follows the project default",
+              max_tokens: 900,
+            },
+          },
+        },
+      });
+      const mcpPack = JSON.parse(mcpCompiled.body.result.content[0].text);
+      assert.equal(mcpPack.data.items.some((item: { claim_id: string }) => item.claim_id === mcpPayload.data.claim_id), true);
+
+      const hidden = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          kind: "user_statement",
+          content: "This private note stays with the writer.",
+          source: { type: "chat", ref: "shared#2" },
+          visibility: "private",
+          consolidate: true,
+        },
+      });
+      expectOk(hidden, 201);
+      assert.equal(hidden.body.data.visibility, "private");
+      assert.match(String(hidden.body.meta.visibility_warning), /default_visibility "organization"/);
+      const readerPack = await fx.call("POST", "/v1/context/compile", {
+        key: reader.key,
+        body: {
+          subject_id: "castle:shared",
+          project_id: projectId,
+          task: "private note stays with the writer",
+          max_tokens: 900,
+        },
+      });
+      expectOk(readerPack);
+      assert.equal(
+        readerPack.body.data.items.some((item: { claim_id: string }) => item.claim_id === hidden.body.data.claim_id),
+        false,
+      );
+
+      const plain = await fx.call("POST", "/v1/projects/resolve", {
+        key: writer.key,
+        body: { reference: "castle/plain", create: true },
+      });
+      expectOk(plain, 201);
+      assert.equal(plain.body.data.default_visibility, "private");
+      const unchanged = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:plain",
+          project_id: plain.body.data.project_id,
+          kind: "user_statement",
+          content: "No default still means private.",
+          source: { type: "chat", ref: "plain#1" },
+        },
+      });
+      expectOk(unchanged, 201);
+      assert.equal(unchanged.body.data.visibility, "private");
+      assert.equal(unchanged.body.meta.visibility_warning, undefined);
+
+      const patched = await fx.call("PATCH", `/v1/projects/${plain.body.data.project_id}`, {
+        key: writer.key,
+        body: { default_visibility: "organization" },
+      });
+      expectOk(patched);
+      assert.equal(patched.body.data.default_visibility, "organization");
+
+      const teamProject = await fx.call("POST", "/v1/projects/resolve", {
+        key: writer.key,
+        body: { reference: "castle/team", create: true, default_visibility: "team" },
+      });
+      expectOk(teamProject, 201);
+      const missingWorkspace = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "castle:team",
+          project_id: teamProject.body.data.project_id,
+          kind: "user_statement",
+          content: "Team default still needs a workspace.",
+          source: { type: "chat", ref: "team#1" },
+        },
+      });
+      expectError(missingWorkspace, 400, "VALIDATION_ERROR");
+    },
+  },
+  {
     name: "resolution never creates a project without the create capability",
     async run(fx) {
       const owner = await fx.provision();
@@ -2572,6 +2750,12 @@ export const CASES: Case[] = [
         data_target_id: null,
         organization_role: "root",
         auth_stage: "full",
+        fences: {
+          read_projects: null,
+          read_subjects: null,
+          write_projects: null,
+          write_subjects: null,
+        },
       });
       expectError(await fx.call("GET", "/v1/principal"), 401, "UNAUTHENTICATED");
 
@@ -4360,6 +4544,572 @@ export const CASES: Case[] = [
       const compiledPayload = JSON.parse(compile.body.result.content[0].text);
       assert.equal(compiledPayload.data.items[0].claim_id, claimId);
       assert.ok(compiledPayload.data.items.length > 0, "MCP recall must return the claim it created");
+    },
+  },
+  {
+    name: "remember consolidate true is recallable when the model is disabled",
+    async run(fx) {
+      const agent = await fx.provision({ scopes: ["*"] });
+      const mcp = (id: number, name: string, args: Record<string, unknown>) =>
+        fx.call("POST", "/mcp", {
+          key: agent.key,
+          body: {
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: { name, arguments: args },
+          },
+        });
+      const remembered = await mcp(1, "titen_remember", {
+        subject_id: "subject_auto_claim",
+        kind: "decision",
+        content: "Shared deploy window is Tuesday 06:00 UTC.",
+        source_type: "chat",
+        source_ref: "auto-claim#1",
+        trust: "asserted",
+        visibility: "organization",
+        consolidate: true,
+      });
+      assert.equal(remembered.status, 200);
+      assert.equal(remembered.body.result.isError, undefined);
+      const payload = JSON.parse(remembered.body.result.content[0].text);
+      assert.equal(payload.meta.model, "disabled");
+      assert.equal(payload.data.consolidated, true);
+      assert.equal(payload.data.trust, "asserted");
+      assert.equal(payload.data.visibility, "organization");
+      assert.equal(payload.data.claim.kind, "decision");
+      assert.equal(payload.data.claim.statement, "Shared deploy window is Tuesday 06:00 UTC.");
+      assert.equal(payload.data.claim.trust, "asserted");
+      assert.equal(payload.data.claim.visibility, "organization");
+      assert.match(payload.data.claim.claim_id, /^claim_/);
+
+      const compiled = await mcp(2, "titen_compile", {
+        subject_id: "subject_auto_claim",
+        task: "shared deploy window",
+        max_tokens: 900,
+      });
+      const pack = JSON.parse(compiled.body.result.content[0].text);
+      assert.equal(pack.data.items.length, 1);
+      assert.equal(pack.data.items[0].claim_id, payload.data.claim.claim_id);
+      assert.equal(pack.data.budget.unconsolidated_observations, 0);
+
+      const plain = await mcp(3, "titen_remember", {
+        subject_id: "subject_auto_claim",
+        kind: "user_statement",
+        content: "An unconsolidated note stays out of compile.",
+        source_type: "chat",
+        source_ref: "auto-claim#2",
+        trust: "asserted",
+        visibility: "private",
+      });
+      const plainPayload = JSON.parse(plain.body.result.content[0].text);
+      assert.equal(plainPayload.data.consolidated, undefined);
+      assert.equal(plainPayload.data.claim, undefined);
+      const pending = await mcp(4, "titen_compile", {
+        subject_id: "subject_auto_claim",
+        task: "unconsolidated note stays out",
+        max_tokens: 900,
+      });
+      const pendingPack = JSON.parse(pending.body.result.content[0].text);
+      assert.equal(pendingPack.data.budget.unconsolidated_observations, 1);
+      assert.ok(
+        pendingPack.data.items.every((item: { claim_id: string }) => item.claim_id !== plainPayload.data.observation_id),
+      );
+
+      const writer = await fx.provision({
+        orgId: agent.orgId,
+        scopes: ["observations:write", "context:compile"],
+      });
+      const refused = await fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "This write must not land without claims:write.",
+          source: { type: "chat", ref: "auto-claim#3" },
+          consolidate: true,
+        },
+      });
+      expectError(refused, 403, "FORBIDDEN");
+      const stored = await fx.query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM observations WHERE org_id = ? AND content = ?`,
+        [agent.orgId, "This write must not land without claims:write."],
+      );
+      assert.equal(Number(stored[0]?.n ?? 0), 0);
+
+      const recalled = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "Recalled text cannot be claimed from remember.",
+          source: { type: "recalled", ref: "auto-claim#4" },
+          consolidate: true,
+        },
+      });
+      expectError(recalled, 400, "VALIDATION_ERROR");
+
+      const oversized = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "x".repeat(4001),
+          source: { type: "chat", ref: "auto-claim#5" },
+          consolidate: true,
+        },
+      });
+      expectError(oversized, 400, "VALIDATION_ERROR");
+      const oversizedRows = await fx.query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM observations WHERE org_id = ? AND source_ref = ?`,
+        [agent.orgId, "auto-claim#5"],
+      );
+      assert.equal(Number(oversizedRows[0]?.n ?? 0), 0);
+
+      const fact = await fx.call("POST", "/v1/observations", {
+        key: agent.key,
+        body: {
+          subject_id: "subject_auto_claim",
+          kind: "user_statement",
+          content: "A non-decision observation becomes a semantic fact.",
+          source: { type: "chat", ref: "auto-claim#6" },
+          trust: "verified",
+          visibility: "private",
+          consolidate: true,
+        },
+      });
+      expectOk(fact, 201);
+      assert.equal(fact.body.data.claim.kind, "semantic_fact");
+      assert.equal(fact.body.data.claim.trust, "verified");
+      assert.equal(fact.body.data.claim.visibility, "private");
+    },
+  },
+  {
+    name: "key target fences deny foreign writes and keep shared reads",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const created = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "alice fence",
+          scopes: [
+            "observations:write", "observations:purge", "claims:write",
+            "context:compile", "mcp:call", "checkpoints:write",
+          ],
+          write_subjects: ["x:profile:alice", "x:shared"],
+        },
+      });
+      expectOk(created, 201);
+      const child = created.body.data.api_key as string;
+      const childId = created.body.data.key_id as string;
+      assert.deepEqual(created.body.data.fences, {
+        read_projects: null,
+        read_subjects: null,
+        write_projects: null,
+        write_subjects: ["x:profile:alice", "x:shared"],
+      });
+      const principal = await fx.call("GET", "/v1/principal", { key: child });
+      expectOk(principal);
+      assert.deepEqual(principal.body.data.fences, created.body.data.fences);
+
+      const denied = await fx.call("POST", "/v1/observations", {
+        key: child,
+        body: observation({
+          subject_id: "x:profile:bob",
+          content: "Bob profile must reject a fenced writer.",
+          visibility: "organization",
+          trust: "asserted",
+        }),
+      });
+      expectError(denied, 403, "FORBIDDEN");
+      assert.match(denied.body.error.message, /write fence/u);
+      const deniedClaim = await fx.call("POST", "/v1/consolidations", {
+        key: child,
+        body: {
+          subject_id: "x:profile:bob",
+          claims: [claim("observation_missing", { statement: "must not land", visibility: "organization" })],
+        },
+      });
+      expectError(deniedClaim, 403, "FORBIDDEN");
+
+      const mcp = (id: number, name: string, args: Record<string, unknown>) =>
+        fx.call("POST", "/mcp", {
+          key: child,
+          body: {
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: { name, arguments: args },
+          },
+        });
+      const mcpDenied = await mcp(1, "titen_remember", {
+        subject_id: "x:profile:bob",
+        kind: "user_statement",
+        content: "MCP must surface the write fence.",
+        source_type: "chat",
+        source_ref: "fence#bob",
+        trust: "asserted",
+        visibility: "organization",
+      });
+      assert.equal(mcpDenied.status, 200);
+      assert.equal(mcpDenied.body.result.isError, true);
+      assert.equal(JSON.parse(mcpDenied.body.result.content[0].text).code, "FORBIDDEN");
+      const mcpConsolidate = await mcp(2, "titen_consolidate", {
+        subject_id: "x:profile:bob",
+        claims: [{
+          kind: "semantic_fact",
+          statement: "must not consolidate bob",
+          confidence: 0.8,
+          sources: [{ observation_id: "observation_missing", relation: "supports" }],
+        }],
+      });
+      assert.equal(mcpConsolidate.body.result.isError, true);
+      assert.equal(JSON.parse(mcpConsolidate.body.result.content[0].text).code, "FORBIDDEN");
+      const bobRows = await fx.query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM observations WHERE org_id = ? AND subject_id = ?`,
+        [owner.orgId, "x:profile:bob"],
+      );
+      assert.equal(Number(bobRows[0]?.n ?? 0), 0);
+
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: child,
+        body: observation({
+          subject_id: "x:profile:alice",
+          content: "Alice may record her own profile.",
+          visibility: "private",
+          trust: "asserted",
+        }),
+      }), 201);
+      const shared = await mcp(3, "titen_remember", {
+        subject_id: "x:shared",
+        kind: "decision",
+        content: "Shared window is Tuesday.",
+        source_type: "chat",
+        source_ref: "fence#shared",
+        trust: "asserted",
+        visibility: "organization",
+        consolidate: true,
+      });
+      assert.equal(shared.body.result.isError, undefined);
+      assert.equal(JSON.parse(shared.body.result.content[0].text).data.consolidated, true);
+      expectError(await fx.call("POST", "/v1/checkpoints", {
+        key: child,
+        body: { subject_id: "x:profile:bob", kind: "task_state", state: { step: 1 }, ttl_seconds: 60 },
+      }), 403, "FORBIDDEN");
+      expectOk(await fx.call("POST", "/v1/checkpoints", {
+        key: child,
+        body: { subject_id: "x:profile:alice", kind: "task_state", state: { step: 1 }, ttl_seconds: 60 },
+      }), 201);
+
+      const orgObservation = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({
+          subject_id: "x:profile:bob",
+          content: "Organization can read Bob.",
+          visibility: "organization",
+        }),
+      });
+      expectOk(orgObservation, 201);
+      const orgClaim = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "x:profile:bob",
+          claims: [claim(orgObservation.body.data.observation_id, {
+            statement: "Organization can read Bob.",
+            visibility: "organization",
+          })],
+        },
+      });
+      expectOk(orgClaim, 201);
+      const orgClaimId = orgClaim.body.data.claims[0].claim_id as string;
+      const privateObservation = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({
+          subject_id: "x:profile:bob",
+          content: "Owner private stays hidden.",
+          visibility: "private",
+        }),
+      });
+      expectOk(privateObservation, 201);
+      const privateClaim = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "x:profile:bob",
+          claims: [claim(privateObservation.body.data.observation_id, {
+            statement: "Owner private stays hidden.",
+            visibility: "private",
+          })],
+        },
+      });
+      expectOk(privateClaim, 201);
+      const compiled = await fx.call("POST", "/v1/context/compile", {
+        key: child,
+        body: { subject_id: "x:profile:bob", task: "Organization can read Bob", max_tokens: 900 },
+      });
+      expectOk(compiled);
+      const claimIds = compiled.body.data.items.map((item: { claim_id: string }) => item.claim_id);
+      assert.ok(claimIds.includes(orgClaimId));
+      assert.ok(!claimIds.includes(privateClaim.body.data.claims[0].claim_id));
+      const hidden = await fx.call("POST", "/v1/context/compile", {
+        key: child,
+        body: { subject_id: "x:profile:bob", task: "Owner private stays hidden", max_tokens: 900 },
+      });
+      expectOk(hidden);
+      assert.equal(hidden.body.data.items.length, 0);
+      const mcpCompiled = await mcp(4, "titen_compile", {
+        subject_id: "x:profile:bob",
+        task: "Organization can read Bob",
+        max_tokens: 900,
+      });
+      const mcpPack = JSON.parse(mcpCompiled.body.result.content[0].text);
+      assert.ok(mcpPack.data.items.some((item: { claim_id: string }) => item.claim_id === orgClaimId));
+
+      const workspace = await fx.call("POST", "/v1/workspaces", {
+        key: owner.key,
+        body: { name: "fence-team" },
+      });
+      expectOk(workspace, 201);
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          workspace_id: workspace.body.data.workspace_id,
+          principal_id: owner.principalId,
+          principal_kind: "agent",
+          role: "member",
+        },
+      }), 201);
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: {
+          workspace_id: workspace.body.data.workspace_id,
+          principal_id: created.body.data.principal_id,
+          principal_kind: "agent",
+          role: "member",
+        },
+      }), 201);
+      const teamObservation = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({
+          subject_id: "x:profile:bob",
+          workspace_id: workspace.body.data.workspace_id,
+          visibility: "team",
+          content: "Team can read Bob.",
+        }),
+      });
+      expectOk(teamObservation, 201);
+      const teamClaim = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "x:profile:bob",
+          workspace_id: workspace.body.data.workspace_id,
+          claims: [claim(teamObservation.body.data.observation_id, {
+            statement: "Team can read Bob.",
+            visibility: "team",
+          })],
+        },
+      });
+      expectOk(teamClaim, 201);
+      const teamCompiled = await fx.call("POST", "/v1/context/compile", {
+        key: child,
+        body: { subject_id: "x:profile:bob", task: "Team can read Bob", max_tokens: 900 },
+      });
+      expectOk(teamCompiled);
+      assert.ok(teamCompiled.body.data.items.some(
+        (item: { claim_id: string }) => item.claim_id === teamClaim.body.data.claims[0].claim_id,
+      ));
+      expectError(await fx.call("DELETE", `/v1/observations/${orgObservation.body.data.observation_id}`, {
+        key: child,
+      }), 403, "FORBIDDEN");
+
+      const prefixed = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "profile prefix",
+          scopes: ["observations:write"],
+          write_subjects: ["x:profile:*"],
+        },
+      });
+      expectOk(prefixed, 201);
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: prefixed.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:carol",
+          content: "A prefix fence allows this profile.",
+          trust: "asserted",
+          visibility: "private",
+        }),
+      }), 201);
+      expectError(await fx.call("POST", "/v1/observations", {
+        key: prefixed.body.data.api_key,
+        body: observation({
+          subject_id: "x:shared",
+          content: "A prefix fence rejects the shared subject.",
+          trust: "asserted",
+          visibility: "organization",
+        }),
+      }), 403, "FORBIDDEN");
+
+      const projectA = await fx.call("POST", "/v1/projects/resolve", {
+        key: owner.key,
+        body: { reference: "castle/alice", create: true },
+      });
+      const projectB = await fx.call("POST", "/v1/projects/resolve", {
+        key: owner.key,
+        body: { reference: "castle/bob", create: true },
+      });
+      expectOk(projectA, 201);
+      expectOk(projectB, 201);
+      const both = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "project and subject",
+          scopes: ["observations:write"],
+          write_projects: [projectA.body.data.project_id],
+          write_subjects: ["x:profile:alice"],
+        },
+      });
+      expectOk(both, 201);
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: both.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:alice",
+          project_id: projectA.body.data.project_id,
+          content: "Both fences match.",
+          trust: "asserted",
+          visibility: "organization",
+        }),
+      }), 201);
+      expectError(await fx.call("POST", "/v1/observations", {
+        key: both.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:alice",
+          content: "A project fence rejects an omitted project.",
+          trust: "asserted",
+          visibility: "private",
+        }),
+      }), 403, "FORBIDDEN");
+      expectError(await fx.call("POST", "/v1/observations", {
+        key: both.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:bob",
+          project_id: projectA.body.data.project_id,
+          content: "A subject fence rejects Bob inside the allowed project.",
+          trust: "asserted",
+          visibility: "organization",
+        }),
+      }), 403, "FORBIDDEN");
+      expectError(await fx.call("POST", "/v1/observations", {
+        key: both.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:alice",
+          project_id: projectB.body.data.project_id,
+          content: "A project fence rejects the other project.",
+          trust: "asserted",
+          visibility: "organization",
+        }),
+      }), 403, "FORBIDDEN");
+
+      const reader = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: {
+          label: "alice read fence",
+          scopes: ["observations:write", "context:compile"],
+          read_subjects: ["x:profile:alice"],
+        },
+      });
+      expectOk(reader, 201);
+      const aliceOrg = await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({
+          subject_id: "x:profile:alice",
+          content: "Organization can read Alice.",
+          visibility: "organization",
+        }),
+      });
+      expectOk(aliceOrg, 201);
+      const aliceClaim = await fx.call("POST", "/v1/consolidations", {
+        key: owner.key,
+        body: {
+          subject_id: "x:profile:alice",
+          claims: [claim(aliceOrg.body.data.observation_id, {
+            statement: "Organization can read Alice.",
+            visibility: "organization",
+          })],
+        },
+      });
+      expectOk(aliceClaim, 201);
+      const readBob = await fx.call("POST", "/v1/context/compile", {
+        key: reader.body.data.api_key,
+        body: { subject_id: "x:profile:bob", task: "Organization can read Bob", max_tokens: 900 },
+      });
+      expectOk(readBob);
+      assert.equal(readBob.body.data.items.length, 0);
+      const readAlice = await fx.call("POST", "/v1/context/compile", {
+        key: reader.body.data.api_key,
+        body: { subject_id: "x:profile:alice", task: "Organization can read Alice", max_tokens: 900 },
+      });
+      expectOk(readAlice);
+      assert.ok(readAlice.body.data.items.some(
+        (item: { claim_id: string }) => item.claim_id === aliceClaim.body.data.claims[0].claim_id,
+      ));
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: reader.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:bob",
+          content: "A read fence does not block a write.",
+          trust: "asserted",
+          visibility: "private",
+        }),
+      }), 201);
+
+      const open = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: { label: "unfenced", scopes: ["observations:write"] },
+      });
+      expectOk(open, 201);
+      assert.deepEqual(open.body.data.fences.write_subjects, null);
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: open.body.data.api_key,
+        body: observation({
+          subject_id: "x:profile:bob",
+          content: "An unfenced key can still write Bob.",
+          trust: "asserted",
+          visibility: "private",
+        }),
+      }), 201);
+
+      const listed = await fx.call("GET", "/v1/keys", { key: owner.key });
+      expectOk(listed);
+      const listedChild = listed.body.data.keys.find((row: { key_id: string }) => row.key_id === childId);
+      assert.deepEqual(listedChild.fences.write_subjects, ["x:profile:alice", "x:shared"]);
+      const audit = await fx.query<{ detail: string }>(
+        `SELECT detail FROM audit_log WHERE org_id = ? AND action = 'key.create' AND resource_id = ?`,
+        [owner.orgId, childId],
+      );
+      assert.equal(audit.length, 1);
+      const detail = JSON.parse(audit[0]!.detail);
+      assert.deepEqual(detail.write_subjects, ["x:profile:alice", "x:shared"]);
+      assert.equal(detail.read_projects, null);
+      assert.equal(detail.read_subjects, null);
+      assert.equal(detail.write_projects, null);
+      assert.match(detail.not_before, /^\d{4}-/u);
+
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: { label: "empty", scopes: ["observations:write"], write_subjects: [] },
+      }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: { label: "duplicate", scopes: ["observations:write"], write_subjects: ["x:shared", "x:shared"] },
+      }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: { label: "middle", scopes: ["observations:write"], write_subjects: ["x:*:bob"] },
+      }), 400, "VALIDATION_ERROR");
+      expectError(await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: { label: "project star", scopes: ["observations:write"], write_projects: ["project_*"] },
+      }), 400, "VALIDATION_ERROR");
     },
   },
   {

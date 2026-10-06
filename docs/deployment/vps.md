@@ -41,7 +41,8 @@ pnpm titen serve
 # Verify
 curl http://127.0.0.1:8787/healthz
 
-# Create an agent key
+# Create an agent key. Add --subjects to fence writes, for example
+# --subjects 'castle:profile:alice,castle:shared'
 pnpm titen key create --org-id <org_id> --label 'my agent'
 ```
 
