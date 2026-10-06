@@ -7,7 +7,17 @@
 // comment to TypeScript and the whole check to `sh`, which never reaches line 3
 // because it has already exec'd Bun or exited. One entry, one guard.
 import { createApiKey, keyLifecycleStatus, SCOPES } from "../../core/auth";
+import { auditStatement } from "../../core/audit";
 import type { Stmt } from "../../core/db";
+import {
+  fenceAuditDetail,
+  fenceStatements,
+  fencesAreRestricted,
+  fencesFromRows,
+  parseFenceCsv,
+  type FenceRow,
+  type KeyFences,
+} from "../../core/key-fences";
 import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, VISIBILITIES, type Trust, type Visibility } from "../../core/validate";
@@ -45,6 +55,9 @@ Usage:
   titen key create [--db <path>] --org-id <id> [--principal <id>] [--kind agent]
                    [--scopes "a,b"] [--trust asserted] [--label name]
                    [--not-before <UTC timestamp>] [--expires-at <UTC timestamp>] [--print-sql]
+                   [--subjects <pattern,...>] [--projects <id,...>]
+                   [--write-subjects <pattern,...>] [--write-projects <id,...>]
+                   [--read-subjects <pattern,...>] [--read-projects <id,...>]
   titen key list   [--db <path>]
   titen key revoke [--db <path>] --id <key id>
   titen project create [--db <path>] --org-id <id> --reference <owner/repo>
@@ -80,6 +93,12 @@ Notes:
   --print-sql emits SQL for a remote database (Cloudflare D1) instead of writing
   locally. A raw key and temporary dashboard password are printed once and are
   never recoverable afterwards.
+  --subjects and --projects are write fences. --write-subjects and
+  --write-projects are the same fences. Subject patterns are exact or a single
+  trailing *. Project values are project ids. Omit a list to leave that
+  dimension unrestricted. A key with no fences behaves as before. Existing
+  keys stay unrestricted; revoke one and create a replacement to add a fence.
+  JSONL export does not carry fences. A SQLite backup does.
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
 
@@ -108,6 +127,8 @@ const COMMAND_FLAGS: Record<
     values: [
       "db", "org-id", "principal", "kind", "scopes", "trust", "label",
       "not-before", "expires-at",
+      "subjects", "projects", "write-subjects", "write-projects",
+      "read-subjects", "read-projects",
     ],
     booleans: ["print-sql"],
   },
@@ -191,6 +212,38 @@ function port(value: string | boolean | undefined): number {
   if (!/^\d+$/.test(raw) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
     fail("--port must be an integer between 1 and 65535");
   return parsed;
+}
+
+function formatFence(patterns: string[] | null): string {
+  return patterns && patterns.length ? patterns.join(",") : "-";
+}
+
+function optionalFence(
+  flags: Record<string, string | boolean>,
+  flag: string,
+  alias: string | undefined,
+  kind: "project" | "subject",
+): string[] | null {
+  const primary = flags[flag];
+  const aliased = alias ? flags[alias] : undefined;
+  if (typeof primary === "string" && typeof aliased === "string")
+    fail(`pass only one of --${flag} and --${alias}`);
+  const value = typeof primary === "string" ? primary : typeof aliased === "string" ? aliased : undefined;
+  if (value === undefined) return null;
+  try {
+    return parseFenceCsv(value, flag, kind);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : `invalid --${flag}`);
+  }
+}
+
+function keyFencesFromFlags(flags: Record<string, string | boolean>): KeyFences {
+  return {
+    read_projects: optionalFence(flags, "read-projects", undefined, "project"),
+    read_subjects: optionalFence(flags, "read-subjects", undefined, "subject"),
+    write_projects: optionalFence(flags, "write-projects", "projects", "project"),
+    write_subjects: optionalFence(flags, "write-subjects", "subjects", "subject"),
+  };
 }
 
 function timestamp(value: string | boolean | undefined, flag: string): Date | undefined {
@@ -542,6 +595,7 @@ switch (command) {
       const expiresAt = timestamp(flags["expires-at"], "expires-at");
       if (expiresAt && notBefore.getTime() >= expiresAt.getTime())
         fail("--not-before must be earlier than --expires-at");
+      const fences = keyFencesFromFlags(flags);
       const key = await createApiKey({
         orgId,
         principalId: text(flags.principal, newId("agent")),
@@ -552,8 +606,25 @@ switch (command) {
         notBefore,
         ...(expiresAt ? { expiresAt } : {}),
       }, issuedAt);
+      const fenceSql = fenceStatements(key.id, fences);
+      const audit = fencesAreRestricted(fences)
+        ? auditStatement(
+          orgId,
+          "cli",
+          "key.create",
+          "api_key",
+          issuedAt.toISOString(),
+          key.id,
+          fenceAuditDetail({
+            not_before: notBefore.toISOString(),
+            expires_at: expiresAt ? expiresAt.toISOString() : null,
+          }, fences),
+        )
+        : null;
       if (flags["print-sql"]) {
         console.log(renderStatement(key.statement));
+        for (const statement of fenceSql) console.log(renderStatement(statement));
+        if (audit) console.log(renderStatement(audit));
         console.error(`key_id: ${key.id}`);
         console.error(`api_key: ${key.key}`);
         break;
@@ -563,29 +634,45 @@ switch (command) {
         if (!organization) throw new CliFailure(`organization not found: ${orgId}`);
         database.transaction(() => {
           database.query(key.statement.sql).run(...key.statement.params);
+          for (const statement of fenceSql)
+            database.query(statement.sql).run(...(statement.params ?? []));
+          if (audit) database.query(audit.sql).run(...(audit.params ?? []));
         })();
       });
       printKey(key.key, key.id);
       break;
     }
     if (action === "list") {
-      const rows = await existingDatabase(dbPath, (_database, db) =>
-        db.all<{
-          id: string;
-          org_id: string;
-          label: string;
-          principal_id: string;
-          scopes: string;
-          max_trust: string;
-          not_before: string;
-          expires_at: string | null;
-          last_used_at: string | null;
-          revoked_at: string | null;
-        }>(
-          `SELECT id, org_id, label, principal_id, scopes, max_trust,
-                  not_before, expires_at, last_used_at, revoked_at
-             FROM api_keys ORDER BY created_at`,
-        ), true);
+      const listedKeys = await existingDatabase(dbPath, (_database, db) =>
+        Promise.all([
+          db.all<{
+            id: string;
+            org_id: string;
+            label: string;
+            principal_id: string;
+            scopes: string;
+            max_trust: string;
+            not_before: string;
+            expires_at: string | null;
+            last_used_at: string | null;
+            revoked_at: string | null;
+          }>(
+            `SELECT id, org_id, label, principal_id, scopes, max_trust,
+                    not_before, expires_at, last_used_at, revoked_at
+               FROM api_keys ORDER BY created_at`,
+          ),
+          db.all<FenceRow & { key_id: string }>(
+            `SELECT key_id, access, target_type, pattern FROM api_key_fences`,
+          ),
+        ]), true);
+      const rows = listedKeys[0];
+      const fenceRows = listedKeys[1];
+      const fencesByKey = new Map<string, FenceRow[]>();
+      for (const fence of fenceRows) {
+        const group = fencesByKey.get(fence.key_id) ?? [];
+        group.push(fence);
+        fencesByKey.set(fence.key_id, group);
+      }
       const at = new Date().toISOString();
       for (const row of rows) {
         const status = keyLifecycleStatus({
@@ -593,8 +680,9 @@ switch (command) {
           expiresAt: row.expires_at,
           revokedAt: row.revoked_at,
         }, at);
+        const fences = fencesFromRows(fencesByKey.get(row.id) ?? []);
         console.log(
-          `${row.id}  ${status.padEnd(7)}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}`,
+          `${row.id}  ${status.padEnd(7)}  ${row.org_id}  ${row.principal_id}  ${row.max_trust}  ${row.label}  [${row.scopes}]  not_before=${row.not_before}  expires_at=${row.expires_at ?? "never"}  last_used_at=${row.last_used_at ?? "never"}  read_projects=${formatFence(fences.read_projects)}  read_subjects=${formatFence(fences.read_subjects)}  write_projects=${formatFence(fences.write_projects)}  write_subjects=${formatFence(fences.write_subjects)}`,
         );
       }
       if (!rows.length) console.log("no keys");

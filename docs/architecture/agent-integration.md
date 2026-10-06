@@ -499,6 +499,12 @@ steps: pass `consolidate: true`. That flag copies the observation text, trust,
 and visibility into one supporting claim. Omitting it leaves the observation
 unconsolidated, and compile will not return it.
 
+A per-agent key can also carry write fences for project ids and subject
+patterns, including a prefix such as `castle:profile:alice` plus `castle:shared`.
+A remember or consolidate outside that fence fails. Organization and team reads
+that the key is already allowed to see continue to compile. The MCP tool error
+uses code `FORBIDDEN`.
+
 ### 4. Checkpoint and coordinate
 
 For work that may resume or run in parallel:

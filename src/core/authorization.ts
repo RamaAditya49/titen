@@ -1,6 +1,7 @@
 import { first, type Db, type Param } from "./db";
 import { notFound, validationError } from "./errors";
 import type { Principal } from "./auth";
+import { assertWriteFence, readFenceSql } from "./key-fences";
 import type { Visibility } from "./validate";
 
 type RecordAlias = "c" | "o";
@@ -67,6 +68,7 @@ export function recordAccessSql(alias: RecordAlias, principalSql = "?", permissi
          )
     )
   )
+  AND ${readFenceSql(alias)}
   AND ${retentionAccessSql(alias)}`;
 }
 
@@ -74,7 +76,12 @@ export function recordAccessParams(principal: string | Principal): Param[] {
   const principalId = typeof principal === "string" ? principal : principal.principalId;
   const authorityId = typeof principal === "string" ? principal : principal.issuedBy ?? principal.principalId;
   const keyId = typeof principal === "string" ? "" : principal.keyId;
-  return [principalId, principalId, authorityId, authorityId, keyId, keyId];
+  // The last five binds are the read-fence key id. An empty key id matches no
+  // fence rows, so a string actor stays unrestricted.
+  return [
+    principalId, principalId, authorityId, authorityId, keyId, keyId,
+    keyId, keyId, keyId, keyId, keyId,
+  ];
 }
 
 /** Fails closed before a canonical write whose target is not currently delegated. */
@@ -112,6 +119,7 @@ export async function authorizeRecordTarget(
     [principal.orgId, authorityId, principal.orgId, authorityId, projectId, subjectId,
       principal.keyId, principal.keyId, projectId, subjectId]);
   if (!allowed) throw notFound();
+  assertWriteFence(principal.fences, subjectId, projectId);
 }
 
 /** Record access for a principal already available as a trusted SQL column. */

@@ -138,6 +138,13 @@ export interface HandoffOptions {
   message?: string;
 }
 
+export interface KeyFences {
+  read_projects: string[] | null;
+  read_subjects: string[] | null;
+  write_projects: string[] | null;
+  write_subjects: string[] | null;
+}
+
 export interface CreateKeyOptions {
   label: string;
   scopes: string[];
@@ -147,6 +154,10 @@ export interface CreateKeyOptions {
   membership_role?: "owner" | "admin" | "member" | "reader";
   not_before?: string;
   expires_at?: string;
+  read_projects?: string[];
+  read_subjects?: string[];
+  write_projects?: string[];
+  write_subjects?: string[];
 }
 
 export interface CreatedKey {
@@ -160,6 +171,7 @@ export interface CreatedKey {
   not_before: string;
   expires_at: string | null;
   last_used_at: null;
+  fences: KeyFences;
   membership_id?: string;
   membership_role?: "owner" | "admin" | "member" | "reader";
   warning: string;
@@ -510,6 +522,7 @@ export interface KeyRecord {
   expires_at: string | null;
   last_used_at: string | null;
   revoked_at: string | null;
+  fences: KeyFences;
   status: "pending" | "active" | "expired" | "revoked";
 }
 

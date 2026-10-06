@@ -1566,6 +1566,20 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
          CHECK (default_visibility IN ('private', 'team', 'organization'))`,
     ],
   },
+  {
+    version: 26,
+    statements: [
+      // Absence of rows means the key is unrestricted. Existing api_keys rows
+      // keep that behavior. data_target_* stays a separate single-target gate.
+      `CREATE TABLE api_key_fences (
+         key_id TEXT NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,
+         access TEXT NOT NULL CHECK (access IN ('read', 'write')),
+         target_type TEXT NOT NULL CHECK (target_type IN ('project', 'subject')),
+         pattern TEXT NOT NULL,
+         PRIMARY KEY (key_id, access, target_type, pattern)
+       )`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

@@ -1,6 +1,7 @@
 import type { Db } from "./db";
 import { forbidden, unauthenticated, validationError } from "./errors";
 import { newId, randomToken, sha256Hex } from "./ids";
+import { fencesFromRows, UNRESTRICTED_FENCES, type FenceRow, type KeyFences } from "./key-fences";
 import { TRUST_RANK, type Trust } from "./validate";
 
 export const KEY_PREFIX = "titen_sk_";
@@ -76,6 +77,8 @@ export interface Principal {
   dataTargetType?: "organization" | "project" | "subject" | null;
   dataTargetId?: string | null;
   authStage?: AuthStage;
+  /** Null lists are unrestricted. Omitted means the caller did not load fences. */
+  fences?: KeyFences;
 }
 
 interface KeyRow {
@@ -156,6 +159,10 @@ export async function authenticate(
   );
   const row = rows[0];
   if (!row) throw unauthenticated();
+  const fenceRows = await db.all<FenceRow>(
+    `SELECT access, target_type, pattern FROM api_key_fences WHERE key_id = ?`,
+    [row.id],
+  );
   return {
     keyId: row.id,
     orgId: row.org_id,
@@ -167,6 +174,7 @@ export async function authenticate(
     dataTargetType: row.data_target_type,
     dataTargetId: row.data_target_id,
     authStage: row.auth_stage,
+    fences: fenceRows.length ? fencesFromRows(fenceRows) : UNRESTRICTED_FENCES,
   };
 }
 

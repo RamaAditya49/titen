@@ -464,7 +464,16 @@ titen key create \
 ```
 
 `mcp:call` includes write-capable memory and coordination tools. Do not share
-one key across every agent.
+one key across every agent. Optional `--subjects` and `--projects` limit that
+key's writes to those subject patterns and project ids. `--subjects
+castle:profile:alice,castle:shared` is a write fence; a trailing `*` is a
+prefix. Omit the flags and the key stays unrestricted. Revoke an existing key
+and create a replacement to add a fence. The raw key is printed once.
+
+`titen project create` and `titen project update` accept `--default-visibility`.
+A remember that omits `visibility` uses that project default. When no enrichment
+model is configured, pass `consolidate: true` on `titen_remember` so
+`titen_compile` can return the write.
 
 ### 2. Start the service
 

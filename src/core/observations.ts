@@ -6,6 +6,7 @@ import { newId, sha256Hex } from "./ids";
 import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject, resolveWriteVisibility } from "./projects";
 import { authorizeRecordTarget, authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
+import { assertWriteFence } from "./key-fences";
 import type { RequestContext, Result } from "./http";
 import { derivationJobStatement } from "./enrichment";
 import { historyStatement, outboxStatement } from "./writes";
@@ -594,13 +595,14 @@ async function reuseOrCreateAutoClaim(
 export async function purgeObservation(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const observationId = ctx.params.id!;
-  const observation = await first<{ id: string; content_hash: string }>(
+  const observation = await first<{ id: string; content_hash: string; subject_id: string; project_id: string | null }>(
     ctx.app.db,
-    `SELECT o.id, o.content_hash FROM observations o
+    `SELECT o.id, o.content_hash, o.subject_id, o.project_id FROM observations o
       WHERE o.id = ? AND o.org_id = ? AND ${recordAccessSql("o", "?", "write")}`,
     [observationId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!observation) throw notFound();
+  assertWriteFence(principal.fences, observation.subject_id, observation.project_id);
   const hold = await first<{ id: string }>(
     ctx.app.db,
     `SELECT h.id FROM legal_holds h

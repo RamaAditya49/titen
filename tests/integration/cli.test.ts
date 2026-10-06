@@ -299,6 +299,63 @@ test("key lifecycle flags survive listing and verified backup", async () => {
   }
 });
 
+test("key create stores subject and project fences and key list prints them", () => {
+  const boot = run("key-fences", ["bootstrap", "--db", "source.db"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const orgId = /^organization: (org_[^ ]+)/m.exec(boot.output)?.[1];
+  assert.ok(orgId);
+  const created = run("key-fences", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--subjects", "castle:profile:alice,castle:shared",
+    "--projects", "project_alice",
+    "--read-subjects", "castle:profile:*",
+  ]);
+  assert.equal(created.exitCode, 0, created.output);
+  const keyId = /^key_id: (key_[^\s]+)/m.exec(created.output)?.[1];
+  assert.ok(keyId);
+  const listed = run("key-fences", ["key", "list", "--db", "source.db"]);
+  assert.match(listed.output, new RegExp(
+    `${keyId} .* read_projects=-  read_subjects=castle:profile:\\*  write_projects=project_alice  write_subjects=castle:profile:alice,castle:shared`,
+  ));
+  const database = openDatabase(join(root, "key-fences", "source.db"), { create: false, readonly: true });
+  try {
+    const fences = database.query(
+      `SELECT access, target_type, pattern FROM api_key_fences WHERE key_id = ? ORDER BY access, target_type, pattern`,
+    ).all(keyId) as { access: string; target_type: string; pattern: string }[];
+    assert.deepEqual(fences, [
+      { access: "read", target_type: "subject", pattern: "castle:profile:*" },
+      { access: "write", target_type: "project", pattern: "project_alice" },
+      { access: "write", target_type: "subject", pattern: "castle:profile:alice" },
+      { access: "write", target_type: "subject", pattern: "castle:shared" },
+    ]);
+    const audit = database.query(
+      `SELECT actor_id, detail FROM audit_log WHERE action = 'key.create' AND resource_id = ?`,
+    ).get(keyId) as { actor_id: string; detail: string };
+    assert.equal(audit.actor_id, "cli");
+    const detail = JSON.parse(audit.detail) as { write_subjects: string[]; write_projects: string[] };
+    assert.deepEqual(detail.write_subjects, ["castle:profile:alice", "castle:shared"]);
+    assert.deepEqual(detail.write_projects, ["project_alice"]);
+  } finally {
+    database.close();
+  }
+
+  const conflict = run("key-fences", [
+    "key", "create", "--db", "source.db", "--org-id", orgId,
+    "--subjects", "castle:shared", "--write-subjects", "castle:shared",
+  ]);
+  assert.notEqual(conflict.exitCode, 0);
+  assert.match(conflict.output, /pass only one of --write-subjects and --subjects/);
+
+  const printed = run("key-fence-sql", [
+    "key", "create", "--print-sql", "--org-id", "org_remote",
+    "--subjects", "castle:profile:alice",
+  ]);
+  assert.equal(printed.exitCode, 0, printed.output);
+  assert.match(printed.output, /INSERT INTO api_key_fences/);
+  assert.match(printed.output, /castle:profile:alice/);
+  assert.deepEqual(printed.files, []);
+});
+
 test("local key administration fails closed for missing organizations and keys", () => {
   const missingCases = [
     ["list", ["key", "list", "--db", "missing.db"]],

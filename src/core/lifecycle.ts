@@ -1,5 +1,6 @@
 import { first, type Stmt } from "./db";
 import { recordAccessParams, recordAccessSql, authorizeRecordWorkspace } from "./authorization";
+import { assertWriteFence } from "./key-fences";
 import { conflict, notFound, validationError } from "./errors";
 import { sha256Hex } from "./ids";
 import { auditStatement } from "./audit";
@@ -34,6 +35,7 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
     [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
+  assertWriteFence(principal.fences, claim.subject_id, claim.project_id);
   if (newClaimId === claimId) throw validationError("A claim cannot supersede itself.");
   await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
   if (claim.version !== expectedVersion) throw conflict("Claim version changed; reload it and retry.");
@@ -47,6 +49,7 @@ export async function supersedeClaim(ctx: RequestContext): Promise<Result> {
     [newClaimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!replacement) throw notFound();
+  assertWriteFence(principal.fences, replacement.subject_id, replacement.project_id);
   if (replacement.status !== "active")
     throw validationError("The replacement claim must be active.");
   if (
@@ -111,13 +114,14 @@ export async function revokeClaim(ctx: RequestContext): Promise<Result> {
   const reason = optionalString(body, "reason", LIMITS.statement);
   const expectedVersion = requireInteger(body, "expected_version", 1, Number.MAX_SAFE_INTEGER);
 
-  const claim = await first<{ id: string; status: string; version: number; workspace_id: string | null; visibility: "private" | "team" | "organization" }>(
+  const claim = await first<{ id: string; status: string; version: number; subject_id: string; project_id: string | null; workspace_id: string | null; visibility: "private" | "team" | "organization" }>(
     ctx.app.db,
-    `SELECT c.id, c.status, c.version, c.workspace_id, c.visibility
+    `SELECT c.id, c.status, c.version, c.subject_id, c.project_id, c.workspace_id, c.visibility
        FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c", "?", "write")}`,
     [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
+  assertWriteFence(principal.fences, claim.subject_id, claim.project_id);
   await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
   if (claim.version !== expectedVersion) throw conflict("Claim version changed; reload it and retry.");
   if (claim.status === "revoked")
@@ -166,13 +170,14 @@ export async function expireClaim(ctx: RequestContext): Promise<Result> {
   const reason = optionalString(body, "reason", LIMITS.statement);
   const expectedVersion = requireInteger(body, "expected_version", 1, Number.MAX_SAFE_INTEGER);
 
-  const claim = await first<{ id: string; status: string; version: number; workspace_id: string | null; visibility: "private" | "team" | "organization"; valid_to: string | null }>(
+  const claim = await first<{ id: string; status: string; version: number; subject_id: string; project_id: string | null; workspace_id: string | null; visibility: "private" | "team" | "organization"; valid_to: string | null }>(
     ctx.app.db,
-    `SELECT c.id, c.status, c.version, c.workspace_id, c.visibility, c.valid_to
+    `SELECT c.id, c.status, c.version, c.subject_id, c.project_id, c.workspace_id, c.visibility, c.valid_to
        FROM claims c WHERE c.id = ? AND c.org_id = ? AND ${recordAccessSql("c", "?", "write")}`,
     [claimId, principal.orgId, ...recordAccessParams(principal)],
   );
   if (!claim) throw notFound();
+  assertWriteFence(principal.fences, claim.subject_id, claim.project_id);
   await authorizeRecordWorkspace(ctx.app.db, principal, claim.workspace_id, claim.visibility);
   if (claim.version !== expectedVersion) throw conflict("Claim version changed; reload it and retry.");
   if (claim.status === "expired")

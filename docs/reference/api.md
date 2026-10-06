@@ -141,6 +141,23 @@ nullable `last_used_at`, issuer, declared data target, and
 effective target is re-evaluated against the issuer's current grants on every
 request; revoking an issuer grant narrows every derived key without a sweep.
 
+Optional `read_projects`, `read_subjects`, `write_projects`, and
+`write_subjects` are target fences. Omit a field, or send JSON `null`, to leave
+that dimension unrestricted. An empty array is rejected. Each list holds at
+most 32 patterns. A project pattern is an exact project id. A subject pattern
+is an exact subject id or a prefix ending in one `*`. When both a project list
+and a subject list are set for the same access, a call must match both. A write
+outside the write fence returns `403 FORBIDDEN` with a fence message and does
+not insert a row. A read fence filters compile and other canonical reads; it
+does not remove organization or team visibility from a key that has no read
+fence. `data_target_type` remains a separate single-target gate and still
+misses as `404`. Creation, `GET /v1/keys`, and `GET /v1/principal` return
+`fences` with `null` for each unrestricted dimension. `key.create` audit detail
+records the same four fields beside `not_before` and `expires_at`. A key with
+no fence rows behaves as it did before this field existed. JSONL export does
+not carry fence rows; a SQLite file backup does. Add a fence by revoking the
+old key and creating a replacement. The raw secret is shown once.
+
 A wildcard root credential may reissue any explicit principal identity. A
 non-wildcard key manager may explicitly reuse only its own `principal_id` with
 the same `principal_kind`; omitting `principal_id` asks the server to generate a
@@ -160,8 +177,8 @@ authorization, or SQL failure creates neither record. The one-time response adds
 ### `GET /v1/principal`
 
 Validate the bearer key and return its own non-secret `organization_id`,
-`principal_id`, `principal_kind`, `key_id`, `scopes`, `max_trust`, and active
-organization role. This route requires authentication but no additional scope,
+`principal_id`, `principal_kind`, `key_id`, `scopes`, `max_trust`, active
+organization role, and `fences`. This route requires authentication but no additional scope,
 so a least-privilege dashboard session can verify its identity. A wildcard
 bootstrap/recovery key reports role `root`; a key without an active
 organization membership reports `null`. Expired or revoked keys return `401`
@@ -1243,7 +1260,9 @@ tool records the observation and a claim in one call, with the same provenance,
 trust, and visibility as `POST /v1/observations`. When no enrichment model is
 configured, `initialize` instructions say to call `titen_consolidate` after
 `titen_remember`, or to pass `consolidate: true`, because compile does not
-return an unconsolidated observation.
+return an unconsolidated observation. A write outside the credential's write
+fence is a tool result with `isError: true` and `code: FORBIDDEN`. The HTTP
+status of that tool call stays 200.
 
 ### Reference memory-server compatibility
 
