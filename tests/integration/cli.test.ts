@@ -59,6 +59,11 @@ test("help is side-effect free for every documented command", () => {
     ["key-create", ["key", "create", "--help"]],
     ["key-list", ["key", "list", "--help"]],
     ["key-revoke", ["key", "revoke", "--help"]],
+    ["principal-reassign", ["principal", "reassign", "--help"]],
+    ["jobs-list", ["jobs", "list", "--help"]],
+    ["jobs-retry", ["jobs", "retry", "--help"]],
+    ["jobs-ack", ["jobs", "ack", "--help"]],
+    ["jobs-purge", ["jobs", "purge", "--help"]],
     ["project-create", ["project", "create", "--help"]],
     ["project-update", ["project", "update", "--help"]],
     ["backup", ["backup", "--help"]],
@@ -82,7 +87,7 @@ test("version is exact and side-effect free", () => {
 
   const command = run("version-command", ["version"]);
   assert.equal(command.exitCode, 0);
-  assert.equal(command.output, `${version}\n`);
+  assert.equal(command.output, `${version}\nschema_version ${SCHEMA_VERSION}\n`);
   assert.deepEqual(command.files, []);
 });
 
@@ -712,4 +717,60 @@ test("project commands set default visibility on a new and an existing project",
   assert.equal(shared.default_visibility, "organization");
   assert.equal(changed.default_visibility, "organization");
   database.close();
+});
+
+test("jobs ack clears readiness and principal reassign can preview private ownership", () => {
+  const boot = run("ops-feedback", ["bootstrap", "--db", "titen.db", "--org", "Example"]);
+  assert.equal(boot.exitCode, 0, boot.output);
+  const dbPath = join(root, "ops-feedback", "titen.db");
+  const database = openDatabase(dbPath);
+  const org = database.query("SELECT id FROM organizations LIMIT 1").get() as { id: string };
+  const hex = "ab".repeat(32);
+  const now = "2026-01-01T00:00:00.000Z";
+  database.query(
+    `INSERT INTO enrichment_jobs (
+       id, org_id, lane, derivation_key, input_ids, input_hash, subject_id, actor_id,
+       model_id, model_fingerprint, prompt_fingerprint, schema_fingerprint, policy_fingerprint,
+       state, attempts, max_attempts, next_attempt_at, created_at, updated_at
+     ) VALUES (?, ?, 'derivation', ?, '[]', ?, 'team:shared', 'agent_old',
+       'fixture-model', ?, ?, ?, ?, 'failed', 4, 4, ?, ?, ?)`,
+  ).run("job_failed", org.id, hex, hex, hex, hex, hex, hex, now, now, now);
+  database.query(
+    `INSERT INTO observations (
+       id, org_id, subject_id, actor_id, kind, content, content_hash, source_type, source_ref,
+       trust, visibility, ingested_at
+     ) VALUES (?, ?, 'team:shared', 'agent_old', 'user_statement', 'private note', ?, 'chat', 'note',
+       'asserted', 'private', ?)`,
+  ).run("obs_private", org.id, hex, now);
+  database.close();
+
+  const listed = run("ops-feedback", ["jobs", "list", "--db", "titen.db", "--status", "terminal_error"]);
+  assert.equal(listed.exitCode, 0, listed.output);
+  assert.match(listed.output, /job_failed/);
+  const preview = run("ops-feedback", [
+    "principal", "reassign", "--db", "titen.db", "--org-id", org.id,
+    "--from", "agent_old", "--to", "agent_a", "--dry-run",
+  ]);
+  assert.equal(preview.exitCode, 0, preview.output);
+  assert.match(preview.output, /"dry_run":true/);
+  assert.match(preview.output, /"observations":1/);
+  const acked = run("ops-feedback", ["jobs", "ack", "--db", "titen.db", "--status", "terminal_error", "--id", "job_failed"]);
+  assert.equal(acked.exitCode, 0, acked.output);
+  assert.match(acked.output, /"matched":1/);
+  const again = run("ops-feedback", ["jobs", "list", "--db", "titen.db", "--status", "failed"]);
+  assert.match(again.output, /job_failed/);
+  const moved = run("ops-feedback", [
+    "principal", "reassign", "--db", "titen.db", "--org-id", org.id,
+    "--from", "agent_old", "--to", "agent_a",
+  ]);
+  assert.equal(moved.exitCode, 0, moved.output);
+  const check = openDatabase(dbPath, { create: false, readonly: true });
+  try {
+    const actor = check.query("SELECT actor_id FROM observations WHERE id = 'obs_private'").get() as { actor_id: string };
+    const ackedAt = check.query("SELECT acked_at FROM enrichment_jobs WHERE id = 'job_failed'").get() as { acked_at: string };
+    assert.equal(actor.actor_id, "agent_a");
+    assert.ok(ackedAt.acked_at);
+  } finally {
+    check.close();
+  }
 });

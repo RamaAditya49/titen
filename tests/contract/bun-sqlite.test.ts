@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import { serve } from "../../src/runtime/bun/server";
 import { CASES, assertBatchAtomicity } from "./cases";
+import "./agent-ergonomics";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_CIPHER, TEST_WEBHOOK_SECURITY, type Fixture } from "./harness";
 import { assertEnrichmentContract } from "./enrichment";
 import {

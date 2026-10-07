@@ -299,6 +299,8 @@ export function packUnderBudget<T>(
   omittedCount: number;
   deduplicatedCount: number;
   budgetExhausted: boolean;
+  /** Token size of the smallest eligible item that did not fit. Null when all fit. */
+  smallestOmittedTokens: number | null;
 } {
   const uniqueDedupe = new Set<string>();
   let eligibleCount = 0;
@@ -331,6 +333,7 @@ export function packUnderBudget<T>(
     omittedCount: 0,
     deduplicatedCount,
     budgetExhausted: false,
+    smallestOmittedTokens: null,
   };
 
   const selected: T[] = [];
@@ -355,11 +358,24 @@ export function packUnderBudget<T>(
   }
   for (const [index, entry] of entries.entries()) take(entry, index);
   const omittedCount = eligibleCount - selected.length;
+  const selectedValues = new Set(selected);
+  const seenDedupe = new Set<string>();
+  let smallestOmittedTokens: number | null = null;
+  for (const entry of entries) {
+    if (entry.dedupeKey) {
+      if (seenDedupe.has(entry.dedupeKey)) continue;
+      seenDedupe.add(entry.dedupeKey);
+    }
+    if (selectedValues.has(entry.value)) continue;
+    if (smallestOmittedTokens === null || entry.tokens < smallestOmittedTokens)
+      smallestOmittedTokens = entry.tokens;
+  }
   return {
     selected,
     usedTokens,
     omittedCount,
     deduplicatedCount,
     budgetExhausted: omittedCount > 0,
+    smallestOmittedTokens,
   };
 }

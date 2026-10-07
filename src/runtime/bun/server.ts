@@ -55,6 +55,8 @@ export interface ServeOptions {
   webauthnRpId?: string;
   webauthnOrigin?: string;
   webauthnRpName?: string;
+  /** IANA time zone for parallel *_local fields. Falls back to TITEN_DISPLAY_TIMEZONE. */
+  displayTimezone?: string;
 }
 
 /**
@@ -163,6 +165,7 @@ export async function serve(options: ServeOptions) {
     webhookSecurity: options.webhookSecurity,
     secretCipher: options.secretCipher,
     mcpOrigin,
+    displayTimezone: options.displayTimezone ?? process.env.TITEN_DISPLAY_TIMEZONE,
     webauthn: createWebAuthnRuntime(parseWebAuthnConfig({
       rpId: options.webauthnRpId,
       origin: options.webauthnOrigin,

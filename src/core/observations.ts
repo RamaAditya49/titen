@@ -6,21 +6,26 @@ import { newId, sha256Hex } from "./ids";
 import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { requireProject, resolveWriteVisibility } from "./projects";
 import { authorizeRecordTarget, authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
-import { assertWriteFence } from "./key-fences";
+import { assertWriteFence, impliedWriteProject } from "./key-fences";
 import type { RequestContext, Result } from "./http";
 import { derivationJobStatement } from "./enrichment";
 import { historyStatement, outboxStatement } from "./writes";
 export { historyStatement, outboxStatement } from "./writes";
+import { resolveDisplayTimezone, withLocalTimestamps } from "./timezones";
 import {
   LIMITS,
   OBSERVATION_KINDS,
   RECALLED_SOURCE_TYPE,
   TRUST_LEVELS,
   VISIBILITIES,
+  applyDeprecatedAliases,
+  collectFieldIssues,
+  isRecord,
   optionalBoolean,
   optionalEnum,
   optionalString,
   optionalTimestamp,
+  rejectFieldIssues,
   requireEnum,
   requireObject,
   requireString,
@@ -87,7 +92,7 @@ function autoClaimKind(observationKind: string): string {
   return observationKind === "decision" ? "decision" : "semantic_fact";
 }
 
-function claimPayload(data: ReturnType<typeof replayData>, claim: AutoClaimView | null) {
+function claimPayload<T extends ReturnType<typeof replayData>>(data: T, claim: AutoClaimView | null) {
   if (!claim) return data;
   return { ...data, consolidated: true, claim_id: claim.claim_id, claim };
 }
@@ -280,6 +285,21 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   const raw = await ctx.rawBody();
   const body = requireObject(await ctx.json());
 
+  const deprecatedFields = applyDeprecatedAliases(body, [["subject", "subject_id"]]);
+  const fieldIssues = collectFieldIssues([
+    () => requireString(body, "subject_id", LIMITS.identifier),
+    () => requireEnum(body, "kind", OBSERVATION_KINDS),
+    () => requireString(body, "content", LIMITS.content),
+    () => requireObject(body.source, "source"),
+  ]);
+  if (fieldIssues.length === 0 && isRecord(body.source)) {
+    const sourceBody = body.source;
+    fieldIssues.push(...collectFieldIssues([
+      () => requireString(sourceBody, "type", LIMITS.label, "source.type"),
+      () => requireString(sourceBody, "ref", LIMITS.identifier, "source.ref"),
+    ]));
+  }
+  rejectFieldIssues(fieldIssues);
   const subjectId = requireString(body, "subject_id", LIMITS.identifier);
   const kind = requireEnum(body, "kind", OBSERVATION_KINDS);
   const content = requireString(body, "content", LIMITS.content);
@@ -339,11 +359,30 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
   assertTrustCeiling(principal, trust);
   if (trust === "policy_approved")
     throw validationError('Trust "policy_approved" is assigned only by the claim approval workflow.');
-  const projectId = await requireProject(
-    ctx.app.db,
-    principal.orgId,
+  const impliedProject = impliedWriteProject(
+    principal.fences,
     optionalString(body, "project_id", LIMITS.identifier),
   );
+  const projectId = await requireProject(ctx.app.db, principal.orgId, impliedProject.projectId);
+  const projectIdSource = impliedProject.source === "key_fence" ? "key_fence" : undefined;
+  const timeZone = resolveDisplayTimezone(body, ctx.app.displayTimezone);
+  const present = (result: Result): Result => {
+    const data = result.data;
+    const annotated = data && typeof data === "object"
+      ? { ...(data as Record<string, unknown>), ...(projectIdSource ? { project_id_source: projectIdSource } : {}) }
+      : data;
+    const stamped = annotated && typeof annotated === "object"
+      ? withLocalTimestamps(annotated as Record<string, unknown>, ["occurred_at", "ingested_at"], timeZone)
+      : annotated;
+    return {
+      ...result,
+      data: stamped,
+      meta: {
+        ...result.meta,
+        ...(deprecatedFields.length ? { deprecated_fields: deprecatedFields } : {}),
+      },
+    };
+  };
   const resolvedVisibility = await resolveWriteVisibility(
     ctx.app.db,
     principal.orgId,
@@ -384,7 +423,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
       WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
     [principal.orgId, principal.principalId, canonicalHash]) : undefined;
   if (existing) {
-    if (!wantsClaim) return { status: 200, data: replayData(existing), meta: observationMeta(true) };
+    if (!wantsClaim) return present({ status: 200, data: replayData(existing), meta: observationMeta(true) });
     const claim = await reuseOrCreateAutoClaim(ctx, principal, {
       observationId: existing.id,
       subjectId: existing.subject_id,
@@ -395,11 +434,11 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
       trust: existing.trust,
       visibility: existing.visibility,
     });
-    return {
+    return present({
       status: 200,
       data: claimPayload(replayData(existing), claim),
       meta: observationMeta(true),
-    };
+    });
   }
 
   try {
@@ -446,6 +485,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
         observation_id: id,
         subject_id: subjectId,
         project_id: projectId,
+        ...(projectIdSource ? { project_id_source: projectIdSource } : {}),
         agent_id: agentId,
         run_id: runId,
         kind,
@@ -527,11 +567,11 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
     },
     );
 
-    return {
+    return present({
       status: result.replayed ? 200 : result.status,
       data: result.data,
       meta: observationMeta(result.replayed),
-    };
+    });
   } catch (error) {
     if (canonicalHash && error instanceof Error && /UNIQUE.*canonical_hash/i.test(error.message)) {
       const raced = await first<ObservationReplayRow>(ctx.app.db,
@@ -541,7 +581,7 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
           WHERE org_id = ? AND actor_id = ? AND canonical_hash = ? LIMIT 1`,
         [principal.orgId, principal.principalId, canonicalHash]);
       if (raced) {
-        if (!wantsClaim) return { status: 200, data: replayData(raced), meta: observationMeta(true) };
+        if (!wantsClaim) return present({ status: 200, data: replayData(raced), meta: observationMeta(true) });
         const claim = await reuseOrCreateAutoClaim(ctx, principal, {
           observationId: raced.id,
           subjectId: raced.subject_id,
@@ -552,11 +592,11 @@ export async function appendObservation(ctx: RequestContext): Promise<Result> {
           trust: raced.trust,
           visibility: raced.visibility,
         });
-        return {
+        return present({
           status: 200,
           data: claimPayload(replayData(raced), claim),
           meta: observationMeta(true),
-        };
+        });
       }
     }
     throw error;

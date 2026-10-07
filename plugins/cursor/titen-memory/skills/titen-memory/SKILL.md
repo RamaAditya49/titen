@@ -20,7 +20,7 @@ matches it.
   memory work. A host may display a transport prefix: Claude/Codex commonly use
   `mcp__titen__<canonical-name>`, Hermes uses
   `mcp_titen_<canonical-name>`, and OpenClaw uses
-  `titen__<canonical-name>`. The prefix does not change the nine-tool contract.
+  `titen__<canonical-name>`. The prefix does not change the ten-tool contract.
 - If neither canonical nor recognized-prefixed tools are available, continue the
   user's primary task without memory when safe and point the operator to Titen's
   agent guide. Never ask for or print an API key in chat, source control, a
@@ -29,9 +29,12 @@ matches it.
   workflow. For repository work, resolve and pass the canonical `project_id`
   before the first compile. Never guess an opaque ID from memory content or use
   an absolute local path as a portable project identity.
+- Call `titen_whoami` before the first write. It returns the principal, scopes,
+  allowed trust, and fences, and it never returns the key. Trust on remember
+  defaults to `asserted`.
 - Call `titen_project_resolve` when only a stable project reference such as
-  lowercase `owner/repo` is available. Set `create` only when the operator has
-  authorized project creation.
+  lowercase `owner/repo` is available. A subject id is not a project reference.
+  Set `create` only when the operator has authorized project creation.
 - Omit `project_id` only outside a project; omission selects unscoped memory,
   not every project. Never set `cross_project` by default. Use it only for an
   explicit operator-approved broad lookup with `context:compile:all` authority.
@@ -40,7 +43,7 @@ matches it.
 
 1. Identify the concrete task and authorized subject/project scope.
 2. Use `titen_checkpoint_get` only when a resumable checkpoint is relevant.
-3. Call `titen_compile` once for the task boundary with a bounded token budget.
+3. Call `titen_compile` once for the task boundary with `max_tokens` of at least 800.
 4. Verify any recalled operational fact against current source or runtime before
    acting on it. Preserve conflicts and uncertainty instead of selecting the most
    convenient statement.
@@ -53,7 +56,8 @@ needs a targeted policy or incident check. Do not recall before every tool call.
 
 - Use `titen_remember` only for a stable user preference, accepted decision,
   verified tool result, production observation, reusable procedure, or explicit
-  correction that will help future work.
+  correction that will help future work. Pass `consolidate: true` when no
+  enrichment model is configured.
 - Call `titen_consolidate` with that observation ID and a bounded claim when the
   signal must become retrievable. Never invent evidence IDs or widen its scope,
   trust, or visibility.
@@ -106,7 +110,7 @@ never be reported as durable memory.
 
 ## Tool boundary
 
-Ordinary agents use exactly: `titen_project_resolve`, `titen_compile`,
+Ordinary agents use exactly: `titen_whoami`, `titen_project_resolve`, `titen_compile`,
 `titen_remember`, `titen_consolidate`, `titen_feedback`,
 `titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`, and
 `titen_handoff`. Do not seek administrative key, membership, retention,

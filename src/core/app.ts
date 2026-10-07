@@ -41,7 +41,10 @@ import {
   revokeGrant,
   simulateAccess,
 } from "./directory";
-import { schemaState } from "./migrations";
+import { SCHEMA_VERSION, schemaState } from "./migrations";
+import { reassignPrincipal } from "./principals";
+import { TITEN_VERSION } from "./version";
+import { assertIanaTimeZone } from "./timezones";
 import { getModelConfig, probeModel } from "./models";
 import { ApiError, forbidden, unavailable, validationError } from "./errors";
 import { assertJsonDepth } from "./validate";
@@ -139,6 +142,8 @@ export interface AppContext {
    * the model is told which store answered; a served deployment leaves it unset.
    */
   mcpInstructionsNote?: string;
+  /** IANA name used when a call omits `tz`. UTC fields stay unchanged. */
+  displayTimezone?: string;
 }
 
 /** Capabilities are reported honestly based on what's configured. */
@@ -193,6 +198,7 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", path: "/v1/subjects", scope: "subjects:read", handler: listSubjects },
   { method: "GET", path: "/v1/subjects/:id/references", scope: "subjects:read", handler: listSubjectReferences },
   { method: "GET", path: "/v1/principals", scope: "principals:read", handler: listPrincipals },
+  { method: "POST", path: "/v1/principals/reassign", scope: "keys:manage", handler: reassignPrincipal },
   { method: "GET", path: "/v1/grants", scope: "grants:read", handler: listGrants },
   { method: "POST", path: "/v1/grants", scope: "grants:write", handler: createGrant },
   { method: "DELETE", path: "/v1/grants/:id", scope: "grants:write", handler: revokeGrant },
@@ -437,7 +443,7 @@ async function readiness(ctx: RequestContext): Promise<Result> {
         backlog: number;
       }>(
         `SELECT
-           EXISTS(SELECT 1 FROM enrichment_jobs WHERE state = 'failed') AS failed,
+           EXISTS(SELECT 1 FROM enrichment_jobs WHERE state = 'failed' AND acked_at IS NULL) AS failed,
            EXISTS(SELECT 1 FROM enrichment_jobs
                    WHERE state IN ('pending', 'leased')) AS backlog`,
       );
@@ -466,6 +472,8 @@ async function readiness(ctx: RequestContext): Promise<Result> {
     ready,
     runtime: ctx.app.runtime,
     revision: ctx.app.revision,
+    version: TITEN_VERSION,
+    schema_version: schema.applied,
     schema,
     checks,
     capabilities: caps,
@@ -518,6 +526,8 @@ export function createApp(context: {
   checkPassword?: AppContext["checkPassword"];
   webauthn?: WebAuthnRuntime;
   mcpInstructionsNote?: string;
+  /** IANA name used when a call omits `tz`. UTC fields stay unchanged. */
+  displayTimezone?: string;
 }): (request: Request) => Promise<Response> {
   const mcpOrigin = parseMcpOrigin(context.mcpOrigin);
   const configuredVectors = context.vectors;
@@ -567,7 +577,9 @@ export function createApp(context: {
     checkPassword: context.checkPassword ?? passwordCheckGuard(context.passwordCheckLimit),
     webauthn: context.webauthn ?? createWebAuthnRuntime({ state: "disabled" }),
     mcpInstructionsNote: context.mcpInstructionsNote,
+    displayTimezone: context.displayTimezone,
   };
+  if (app.displayTimezone) assertIanaTimeZone(app.displayTimezone);
   let semanticPreparation: Promise<SemanticReadiness> | undefined;
 
   const prepareSemantic = async () => {

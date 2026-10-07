@@ -17,6 +17,7 @@ const ordinaryTools = [
   "titen_lease_acquire",
   "titen_project_resolve",
   "titen_remember",
+  "titen_whoami",
 ].sort();
 
 test("the README leads with what Titen is, then defines the product contract", () => {

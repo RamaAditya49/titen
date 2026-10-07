@@ -18,7 +18,15 @@ import {
   type FenceRow,
   type KeyFences,
 } from "../../core/key-fences";
-import { MIGRATIONS, migrate, pendingMigrations, schemaState } from "../../core/migrations";
+import { MIGRATIONS, SCHEMA_VERSION, migrate, pendingMigrations, schemaState } from "../../core/migrations";
+import {
+  ackEnrichmentJobs,
+  listEnrichmentJobs,
+  parseJobStatus,
+  purgeEnrichmentJobs,
+  retryEnrichmentJobs,
+} from "../../core/jobs";
+import { reassignPrivatePrincipal } from "../../core/principals";
 import { newId } from "../../core/ids";
 import { TRUST_LEVELS, VISIBILITIES, type Trust, type Visibility } from "../../core/validate";
 import { normalizeProjectReference } from "../../core/projects";
@@ -60,6 +68,8 @@ Usage:
                    [--read-subjects <pattern,...>] [--read-projects <id,...>]
   titen key list   [--db <path>]
   titen key revoke [--db <path>] --id <key id>
+  titen principal reassign [--db <path>] --org-id <id> --from <principal> --to <principal> [--dry-run]
+  titen jobs list|retry|ack|purge [--db <path>] [--status terminal_error] [--org-id <id>] [--id <job id>]
   titen project create [--db <path>] --org-id <id> --reference <owner/repo>
                    [--default-visibility private|team|organization]
   titen project update [--db <path>] --org-id <id> --default-visibility <value>
@@ -98,7 +108,12 @@ Notes:
   trailing *. Project values are project ids. Omit a list to leave that
   dimension unrestricted. A key with no fences behaves as before. Existing
   keys stay unrestricted; revoke one and create a replacement to add a fence.
-  JSONL export does not carry fences. A SQLite backup does.
+  JSONL export does not carry key fences or raw keys. A SQLite backup does.
+  Changing a key's principal does not move private records. Use
+  "titen principal reassign" so the new principal can read them.
+  "jobs ack" keeps a failed enrichment job but stops it from marking readiness
+  terminal_error. "jobs purge" deletes an uncited failed job. "jobs retry"
+  queues it again. Public /readyz does not list job ids; "jobs list" does.
   Scopes: ${SCOPES.join(", ")} (or * for all).
 `;
 
@@ -137,6 +152,14 @@ const COMMAND_FLAGS: Record<
   "account reset-password": { values: ["db", "username"] },
   "key list": { values: ["db"] },
   "key revoke": { values: ["db", "id"] },
+  "principal reassign": {
+    values: ["db", "org-id", "from", "to"],
+    booleans: ["dry-run"],
+  },
+  "jobs list": { values: ["db", "status", "org-id", "id"] },
+  "jobs retry": { values: ["db", "status", "org-id", "id"] },
+  "jobs ack": { values: ["db", "status", "org-id", "id"] },
+  "jobs purge": { values: ["db", "status", "org-id", "id"] },
   "project create": {
     values: ["db", "org-id", "reference", "default-visibility"],
   },
@@ -163,7 +186,7 @@ function parseArgs(argv: string[]) {
     return { command: undefined, action: undefined, flags, positional: undefined };
 
   const command = argv[0]!;
-  const action = ["key", "account", "project"].includes(command) ? argv[1] : undefined;
+  const action = ["key", "account", "project", "principal", "jobs"].includes(command) ? argv[1] : undefined;
   const name = action ? `${command} ${action}` : command;
   const schema = COMMAND_FLAGS[name];
   if (!schema) {
@@ -171,7 +194,11 @@ function parseArgs(argv: string[]) {
       ? "key needs create, list, or revoke"
       : command === "project"
         ? "project needs create or update"
-        : `unknown command "${command}"`);
+        : command === "principal"
+          ? "principal needs reassign"
+          : command === "jobs"
+            ? "jobs needs list, retry, ack, or purge"
+            : `unknown command "${command}"`);
   }
 
   const values = new Set(schema.values);
@@ -424,6 +451,7 @@ switch (command) {
   case "version": {
     if (!flags.check) {
       console.log(TITEN_VERSION);
+      console.log(`schema_version ${SCHEMA_VERSION}`);
       break;
     }
     let release: Awaited<ReturnType<typeof fetchStableRelease>>;
@@ -833,6 +861,41 @@ switch (command) {
       fail(`backup failed: ${error instanceof Error ? error.message : "unknown error"}`);
     }
     console.log(`backup verified: ${outPath}`);
+    break;
+  }
+
+  case "principal": {
+    if (action !== "reassign") fail("principal needs reassign");
+    const orgId = text(flags["org-id"], "");
+    const from = text(flags.from, "");
+    const to = text(flags.to, "");
+    if (!orgId || !from || !to) fail("--org-id, --from, and --to are required");
+    const dryRun = flags["dry-run"] === true;
+    const result = await existingDatabase(dbPath, (database, db) =>
+      reassignPrivatePrincipal(db, orgId, "cli", from, to, new Date().toISOString(), dryRun));
+    console.log(JSON.stringify(result));
+    break;
+  }
+
+  case "jobs": {
+    if (!action || !["list", "retry", "ack", "purge"].includes(action))
+      fail("jobs needs list, retry, ack, or purge");
+    let status;
+    try {
+      status = parseJobStatus(text(flags.status, action === "list" ? "failed" : "terminal_error"));
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "invalid status");
+    }
+    const orgId = text(flags["org-id"], "") || null;
+    const id = text(flags.id, "") || null;
+    const at = new Date().toISOString();
+    const result = await existingDatabase(dbPath, async (database, db) => {
+      if (action === "list") return { jobs: await listEnrichmentJobs(db, status, orgId) };
+      if (action === "retry") return retryEnrichmentJobs(db, status, at, orgId, id);
+      if (action === "ack") return ackEnrichmentJobs(db, status, at, orgId, id);
+      return purgeEnrichmentJobs(db, status, orgId, id);
+    });
+    console.log(JSON.stringify(result));
     break;
   }
 

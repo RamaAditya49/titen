@@ -1,4 +1,4 @@
-import { validationError } from "./errors";
+import { ApiError, validationError } from "./errors";
 
 export const TRUST_LEVELS = ["unverified", "asserted", "verified", "policy_approved"] as const;
 export type Trust = (typeof TRUST_LEVELS)[number];
@@ -188,6 +188,56 @@ export function assertTimestampOrder(
 ): void {
   if (validTo !== null && validTo <= validFrom)
     throw validationError(`Field "${toPath}" must be later than "${fromPath}".`);
+}
+
+export interface FieldIssue {
+  field: string;
+  message: string;
+}
+
+/** Runs independent field checks and keeps every validation failure. */
+export function collectFieldIssues(checks: Array<() => void>): FieldIssue[] {
+  const issues: FieldIssue[] = [];
+  for (const check of checks) {
+    try {
+      check();
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "VALIDATION_ERROR") {
+        const match = /Field "([^"]+)"/u.exec(error.message);
+        issues.push({ field: match?.[1] ?? "request", message: error.message });
+        continue;
+      }
+      throw error;
+    }
+  }
+  return issues;
+}
+
+/** One VALIDATION_ERROR whose message and meta list every issue. */
+export function rejectFieldIssues(issues: FieldIssue[]): void {
+  if (issues.length === 0) return;
+  throw validationError(issues.map((issue) => issue.message).join(" "), { fields: issues });
+}
+
+/**
+ * Copies a deprecated alias onto its canonical field when the canonical field
+ * is absent. A disagreement is a validation error. Returns the aliases used.
+ */
+export function applyDeprecatedAliases(
+  body: Record<string, unknown>,
+  aliases: ReadonlyArray<readonly [alias: string, canonical: string]>,
+): string[] {
+  const used: string[] = [];
+  for (const [alias, canonical] of aliases) {
+    if (body[alias] === undefined) continue;
+    if (body[canonical] === undefined) body[canonical] = body[alias];
+    else if (body[canonical] !== body[alias])
+      throw validationError(
+        `Field "${alias}" is a deprecated alias of "${canonical}" and they disagree.`,
+      );
+    used.push(alias);
+  }
+  return used;
 }
 
 export function optionalBoolean(

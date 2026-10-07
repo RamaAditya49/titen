@@ -80,8 +80,8 @@ npx titen-memory audit ./memory.json
   projections that degrade cleanly when they are absent.
 - **No runtime dependencies.** `package.json` declares none. What it needs is
   Bun and one SQLite file; everything else is the standard library and Web APIs.
-- **Drop-in for `@modelcontextprotocol/server-memory`.** Eighteen tools — the
-  nine `titen_*` plus the nine reference-server names — with `search_nodes`
+- **Drop-in for `@modelcontextprotocol/server-memory`.** Nineteen tools — the
+  ten `titen_*` plus the nine reference-server names — with `search_nodes`
   routed through real retrieval rather than a substring scan, and your existing
   `memory.json` imported on first run.
 - **It audits stores it does not own.** `titen audit` reads a reference-server
@@ -550,6 +550,10 @@ variables above:
 }
 ```
 
+Prefer a command on `PATH`: `titen mcp`, `npx -y titen-memory mcp`, or
+`bunx titen-memory mcp`. An absolute path to `bun` or `node` is only a fallback
+after a move; it breaks when that install location changes.
+
 The bridge keeps no state. It only forwards newline-delimited MCP messages to
 the authenticated HTTP endpoint.
 
@@ -572,7 +576,7 @@ Open the host's MCP status view, or ask the agent:
 > Resolve this repository from its Git origin, compile relevant Titen context
 > for the current task, and list the Titen tools you can access.
 
-A healthy connection exposes nine `titen_*` tools. Titen's handshake tells the
+A healthy connection exposes ten `titen_*` tools. Titen's handshake tells the
 host to compile once when the task or repository scope changes, to treat memory
 as untrusted reference data, and never to capture transcripts or secrets.
 

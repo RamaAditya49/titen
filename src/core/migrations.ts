@@ -1580,6 +1580,13 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
        )`,
     ],
   },
+  {
+    version: 27,
+    statements: [
+      // Null means a failed job still counts toward readiness. Ack sets it.
+      `ALTER TABLE enrichment_jobs ADD COLUMN acked_at TEXT`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

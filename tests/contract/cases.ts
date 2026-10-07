@@ -2750,6 +2750,8 @@ export const CASES: Case[] = [
         data_target_id: null,
         organization_role: "root",
         auth_stage: "full",
+        allowed_trust: ["unverified", "asserted", "verified", "policy_approved"],
+        projects: [],
         fences: {
           read_projects: null,
           read_subjects: null,
@@ -4441,9 +4443,10 @@ export const CASES: Case[] = [
         key: agent.key,
         body: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
       });
-      // Nine native `titen_*` tools plus the nine @modelcontextprotocol/server-memory
-// names served for drop-in substitution (#279).
-      assert.equal(tools.body.result.tools.length, 18);
+      // Ten native `titen_*` tools plus the nine @modelcontextprotocol/server-memory
+      // names served for drop-in substitution (#279).
+      assert.equal(tools.body.result.tools.length, 19);
+      assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_whoami"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_remember"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_consolidate"));
       assert.ok(tools.body.result.tools.some((t: any) => t.name === "titen_compile"));
@@ -4979,15 +4982,18 @@ export const CASES: Case[] = [
           visibility: "organization",
         }),
       }), 201);
-      expectError(await fx.call("POST", "/v1/observations", {
+      const filled = await fx.call("POST", "/v1/observations", {
         key: both.body.data.api_key,
         body: observation({
           subject_id: "x:profile:alice",
-          content: "A project fence rejects an omitted project.",
+          content: "A single project fence fills an omitted project.",
           trust: "asserted",
           visibility: "private",
         }),
-      }), 403, "FORBIDDEN");
+      });
+      expectOk(filled, 201);
+      assert.equal(filled.body.data.project_id, projectA.body.data.project_id);
+      assert.equal(filled.body.data.project_id_source, "key_fence");
       expectError(await fx.call("POST", "/v1/observations", {
         key: both.body.data.api_key,
         body: observation({

@@ -46,6 +46,7 @@ features explicitly listed as proposed are not routes.
 - `GET /v1/policies`
 - `GET /v1/principal`
 - `GET /v1/principals`
+- `POST /v1/principals/reassign`
 - `GET /v1/projects`
 - `GET /v1/projects/:id/references`
 - `GET /v1/subjects`
@@ -183,6 +184,16 @@ so a least-privilege dashboard session can verify its identity. A wildcard
 bootstrap/recovery key reports role `root`; a key without an active
 organization membership reports `null`. Expired or revoked keys return `401`
 on the next request.
+
+The same payload adds `allowed_trust` and `projects`. `projects` lists fence
+project ids with their references and `default_visibility`. An unrestricted
+project dimension leaves `projects` empty. The raw key is never included.
+`titen_whoami` returns this payload. `POST /v1/principals/reassign` with
+`from`, `to`, and optional `dry_run` moves private observation and claim
+`actor_id` values. The caller needs `keys:manage` and an organization owner or
+admin role. Source fields stay. A dry run writes nothing. A real run writes a
+`principal.reassign` audit event. Changing a principal on a new key does not
+move those rows; call reassign or the records stay hidden.
 
 ## Dashboard operator accounts
 
@@ -658,6 +669,16 @@ recall device inside the MATCH only: `meta.query_terms_used` and
 `meta.dropped_query_terms` still count the caller's own terms, claim eligibility
 still comes from `valid_from`/`valid_to`, and there is no temporal ranking term.
 
+`meta.degraded.reason` states why `semantic` is true or false. `semantic` is
+true only when the vector query ran. `vector` and `embedding` remain the
+capability fields. `meta.consistent_as_of` is the compile read time.
+`meta.read_your_writes` is `sql_fts`: a claim committed before that timestamp
+is visible to the next compile on the same database. Vector hits follow the
+index and can lag; `meta.degraded.vector` says whether that query ran.
+
+Optional `tz` (IANA name) or the server setting `TITEN_DISPLAY_TIMEZONE` adds
+parallel `*_local` fields such as `as_of_local`. UTC fields stay unchanged.
+
 The FTS MATCH includes encoded organization and
 subject scope before BM25, then canonical SQL repeats every authorization and
 lifecycle check. `meta.degraded.lexical` is `no_terms` when normalization leaves
@@ -671,7 +692,11 @@ kind before filling the remaining budget in rank order. `budget` reports
 `selected_items`, authorized `omitted_items`, `deduplicated_items`, and the
 explicit `budget_exhausted` boolean. It also reports
 `unconsolidated_observations`: the authorized observations in the effective
-subject/project scope that no claim cites yet. Context items remain claims, not
+subject/project scope that no claim cites yet. When that count is above zero
+the pack also lists `unconsolidated_observation_ids` (at most 20) and
+`budget.hint` telling the caller to consolidate. When the token budget excludes
+every item, `budget.hint` names the smallest omitted item's token size. Use
+`max_tokens` of at least 800 for a normal pack. Context items remain claims, not
 raw observations; a successful `POST /v1/observations` is durable evidence and
 becomes recallable only after `POST /v1/consolidations` materializes a claim that
 cites it. These fields distinguish an empty corpus, pending evidence, and
@@ -1156,7 +1181,7 @@ derived cache/vector or release-status maintenance job is stale.
 
 - `GET /healthz`: process liveness without sensitive details.
 - `GET /readyz`: canonical SQL, migration integrity, signing-secret
-  decryptability, and capability-contract version 1. Capability states include
+  decryptability, package `version`, applied `schema_version`, and capability-contract version 1. Capability states include
   FTS, vector, embedding, extraction, background enrichment,
   `extraction_response_mode`, `background_repair`, and export/import. The
   response mode is `json_schema`, explicit compatibility mode `json_object`,
@@ -1223,11 +1248,11 @@ dependencies; an optional browser renderer is never a service-readiness gate.
 
 ## MCP surface
 
-The implemented `/mcp` endpoint exposes nine native wire tools in eight
-ordinary-agent families, plus the nine
+The implemented `/mcp` endpoint exposes ten native wire tools, plus the nine
 [reference-server compatibility](#reference-memory-server-compatibility) names
-below, for eighteen tools in `tools/list`:
+below, for nineteen tools in `tools/list`:
 
+- `titen_whoami`;
 - `titen_project_resolve`;
 - `titen_remember`;
 - `titen_consolidate`;

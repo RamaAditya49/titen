@@ -27,7 +27,12 @@ compacted, self-contained copy, then verifies `PRAGMA integrity_check`,
 before it will replace the target path. A copy that fails any of those is
 deleted rather than left looking usable.
 
-The snapshot is the canonical SQL only. It does **not** contain:
+The snapshot is the canonical SQL only, including API key hashes and key target
+fences. JSONL export (`GET /v1/export`) does not include `api_key_fences`, and
+it stores key hashes rather than raw keys. After a JSONL import, recreate
+fences with `titen key create`. A SQLite backup keeps both.
+
+It does **not** contain:
 
 - the `sqlite-vec` sidecar at `TITEN_VEC_DB_PATH` (default `<db>.vec`) — it is
   rebuildable, and a restored canonical store paired with a stale or missing

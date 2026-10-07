@@ -35,7 +35,7 @@ sudo -u titen bun /opt/titen/src/runtime/bun/cli.ts bootstrap --db /var/lib/tite
 # SAVE THE PRINTED KEY
 
 # Install services
-sudo cp deploy/titen.service /etc/systemd/system/
+sudo cp deploy/titen.service deploy/titen-dashboard.service /etc/systemd/system/
 sudo cp deploy/backup.service deploy/backup.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now titen

@@ -18,7 +18,8 @@
             "titen_checkpoint_save",
             "titen_checkpoint_get",
             "titen_lease_acquire",
-            "titen_handoff"
+            "titen_handoff",
+            "titen_whoami"
           ]
         }
       }

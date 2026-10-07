@@ -102,6 +102,8 @@ export interface CompileOptions {
    */
   top_k?: number;
   project_id?: string;
+  /** IANA time zone. Adds parallel *_local fields and leaves UTC timestamps unchanged. */
+  tz?: string;
   /** Explicit all-project request; requires the separate context:compile:all capability. */
   cross_project?: boolean;
   include_checkpoints?: boolean;
@@ -232,6 +234,8 @@ export interface Readiness {
   ready: boolean;
   runtime: string;
   revision: string;
+  version: string;
+  schema_version: number;
   schema: { applied: number; expected: number; verified: boolean };
   checks: ReadinessChecks;
   capabilities: ReadinessCapabilities;
@@ -324,6 +328,9 @@ export interface ContextPack {
     project_mode: "project" | "unscoped" | "cross_project";
     broad_access_reason: "credential_scope:context:compile:all" | null;
     as_of: string;
+    as_of_local?: string;
+    project_id_source?: "key_fence";
+    hint?: string;
   };
   budget: {
     max_tokens: number;
@@ -332,7 +339,9 @@ export interface ContextPack {
     omitted_items: number;
     deduplicated_items: number;
     unconsolidated_observations: number;
+    unconsolidated_observation_ids?: string[];
     budget_exhausted: boolean;
+    hint?: string;
   };
   items: Array<{
     untrusted: true;

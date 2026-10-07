@@ -1,7 +1,7 @@
 # Titen Memory
 
 Use a Titen MCP server as explicit, evidence-grounded memory in Cursor. The
-plugin adds one bounded skill and the nine ordinary Titen tools. It does not
+plugin adds one bounded skill and the ten ordinary Titen tools. It does not
 capture transcripts, install a model, or run lifecycle hooks.
 
 ## Configure

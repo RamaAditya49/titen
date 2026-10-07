@@ -7,6 +7,7 @@ import { canonicalJson, commitIdempotent, idempotencyKey } from "./idempotency";
 import { isRedactedObservation } from "./observations";
 import { historyStatement, outboxStatement, purgedEvidenceGuardStatement } from "./writes";
 export { purgedEvidenceGuardStatement } from "./writes";
+import { impliedWriteProject } from "./key-fences";
 import { projectDefaultVisibility, requireProject } from "./projects";
 import {
   authorizeRecordWorkspace,
@@ -118,11 +119,11 @@ export async function consolidate(ctx: RequestContext): Promise<Result> {
   const raw = await ctx.rawBody();
   const body = requireObject(await ctx.json());
   const subjectId = requireString(body, "subject_id", LIMITS.identifier);
-  const projectId = await requireProject(
-    ctx.app.db,
-    principal.orgId,
+  const impliedProject = impliedWriteProject(
+    principal.fences,
     optionalString(body, "project_id", LIMITS.identifier),
   );
+  const projectId = await requireProject(ctx.app.db, principal.orgId, impliedProject.projectId);
   const workspaceId = optionalString(body, "workspace_id", LIMITS.identifier);
   await authorizeRecordTarget(ctx.app.db, principal, subjectId, projectId);
   const projectDefault = await projectDefaultVisibility(ctx.app.db, principal.orgId, projectId);

@@ -2,7 +2,7 @@ import type { Db } from "./db";
 import { forbidden, unauthenticated, validationError } from "./errors";
 import { newId, randomToken, sha256Hex } from "./ids";
 import { fencesFromRows, UNRESTRICTED_FENCES, type FenceRow, type KeyFences } from "./key-fences";
-import { TRUST_RANK, type Trust } from "./validate";
+import { TRUST_LEVELS, TRUST_RANK, type Trust } from "./validate";
 
 export const KEY_PREFIX = "titen_sk_";
 
@@ -214,10 +214,20 @@ export function keyLifecycleStatus(
   return "active";
 }
 
+/** Trust levels this credential may assert, from unverified up to its ceiling. */
+export function allowedTrustLevels(maxTrust: Trust): Trust[] {
+  return TRUST_LEVELS.filter((level) => TRUST_RANK[level] <= TRUST_RANK[maxTrust]);
+}
+
 /** A principal can never assert evidence more trusted than its own ceiling. */
 export function assertTrustCeiling(principal: Principal, trust: Trust): void {
-  if (TRUST_RANK[trust] > TRUST_RANK[principal.maxTrust])
-    throw forbidden(`This credential may not assert "${trust}" trust.`);
+  if (TRUST_RANK[trust] <= TRUST_RANK[principal.maxTrust]) return;
+  const allowed = allowedTrustLevels(principal.maxTrust);
+  throw forbidden(`This credential may not assert "${trust}" trust. Allowed: ${allowed.join(", ")}.`, {
+    reason: "trust_ceiling",
+    got: trust,
+    allowed_trust: allowed,
+  });
 }
 
 export interface NewKey {
