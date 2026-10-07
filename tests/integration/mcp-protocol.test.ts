@@ -89,7 +89,11 @@ test("initialize negotiates a protocol revision and names the server", async () 
   assert.match(current.body.result.instructions, /never capture transcripts or secrets/);
   assert.match(current.body.result.instructions, /pass consolidate: true on titen_remember/);
   assert.match(current.body.result.instructions, /titen_compile omits a titen_remember write until titen_consolidate/);
-  assert.ok(current.body.result.instructions.length <= 512);
+  assert.match(current.body.result.instructions, /titen_whoami/);
+  assert.match(current.body.result.instructions, /max_tokens of at least 800/);
+  assert.match(current.body.result.instructions, /subject id is not a project reference/);
+  assert.match(current.body.result.instructions, /Trust on remember defaults to asserted/);
+  assert.ok(current.body.result.instructions.length <= 800);
 
   const latest = await rpc({
     jsonrpc: "2.0",
@@ -143,7 +147,7 @@ test("ping answers, and the full handshake completes in order", async () => {
   assert.ok(Array.isArray(tools.body.result.tools), "tools must be an array");
   // Nine native `titen_*` tools plus the nine @modelcontextprotocol/server-memory
   // names served for drop-in substitution (#279).
-  assert.equal(tools.body.result.tools.length, 18, "every ordinary-agent tool must be advertised");
+  assert.equal(tools.body.result.tools.length, 19, "every ordinary-agent tool must be advertised");
   for (const tool of tools.body.result.tools) {
     assert.ok(typeof tool.name === "string" && tool.name.length > 0);
     assert.ok(typeof tool.description === "string" && tool.description.length > 0);

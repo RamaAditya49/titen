@@ -21,6 +21,8 @@ export interface Env {
   };
   /** Non-secret build marker surfaced by health and readiness. */
   TITEN_REVISION?: string;
+  /** IANA time zone for parallel *_local fields. */
+  TITEN_DISPLAY_TIMEZONE?: string;
   /** Set to "1" to apply pending migrations from the Worker itself. */
   TITEN_AUTO_MIGRATE?: string;
   VECTORIZE?: unknown;
@@ -176,6 +178,7 @@ export default {
       checkPassword: workerPasswordChecks,
       db,
       revision: env.TITEN_REVISION ?? "dev",
+      displayTimezone: env.TITEN_DISPLAY_TIMEZONE,
       runtime: "cloudflare-d1",
       vectors: vectorInitialization.vectors,
       semanticReadiness: vectorInitialization.readiness,

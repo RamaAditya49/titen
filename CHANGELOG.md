@@ -26,7 +26,26 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+schema 27
+
+### Upgrade notes
+
+- Migration 27 adds nullable `enrichment_jobs.acked_at`. A failed job with that timestamp no longer marks `/readyz` `terminal_error`. Restart so migrate runs, or run `titen migrate --db <path>`.
+- `titen version` prints `schema_version` on a second line. `titen --version` stays the bare package version.
+
+### Added
+
+- Write-fence and trust denials name the failed check and the values the key may use. `VALIDATION_ERROR` lists every missing field. `subject` and `query` are deprecated aliases of `subject_id` and `task`.
+- A write or compile that omits `project_id` fills it when the write fence lists exactly one project and reports `project_id_source: "key_fence"`. An unscoped compile on a multi-project fence includes a scope hint.
+- `titen_whoami` and `GET /v1/principal` report allowed trust and fenced projects. `titen_project_resolve` accepts a subject id and suggests close project references. The response never includes the raw key.
+- Compile reports unconsolidated observation ids, a budget hint when nothing fits, `meta.degraded.reason`, and `meta.consistent_as_of`. SQL and FTS include commits visible at that timestamp. Vector matches follow the index.
+- `titen jobs list|retry|ack|purge` manages failed enrichment jobs. `titen principal reassign` moves private observation and claim ownership and writes an audit event. `POST /v1/principals/reassign` does the same for an owner or admin with `keys:manage`.
+- Optional `tz` or `TITEN_DISPLAY_TIMEZONE` adds parallel `*_local` timestamps. UTC fields stay unchanged.
+- `/readyz` reports `version` and `schema_version`. The dashboard unit uses `PartOf=` and `Wants=` so a titen restart brings it back.
+
 ## [0.10.5] — 2026-10-06
+
+schema 26
 
 Share one memory service across agents with an optional one-call claim, a per-project visibility default, and optional key target fences.
 

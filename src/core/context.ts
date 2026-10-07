@@ -1,6 +1,8 @@
 import { first } from "./db";
 import type { Stmt } from "./db";
 import { notFound, validationError } from "./errors";
+import { impliedWriteProject, unscopedWriteHint } from "./key-fences";
+import { resolveDisplayTimezone, withLocalTimestamps } from "./timezones";
 import { requireScope } from "./auth";
 import { contradictedSql, recordAccessParams, recordAccessSql } from "./authorization";
 import { newId, sha256Hex } from "./ids";
@@ -19,9 +21,12 @@ import {
 import {
   FEEDBACK_OUTCOMES,
   LIMITS,
+  applyDeprecatedAliases,
+  collectFieldIssues,
   optionalBoolean,
   optionalString,
   optionalTimestamp,
+  rejectFieldIssues,
   requireEnum,
   requireInteger,
   requireObject,
@@ -73,36 +78,50 @@ async function countUnconsolidatedObservations(
   subjectId: string,
   projectId: string | null,
   crossProject: boolean,
-): Promise<number> {
+): Promise<{ count: number; ids: string[] }> {
   const principal = ctx.principal!;
-  const row = await first<{ count: number }>(
-    ctx.app.db,
-    `SELECT COUNT(*) AS count
-       FROM observations o
-      WHERE o.org_id = ? AND o.subject_id = ?
+  const where = `o.org_id = ? AND o.subject_id = ?
         AND (? = 1 OR o.project_id IS ?)
         AND ${recordAccessSql("o")}
         AND NOT EXISTS (
           SELECT 1 FROM claim_sources source
            WHERE source.observation_id = o.id
-        )`,
-    [
-      principal.orgId,
-      subjectId,
-      Number(crossProject),
-      projectId,
-      ...recordAccessParams(principal),
-    ],
+        )`;
+  const params = [
+    principal.orgId,
+    subjectId,
+    Number(crossProject),
+    projectId,
+    ...recordAccessParams(principal),
+  ];
+  const row = await first<{ count: number }>(
+    ctx.app.db,
+    `SELECT COUNT(*) AS count FROM observations o WHERE ${where}`,
+    params,
   );
-  return Number(row?.count ?? 0);
+  const ids = await ctx.app.db.all<{ id: string }>(
+    `SELECT o.id FROM observations o WHERE ${where} ORDER BY o.ingested_at, o.id LIMIT 20`,
+    params,
+  );
+  return { count: Number(row?.count ?? 0), ids: ids.map((item) => item.id) };
 }
 
 export async function compileContext(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
+  const deprecatedFields = applyDeprecatedAliases(body, [
+    ["subject", "subject_id"],
+    ["query", "task"],
+  ]);
+  rejectFieldIssues(collectFieldIssues([
+    () => requireString(body, "subject_id", LIMITS.identifier),
+    () => requireString(body, "task", LIMITS.statement),
+    () => requireInteger(body, "max_tokens", MIN_BUDGET_TOKENS, LIMITS.maxTokens),
+  ]));
   const subjectId = requireString(body, "subject_id", LIMITS.identifier);
   const task = requireString(body, "task", LIMITS.statement);
   const maxTokens = requireInteger(body, "max_tokens", MIN_BUDGET_TOKENS, LIMITS.maxTokens);
+  const timeZone = resolveDisplayTimezone(body, ctx.app.displayTimezone);
   const maxCandidates = body.max_candidates === undefined
     ? LIMITS.candidates
     : requireInteger(body, "max_candidates", 1, LIMITS.maxCandidates);
@@ -118,21 +137,27 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   if (crossProject && requestedProjectId)
     throw validationError('Fields "project_id" and "cross_project" are mutually exclusive.');
   if (crossProject) requireScope(principal, "context:compile:all");
+  const impliedProject = crossProject
+    ? { projectId: null, source: null }
+    : impliedWriteProject(principal.fences, requestedProjectId);
   const projectId = crossProject
     ? null
-    : await requireProject(ctx.app.db, principal.orgId, requestedProjectId);
+    : await requireProject(ctx.app.db, principal.orgId, impliedProject.projectId);
+  const projectIdSource = impliedProject.source === "key_fence" ? "key_fence" : undefined;
+  const unscopedHint = projectId || crossProject ? null : unscopedWriteHint(principal.fences);
   const projectMode: ProjectMode = crossProject
     ? "cross_project"
     : projectId
       ? "project"
       : "unscoped";
   const policySnapshot = scopePolicySnapshot(projectMode);
-  const unconsolidatedObservations = await countUnconsolidatedObservations(
+  const unconsolidated = await countUnconsolidatedObservations(
     ctx,
     subjectId,
     projectId,
     Boolean(crossProject),
   );
+  const unconsolidatedObservations = unconsolidated.count;
 
   const now = ctx.app.now();
   const at = optionalTimestamp(body, "at") ?? now.toISOString();
@@ -264,10 +289,16 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       evidence_ids: selected.item.evidence_ids,
     }));
 
+  const semanticReason = !ctx.app.vectors
+    ? "semantic is false because the vector index is not enabled; retrieval used lexical FTS."
+    : vectorUsed
+      ? "semantic retrieval ran against the vector index. The semantic flag is true when that query succeeded."
+      : "semantic is false because vector retrieval did not return a query embedding; lexical results were kept.";
   const degraded = {
     version: 1,
     lexical: lexical.match ? "used" : "no_terms",
-    semantic: false,
+    semantic: vectorUsed,
+    reason: semanticReason,
     vector: ctx.app.vectors
       ? (vectorUsed ? "used" : "error")
       : ctx.app.semanticReadiness.vector,
@@ -314,7 +345,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   ];
   await ctx.app.db.batch(statements);
 
-  return {
+  return presentCompile({
     data: {
       context_id: contextId,
       // Server-issued proof that what follows came out of Titen. A caller that
@@ -324,7 +355,11 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       // self-reported (#280). Opaque: verified, never parsed.
       context_token: contextId,
       query: task,
-      scope: effectiveScope(subjectId, projectId, projectMode, at),
+      scope: {
+        ...effectiveScope(subjectId, projectId, projectMode, at),
+        ...(projectIdSource ? { project_id_source: projectIdSource } : {}),
+        ...(unscopedHint ? { hint: unscopedHint } : {}),
+      },
       budget: {
         max_tokens: maxTokens,
         used_tokens: usedTokens,
@@ -332,9 +367,23 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         omitted_items: packed.omittedCount + omittedByTopK,
         deduplicated_items: packed.deduplicatedCount,
         unconsolidated_observations: unconsolidatedObservations,
+        ...(unconsolidated.ids.length > 0
+          ? { unconsolidated_observation_ids: unconsolidated.ids }
+          : {}),
         // Token budget only. `omitted_items` above it and `budget_exhausted`
         // false together mean the count bound truncated, not the budget.
         budget_exhausted: packed.budgetExhausted,
+        ...(() => {
+          const hints = [
+            unconsolidatedObservations > 0
+              ? "call titen_consolidate (or remember with consolidate: true)"
+              : null,
+            packed.budgetExhausted && items.length === 0 && packed.smallestOmittedTokens !== null
+              ? `increase max_tokens; smallest omitted item needs ~${packed.smallestOmittedTokens} tokens`
+              : null,
+          ].filter((hint): hint is string => hint !== null);
+          return hints.length > 0 ? { hint: hints.join(" ") } : {};
+        })(),
       },
       items,
       conflicts,
@@ -346,6 +395,24 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       candidates: candidates.length,
       query_terms_used: lexical.termsUsed,
       dropped_query_terms: lexical.termsDropped,
+      consistent_as_of: now.toISOString(),
+      read_your_writes: "sql_fts",
+      ...(deprecatedFields.length ? { deprecated_fields: deprecatedFields } : {}),
+    },
+  }, timeZone);
+}
+
+function presentCompile(result: Result, timeZone: string | null): Result {
+  const data = result.data as {
+    scope: { as_of: string };
+    items: Array<{ valid_from: string; valid_to: string | null }>;
+  };
+  return {
+    ...result,
+    data: {
+      ...data,
+      scope: withLocalTimestamps(data.scope, ["as_of"], timeZone),
+      items: data.items.map((item) => withLocalTimestamps(item, ["valid_from", "valid_to"], timeZone)),
     },
   };
 }

@@ -1,0 +1,28 @@
+[Unit]
+Description=Titen operator dashboard
+After=titen.service
+Wants=titen.service
+PartOf=titen.service
+
+[Service]
+Type=simple
+User=titen
+Group=titen
+WorkingDirectory=/opt/titen
+EnvironmentFile=-/etc/titen/titen.env
+Environment=TITEN_DASHBOARD_LIVE=true
+Environment=TITEN_DASHBOARD_AUTH=session
+Environment=TITEN_API_URL=http://127.0.0.1:8787
+ExecStart=/usr/local/bin/bun /opt/titen/src/runtime/bun/cli.ts dashboard --port 4322
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,4 @@
-import { createApiKey, keyLifecycleStatus, requestedScopes, requireScope } from "./auth";
+import { allowedTrustLevels, createApiKey, keyLifecycleStatus, requestedScopes, requireScope } from "./auth";
 import { auditStatement } from "./audit";
 import { first } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
@@ -39,6 +39,29 @@ export async function getPrincipal(ctx: RequestContext): Promise<Result> {
         AND principal_kind = ? AND removed_at IS NULL LIMIT 1`,
     [principal.orgId, principal.principalId, principal.principalKind],
   );
+  const fences = principal.fences ?? UNRESTRICTED_FENCES;
+  const projectIds = [...new Set([...(fences.write_projects ?? []), ...(fences.read_projects ?? [])])];
+  const projectRows = projectIds.length === 0
+    ? []
+    : await ctx.app.db.all<{ id: string; reference: string; default_visibility: string | null }>(
+      `SELECT id, reference, default_visibility FROM projects
+        WHERE org_id = ? AND id IN (${projectIds.map(() => "?").join(", ")})`,
+      [principal.orgId, ...projectIds],
+    );
+  const byId = new Map(projectRows.map((row) => [row.id, row]));
+  const projects = projectIds.map((id) => {
+    const row = byId.get(id);
+    const access = [
+      fences.read_projects?.includes(id) ? "read" : null,
+      fences.write_projects?.includes(id) ? "write" : null,
+    ].filter((entry): entry is string => entry !== null);
+    return {
+      project_id: id,
+      reference: row?.reference ?? null,
+      default_visibility: row?.default_visibility ?? "private",
+      access,
+    };
+  });
   return { data: {
     organization_id: principal.orgId,
     principal_id: principal.principalId,
@@ -46,13 +69,15 @@ export async function getPrincipal(ctx: RequestContext): Promise<Result> {
     key_id: principal.keyId,
     scopes: principal.scopes,
     max_trust: principal.maxTrust,
+    allowed_trust: allowedTrustLevels(principal.maxTrust),
     issued_by: principal.issuedBy ?? principal.principalId,
     data_target_type: principal.dataTargetType ?? "organization",
     data_target_id: principal.dataTargetType === "project" && principal.dataTargetId === "~"
       ? null : principal.dataTargetId ?? null,
     organization_role: principal.scopes.includes("*") ? "root" : membership?.role ?? null,
     auth_stage: principal.authStage ?? "full",
-    fences: principal.fences ?? UNRESTRICTED_FENCES,
+    fences,
+    projects,
   } };
 }
 

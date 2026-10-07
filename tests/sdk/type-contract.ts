@@ -74,6 +74,8 @@ const readiness: Readiness = {
   ready: true,
   runtime: "type-contract",
   revision: "type-contract",
+  version: "0.0.0",
+  schema_version: 19,
   schema: { applied: 19, expected: 19, verified: true },
   checks: readinessChecksByJobState.idle,
   capabilities,

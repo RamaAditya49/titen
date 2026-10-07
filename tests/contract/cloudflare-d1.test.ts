@@ -9,6 +9,7 @@ import type { Db } from "../../src/core/db";
 import type { Stmt } from "../../src/core/db";
 import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../../src/core/migrations";
 import { CASES, assertBatchAtomicity } from "./cases";
+import "./agent-ergonomics";
 import { clientVia, provisionWith, revokeWith, TEST_SECRET_KEY, type Fixture } from "./harness";
 import { assertPopulatedV10RetrievalMigration } from "./retrieval-migration";
 import {

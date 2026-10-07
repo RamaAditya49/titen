@@ -73,14 +73,14 @@ export function supportGuidance(error: ApiError): ErrorSupportGuidance {
   };
 }
 
-export const validationError = (message: string) =>
-  new ApiError(400, "VALIDATION_ERROR", message);
+export const validationError = (message: string, meta?: Record<string, unknown>) =>
+  new ApiError(400, "VALIDATION_ERROR", message, meta);
 
 export const unauthenticated = () =>
   new ApiError(401, "UNAUTHENTICATED", "Credential is missing or invalid.");
 
-export const forbidden = (message = "Operation is not permitted.") =>
-  new ApiError(403, "FORBIDDEN", message);
+export const forbidden = (message = "Operation is not permitted.", meta?: Record<string, unknown>) =>
+  new ApiError(403, "FORBIDDEN", message, meta);
 
 /**
  * Foreign or unauthorized records must not disclose their existence, so every

@@ -1,6 +1,6 @@
 {
   "name": "titen-memory",
-  "version": "0.10.5",
+  "version": "0.10.6",
   "mcpName": "io.github.RamaAditya49/titen-memory",
   "description": "Agent memory with no API key, no LLM, and no embedding provider. Serves MCP over stdio against a local SQLite store, or Cloudflare Workers + D1. Drop-in for @modelcontextprotocol/server-memory; every memory keeps its source, its scope, and the evidence that contradicts it.",
   "license": "Apache-2.0",
@@ -86,7 +86,7 @@
     "titen": "bun src/runtime/bun/cli.ts",
     "screenshots": "UPDATE_DASHBOARD_SCREENSHOTS=1 playwright test tests/dashboard-screenshots.spec.ts",
     "check:routes": "node scripts/check-route-docs.mjs",
-    "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test && node scripts/check-ponytail-debt.mjs && pnpm check:public",
+    "check:workflow": "node scripts/check-workflow-docs.mjs && node scripts/check-workflow-docs.mjs --self-test && node scripts/check-schema-version.mjs && node scripts/check-ponytail-debt.mjs && pnpm check:public",
     "check:public": "node scripts/check-public-artifacts.mjs",
     "check:ponytail": "node scripts/check-ponytail-debt.mjs",
     "verify:dashboard-live": "bun scripts/verify-dashboard-live.ts",

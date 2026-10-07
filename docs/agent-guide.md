@@ -359,9 +359,10 @@ one set the command throws rather than guessing which store you meant.
 The [host distribution guide](./agent-plugins.md) covers the shipped Codex,
 Claude Code/ZCode/OpenClaw, Cursor, Hermes, Pi, OpenCode, Windsurf, and TRAE
 artifacts. Current repository artifacts reuse these entry points and the same
-nine-tool `titen_*` boundary; the server additionally answers the nine
+ten-tool `titen_*` boundary; the server additionally answers the nine
 `@modelcontextprotocol/server-memory` compatibility names, so `tools/list`
-returns eighteen.
+returns nineteen. Launch MCP with `titen mcp`, `npx -y titen-memory mcp`, or
+`bunx titen-memory mcp` from `PATH`. An absolute bun or node path is only a fallback.
 
 ### Codex reference plugin
 
@@ -386,6 +387,7 @@ in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.titen]
 enabled_tools = [
+  "titen_whoami",
   "titen_project_resolve",
   "titen_remember",
   "titen_consolidate",

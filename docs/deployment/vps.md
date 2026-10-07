@@ -587,6 +587,11 @@ all sessions on restart. For multiple replicas or restart-stable sessions,
 inject the same base64url-encoded 32-byte key into every adapter from the host's
 secret manager. Rotating it invalidates every existing cookie.
 
+`deploy/titen-dashboard.service` starts the adapter with `PartOf=titen.service`
+and `Wants=titen.service`, plus `Restart=on-failure`. A restart of `titen`
+restarts the dashboard. Do not use `Requires=titen` on the dashboard unit: that
+stops the dashboard when titen stops and leaves it down.
+
 The adapter remains bound to `127.0.0.1:4322`. Follow the
 [secure ingress guide](./secure-ingress.md) to publish only that listener with
 Tailscale Serve or Cloudflare Tunnel protected by Access. The exact HTTPS

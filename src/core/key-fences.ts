@@ -1,5 +1,5 @@
 import type { Stmt } from "./db";
-import { forbidden, notFound, validationError } from "./errors";
+import { ApiError, notFound, validationError } from "./errors";
 import { LIMITS, requireString } from "./validate";
 
 /** Null on a dimension means that dimension is unrestricted. */
@@ -219,14 +219,53 @@ function dimensionAllows(
   return projectOk && subjectOk;
 }
 
+/**
+ * When the caller omits project_id and the write fence lists exactly one
+ * project, that project is the write target. Several projects stay explicit.
+ */
+export function impliedWriteProject(
+  fences: KeyFences | undefined,
+  projectId: string | null,
+): { projectId: string | null; source: "request" | "key_fence" | null } {
+  if (projectId) return { projectId, source: "request" };
+  const projects = fences?.write_projects ?? null;
+  if (projects?.length === 1) return { projectId: projects[0]!, source: "key_fence" };
+  return { projectId: null, source: null };
+}
+
+/** Hint for an unscoped read on a key whose write fence lists several projects. */
+export function unscopedWriteHint(fences: KeyFences | undefined): string | null {
+  const projects = fences?.write_projects ?? null;
+  if (!projects || projects.length < 2) return null;
+  return `results are not project-scoped; writes for this subject need project_id ${projects.join(" or ")}`;
+}
+
 export function assertWriteFence(
   fences: KeyFences | undefined,
   subjectId: string,
   projectId: string | null,
 ): void {
   const current = fences ?? UNRESTRICTED_FENCES;
-  if (!dimensionAllows(current.write_projects, current.write_subjects, subjectId, projectId))
-    throw forbidden(WRITE_FENCE_DENIED);
+  const projects = current.write_projects;
+  const subjects = current.write_subjects;
+  const subjectOk = subjects === null || subjects.some((pattern) => subjectMatches(pattern, subjectId));
+  const projectOk = projects === null || (projectId !== null && projects.includes(projectId));
+  if (subjectOk && projectOk) return;
+  const failed = subjectOk ? "project_id" : "subject_id";
+  const reason = subjectOk ? "project_fence" : "subject_fence";
+  const allowed = subjectOk ? (projects ?? []).join(", ") : (subjects ?? []).join(", ");
+  const detail = !subjectOk
+    ? `subject_id is not allowed for this key; allowed: ${allowed}.`
+    : projectId === null
+      ? `project_id is required for this key; allowed: ${allowed}.`
+      : `project_id is not allowed for this key; allowed: ${allowed}.`;
+  throw new ApiError(403, "FORBIDDEN", `${WRITE_FENCE_DENIED} ${detail}`, {
+    reason,
+    failed,
+    got: failed === "subject_id" ? subjectId : projectId,
+    allowed_subjects: subjects,
+    allowed_projects: projects,
+  });
 }
 
 /** A direct read outside a read fence is indistinguishable from a missing row. */

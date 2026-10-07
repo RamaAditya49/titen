@@ -3,6 +3,7 @@ import { first, type Db } from "./db";
 import { notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import { hasScope, type Principal } from "./auth";
+import { subjectMatches, type KeyFences } from "./key-fences";
 import {
   LIMITS,
   VISIBILITIES,
@@ -68,11 +69,104 @@ export function normalizeProjectReference(input: string): string {
   return normalized;
 }
 
+function editDistance(left: string, right: string): number {
+  const a = left.slice(0, 80);
+  const b = right.slice(0, 80);
+  const rows = Array.from({ length: a.length + 1 }, (_, index) => index);
+  for (let j = 1; j <= b.length; j += 1) {
+    let diagonal = rows[0]!;
+    rows[0] = j;
+    for (let i = 1; i <= a.length; i += 1) {
+      const next = a[i - 1] === b[j - 1]
+        ? diagonal
+        : Math.min(diagonal, rows[i]!, rows[i - 1]!) + 1;
+      diagonal = rows[i]!;
+      rows[i] = next;
+    }
+  }
+  return rows[a.length]!;
+}
+
+function isSubjectStyle(reference: string): boolean {
+  if (/^[a-z]:[\\/]/i.test(reference) || reference.includes("\\") || reference.startsWith("/"))
+    return false;
+  return reference.includes(":") && !reference.includes("://") && !reference.startsWith("git@");
+}
+
+async function projectRowsForFence(
+  db: Db,
+  orgId: string,
+  fences: KeyFences | undefined,
+): Promise<Array<{ id: string; reference: string; default_visibility: string | null }>> {
+  const ids = [...new Set([
+    ...(fences?.write_projects ?? []),
+    ...(fences?.read_projects ?? []),
+  ])];
+  if (ids.length === 0) {
+    if (fences?.write_projects || fences?.read_projects) return [];
+    return db.all(
+      `SELECT id, reference, default_visibility FROM projects WHERE org_id = ? ORDER BY reference LIMIT 50`,
+      [orgId],
+    );
+  }
+  return db.all(
+    `SELECT id, reference, default_visibility FROM projects
+      WHERE org_id = ? AND id IN (${ids.map(() => "?").join(", ")})
+      ORDER BY reference`,
+    [orgId, ...ids],
+  );
+}
+
+function closeProjects(
+  reference: string,
+  rows: Array<{ id: string; reference: string; default_visibility: string | null }>,
+) {
+  const needle = reference.toLowerCase();
+  return rows
+    .map((row) => ({ row, distance: editDistance(needle, row.reference.toLowerCase()) }))
+    .filter(({ row, distance }) => {
+      const haystack = row.reference.toLowerCase();
+      return distance <= 3
+        || (needle.length >= 3 && (haystack.includes(needle) || needle.includes(haystack)));
+    })
+    .sort((left, right) => left.distance - right.distance || left.row.reference.localeCompare(right.row.reference))
+    .slice(0, 3)
+    .map(({ row }) => ({
+      project_id: row.id,
+      reference: row.reference,
+      default_visibility: row.default_visibility ?? "private",
+    }));
+}
+
 export async function resolveProject(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const body = requireObject(await ctx.json());
-  const reference = normalizeProjectReference(requireString(body, "reference", LIMITS.identifier));
+  const rawReference = requireString(body, "reference", LIMITS.identifier);
   const wantsCreate = optionalBoolean(body, "create");
+  if (isSubjectStyle(rawReference)) {
+    const fences = principal.fences;
+    const subjectPatterns = [...(fences?.write_subjects ?? []), ...(fences?.read_subjects ?? [])];
+    const subjectAllowed = subjectPatterns.length === 0
+      || subjectPatterns.some((pattern) => subjectMatches(pattern, rawReference));
+    const rows = await projectRowsForFence(ctx.app.db, principal.orgId, fences);
+    const projects = subjectAllowed && (fences?.write_projects || fences?.read_projects)
+      ? rows.map((row) => ({
+        project_id: row.id,
+        reference: row.reference,
+        default_visibility: row.default_visibility ?? "private",
+      }))
+      : [];
+    return {
+      data: {
+        matched: "subject",
+        subject_id: rawReference,
+        projects,
+        suggestions: projects.length > 0 ? projects : closeProjects(rawReference, rows),
+        hint: "This is a subject id, not a project reference. Pass one of the project references to titen_project_resolve, or pass its project_id on remember and compile.",
+      },
+    };
+  }
+  const reference = normalizeProjectReference(rawReference);
 
   const defaultVisibility = body.default_visibility === undefined || body.default_visibility === null
     ? null
@@ -93,12 +187,15 @@ export async function resolveProject(ctx: RequestContext): Promise<Result> {
     };
 
   // Resolution alone never creates scope; creating a project is a capability.
-  if (!wantsCreate || !hasScope(principal, "projects:create"))
+  if (!wantsCreate || !hasScope(principal, "projects:create")) {
+    const rows = await projectRowsForFence(ctx.app.db, principal.orgId, principal.fences);
     throw notFound({
       reason: "project_not_registered",
       reference,
       can_create: hasScope(principal, "projects:create"),
+      suggestions: closeProjects(reference, rows),
     });
+  }
 
   const id = newId("project");
   const at = ctx.app.now().toISOString();

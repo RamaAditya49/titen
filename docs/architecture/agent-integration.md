@@ -217,6 +217,7 @@ host configuration or the runtime's secret store.
         headers: { Authorization: "Bearer ${TITEN_API_KEY}" },
         toolFilter: {
           include: [
+            "titen_whoami",
             "titen_project_resolve",
             "titen_remember",
             "titen_consolidate",
@@ -247,6 +248,7 @@ mcp_servers:
       Authorization: "Bearer ${TITEN_API_KEY}"
     tools:
       include:
+        - titen_whoami
         - titen_project_resolve
         - titen_remember
         - titen_consolidate
@@ -268,6 +270,7 @@ remain deferred until a host-specific parity fixture exists.
 url = "http://127.0.0.1:8787/mcp"
 bearer_token_env_var = "TITEN_API_KEY"
 enabled_tools = [
+  "titen_whoami",
   "titen_project_resolve",
   "titen_remember",
   "titen_consolidate",

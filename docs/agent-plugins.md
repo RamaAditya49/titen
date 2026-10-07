@@ -64,11 +64,11 @@ fallback for hosts that only launch stdio servers.
 | Claude Code | `claude mcp add --transport stdio --scope user titen -- titen mcp` | `claude mcp get titen` and `/mcp` |
 | OpenClaw | merge `integrations/openclaw/openclaw.json` or install the ClawHub bundle | `openclaw mcp doctor titen --probe` |
 | Hermes | stdio bridge with explicit environment-name mapping below | `hermes mcp test titen` |
-| Generic stdio host | command `titen`, args `mcp` | confirm all eighteen tools appear |
+| Generic stdio host | command `titen`, args `mcp` | confirm all nineteen tools appear |
 
 After connecting, ask the host to resolve the current Git origin and compile
-Titen context for one concrete task. A correct connection lists eighteen tools —
-the nine `titen_*` tools plus the nine `@modelcontextprotocol/server-memory`
+Titen context for one concrete task. A correct connection lists nineteen tools —
+the ten `titen_*` tools plus the nine `@modelcontextprotocol/server-memory`
 compatibility names — and uses `titen_project_resolve` before the first
 project-scoped compile.
 
@@ -87,13 +87,14 @@ project-scoped compile.
 | Windsurf | Native MCP config + model-decision rule | `integrations/windsurf` |
 | TRAE | Native MCP UI recipe + Agent Skill | `.agents/skills/titen-memory` |
 
-The plugin names differ, but current repository artifacts target the same nine
-`titen_*` server tools: `titen_project_resolve`, `titen_compile`,
+The plugin names differ, but current repository artifacts target the same ten
+`titen_*` server tools: `titen_whoami`, `titen_project_resolve`, `titen_compile`,
 `titen_remember`, `titen_consolidate`, `titen_feedback`,
 `titen_checkpoint_save`, `titen_checkpoint_get`, `titen_lease_acquire`, and
 `titen_handoff`. The server also answers the nine
 `@modelcontextprotocol/server-memory` compatibility names, so a host that lists
-tools sees eighteen.
+tools sees nineteen. Prefer `titen mcp`, `npx -y titen-memory mcp`, or
+`bunx titen-memory mcp` on `PATH`. Use an absolute binary path only as a fallback.
 
 ## Check and update
 
@@ -295,7 +296,7 @@ Merge the `titen` entry from `integrations/windsurf/mcp_config.json` into
 `~/.codeium/windsurf/mcp_config.json`, then copy
 `integrations/windsurf/titen-memory.md` to
 `.windsurf/rules/titen-memory.md` in the target workspace. Restart Cascade and
-verify that the eighteen tools appear. Windsurf expands `${env:NAME}` in remote MCP
+verify that the nineteen tools appear. Windsurf expands `${env:NAME}` in remote MCP
 URLs and headers; see [Cascade MCP](https://docs.windsurf.com/windsurf/cascade/mcp)
 and [Rules](https://docs.windsurf.com/windsurf/cascade/memories).
 

@@ -49,6 +49,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     omittedCount: 0,
     deduplicatedCount: 0,
     budgetExhausted: false,
+    smallestOmittedTokens: null,
   });
 
   assert.deepEqual(packUnderBudget([
@@ -63,6 +64,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     omittedCount: 1,
     deduplicatedCount: 0,
     budgetExhausted: true,
+    smallestOmittedTokens: 2,
   });
 
   assert.deepEqual(packUnderBudget([
@@ -75,6 +77,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     omittedCount: 0,
     deduplicatedCount: 1,
     budgetExhausted: false,
+    smallestOmittedTokens: null,
   });
 
   assert.deepEqual(packUnderBudget([
@@ -85,6 +88,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     omittedCount: 1,
     deduplicatedCount: 0,
     budgetExhausted: true,
+    smallestOmittedTokens: 9,
   });
 });
 
