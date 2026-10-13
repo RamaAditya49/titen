@@ -55,23 +55,8 @@ function effectiveScope(subjectId: string, projectId: string | null, mode: Proje
   };
 }
 
-/** Smallest budget that can still hold the envelope plus one small item. */
+/** Smallest `max_tokens` the compile route accepts. A normal item needs more. */
 export const MIN_BUDGET_TOKENS = 128;
-
-const ENVELOPE_TOKENS = estimateJsonTokens({
-  context_id: "ctx_00000000000000000000000000000000",
-  query: "",
-  instructions: CONTEXT_INSTRUCTIONS,
-  budget: {
-    max_tokens: 0,
-    used_tokens: 0,
-    selected_items: 0,
-    omitted_items: 0,
-    deduplicated_items: 0,
-    unconsolidated_observations: 0,
-    budget_exhausted: false,
-  },
-});
 
 async function countUnconsolidatedObservations(
   ctx: RequestContext,
@@ -248,8 +233,19 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
   // `slice(0, undefined)` is the whole no-op path.
   const ranked = allRanked.slice(0, topK);
   const omittedByTopK = allRanked.length - ranked.length;
+  // Citation reads for the returned window stay as they were. A count-bound
+  // tail still needs its authorized evidence ids so the reported size is the
+  // item the caller would have received, not a smaller stand-in.
+  if (omittedByTopK > 0 && !contested) {
+    const tailSources = await loadAuthorizedSources(
+      ctx.app.db,
+      principal,
+      allRanked.slice(ranked.length).map((entry) => entry.candidate.id),
+    );
+    for (const [id, rows] of tailSources) sources.set(id, rows);
+  }
 
-  const entries = ranked.map((entry) => {
+  const allEntries = allRanked.map((entry) => {
     const item = {
       untrusted: true,
       claim_id: entry.candidate.id,
@@ -274,10 +270,12 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         : {}),
     };
   });
+  const entries = allEntries.slice(0, ranked.length);
 
-  // The envelope is reserved out of the budget but not reported as content, so
-  // an empty pack reports zero used tokens while the whole payload still fits.
-  const packed = packUnderBudget(entries, maxTokens - ENVELOPE_TOKENS);
+  // `used_tokens` is this sum and `max_tokens` is this ceiling. Reserving an
+  // unreported wrapper here made the pack stop while the response still showed
+  // room, and the dropped results carried no reason (#331).
+  const packed = packUnderBudget(entries, maxTokens);
   const contextId = newId("ctx");
   const usedTokens = packed.usedTokens;
   const items = packed.selected.map((selected) => selected.item);
@@ -373,6 +371,18 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         // Token budget only. `omitted_items` above it and `budget_exhausted`
         // false together mean the count bound truncated, not the budget.
         budget_exhausted: packed.budgetExhausted,
+        omissions: [
+          ...packed.omissions.map((omission) => ({
+            claim_id: omission.value.item.claim_id,
+            tokens: omission.tokens,
+            reason: omission.reason,
+          })),
+          ...allEntries.slice(ranked.length).map((entry) => ({
+            claim_id: entry.value.item.claim_id,
+            tokens: entry.tokens,
+            reason: "count_bound" as const,
+          })),
+        ],
         ...(() => {
           const hints = [
             unconsolidatedObservations > 0

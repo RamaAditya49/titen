@@ -286,9 +286,23 @@ export function hasDeadHeat<T extends RankInput>(ranked: Ranked<T>[], limit?: nu
   });
 }
 
+/** Why an eligible, non-duplicate candidate was left out of the pack. */
+export type PackOmissionReason = "result_too_large" | "budget_exhausted";
+
+export interface PackOmission<T> {
+  value: T;
+  tokens: number;
+  reason: PackOmissionReason;
+}
+
 /**
  * Two deterministic passes cover each available kind, then fill by rank under
  * the hard budget. Content is never truncated into misleading text (FRD CTX-001).
+ *
+ * `budget` is the same ceiling the caller compares with `usedTokens`. An item
+ * whose estimate is within the remainder is selected. An item larger than the
+ * whole budget is `result_too_large`; an item that fits alone but not beside
+ * the selection is `budget_exhausted`.
  */
 export function packUnderBudget<T>(
   entries: { value: T; kind: string; tokens: number; dedupeKey?: string }[],
@@ -301,6 +315,7 @@ export function packUnderBudget<T>(
   budgetExhausted: boolean;
   /** Token size of the smallest eligible item that did not fit. Null when all fit. */
   smallestOmittedTokens: number | null;
+  omissions: PackOmission<T>[];
 } {
   const uniqueDedupe = new Set<string>();
   let eligibleCount = 0;
@@ -334,6 +349,7 @@ export function packUnderBudget<T>(
     deduplicatedCount,
     budgetExhausted: false,
     smallestOmittedTokens: null,
+    omissions: [],
   };
 
   const selected: T[] = [];
@@ -360,6 +376,7 @@ export function packUnderBudget<T>(
   const omittedCount = eligibleCount - selected.length;
   const selectedValues = new Set(selected);
   const seenDedupe = new Set<string>();
+  const omissions: PackOmission<T>[] = [];
   let smallestOmittedTokens: number | null = null;
   for (const entry of entries) {
     if (entry.dedupeKey) {
@@ -367,6 +384,11 @@ export function packUnderBudget<T>(
       seenDedupe.add(entry.dedupeKey);
     }
     if (selectedValues.has(entry.value)) continue;
+    omissions.push({
+      value: entry.value,
+      tokens: entry.tokens,
+      reason: entry.tokens > budget ? "result_too_large" : "budget_exhausted",
+    });
     if (smallestOmittedTokens === null || entry.tokens < smallestOmittedTokens)
       smallestOmittedTokens = entry.tokens;
   }
@@ -377,5 +399,6 @@ export function packUnderBudget<T>(
     deduplicatedCount,
     budgetExhausted: omittedCount > 0,
     smallestOmittedTokens,
+    omissions,
   };
 }

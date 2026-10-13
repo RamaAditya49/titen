@@ -341,6 +341,17 @@ export interface ContextPack {
     unconsolidated_observations: number;
     unconsolidated_observation_ids?: string[];
     budget_exhausted: boolean;
+    /**
+     * Authorized candidates left out of `items`, in rank order. `tokens` is the
+     * same estimate packing uses. `result_too_large` exceeds `max_tokens` on
+     * its own. `budget_exhausted` fits in `max_tokens` but not in the remainder.
+     * `count_bound` was dropped by `top_k` before the token budget.
+     */
+    omissions: Array<{
+      claim_id: string;
+      tokens: number;
+      reason: "result_too_large" | "budget_exhausted" | "count_bound";
+    }>;
     hint?: string;
   };
   items: Array<{
