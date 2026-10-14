@@ -26,11 +26,19 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.7] — 2026-10-14
+
 schema 27
+
+Compile includes each result that fits the reported token remainder, and names every omitted authorized candidate.
 
 ### Fixed
 
 - Compile charges item estimates against the reported `max_tokens`. A result that fits in `max_tokens - used_tokens` is included. Each omitted authorized candidate is listed in `budget.omissions` with `claim_id`, `tokens`, and `reason` (`result_too_large`, `budget_exhausted`, or `count_bound`).
+
+## [0.10.6] — 2026-10-07
+
+schema 27
 
 ### Upgrade notes
 
@@ -1611,7 +1619,9 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.5...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.7...HEAD
+[0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
+[0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
 [0.10.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.5
 [0.10.4]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.4
 [0.10.3]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.3
