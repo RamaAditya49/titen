@@ -28,6 +28,8 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [0.10.7] — 2026-10-14
 
+schema 27
+
 Compile includes each result that fits the reported token remainder, and names every omitted authorized candidate.
 
 ### Fixed
