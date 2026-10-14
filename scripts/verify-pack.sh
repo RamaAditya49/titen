@@ -241,7 +241,7 @@ tool_names="$(printf '%s' "$tools" | node --input-type=module -e '
   if (!Array.isArray(tools)) process.exit(1);
   console.log(tools.map((tool) => tool.name).sort().join("\n"));
 ')"
-# Nine native tools, plus the nine @modelcontextprotocol/server-memory names
+# Ten native tools, plus the nine @modelcontextprotocol/server-memory names
 # served so a caller can swap that server for Titen by editing one line of MCP
 # config (#279). Sorted, so the compatibility names lead.
 expected_tools='add_observations
@@ -261,7 +261,8 @@ titen_feedback
 titen_handoff
 titen_lease_acquire
 titen_project_resolve
-titen_remember'
+titen_remember
+titen_whoami'
 [ "$tool_names" = "$expected_tools" ] \
   || { echo "FAIL: installed MCP tool list differs" >&2; exit 1; }
 
@@ -277,7 +278,7 @@ printf '%s' "$stdio" | node --input-type=module -e '
   const messages = input.split("\n").filter(Boolean).map(JSON.parse);
   if (messages.length !== 2 ||
       !messages[0]?.result?.instructions?.includes("titen_compile once") ||
-      messages[1]?.result?.tools?.length !== 18)
+      messages[1]?.result?.tools?.length !== 19)
     throw new Error("installed stdio bridge failed its MCP handshake");
 ' || { echo "FAIL: installed stdio MCP bridge failed" >&2; exit 1; }
 case "$stdio" in
