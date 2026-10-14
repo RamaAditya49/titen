@@ -575,13 +575,20 @@ absent by default, leaving `max_tokens` as the only bound on pack size. The two
 limits are different things: `max_candidates` bounds what retrieval considers,
 `top_k` bounds what comes back. `top_k` is applied to the ranked list before the
 token budget, so a bounded pack costs fewer tokens rather than being trimmed
-after the caller has paid for a full one. `budget.omitted_items` counts every
+after the caller has paid for a full one. `budget.used_tokens` is the sum of the selected items' token estimates, and
+`max_tokens` is the ceiling for that sum. A candidate whose estimate fits in
+`max_tokens - used_tokens` is included. `budget.omitted_items` counts every
 ranked candidate that was dropped, by the count bound as well as by the budget,
-so a truncated answer is never reported as a complete one;
+so a truncated answer is never reported as a complete one.
 `budget.budget_exhausted` stays specific to the token budget, and omissions with
-`budget_exhausted: false` are the count bound. It is a ceiling, not an exact
-count: duplicate statements are still deduplicated, and fewer eligible claims
-still return fewer items. `meta.candidates` continues to report everything
+`budget_exhausted: false` are the count bound. Each dropped candidate is also
+listed in `budget.omissions` with its `claim_id`, its `tokens` estimate, and a
+`reason`: `result_too_large` when the estimate exceeds `max_tokens` on its own,
+`budget_exhausted` when it fits in `max_tokens` but not in the remainder, and
+`count_bound` when `top_k` dropped it before the token budget. Duplicate
+statements stay in `deduplicated_items` and are not listed again. `top_k` is a
+ceiling, not an exact count: duplicate statements are still deduplicated, and
+fewer eligible claims still return fewer items. `meta.candidates` continues to report everything
 retrieval considered. `at` optionally supplies an ISO-8601 point-in-time
 eligibility anchor and defaults to the server's current instant. The response
 scope reports the normalized `as_of` instant. The response includes selected claims,
@@ -688,9 +695,11 @@ letters such as `ł` and `ß` do not.
 
 Packing preserves deterministic rank order when every deduplicated candidate
 fits. Under actual token pressure it selects one fitting claim per available
-kind before filling the remaining budget in rank order. `budget` reports
-`selected_items`, authorized `omitted_items`, `deduplicated_items`, and the
-explicit `budget_exhausted` boolean. It also reports
+kind before filling the remaining budget in rank order. The budget compared
+with each item is the reported `max_tokens`; `used_tokens` is the sum of the
+estimates for the items that were selected. `budget` reports
+`selected_items`, authorized `omitted_items`, `deduplicated_items`, the
+explicit `budget_exhausted` boolean, and `omissions`. It also reports
 `unconsolidated_observations`: the authorized observations in the effective
 subject/project scope that no claim cites yet. When that count is above zero
 the pack also lists `unconsolidated_observation_ids` (at most 20) and

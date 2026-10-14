@@ -28,6 +28,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 schema 27
 
+### Fixed
+
+- Compile charges item estimates against the reported `max_tokens`. A result that fits in `max_tokens - used_tokens` is included. Each omitted authorized candidate is listed in `budget.omissions` with `claim_id`, `tokens`, and `reason` (`result_too_large`, `budget_exhausted`, or `count_bound`).
+
 ### Upgrade notes
 
 - Migration 27 adds nullable `enrichment_jobs.acked_at`. A failed job with that timestamp no longer marks `/readyz` `terminal_error`. Restart so migrate runs, or run `titen migrate --db <path>`.

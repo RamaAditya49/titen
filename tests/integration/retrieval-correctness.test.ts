@@ -50,6 +50,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     deduplicatedCount: 0,
     budgetExhausted: false,
     smallestOmittedTokens: null,
+    omissions: [],
   });
 
   assert.deepEqual(packUnderBudget([
@@ -65,6 +66,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     deduplicatedCount: 0,
     budgetExhausted: true,
     smallestOmittedTokens: 2,
+    omissions: [{ value: "a4", tokens: 2, reason: "budget_exhausted" }],
   });
 
   assert.deepEqual(packUnderBudget([
@@ -78,6 +80,7 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     deduplicatedCount: 1,
     budgetExhausted: false,
     smallestOmittedTokens: null,
+    omissions: [],
   });
 
   assert.deepEqual(packUnderBudget([
@@ -89,7 +92,41 @@ test("packing preserves full-fit rank, then uses diversity under pressure", () =
     deduplicatedCount: 0,
     budgetExhausted: true,
     smallestOmittedTokens: 9,
+    omissions: [{ value: "too-large", tokens: 9, reason: "result_too_large" }],
   });
+});
+
+test("partial fit keeps every item that fits and names the ones that do not", () => {
+  const packed = packUnderBudget([
+    { value: "first", kind: "fact", tokens: 100 },
+    { value: "second", kind: "fact", tokens: 80 },
+    { value: "third", kind: "fact", tokens: 50 },
+    { value: "remainder", kind: "fact", tokens: 90 },
+    { value: "huge", kind: "fact", tokens: 400 },
+  ], 300);
+  assert.deepEqual(packed.selected, ["first", "second", "third"]);
+  assert.equal(packed.usedTokens, 230);
+  assert.equal(packed.budgetExhausted, true);
+  assert.equal(packed.omittedCount, packed.omissions.length);
+  assert.deepEqual(packed.omissions, [
+    { value: "remainder", tokens: 90, reason: "budget_exhausted" },
+    { value: "huge", tokens: 400, reason: "result_too_large" },
+  ]);
+  const remaining = 300 - packed.usedTokens;
+  for (const omission of packed.omissions)
+    assert.ok(omission.tokens > remaining, "a result that fits the remainder must be included");
+
+  // The rank-order pass stops at the first item that does not fit. The fill
+  // pass must still admit a later item that does.
+  const later = packUnderBudget([
+    { value: "huge", kind: "fact", tokens: 250 },
+    { value: "small", kind: "fact", tokens: 40 },
+  ], 200);
+  assert.deepEqual(later.selected, ["small"]);
+  assert.equal(later.usedTokens, 40);
+  assert.deepEqual(later.omissions, [
+    { value: "huge", tokens: 250, reason: "result_too_large" },
+  ]);
 });
 
 test("hot retrieval SQL bounds candidates and drives evidence from claim sources", async () => {

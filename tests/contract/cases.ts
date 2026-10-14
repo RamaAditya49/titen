@@ -3,6 +3,7 @@ import type { Db } from "../../src/core/db";
 import { MAX_BODY_BYTES } from "../../src/core/http";
 import { sha256Hex } from "../../src/core/ids";
 import { signPayload } from "../../src/core/webhooks";
+import { estimateJsonTokens } from "../../src/core/tokens";
 import { TITEN_VERSION } from "../../src/core/version";
 import type { Fixture, Res } from "./harness";
 
@@ -1616,6 +1617,11 @@ export const CASES: Case[] = [
         false,
         "the token budget did not bind, so only omitted_items may report the truncation",
       );
+      assert.deepEqual(bounded.body.data.budget.omissions, [{
+        claim_id: unbounded.body.data.items[2].claim_id,
+        tokens: estimateJsonTokens(unbounded.body.data.items[2]),
+        reason: "count_bound",
+      }]);
 
       for (const value of [0, 1_001, 1.5, "2", null])
         expectError(await compile({ top_k: value }), 400, "VALIDATION_ERROR");
@@ -1779,6 +1785,86 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "a partial token budget includes every result that fits and explains each omission",
+    async run(fx) {
+      const agent = await fx.provision();
+      const subject = `partial_fit_${fx.runtime}`;
+      const statements = [
+        "Quorumlattice alpha keeps the rollback note.",
+        "Quorumlattice bravo keeps the rollback note.",
+        "Quorumlattice charlie keeps the rollback note.",
+      ];
+      const seeded = [];
+      for (const statement of statements) {
+        seeded.push(await seedClaim(fx, agent.key, {
+          observation: { subject_id: subject, content: `Evidence for ${statement}` },
+          claim: { kind: "procedural", statement },
+        }));
+      }
+      const compile = (maxTokens: number) => fx.call("POST", "/v1/context/compile", {
+        key: agent.key,
+        body: { subject_id: subject, task: "quorumlattice rollback", max_tokens: maxTokens },
+      });
+
+      const wide = await compile(4_000);
+      expectOk(wide);
+      assert.equal(wide.body.data.items.length, 3, "a wide budget must return every match");
+      const sizes = wide.body.data.items.map((item: unknown) => estimateJsonTokens(item));
+      const [first, second, third] = sizes as [number, number, number];
+      assert.equal(
+        wide.body.data.budget.used_tokens,
+        first + second + third,
+        "used_tokens must be the sum of the selected item estimates",
+      );
+      assert.deepEqual(wide.body.data.budget.omissions, []);
+
+      // Exactly the first two estimates. The third fits in neither this
+      // ceiling nor the remainder after those two, and it must say so.
+      const budget = first + second;
+      assert.ok(budget >= 128 && budget <= 32_000);
+      assert.ok(third > budget - (first + second));
+      assert.ok(second <= budget - first, "the second result fits in the reported remainder");
+      const tight = await compile(budget);
+      expectOk(tight);
+      assert.deepEqual(
+        tight.body.data.items.map((item: { claim_id: string }) => item.claim_id),
+        wide.body.data.items.slice(0, 2).map((item: { claim_id: string }) => item.claim_id),
+        "a result that fits under the reported budget must be included",
+      );
+      assert.equal(tight.body.data.budget.used_tokens, budget);
+      assert.equal(tight.body.data.budget.max_tokens, budget);
+      assert.equal(tight.body.data.budget.selected_items, 2);
+      assert.equal(tight.body.data.budget.omitted_items, 1);
+      assert.equal(tight.body.data.budget.budget_exhausted, true);
+      assert.equal(tight.body.data.budget.omissions.length, tight.body.data.budget.omitted_items);
+      const omitted = tight.body.data.budget.omissions[0];
+      assert.equal(omitted.claim_id, wide.body.data.items[2].claim_id);
+      assert.equal(omitted.tokens, third);
+      assert.equal(
+        omitted.reason,
+        third > budget ? "result_too_large" : "budget_exhausted",
+      );
+      assert.ok(
+        omitted.tokens > budget - tight.body.data.budget.used_tokens,
+        "an omitted result must be larger than the reported remainder",
+      );
+
+      const tiny = await compile(128);
+      expectOk(tiny);
+      assert.deepEqual(tiny.body.data.items, []);
+      assert.equal(tiny.body.data.budget.used_tokens, 0);
+      assert.equal(tiny.body.data.budget.budget_exhausted, true);
+      assert.equal(tiny.body.data.budget.omissions.length, 3);
+      const seededIds = new Set(seeded.map((row) => row.claimId));
+      for (const row of tiny.body.data.budget.omissions) {
+        assert.equal(row.reason, "result_too_large");
+        assert.ok(row.tokens > 128, "a result larger than the budget reports its size");
+        assert.ok(seededIds.has(row.claim_id), "only the authorized matches are listed");
+      }
+      assert.match(tiny.body.data.budget.hint, /increase max_tokens/);
+    },
+  },
+  {
     name: "no eligible memory returns a successful empty pack",
     async run(fx) {
       const agent = await fx.provision();
@@ -1803,6 +1889,7 @@ export const CASES: Case[] = [
         deduplicated_items: 0,
         unconsolidated_observations: 0,
         budget_exhausted: false,
+        omissions: [],
       });
     },
   },
@@ -1893,6 +1980,11 @@ export const CASES: Case[] = [
       expectOk(foreign);
       assert.equal(foreign.body.data.items.length, 0, "cross-organization memory must not leak");
       assert.equal(foreign.body.meta.candidates, 0, "hidden records must not appear in counts");
+      assert.equal(
+        JSON.stringify(foreign.body).includes(seeded.claimId),
+        false,
+        "an omitted-item list must not reveal another organization's claim",
+      );
       expectError(
         await fx.call("GET", `/v1/claims/${seeded.claimId}/evidence`, { key: intruder.key }),
         404,
@@ -1929,6 +2021,11 @@ export const CASES: Case[] = [
         ownerView.body.data.items.length,
         0,
         "another principal's private memory must not be compiled",
+      );
+      assert.equal(
+        JSON.stringify(ownerView.body).includes(privateSeed.claimId),
+        false,
+        "an omitted-item list must not reveal another principal's private claim",
       );
       expectError(
         await fx.call("GET", `/v1/claims/${privateSeed.claimId}/evidence`, { key: owner.key }),

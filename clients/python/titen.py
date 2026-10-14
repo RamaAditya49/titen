@@ -287,7 +287,10 @@ class Titen:
         ``max_tokens`` accepts 128 through 32,000. Omitting ``project_id``
         selects only claims with no project; it is never a wildcard.
         ``top_k`` accepts 1 through 1,000 and hard-caps the returned items;
-        omitting it leaves ``max_tokens`` as the only bound.
+        omitting it leaves ``max_tokens`` as the only bound. ``budget.used_tokens``
+        is the sum of the selected item estimates. ``budget.omissions`` lists
+        each dropped candidate with ``tokens`` and ``reason``
+        (``result_too_large``, ``budget_exhausted``, or ``count_bound``).
         """
         return self.request(
             "POST",
