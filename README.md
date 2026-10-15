@@ -23,6 +23,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.producthunt.com/products/titen?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-titen" target="_blank" rel="noopener noreferrer"><img alt="Titen - Open-source agent memory with receipts. No API key, no LLM. | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1276652&amp;theme=dark&amp;t=1792041457269"></a>
+</p>
+
+<p align="center">
   Built with <a href="https://cadis.digital/">C.A.D.I.S Agent</a>.
 </p>
 
