@@ -20,6 +20,8 @@
   <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm version" src="https://img.shields.io/npm/v/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=A9552A"></a>
   <a href="https://www.npmjs.com/package/titen-memory"><img alt="npm downloads" src="https://img.shields.io/npm/dm/titen-memory?style=flat&amp;labelColor=3E3630&amp;color=223A57"></a>
   <a href="https://github.com/RamaAditya49/titen/blob/main/LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-171310?style=flat&amp;labelColor=3E3630"></a>
+  <a href="https://github.com/RamaAditya49/titen/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/RamaAditya49/titen?style=flat&amp;labelColor=3E3630&amp;color=A9552A"></a>
+  <a href="https://glama.ai/mcp/servers/RamaAditya49/titen"><img alt="Titen MCP server on Glama" src="https://glama.ai/mcp/servers/RamaAditya49/titen/badges/score.svg"></a>
 </p>
 
 <p align="center">
@@ -28,6 +30,10 @@
 
 <p align="center">
   Built with <a href="https://cadis.digital/">C.A.D.I.S Agent</a>.
+</p>
+
+<p align="center">
+  If Titen is useful to you, a ⭐ on GitHub helps other people find it.
 </p>
 
 ## Try it in 30 seconds
