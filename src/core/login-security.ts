@@ -6,6 +6,9 @@ import { auditStatement } from "./audit";
 
 const WINDOW_MS = 15 * 60_000;
 const MAX_BUCKETS = 4096;
+const CLIENT_FAILURE_LIMIT = 5;
+const ACCOUNT_FAILURE_LIMIT = 50;
+const EVICTION_IDLE_MS = 2 * 60_000;
 
 export function loginLimited(): ApiError {
   return new ApiError(429, "LOGIN_RATE_LIMITED", "Too many sign-in attempts. Try again later.");
@@ -64,26 +67,30 @@ export async function admitPasswordAttempt(ctx: RequestContext, keys: { account:
   if (Number(admitted[0]?.count) !== 2) throw loginLimited();
 }
 
-// Full storage must not reject every sign-in, so admission frees exactly the rows it
-// needs. Active blocks and the request's own buckets are never removed. Rows with the
-// fewest failures go first, then the oldest, so a flood of one-failure rows evicts
-// itself instead of resetting a bucket that has already counted real failures.
+// Full storage must not reject every sign-in, so admission frees the rows it needs.
+// It removes only rows that are unblocked, hold fewer failures than a client block,
+// and have been idle for two minutes, fewest failures first, then the oldest. The
+// request's own buckets are never removed. The failure and idle bounds stop a flood
+// from cycling one bucket's count faster than four failures per two minutes, which
+// is below what the account ceiling and its delays already permit.
 function evictForAdmission(keys: { account: string; client: string }, now: number): Stmt {
   return {
     sql: `DELETE FROM login_throttles WHERE identity_hash IN (
       SELECT identity_hash FROM login_throttles
-       WHERE blocked_until_ms <= ? AND identity_hash NOT IN (?, ?)
+       WHERE blocked_until_ms <= ? AND failures < ? AND touched_at_ms <= ?
+         AND identity_hash NOT IN (?, ?)
        ORDER BY failures, touched_at_ms, identity_hash
        LIMIT max(0, (SELECT COUNT(*) FROM login_throttles) + 2
          - (SELECT COUNT(*) FROM login_throttles WHERE identity_hash IN (?, ?)) - ?))`,
-    params: [now, keys.account, keys.client, keys.account, keys.client, MAX_BUCKETS],
+    params: [now, CLIENT_FAILURE_LIMIT, now - EVICTION_IDLE_MS,
+      keys.account, keys.client, keys.account, keys.client, MAX_BUCKETS],
   };
 }
 
 export async function recordLoginFailure(ctx: RequestContext, keys: { account: string; client: string }, now: number,
   account?: { id: string; org_id: string; principal_id: string }) {
   const statements: Stmt[] = [];
-  for (const [key, limit, kind] of [[keys.account, 50, "account"], [keys.client, 5, "client"]] as const) {
+  for (const [key, limit, kind] of [[keys.account, ACCOUNT_FAILURE_LIMIT, "account"], [keys.client, CLIENT_FAILURE_LIMIT, "client"]] as const) {
     const count = `(CASE WHEN blocked_until_ms = -1 OR ? - touched_at_ms >= ${WINDOW_MS} THEN 1 ELSE failures + 1 END)`;
     statements.push({ sql: `UPDATE login_throttles SET
       blocked_until_ms = CASE

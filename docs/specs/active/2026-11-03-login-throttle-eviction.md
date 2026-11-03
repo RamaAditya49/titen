@@ -34,15 +34,23 @@ this work narrows it.
 ## Design
 
 Before inserting, admission removes just enough rows to fit the request's two
-buckets. It removes only rows that are not actively blocked and are not the
-request's own buckets. It removes the rows with the fewest recorded failures
-first and, among equal counts, the oldest last-touch time.
+buckets. A row is evictable only when all of these hold:
 
-Ranking by failure count keeps brute-force state. A flood of one-failure rows
-evicts other one-failure rows. It cannot reset an account bucket that holds more
-failures unless the attacker first gives thousands of rows at least as many
-failures. In-flight rows have the newest touch time, so they are removed last
-among equal counts.
+- it is not actively blocked;
+- it holds fewer than five failures, the client block threshold;
+- it has been idle for at least two minutes;
+- it is not one of the request's own buckets.
+
+Among evictable rows, the fewest failures go first, then the oldest last touch.
+
+Eviction must not let an attacker cycle a bucket's failure count. Ranking alone
+does not prevent that: when storage is full of rows that outrank the target, the
+target is the only candidate, and one guess plus one made-up-username request
+resets it, repeatedly. (The Cursor security review found this on the first
+revision of the change.) The two bounds cap any forced reset at four failures per
+bucket per two minutes, at most 120 per hour. The 50-failure account ceiling with
+its delay ladder already permits about 145 guesses per hour, so a flood gains no
+guesses beyond what the ceiling allows.
 
 ## In scope
 
@@ -67,25 +75,26 @@ among equal counts.
 
 ## Risks
 
-- **Residual lockout.** An attacker can still fill storage with actively blocked
-  rows. That needs at least five failures per row and repeated escalation to keep
-  blocks alive, which raises the cost from about 2048 requests to tens of
-  thousands. Edge rate limits remain the recommended first layer.
-- **Lost counts.** Eviction drops the failure count of an unblocked row. Removing
-  a row with N failures requires storage full of rows with at least N failures.
-- **Spurious 429 under heavy concurrency.** Another admission can evict a fresh
-  row between the batch and the admission check. Fresh rows are removed last, so
-  this needs storage full of in-flight rows.
+- **Residual lockout.** An attacker can still fill storage with rows that are not
+  evictable. The cheapest ways are rows with five or more failures (about 10,000
+  requests per 15 minutes) or a sustained flood of about 2048 requests every two
+  minutes. The old cost was about 2048 requests per 15 minutes. Edge rate limits
+  remain the recommended first layer.
+- **Lost counts.** Eviction drops the count of a row with at most four failures
+  that has been idle for two minutes. That is bounded as described in Design.
+- **Recovery delay.** After a flood stops, legitimate sign-in can still see 429
+  until flood rows have been idle for two minutes.
 
 ## EARS acceptance criteria
 
-- **AC-THROTTLE-001 — State-driven:** While throttle storage holds 4096 unblocked rows from other buckets, Titen shall verify a sign-in password and return HTTP 201 for correct credentials.
-- **AC-THROTTLE-002 — Event-driven:** When admission needs storage, Titen shall remove unblocked rows with the fewest recorded failures first and the oldest last-touch time among equal counts.
+- **AC-THROTTLE-001 — State-driven:** While throttle storage holds 4096 unblocked one-failure rows from other buckets idle for at least two minutes, Titen shall verify a sign-in password and return HTTP 201 for correct credentials.
+- **AC-THROTTLE-002 — Event-driven:** When admission needs storage, Titen shall remove evictable rows with the fewest recorded failures first and the oldest last-touch time among equal counts.
 - **AC-THROTTLE-003 — State-driven:** While a throttle row is actively blocked, Titen shall keep that row during admission.
-- **AC-THROTTLE-004 — Unwanted behavior:** If throttle storage holds 4096 actively blocked rows, then Titen shall return HTTP 429 before password verification.
-- **AC-THROTTLE-005 — State-driven:** While an account bucket holds more failures than every other unblocked row, Titen shall keep its failure count when admission evicts rows.
+- **AC-THROTTLE-004 — Unwanted behavior:** If throttle storage holds 4096 rows and fewer evictable rows than the request needs, then Titen shall return HTTP 429 before password verification.
+- **AC-THROTTLE-005 — State-driven:** While a throttle row holds five or more failures, Titen shall keep that row during admission.
 - **AC-THROTTLE-006 — Ubiquitous:** Titen shall keep throttle storage at or below 4096 rows.
 - **AC-THROTTLE-007 — Ubiquitous:** Titen shall apply the same admission behavior on Bun/SQLite and Cloudflare D1.
+- **AC-THROTTLE-008 — State-driven:** While a throttle row was touched within the last two minutes, Titen shall keep that row during admission.
 
 ## Done conditions
 

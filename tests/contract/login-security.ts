@@ -47,7 +47,7 @@ export async function assertLoginSecurity(db: Db, runtime: string) {
   // Storage full of unblocked one-failure rows (what made-up usernames leave behind) must not lock operators out.
   const rowCount = async () => Number((await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles"))[0]!.count);
   const hasRow = async (id: string) => (await db.all("SELECT 1 FROM login_throttles WHERE identity_hash = ?", [id])).length === 1;
-  const recent = now.getTime() - 60_000;
+  const recent = now.getTime() - 5 * 60_000; // idle past the two-minute eviction bound
   await db.batch([
     { sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4094)
       INSERT INTO login_throttles SELECT 'flood-' || printf('%04d', x), 1, 0, ? + x FROM n`, params: [recent] },
@@ -77,5 +77,29 @@ export async function assertLoginSecurity(db: Db, runtime: string) {
   assert.ok(accountRow[0]!.blocked_until_ms > now.getTime(), "the account ceiling still blocks");
   assert.equal((await login("client-e", account.temporaryPassword)).status, 401, "the account block applies to new clients");
   assert.ok(await rowCount() <= 4096, "storage stays bounded");
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // Storage dominated by active blocks must not make a high-count account row the eviction victim.
+  await db.batch([
+    { sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4094)
+      INSERT INTO login_throttles SELECT 'blocked-' || printf('%04d', x), 5, ?, ? FROM n`, params: [now.getTime() + 60_000, recent] },
+    { sql: "INSERT INTO login_throttles VALUES (?, 49, 0, ?)", params: [key, recent - 30_000] },
+    { sql: "INSERT INTO login_throttles VALUES ('flood-last', 1, 0, ?)", params: [recent] },
+  ]);
+  const other = async (client: string) => (await app(new Request("http://titen.test/v1/dashboard-sessions", {
+    method: "POST", headers: { "content-type": "application/json", "test-client": client },
+    body: JSON.stringify({ username: `made-up-${runtime}`, password: "incorrect horse battery staple" }),
+  }))).status;
+  assert.equal(await other("flood-client-3"), 429, "no room without evicting the high-count account row");
+  const survivor = await db.all<{ failures: number }>("SELECT failures FROM login_throttles WHERE identity_hash = ?", [key]);
+  assert.equal(survivor[0]?.failures, 49, "a bucket at or above the client limit is never evicted");
+  assert.ok(await rowCount() <= 4096, "storage stays bounded");
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // Recently touched rows are not evicted, so a flood cannot cycle a bucket's count quickly.
+  await db.batch([{ sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4096)
+    INSERT INTO login_throttles SELECT 'fresh-' || printf('%04d', x), 1, 0, ? FROM n`, params: [now.getTime() - 60_000] }]);
+  assert.equal((await login("fresh-client", account.temporaryPassword)).status, 429, "rows idle under two minutes stay");
+  assert.equal(await rowCount(), 4096);
   await db.batch([{ sql: "DELETE FROM login_throttles" }]);
 }
