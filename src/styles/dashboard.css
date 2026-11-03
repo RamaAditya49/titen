@@ -203,15 +203,23 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .operator-collection > header, .operator-facts > header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
 .operator-collection > header h3, .operator-facts > header h3 { margin: 0; font-size: 14px; }
 .operator-collection > header span { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; text-transform: uppercase; }
-.operator-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--rule); }
+.operator-collection { container-type: inline-size; }
+/* Scroll shadows: the paper covers fade off at each scrolled edge, so a clipped side always shows a cue. */
+.operator-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--rule);
+  background: linear-gradient(to right, var(--paper-strong) 30%, transparent) left / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--paper-strong) 30%, transparent) right / 24px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / .14), transparent) left / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / .14), transparent) right / 10px 100% no-repeat scroll; }
+.operator-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .operator-table { width: 100%; min-width: 720px; border-collapse: collapse; text-align: left; }
 .operator-table th, .operator-table td { padding: 11px 12px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
 .operator-table thead th { color: var(--muted); background: var(--paper); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .08em; text-transform: uppercase; }
 .operator-table tbody tr:last-child td { border-bottom: 0; }
 .operator-table tbody tr:hover, .operator-table tbody tr[aria-selected="true"] { background: #f7eee3; }
 .operator-table tbody tr[aria-selected="true"] { box-shadow: inset 3px 0 var(--accent); }
-.operator-table td { color: var(--ink-soft); font-size: 11px; overflow-wrap: anywhere; }
-.operator-table .mono-value { color: var(--muted); font: 10px/1.45 "JetBrains Mono Variable", monospace; font-variant-numeric: tabular-nums; }
+/* break-word keeps enum values (status, trust) whole; only opaque ids may break anywhere. */
+.operator-table td { color: var(--ink-soft); font-size: 11px; overflow-wrap: break-word; }
+.operator-table .mono-value { color: var(--muted); font: 10px/1.45 "JetBrains Mono Variable", monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .collection-actions { display: flex; flex-wrap: wrap; gap: 10px; min-width: 150px; }
 .collection-actions .text-button { padding: 0; }
 .danger-action { color: var(--danger); }
@@ -449,6 +457,21 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   .inline-form { grid-template-columns: 1fr 1fr; }
   .user-admin, .dashboard-split, .model-grid { grid-template-columns: 1fr; }
 }
+/* A collection narrower than its table shows each row as a label/value record,
+   so a half-width split column never pushes row actions out of view (#343). */
+@container (max-width: 760px) {
+  .operator-table-wrap { overflow: visible; border: 0; background: none; }
+  .operator-table { min-width: 0; }
+  .operator-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .operator-table, .operator-table tbody, .operator-table tr, .operator-table td { display: block; width: 100%; }
+  .operator-table tbody { display: grid; gap: 10px; }
+  .operator-table tbody tr { padding: 10px 12px; background: var(--paper-strong); border: 1px solid var(--rule-soft); }
+  .operator-table th, .operator-table td { padding: 6px 0; border: 0; }
+  .operator-table td { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px; }
+  .operator-table td::before { content: attr(data-label); color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; text-transform: uppercase; }
+  .collection-actions { display: flex !important; min-width: 0; padding-top: 10px !important; border-top: 1px solid var(--rule-soft) !important; }
+  .collection-actions::before { display: none; }
+}
 @media (max-width: 620px) {
   .topbar { align-items: flex-start; min-height: auto; padding: 16px; }
   .topbar-actions { align-items: flex-end; flex-direction: column; gap: 8px; }
@@ -486,17 +509,6 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   .profile-password-form > span { grid-column: auto; }
   .passkey-management { grid-template-columns: 1fr; }
   .passkey-management [data-passkey-list], .passkey-management .one-time-credential { grid-column: auto; }
-  .operator-table-wrap { overflow: visible; border: 0; }
-  .operator-table { min-width: 0; }
-  .operator-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .operator-table, .operator-table tbody, .operator-table tr, .operator-table td { display: block; width: 100%; }
-  .operator-table tbody { display: grid; gap: 10px; }
-  .operator-table tbody tr { padding: 10px 12px; background: var(--paper-strong); border: 1px solid var(--rule-soft); }
-  .operator-table th, .operator-table td { padding: 6px 0; border: 0; }
-  .operator-table td { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px; }
-  .operator-table td::before { content: attr(data-label); color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; text-transform: uppercase; }
-  .collection-actions { display: flex !important; min-width: 0; padding-top: 10px !important; border-top: 1px solid var(--rule-soft) !important; }
-  .collection-actions::before { display: none; }
   .collection-inspector { grid-template-columns: 1fr; }
   .collection-inspector dl, .operator-facts dl { grid-template-columns: 1fr; }
   .collection-inspector dt, .operator-facts dt { padding-bottom: 3px; border-bottom: 0; }
