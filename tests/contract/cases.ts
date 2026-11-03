@@ -276,6 +276,65 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "writes store CRLF as LF, replay across line endings, and still reject a lone CR",
+    async run(fx) {
+      const writer = await fx.provision({ scopes: ["observations:write", "claims:write", "mcp:call"] });
+      const post = (content: string, id?: string) => fx.call("POST", "/v1/observations", {
+        key: writer.key,
+        body: {
+          subject_id: "crlf_subject",
+          kind: "tool_result",
+          content,
+          source: { type: "tool", ref: "windows-host", ...(id ? { id } : {}) },
+          trust: "asserted",
+        },
+      });
+
+      const crlf = await post("Deploy steps:\r\n1. build\r\n2. ship", "crlf-note-1");
+      expectOk(crlf, 201);
+      const stored = await fx.query<{ content: string }>(
+        "SELECT content FROM observations WHERE id = ?", [crlf.body.data.observation_id]);
+      assert.equal(stored[0]!.content, "Deploy steps:\n1. build\n2. ship");
+
+      // The same note with LF endings and the same source id is a canonical replay.
+      const lf = await post("Deploy steps:\n1. build\n2. ship", "crlf-note-1");
+      expectOk(lf);
+      assert.equal(lf.body.data.observation_id, crlf.body.data.observation_id);
+      const count = await fx.query<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM observations WHERE subject_id = 'crlf_subject' AND org_id = ?", [writer.orgId]);
+      assert.equal(Number(count[0]!.n), 1);
+
+      const lone = await post("progress 10%\rprogress 99%");
+      expectError(lone, 400, "VALIDATION_ERROR");
+      assert.match(lone.body.error.message, /carriage return \(U\+000D\) not followed by a line feed/);
+      for (const unsafe of ["nul\u0000byte", "esc\u001b[2Jclear", "bidi\u202eoverride"])
+        expectError(await post(unsafe), 400, "VALIDATION_ERROR");
+
+      const viaMcp = await fx.call("POST", "/mcp", {
+        key: writer.key,
+        body: {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "titen_remember",
+            arguments: {
+              subject_id: "crlf_subject",
+              kind: "tool_result",
+              content: "Readme line\r\nnext line",
+              source_type: "tool",
+              source_ref: "windows-host#mcp",
+            },
+          },
+        },
+      });
+      assert.equal(viaMcp.body.result.isError, undefined, JSON.stringify(viaMcp.body));
+      const mcpStored = await fx.query<{ content: string }>(
+        "SELECT content FROM observations WHERE id = ?", [JSON.parse(viaMcp.body.result.content[0].text).data.observation_id]);
+      assert.equal(mcpStored[0]!.content, "Readme line\nnext line");
+    },
+  },
+  {
     name: "scoped grants drive directories, Atlas graph, and next-request revocation",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
