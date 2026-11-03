@@ -114,6 +114,44 @@ test("concurrent password admission rejects work beyond the configured limit", a
   } finally { handle.close(); }
 });
 
+test("a distinct-username flood from many clients does not lock out a correct sign-in", async () => {
+  const handle = openDatabase(":memory:");
+  const db = createSqliteDb(handle);
+  const now = new Date("2026-11-03T00:00:00.000Z");
+  try {
+    await migrate(db);
+    const account = await newOperatorAccount({ orgId: "org_throttle_flood", createdBy: "owner_throttle_flood",
+      username: "real-operator", role: "owner", scopes: ["*"], maxTrust: "asserted", now });
+    await db.batch([organizationStatement("org_throttle_flood", "Throttle Flood Test", now), ...account.statements]);
+    const app = createApp({ db, runtime: "test", now: () => now, loginClient: (request) => request.headers.get("test-client") ?? "unknown" });
+    const attempt = (username: string, password: string, client: string) => app(new Request("http://titen.test/v1/dashboard-sessions", {
+      method: "POST", headers: { "content-type": "application/json", "test-client": client },
+      body: JSON.stringify({ username, password }),
+    }));
+    let next = 0;
+    await Promise.all(Array.from({ length: 32 }, async () => {
+      while (next < 2100) {
+        const i = next++;
+        await attempt(`ghost-${i}`, "not-the-password-123", `2001:db8::${Math.floor(i / 10).toString(16)}`);
+      }
+    }));
+    const [stored] = await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles");
+    assert.ok(stored!.count <= 4096);
+    assert.equal((await attempt("real-operator", account.temporaryPassword, "203.0.113.7")).status, 201);
+  } finally { handle.close(); }
+}, 60_000);
+
+test("the Bun client limiter evicts the oldest client when full", async () => {
+  const { createClientLoginLimit } = await import("../../src/runtime/bun/login-rate-limit");
+  const limiter = createClientLoginLimit((request) => request.headers.get("test-client")!, () => 0);
+  const hit = (client: string) => limiter.limit({ request: new Request("http://titen.test", { headers: { "test-client": client } }) });
+  for (let i = 0; i < 4096; i++) assert.equal((await hit(`client-${i}`)).success, true);
+  assert.equal((await hit("client-new")).success, true, "a full limiter admits a new client");
+  for (let i = 0; i < 19; i++) assert.equal((await hit("client-new")).success, true);
+  assert.equal((await hit("client-new")).success, false, "the per-client limit still applies");
+  assert.equal((await hit("client-0")).success, true, "the evicted oldest client starts a new bucket");
+});
+
 test("raw paths reject dot segments and encoded separators before routing", async () => {
   const handle = openDatabase(":memory:");
   try {

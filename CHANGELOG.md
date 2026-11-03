@@ -30,6 +30,17 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 - `tz` local-time fields no longer fail on historical Local Mean Time offsets that carry seconds. Such offsets are rounded to the minute with the wall clock shifted, so each `*_local` value keeps the UTC instant, and a value that cannot be presented becomes `null`. Before this, `POST /v1/observations` with an archival `occurred_at` returned 500 after the write committed, and a retry stored duplicate evidence (#337).
 
+## [0.10.8] — 2026-11-03
+
+schema 27
+
+A flood of sign-in attempts with new usernames can no longer lock every operator out of the dashboard ([GHSA-5f6j-4xcw-58px](https://github.com/RamaAditya49/titen/security/advisories/GHSA-5f6j-4xcw-58px)).
+
+### Security
+
+- Dashboard sign-in no longer locks out every operator when the shared throttle table is full. Admission evicts unblocked rows with the fewest recorded failures first and keeps active blocks. Only a table full of active blocks returns `LOGIN_RATE_LIMITED`.
+- The Bun client limiter replaces its oldest client when it tracks 4096 clients, instead of refusing every new client.
+
 ## [0.10.7] — 2026-10-14
 
 schema 27
@@ -1623,7 +1634,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.7...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.8...HEAD
+[0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
 [0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
 [0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
 [0.10.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.5
