@@ -22,6 +22,8 @@ const SECRET = "webhook-shared-secret-value";
 
 interface Received {
   signature: string | null;
+  signatureV2: string | null;
+  timestamp: string | null;
   event: string | null;
   delivery: string | null;
   body: string;
@@ -101,6 +103,8 @@ beforeAll(async () => {
     async fetch(request: Request) {
       received.push({
         signature: request.headers.get("x-titen-signature"),
+        signatureV2: request.headers.get("x-titen-signature-v2"),
+        timestamp: request.headers.get("x-titen-timestamp"),
         event: request.headers.get("x-titen-event"),
         delivery: request.headers.get("x-titen-delivery"),
         body: await request.text(),
@@ -130,6 +134,15 @@ test("a delivered event arrives signed, and the signature verifies independently
     events: ["*"],
   });
   assert.equal(hook.status, 201);
+  assert.deepEqual(hook.body.data.signing.v2, {
+    header: "X-Titen-Signature-V2",
+    timestamp_header: "X-Titen-Timestamp",
+    delivery_header: "X-Titen-Delivery",
+    signed_content: "<timestamp>.<delivery>.<raw body>",
+    algorithm: "HMAC-SHA256",
+    format: "sha256=<hex>",
+    tolerance_seconds: 300,
+  });
 
   // Any canonical write emits an event, which is what gets delivered.
   const observation = await call("POST", "/v1/observations", {
@@ -162,6 +175,20 @@ test("a delivered event arrives signed, and the signature verifies independently
   // A tampered body must not verify, which is the property the header exists for.
   const tampered = await hmacHex(SECRET, `${first.body} `);
   assert.notEqual(first.signature, `sha256=${tampered}`);
+
+  // The timestamped signature binds the attempt time and the delivery id, so a
+  // receiver can reject an old capture and drop a duplicate delivery.
+  assert.match(first.timestamp ?? "", /^\d+$/);
+  assert.ok(Math.abs(Number(first.timestamp) - Date.now() / 1000) < 300, "the timestamp must be current");
+  assert.equal(
+    first.signatureV2,
+    `sha256=${await hmacHex(SECRET, `${first.timestamp}.${first.delivery}.${first.body}`)}`,
+    "the V2 signature must verify against the timestamp, the delivery id, and the exact body",
+  );
+  assert.notEqual(
+    first.signatureV2,
+    `sha256=${await hmacHex(SECRET, `${Number(first.timestamp) + 1}.${first.delivery}.${first.body}`)}`,
+  );
 
   const payload = JSON.parse(first.body);
   assert.ok(payload, "the body must be the JSON event payload");
