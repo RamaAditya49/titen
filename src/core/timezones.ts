@@ -28,24 +28,18 @@ export function resolveDisplayTimezone(
   return raw;
 }
 
-function offsetSuffix(timeZone: string, date: Date): string {
-  const name = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    timeZoneName: "longOffset",
-    hour: "2-digit",
-  }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value ?? "GMT";
-  if (name === "GMT" || name === "UTC") return "+00:00";
-  const match = /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/u.exec(name);
-  if (!match) throw new Error(`Time zone "${timeZone}" did not report a numeric offset.`);
-  return `${match[1]}${match[2]!.padStart(2, "0")}:${(match[3] ?? "00").padStart(2, "0")}`;
-}
+const MINUTE_MS = 60_000;
 
-/** ISO-8601 local time with a numeric offset. The UTC instant is unchanged. */
-export function formatLocalTimestamp(isoUtc: string, timeZone: string): string {
-  const date = new Date(isoUtc);
-  if (Number.isNaN(date.getTime())) throw new Error("Timestamp is not ISO-8601.");
+/**
+ * Offset of `timeZone` at `date`, rounded to whole minutes. Derived from the
+ * zone's wall clock instead of ICU's offset label, because pre-standard-time
+ * Local Mean Time offsets carry seconds (Asia/Jakarta 1920 is +07:07:12) and
+ * RFC 3339 offsets cannot.
+ */
+function offsetMinutes(timeZone: string, date: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
+    era: "short",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -55,12 +49,45 @@ export function formatLocalTimestamp(isoUtc: string, timeZone: string): string {
     hourCycle: "h23",
   }).formatToParts(date);
   const pick = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "00";
-  let hour = pick("hour");
-  if (hour === "24") hour = "00";
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+  const era = parts.find((part) => part.type === "era")?.value;
+  const year = era === "BC" ? 1 - pick("year") : pick("year");
+  const wall = new Date(0);
+  wall.setUTCFullYear(year, pick("month") - 1, pick("day"));
+  wall.setUTCHours(pick("hour") % 24, pick("minute"), pick("second"), 0);
+  const wholeSecond = date.getTime() - (((date.getTime() % 1000) + 1000) % 1000);
+  return Math.round((wall.getTime() - wholeSecond) / MINUTE_MS);
+}
+
+function formatOffset(minutes: number): string {
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = Math.abs(minutes);
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+}
+
+/**
+ * ISO-8601 local time with a numeric offset. The UTC instant is unchanged:
+ * when a historical offset has seconds, the offset is rounded to the minute
+ * and the wall clock is shifted with it.
+ */
+export function formatLocalTimestamp(isoUtc: string, timeZone: string): string {
+  const date = new Date(isoUtc);
+  if (Number.isNaN(date.getTime())) throw new Error("Timestamp is not ISO-8601.");
+  const offset = offsetMinutes(timeZone, date);
+  const wholeSecond = date.getTime() - (((date.getTime() % 1000) + 1000) % 1000);
+  const local = new Date(wholeSecond + offset * MINUTE_MS).toISOString().slice(0, 19);
   const fraction = /\.(\d+)/u.exec(isoUtc)?.[1];
   const fractionSuffix = fraction ? `.${fraction}` : "";
-  return `${pick("year")}-${pick("month")}-${pick("day")}T${hour}:${pick("minute")}:${pick("second")}${fractionSuffix}${offsetSuffix(timeZone, date)}`;
+  return `${local}${fractionSuffix}${formatOffset(offset)}`;
+}
+
+/** Display only: a value that cannot be presented becomes null, never a failed response. */
+function presentLocal(raw: string, timeZone: string): string | null {
+  try {
+    return formatLocalTimestamp(raw, timeZone);
+  } catch {
+    return null;
+  }
 }
 
 /** Adds parallel `*_local` fields. UTC fields on the record stay as they are. */
@@ -73,7 +100,7 @@ export function withLocalTimestamps<T extends Record<string, unknown>>(
   const extra: Record<string, string | null> = {};
   for (const field of fields) {
     const raw = value[field];
-    if (typeof raw === "string") extra[`${field}_local`] = formatLocalTimestamp(raw, timeZone);
+    if (typeof raw === "string") extra[`${field}_local`] = presentLocal(raw, timeZone);
     else if (raw === null) extra[`${field}_local`] = null;
   }
   return { ...value, ...extra };
