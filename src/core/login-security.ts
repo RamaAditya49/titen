@@ -51,9 +51,18 @@ export async function admitPasswordAttempt(ctx: RequestContext, keys: { account:
     "SELECT blocked_until_ms FROM login_throttles WHERE identity_hash IN (?, ?)", [keys.account, keys.client]);
   if (rows.some((row) => row.blocked_until_ms > now))
     throw new ApiError(401, "INVALID_LOGIN", "Username or password is invalid.");
+  const own = [keys.account, keys.client];
   await ctx.app.db.batch([
     { sql: "DELETE FROM login_throttles WHERE blocked_until_ms <= ? AND touched_at_ms <= ?", params: [now, now - WINDOW_MS] },
-    ...[keys.account, keys.client].map((key): Stmt => ({
+    // At capacity, evict unblocked rows with the fewest failures first, oldest first. Active blocks stay.
+    // Failure order keeps a flood of new usernames from resetting a partly failed account.
+    { sql: `DELETE FROM login_throttles WHERE identity_hash IN (SELECT identity_hash FROM login_throttles
+        WHERE blocked_until_ms <= ? AND identity_hash NOT IN (?, ?)
+        ORDER BY CASE WHEN blocked_until_ms = -1 THEN 0 ELSE failures END, touched_at_ms
+        LIMIT max(0, (SELECT COUNT(*) FROM login_throttles) + 2
+          - (SELECT COUNT(*) FROM login_throttles WHERE identity_hash IN (?, ?)) - ?))`,
+      params: [now, ...own, ...own, MAX_BUCKETS] },
+    ...own.map((key): Stmt => ({
       sql: `INSERT OR IGNORE INTO login_throttles (identity_hash, failures, blocked_until_ms, touched_at_ms)
         SELECT ?, 1, -1, ? WHERE (SELECT COUNT(*) FROM login_throttles) < ?`, params: [key, now, MAX_BUCKETS],
     })),
@@ -67,6 +76,9 @@ export async function recordLoginFailure(ctx: RequestContext, keys: { account: s
   account?: { id: string; org_id: string; principal_id: string }) {
   const statements: Stmt[] = [];
   for (const [key, limit, kind] of [[keys.account, 50, "account"], [keys.client, 5, "client"]] as const) {
+    // Eviction can remove a reservation during password work. Recreate it so the failure still counts.
+    statements.push({ sql: `INSERT OR IGNORE INTO login_throttles (identity_hash, failures, blocked_until_ms, touched_at_ms)
+      VALUES (?, 1, -1, ?)`, params: [key, now] });
     const count = `(CASE WHEN blocked_until_ms = -1 OR ? - touched_at_ms >= ${WINDOW_MS} THEN 1 ELSE failures + 1 END)`;
     statements.push({ sql: `UPDATE login_throttles SET
       blocked_until_ms = CASE
