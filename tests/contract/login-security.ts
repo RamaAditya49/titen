@@ -4,6 +4,8 @@ import { createApp } from "../../src/core/app";
 import { newOperatorAccount } from "../../src/core/accounts";
 import { organizationStatement } from "../../src/core/auth";
 import { sha256Hex } from "../../src/core/ids";
+import { recordLoginFailure } from "../../src/core/login-security";
+import type { RequestContext } from "../../src/core/http";
 
 export async function assertLoginSecurity(db: Db, runtime: string) {
   const now = new Date("2026-10-05T00:00:00Z");
@@ -41,6 +43,31 @@ export async function assertLoginSecurity(db: Db, runtime: string) {
   await db.batch([{ sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4096)
     INSERT INTO login_throttles SELECT 'capacity-' || x, 5, ?, ? FROM n`, params: [now.getTime() + 60_000, now.getTime() - 3_600_000] }]);
   assert.equal((await login("new-client", account.temporaryPassword)).status, 429, "full active storage rejects before password work");
-  assert.equal((await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles"))[0]!.count, 4096);
+  const rowCount = async () => (await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles"))[0]!.count;
+  assert.equal(await rowCount(), 4096);
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // Unblocked attempt rows yield to a new sign-in. The row with the most failures is the oldest and still stays.
+  await db.batch([{ sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4095)
+    INSERT INTO login_throttles SELECT 'attempt-' || x, 1, CASE WHEN x % 2 THEN -1 ELSE 0 END, ? FROM n`, params: [now.getTime() - 60_000] },
+  { sql: "INSERT INTO login_throttles VALUES ('heavy-account', 49, 0, ?)", params: [now.getTime() - 600_000] }]);
+  assert.equal((await login("flooded-client", account.temporaryPassword)).status, 201, "unblocked rows must not lock out a correct sign-in");
+  assert.equal((await db.all("SELECT 1 FROM login_throttles WHERE identity_hash = 'heavy-account'")).length, 1, "eviction keeps the row with more failures");
+  assert.ok(await rowCount() <= 4096);
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // Eviction removes only unblocked rows.
+  await db.batch([{ sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4096)
+    INSERT INTO login_throttles SELECT 'mixed-' || x, 5, CASE WHEN x <= 4094 THEN ? ELSE 0 END, ? FROM n`, params: [now.getTime() + 60_000, now.getTime() - 60_000] }]);
+  assert.equal((await login("mixed-client", account.temporaryPassword)).status, 201, "two unblocked rows make room for a sign-in");
+  assert.equal((await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles WHERE blocked_until_ms > ?", [now.getTime()]))[0]!.count, 4094);
+  assert.ok(await rowCount() <= 4096);
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // A failure still counts when eviction removed the attempt's rows during password work.
+  await recordLoginFailure({ app: { db } } as unknown as RequestContext, { account: "evicted", client: "evicted.client" }, now.getTime());
+  assert.deepEqual((await db.all<{ identity_hash: string; failures: number; blocked_until_ms: number }>(
+    "SELECT identity_hash, failures, blocked_until_ms FROM login_throttles ORDER BY identity_hash")).map((row) => ({ ...row })),
+  [{ identity_hash: "evicted", failures: 1, blocked_until_ms: 0 }, { identity_hash: "evicted.client", failures: 1, blocked_until_ms: 0 }]);
   await db.batch([{ sql: "DELETE FROM login_throttles" }]);
 }
