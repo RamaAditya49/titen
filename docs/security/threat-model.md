@@ -120,6 +120,9 @@ Rules at every boundary:
   scope, and must be replaced before the private dashboard shell opens.
 - Login throttle rows contain only a hashed account bucket and bounded timing
   state. Passkey challenges and recovery codes are stored only as hashes.
+- The throttle table is bounded. At capacity it evicts unblocked rows with the
+  fewest failures first, so a flood of new usernames cannot lock out operators
+  or cheaply reset a partly failed account. Active blocks are never evicted.
 - A staged dashboard key cannot call product routes. Concurrent challenge or
   recovery claims produce at most one full session.
 

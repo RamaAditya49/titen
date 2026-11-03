@@ -18,7 +18,8 @@ export function createClientLoginLimit(client: (request: Request) => string, now
       let bucket = attempts.get(key);
       if (!bucket || bucket.expires <= time) {
         for (const [storedKey, stored] of attempts) if (stored.expires <= time) attempts.delete(storedKey);
-        if (attempts.size >= 4096) return { success: false };
+        // Map order is creation order, so the first key expires first. The SQL throttle stays authoritative.
+        if (attempts.size >= 4096) attempts.delete(attempts.keys().next().value!);
         bucket = { count: 0, expires: time + 60_000 };
         attempts.set(key, bucket);
       }
