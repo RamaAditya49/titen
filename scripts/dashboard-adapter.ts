@@ -4,6 +4,7 @@ import { isIP } from "node:net";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readBoundedText } from "../src/core/http";
 
 const enabled = process.env.TITEN_DASHBOARD_LIVE === "true";
 const sessionMode = process.env.TITEN_DASHBOARD_AUTH === "session";
@@ -227,8 +228,8 @@ async function credential(request: Request): Promise<{ key: string } | undefined
 async function bodyObject(request: Request, limit = BODY_LIMIT): Promise<Record<string, unknown> | undefined> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (declared > limit) return;
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > limit) return;
+  const text = await readBoundedText(request, limit);
+  if (text === undefined) return;
   try {
     const parsed: unknown = JSON.parse(text);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
@@ -321,7 +322,8 @@ const readRoutes = new Map<string, { path: string; query: string[] }>([
   ["/dashboard-api/profile/passkeys", { path: "/v1/operator-accounts/current/passkeys", query: [] }],
 ]);
 
-const server = Bun.serve({ hostname: "127.0.0.1", port, async fetch(request) {
+// Every handler reads at most BODY_LIMIT. This bound stops a larger body before a handler runs.
+const server = Bun.serve({ hostname: "127.0.0.1", port, maxRequestBodySize: 2 * BODY_LIMIT, async fetch(request) {
   const raw = request.url.replace(/^https?:\/\/[^/]+/i, "");
   const url = new URL(request.url);
   if (!authorized(request)) return error(403, "FORBIDDEN", "Dashboard adapter is loopback same-origin only.");
