@@ -17,7 +17,8 @@ subject's history for a metadata field. The probe also ignored a historical `at`
 
 Scope: `src/core/context.ts` only, plus docs and tests. No migration; the
 existing `observations_scope (org_id, subject_id, ingested_at)` index serves the
-window. The window size is 500. `budget.unconsolidated_observations` becomes
+window. The window is the 500 newest observations the caller may read, so the
+access predicate runs while the index is walked, before LIMIT. `budget.unconsolidated_observations` becomes
 windowed, and `budget.unconsolidated_observations_capped: true` is added only
 when the window is full, so existing responses keep their shape.
 
@@ -28,6 +29,7 @@ when the window is full, so existing responses keep their shape.
 - **AC-CTX-003 — Event-driven:** When 500 or more observations of the subject fall at or before `as_of`, Titen shall set `budget.unconsolidated_observations_capped` to `true`.
 - **AC-CTX-004 — Event-driven:** When a compile specifies `at`, Titen shall exclude observations ingested after `at` from `unconsolidated_observations` and `unconsolidated_observation_ids`.
 - **AC-CTX-005 — Unwanted behavior:** If a recent observation is not readable by the caller, then Titen shall exclude it from the count and the ids.
+- **AC-CTX-007 — Unwanted behavior:** If observations the caller cannot read are newer than the caller's readable ones, then Titen shall leave `unconsolidated_observations`, `unconsolidated_observation_ids`, and `unconsolidated_observations_capped` exactly as they would be without those observations.
 - **AC-CTX-006 — Ubiquitous:** Titen shall keep the existing budget shape when the window is not full: no `unconsolidated_observations_capped` field and an unchanged consolidation hint.
 
 ## Done conditions
@@ -37,4 +39,4 @@ when the window regresses to a sort or a scan. The benchmark below is recorded.
 
 ## Completion evidence
 
-All six acceptance criteria passed; the paired plan maps each to its check.
+All seven acceptance criteria passed; the paired plan maps each to its check.

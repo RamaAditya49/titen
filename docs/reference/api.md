@@ -702,7 +702,8 @@ estimates for the items that were selected. `budget` reports
 explicit `budget_exhausted` boolean, and `omissions`. It also reports
 `unconsolidated_observations`: the authorized observations in the effective
 subject/project scope that no claim cites yet. The probe inspects only the
-subject's 500 newest observations ingested at or before the compile's `as_of`,
+500 newest observations of the subject that the caller may read, ingested at or
+before the compile's `as_of`,
 so its cost does not grow with the subject's history. When that window is full,
 `budget.unconsolidated_observations_capped` is `true` and the count covers the
 window only; older unconsolidated observations may exist. When the count is

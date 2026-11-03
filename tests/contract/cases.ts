@@ -1897,7 +1897,7 @@ export const CASES: Case[] = [
     name: "compile bounds the unconsolidated probe to a recent window and to the as-of instant",
     async run(fx) {
       const owner = await fx.provision({ principalId: "agent_window_owner" });
-      const other = await fx.provision({ principalId: "agent_window_other" });
+      const other = await fx.provision({ principalId: "agent_window_other", orgId: owner.orgId });
       const subject = "subject_unconsolidated_window";
       const write = (key: string, ref: string, visibility: string) =>
         fx.call("POST", "/v1/observations", {
@@ -1934,6 +1934,24 @@ export const CASES: Case[] = [
       expectOk(before);
       assert.equal(before.body.data.budget.unconsolidated_observations, 0);
       assert.equal(before.body.data.budget.unconsolidated_observation_ids, undefined);
+
+      // Another principal's private notes never fill the caller's window.
+      await fx.query(
+        `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 500)
+         INSERT INTO observations (id, org_id, subject_id, project_id, agent_id, run_id, actor_id,
+                                   kind, content, content_hash, source_type, source_ref, trust,
+                                   visibility, occurred_at, ingested_at, workspace_id)
+         SELECT o.id || '_h' || n.i, o.org_id, o.subject_id, o.project_id, o.agent_id, o.run_id,
+                o.actor_id, o.kind, o.content, o.content_hash, o.source_type, o.source_ref, o.trust,
+                o.visibility, o.occurred_at, '2998-01-01T00:00:00.000Z', o.workspace_id
+           FROM observations o, n WHERE o.id = ?`,
+        [hidden.body.data.observation_id],
+      );
+      const crowded = await compile({ at: "2998-06-01T00:00:00Z" });
+      expectOk(crowded);
+      assert.equal(crowded.body.data.budget.unconsolidated_observations, 1);
+      assert.deepEqual(crowded.body.data.budget.unconsolidated_observation_ids, [seed.body.data.observation_id]);
+      assert.equal(crowded.body.data.budget.unconsolidated_observations_capped, undefined);
 
       // Fill the window with newer readable copies of the seed note.
       await fx.query(

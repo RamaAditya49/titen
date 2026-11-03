@@ -59,8 +59,8 @@ function effectiveScope(subjectId: string, projectId: string | null, mode: Proje
 export const MIN_BUDGET_TOKENS = 128;
 
 /**
- * How many of the subject's newest observations the unconsolidated probe
- * inspects. Observations are append-only, so an unbounded anti-join made every
+ * How many of the subject's newest caller-readable observations the
+ * unconsolidated probe inspects. Observations are append-only, so an unbounded anti-join made every
  * compile cost O(subject history) for a metadata field (#339).
  */
 export const UNCONSOLIDATED_WINDOW = 500;
@@ -76,21 +76,23 @@ export async function countUnconsolidatedObservations(
   at: string,
 ): Promise<{ count: number; ids: string[]; capped: boolean }> {
   const principal = ctx.principal!;
-  // One statement: the window is an index range on observations_scope, and the
-  // access and citation checks run only on rows inside it.
+  // One statement: the window walks observations_scope newest first and keeps
+  // only rows the caller may read, so hidden observations can neither fill the
+  // window nor push readable ones out of it. Only the citation check runs on
+  // the window afterwards.
   const rows = await ctx.app.db.all<{ id: string | null; window_rows: number }>(
     `WITH recent AS (
        SELECT o.id, o.ingested_at FROM observations o
         WHERE o.org_id = ? AND o.subject_id = ?
           AND (? = 1 OR o.project_id IS ?)
           AND o.ingested_at <= ?
+          AND ${recordAccessSql("o")}
         ORDER BY o.ingested_at DESC LIMIT ?
      ), pending AS (
-       SELECT r.id, r.ingested_at FROM recent r JOIN observations o ON o.id = r.id
-        WHERE ${recordAccessSql("o")}
-          AND NOT EXISTS (
-            SELECT 1 FROM claim_sources source WHERE source.observation_id = r.id
-          )
+       SELECT r.id, r.ingested_at FROM recent r
+        WHERE NOT EXISTS (
+          SELECT 1 FROM claim_sources source WHERE source.observation_id = r.id
+        )
      )
      SELECT p.id, (SELECT COUNT(*) FROM recent) AS window_rows
        FROM (SELECT 1) LEFT JOIN pending p ON 1 = 1
@@ -101,8 +103,8 @@ export async function countUnconsolidatedObservations(
       Number(crossProject),
       projectId,
       at,
-      UNCONSOLIDATED_WINDOW,
       ...recordAccessParams(principal),
+      UNCONSOLIDATED_WINDOW,
     ],
   );
   const ids = rows.flatMap((row) => (row.id === null ? [] : [row.id]));
