@@ -30,6 +30,17 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 - Dashboard destructive actions confirm in one shared dialog instead of the browser's `confirm()` and `prompt()`. The dialog names the target record, its impact, and whether it can be undone. Cancel is focused by default, and required reasons go in a labelled multi-line field. Release activation now asks for confirmation too. The API keys table shows Created and Last used columns and a key-id suffix, and marks **This session**, so identical "Dashboard session" rows and their Revoke buttons are distinguishable. Revoking your own session warns first and then says you revoked it (#356).
 
+## [0.10.8] — 2026-11-03
+
+schema 27
+
+A flood of sign-in attempts with new usernames can no longer lock every operator out of the dashboard ([GHSA-5f6j-4xcw-58px](https://github.com/RamaAditya49/titen/security/advisories/GHSA-5f6j-4xcw-58px)).
+
+### Security
+
+- Dashboard sign-in no longer locks out every operator when the shared throttle table is full. Admission evicts unblocked rows with the fewest recorded failures first and keeps active blocks. Only a table full of active blocks returns `LOGIN_RATE_LIMITED`.
+- The Bun client limiter replaces its oldest client when it tracks 4096 clients, instead of refusing every new client.
+
 ## [0.10.7] — 2026-10-14
 
 schema 27
@@ -1623,7 +1634,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.7...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.8...HEAD
+[0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
 [0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
 [0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
 [0.10.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.5
