@@ -3180,19 +3180,26 @@ export const CASES: Case[] = [
         orgId: owner.orgId,
         principalId: `import_admin_${fx.runtime}`,
         principalKind: "human",
-        scopes: ["import:write", "memberships:write"],
+        scopes: ["import:write", "memberships:write", "keys:manage"],
       });
       expectOk(await fx.call("POST", "/v1/memberships", {
         key: owner.key,
         body: { principal_id: admin.principalId, principal_kind: "human", role: "admin" },
       }), 201);
+      const accomplice = `import_accomplice_${fx.runtime}`;
       const body = [
         { type: "titen.export.header", format_version: 4, org_id: owner.orgId },
+        {
+          type: "titen.import.actor_map",
+          source_org_id: owner.orgId,
+          source_actor_id: "source_accomplice",
+          destination_actor_id: accomplice,
+        },
         {
           type: "membership",
           id: `mbr_import_admin_owner_${fx.runtime}`,
           workspace_id: null,
-          principal_id: admin.principalId,
+          principal_id: "source_accomplice",
           principal_kind: "human",
           role: "owner",
           created_at: "2026-08-01T00:00:00.000Z",
@@ -3201,8 +3208,9 @@ export const CASES: Case[] = [
 
       expectError(await fx.callRaw("POST", "/v1/import", { key: admin.key, body }), 403, "FORBIDDEN");
       assert.deepEqual(
-        await fx.query(`SELECT role FROM memberships WHERE org_id = ? AND principal_id = ?`, [owner.orgId, admin.principalId]),
-        [{ role: "admin" }],
+        await fx.query(`SELECT role FROM memberships WHERE org_id = ? AND principal_id = ?`, [owner.orgId, accomplice]),
+        [],
+        "only an owner may grant the owner role",
       );
     },
   },
