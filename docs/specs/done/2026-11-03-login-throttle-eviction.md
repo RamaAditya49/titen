@@ -1,12 +1,11 @@
 ---
 work_id: login-throttle-eviction
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-11-03
 updated: 2026-11-03
-review_after: 2026-11-17
 owner: maintainers
 ---
 # Dashboard sign-in survives a full throttle table
@@ -82,3 +81,8 @@ The Bun edge limiter has the same failure mode. Its map refuses every new client
 - `pnpm test:api`, `pnpm test:integration`, `tsc --noEmit`, and `pnpm check:workflow` pass.
 - The API reference, the VPS guide, the threat model, and the changelog describe the new behavior.
 - Release and advisory publication stay a separate maintainer decision.
+
+## Delivery
+
+Branch `fix/login-throttle-eviction` delivers the change. All acceptance criteria pass on `rama-tuf`.
+The paired plan records the failing runs on the old code and the passing suites.
