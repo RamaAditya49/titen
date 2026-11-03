@@ -1894,6 +1894,77 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "compile bounds the unconsolidated probe to a recent window and to the as-of instant",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "agent_window_owner" });
+      const other = await fx.provision({ principalId: "agent_window_other" });
+      const subject = "subject_unconsolidated_window";
+      const write = (key: string, ref: string, visibility: string) =>
+        fx.call("POST", "/v1/observations", {
+          key,
+          body: {
+            subject_id: subject,
+            kind: "imported_source",
+            content: `Window note ${ref}.`,
+            source: { type: "import:markdown@1", ref },
+            trust: "asserted",
+            visibility,
+          },
+        });
+      const seed = await write(owner.key, "window#seed", "private");
+      expectOk(seed, 201);
+      const hidden = await write(other.key, "window#hidden", "private");
+      expectOk(hidden, 201);
+      const compile = (body: Record<string, unknown> = {}) =>
+        fx.call("POST", "/v1/context/compile", {
+          key: owner.key,
+          body: { subject_id: subject, task: "window note", max_tokens: 900, ...body },
+        });
+
+      const small = await compile();
+      expectOk(small);
+      // Another principal's private note is never counted or listed.
+      assert.equal(small.body.data.budget.unconsolidated_observations, 1);
+      assert.deepEqual(small.body.data.budget.unconsolidated_observation_ids, [seed.body.data.observation_id]);
+      assert.equal(small.body.data.budget.unconsolidated_observations_capped, undefined);
+
+      const before = await compile({
+        at: new Date(Date.parse(seed.body.data.ingested_at) - 1000).toISOString(),
+      });
+      expectOk(before);
+      assert.equal(before.body.data.budget.unconsolidated_observations, 0);
+      assert.equal(before.body.data.budget.unconsolidated_observation_ids, undefined);
+
+      // Fill the window with newer readable copies of the seed note.
+      await fx.query(
+        `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 500)
+         INSERT INTO observations (id, org_id, subject_id, project_id, agent_id, run_id, actor_id,
+                                   kind, content, content_hash, source_type, source_ref, trust,
+                                   visibility, occurred_at, ingested_at, workspace_id)
+         SELECT o.id || '_w' || n.i, o.org_id, o.subject_id, o.project_id, o.agent_id, o.run_id,
+                o.actor_id, o.kind, o.content, o.content_hash, o.source_type, o.source_ref, o.trust,
+                o.visibility, o.occurred_at, '2999-01-01T00:00:00.000Z', o.workspace_id
+           FROM observations o, n WHERE o.id = ?`,
+        [seed.body.data.observation_id],
+      );
+      const full = await compile({ at: "2999-06-01T00:00:00Z" });
+      expectOk(full);
+      assert.equal(full.body.data.budget.unconsolidated_observations, 500);
+      assert.equal(full.body.data.budget.unconsolidated_observation_ids.length, 20);
+      assert.equal(
+        full.body.data.budget.unconsolidated_observation_ids.includes(seed.body.data.observation_id),
+        false,
+      );
+      assert.equal(full.body.data.budget.unconsolidated_observations_capped, true);
+      assert.match(full.body.data.budget.hint, /titen_consolidate/);
+
+      const asOfNow = await compile();
+      expectOk(asOfNow);
+      assert.equal(asOfNow.body.data.budget.unconsolidated_observations, 1);
+      assert.equal(asOfNow.body.data.budget.unconsolidated_observations_capped, undefined);
+    },
+  },
+  {
     name: "compile reports only authorized unconsolidated observations",
     async run(fx) {
       const owner = await fx.provision({ principalId: "agent_observation_owner" });

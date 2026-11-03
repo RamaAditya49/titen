@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Changed
+
+- Context compile no longer scans a subject's entire observation history to report `budget.unconsolidated_observations`. One statement now inspects the 500 newest observations at or before the compile's `as_of` and sets `budget.unconsolidated_observations_capped: true` when that window is full. On a subject with 200,000 unconsolidated observations, median compile latency on Bun dropped from 382 ms to 3.7 ms (2.7 ms for a subject with none). Observations ingested after a historical `at` are no longer counted (#339).
+
 ## [0.10.7] — 2026-10-14
 
 schema 27

@@ -58,37 +58,59 @@ function effectiveScope(subjectId: string, projectId: string | null, mode: Proje
 /** Smallest `max_tokens` the compile route accepts. A normal item needs more. */
 export const MIN_BUDGET_TOKENS = 128;
 
-async function countUnconsolidatedObservations(
+/**
+ * How many of the subject's newest observations the unconsolidated probe
+ * inspects. Observations are append-only, so an unbounded anti-join made every
+ * compile cost O(subject history) for a metadata field (#339).
+ */
+export const UNCONSOLIDATED_WINDOW = 500;
+
+/** Number of unconsolidated observation ids a pack lists. */
+const UNCONSOLIDATED_IDS = 20;
+
+export async function countUnconsolidatedObservations(
   ctx: RequestContext,
   subjectId: string,
   projectId: string | null,
   crossProject: boolean,
-): Promise<{ count: number; ids: string[] }> {
+  at: string,
+): Promise<{ count: number; ids: string[]; capped: boolean }> {
   const principal = ctx.principal!;
-  const where = `o.org_id = ? AND o.subject_id = ?
-        AND (? = 1 OR o.project_id IS ?)
-        AND ${recordAccessSql("o")}
-        AND NOT EXISTS (
-          SELECT 1 FROM claim_sources source
-           WHERE source.observation_id = o.id
-        )`;
-  const params = [
-    principal.orgId,
-    subjectId,
-    Number(crossProject),
-    projectId,
-    ...recordAccessParams(principal),
-  ];
-  const row = await first<{ count: number }>(
-    ctx.app.db,
-    `SELECT COUNT(*) AS count FROM observations o WHERE ${where}`,
-    params,
+  // One statement: the window is an index range on observations_scope, and the
+  // access and citation checks run only on rows inside it.
+  const rows = await ctx.app.db.all<{ id: string | null; window_rows: number }>(
+    `WITH recent AS (
+       SELECT o.id, o.ingested_at FROM observations o
+        WHERE o.org_id = ? AND o.subject_id = ?
+          AND (? = 1 OR o.project_id IS ?)
+          AND o.ingested_at <= ?
+        ORDER BY o.ingested_at DESC LIMIT ?
+     ), pending AS (
+       SELECT r.id, r.ingested_at FROM recent r JOIN observations o ON o.id = r.id
+        WHERE ${recordAccessSql("o")}
+          AND NOT EXISTS (
+            SELECT 1 FROM claim_sources source WHERE source.observation_id = r.id
+          )
+     )
+     SELECT p.id, (SELECT COUNT(*) FROM recent) AS window_rows
+       FROM (SELECT 1) LEFT JOIN pending p ON 1 = 1
+      ORDER BY p.ingested_at, p.id`,
+    [
+      principal.orgId,
+      subjectId,
+      Number(crossProject),
+      projectId,
+      at,
+      UNCONSOLIDATED_WINDOW,
+      ...recordAccessParams(principal),
+    ],
   );
-  const ids = await ctx.app.db.all<{ id: string }>(
-    `SELECT o.id FROM observations o WHERE ${where} ORDER BY o.ingested_at, o.id LIMIT 20`,
-    params,
-  );
-  return { count: Number(row?.count ?? 0), ids: ids.map((item) => item.id) };
+  const ids = rows.flatMap((row) => (row.id === null ? [] : [row.id]));
+  return {
+    count: ids.length,
+    ids: ids.slice(0, UNCONSOLIDATED_IDS),
+    capped: Number(rows[0]?.window_rows ?? 0) >= UNCONSOLIDATED_WINDOW,
+  };
 }
 
 export async function compileContext(ctx: RequestContext): Promise<Result> {
@@ -136,16 +158,16 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
       ? "project"
       : "unscoped";
   const policySnapshot = scopePolicySnapshot(projectMode);
+  const now = ctx.app.now();
+  const at = optionalTimestamp(body, "at") ?? now.toISOString();
   const unconsolidated = await countUnconsolidatedObservations(
     ctx,
     subjectId,
     projectId,
     Boolean(crossProject),
+    at,
   );
   const unconsolidatedObservations = unconsolidated.count;
-
-  const now = ctx.app.now();
-  const at = optionalTimestamp(body, "at") ?? now.toISOString();
   const scope = { subjectId, projectId, crossProject, at, limit: maxCandidates };
   const lexical = planFtsQuery(task);
   const candidates = lexical.match
@@ -368,6 +390,7 @@ export async function compileContext(ctx: RequestContext): Promise<Result> {
         ...(unconsolidated.ids.length > 0
           ? { unconsolidated_observation_ids: unconsolidated.ids }
           : {}),
+        ...(unconsolidated.capped ? { unconsolidated_observations_capped: true } : {}),
         // Token budget only. `omitted_items` above it and `budget_exhausted`
         // false together mean the count bound truncated, not the budget.
         budget_exhausted: packed.budgetExhausted,
