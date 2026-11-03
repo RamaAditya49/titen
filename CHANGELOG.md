@@ -30,6 +30,17 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 - `GET /v1/memories` applies the claim validity window per row: `active` and `disputed` mean currently valid, whichever other statuses are requested. `status=active,superseded` no longer brings back expired or not-yet-valid active claims, and `facets` now use the same predicate, so `facets.status.active` matches what `status=active` lists. Facets and the validity rule are documented (#347).
 
+## [0.10.8] — 2026-11-03
+
+schema 27
+
+A flood of sign-in attempts with new usernames can no longer lock every operator out of the dashboard ([GHSA-5f6j-4xcw-58px](https://github.com/RamaAditya49/titen/security/advisories/GHSA-5f6j-4xcw-58px)).
+
+### Security
+
+- Dashboard sign-in no longer locks out every operator when the shared throttle table is full. Admission evicts unblocked rows with the fewest recorded failures first and keeps active blocks. Only a table full of active blocks returns `LOGIN_RATE_LIMITED`.
+- The Bun client limiter replaces its oldest client when it tracks 4096 clients, instead of refusing every new client.
+
 ## [0.10.7] — 2026-10-14
 
 schema 27
@@ -1623,7 +1634,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.7...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.8...HEAD
+[0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
 [0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
 [0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
 [0.10.5]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.5
