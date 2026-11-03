@@ -367,6 +367,22 @@ function readSelectedFiles(input: string, profileId: SourceImportProfile): {
   return { files, skipped: selected.skipped, bytes: total };
 }
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * The last grapheme boundary at or before `limit`, so a forced cut never splits
+ * a surrogate pair, a ZWJ emoji sequence, or a base character from its marks
+ * (#358). Falls back to `limit` only when one cluster is longer than the window.
+ */
+function graphemeCut(text: string, limit: number): number {
+  let cut = 0;
+  for (const { index } of graphemes.segment(text.slice(0, limit + 64))) {
+    if (index > limit) break;
+    cut = index;
+  }
+  return cut > 0 ? cut : limit;
+}
+
 function splitClaim(text: string): string[] {
   const chunks: string[] = [];
   let rest = text.trim();
@@ -375,7 +391,7 @@ function splitClaim(text: string): string[] {
     const newline = window.lastIndexOf("\n", MAX_CLAIM_CHARS);
     const space = window.lastIndexOf(" ", MAX_CLAIM_CHARS);
     const boundary = Math.max(newline, space);
-    const cut = boundary >= Math.floor(MAX_CLAIM_CHARS / 2) ? boundary : MAX_CLAIM_CHARS;
+    const cut = boundary >= Math.floor(MAX_CLAIM_CHARS / 2) ? boundary : graphemeCut(rest, MAX_CLAIM_CHARS);
     chunks.push(rest.slice(0, cut).trim());
     rest = rest.slice(cut).trimStart();
   }
@@ -662,6 +678,8 @@ export async function prepareSourceImport(options: PrepareSourceImportOptions): 
   const selected = readSelectedFiles(options.path, destination.profile);
   const rawEntries = parseEntries(selected.files, destination.profile).flatMap((entry) => {
     const chunks = splitClaim(entry.content);
+    // Fail in the preview, never halfway through --apply, if a chunk is not valid text.
+    chunks.forEach((chunk, index) => safeText(chunk, `${entry.provenance};chunk=${index}`));
     return chunks.map((content, index) => chunks.length === 1 ? entry : {
       ...entry,
       identity: `${entry.identity}:chunk:${index}`,
