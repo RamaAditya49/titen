@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `GET /v1/keys` can reach every key in the organization. It was capped at the 500 oldest keys with no cursor, so once dashboard sign-ins had filled that window, newly issued keys never appeared. The response now carries `data.next_cursor`, and the endpoint accepts `cursor`, `limit` (1-500, default 500), `status` (`active|pending|expired|revoked|all`) and `principal_id`. Filters run before the limit, and fences are loaded only for the returned page. The default first page is unchanged. The SDK's `listKeys(options)` passes these through and returns `next_cursor` (#340).
+
 ## [0.10.7] — 2026-10-14
 
 schema 27
