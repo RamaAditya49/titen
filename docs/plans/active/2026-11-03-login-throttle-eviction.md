@@ -20,6 +20,7 @@ Run every test on `rama-tuf` in a separate worktree. Push the branch to `rama-tu
 - [ ] Run the new tests on the old code. Record the failures.
 - [ ] Add tiered eviction to `admitPasswordAttempt` in `src/core/login-security.ts`.
 - [ ] Evict the oldest client in `src/runtime/bun/login-rate-limit.ts`.
+- [ ] Insert a missing row in `recordLoginFailure` before its update. Add a contract case for AC-THR-009.
 - [ ] Run `tsc --noEmit`, `pnpm test:api`, and `pnpm test:integration` on `rama-tuf`.
 - [ ] Update `docs/reference/api.md`, `docs/deployment/vps.md`, `docs/security/threat-model.md`, and `CHANGELOG.md`.
 - [ ] Run `pnpm check:workflow`. Move both artifacts to `done/`.
@@ -36,6 +37,7 @@ Run every test on `rama-tuf` in a separate worktree. Push the branch to `rama-tu
 | AC-THR-006 | Integration: 2,100-attempt flood from 210 addresses, then a correct sign-in returns 201 |
 | AC-THR-007 | Integration: limiter with 4096 live clients admits a new client and keeps the per-client limit |
 | AC-THR-008 | `pnpm test:api` runs the contract on Bun/SQLite and D1 (Miniflare) |
+| AC-THR-009 | Contract: a failure with no stored rows creates both rows with one failure |
 
 ## Rollback
 

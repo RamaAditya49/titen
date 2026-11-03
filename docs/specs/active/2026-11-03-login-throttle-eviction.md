@@ -36,6 +36,7 @@ The Bun edge limiter has the same failure mode. Its map refuses every new client
   A pending reservation (`blocked_until_ms = -1`) counts as zero failures.
 - Never evict an active block, or the caller's own account or client row.
 - Keep the 4096-row bound and the HTTP 429 response when active blocks leave no room.
+- Record each verified failure even when eviction removed the attempt's rows during password work.
 - Evict the oldest client from the full Bun edge limiter map instead of refusing the new client.
 - Add contract tests for Bun/SQLite and D1, an HTTP-level flood test, and a limiter unit test.
 - Update the API reference, the VPS guide, the threat model, and the changelog.
@@ -54,8 +55,11 @@ The Bun edge limiter has the same failure mode. Its map refuses every new client
 - Eviction must not reset the 50-failure account ceiling cheaply.
   Plain least-recently-touched eviction would let a flood evict a partly failed account row.
   Eviction by failure tier makes an attacker fill the table with rows of equal or higher failures first.
-- An evicted pending reservation loses at most one failure record for that bucket.
-  The account row of a targeted account is not a reservation after its first failure.
+- Eviction can remove a pending reservation while its password check runs.
+  Without a fix, the failure update then matches no row, and a client can skip its five-failure limit.
+  Keeping reservations out of eviction is not safe: guard-rejected attempts leave reservations, so the lockout returns.
+  `recordLoginFailure` therefore inserts a missing row before its update.
+  The extra rows are bounded by concurrent password checks, and the next admission evicts back to the bound.
 - `LIMIT` with a negative value means no limit in SQLite. The eviction count uses `max(0, ...)`.
 - This change supersedes AC-LOGIN-004 in `docs/specs/done/2026-10-05-login-hardening.md`.
   Only a table without enough unblocked rows now returns HTTP 429.
@@ -69,7 +73,8 @@ The Bun edge limiter has the same failure mode. Its map refuses every new client
 - **AC-THR-005 — Ubiquitous:** Titen shall keep the throttle table at no more than 4096 rows.
 - **AC-THR-006 — Event-driven:** When callers send 2,100 failed sign-ins with distinct usernames from 210 addresses, Titen shall return HTTP 201 for a later correct sign-in.
 - **AC-THR-007 — Unwanted behavior:** If the Bun client limiter holds 4096 live clients, then Titen shall evict the oldest client and admit the new client.
-- **AC-THR-008 — Ubiquitous:** Titen shall apply AC-THR-001 to AC-THR-005 on Bun/SQLite and Cloudflare D1.
+- **AC-THR-008 — Ubiquitous:** Titen shall apply AC-THR-001 to AC-THR-005 and AC-THR-009 on Bun/SQLite and Cloudflare D1.
+- **AC-THR-009 — Unwanted behavior:** If eviction removes an attempt's rows before its failure is recorded, then Titen shall record that failure.
 
 ## Done conditions
 

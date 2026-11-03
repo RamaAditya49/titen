@@ -4,6 +4,8 @@ import { createApp } from "../../src/core/app";
 import { newOperatorAccount } from "../../src/core/accounts";
 import { organizationStatement } from "../../src/core/auth";
 import { sha256Hex } from "../../src/core/ids";
+import { recordLoginFailure } from "../../src/core/login-security";
+import type { RequestContext } from "../../src/core/http";
 
 export async function assertLoginSecurity(db: Db, runtime: string) {
   const now = new Date("2026-10-05T00:00:00Z");
@@ -60,5 +62,12 @@ export async function assertLoginSecurity(db: Db, runtime: string) {
   assert.equal((await login("mixed-client", account.temporaryPassword)).status, 201, "two unblocked rows make room for a sign-in");
   assert.equal((await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles WHERE blocked_until_ms > ?", [now.getTime()]))[0]!.count, 4094);
   assert.ok(await rowCount() <= 4096);
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // A failure still counts when eviction removed the attempt's rows during password work.
+  await recordLoginFailure({ app: { db } } as unknown as RequestContext, { account: "evicted", client: "evicted.client" }, now.getTime());
+  assert.deepEqual((await db.all<{ identity_hash: string; failures: number; blocked_until_ms: number }>(
+    "SELECT identity_hash, failures, blocked_until_ms FROM login_throttles ORDER BY identity_hash")).map((row) => ({ ...row })),
+  [{ identity_hash: "evicted", failures: 1, blocked_until_ms: 0 }, { identity_hash: "evicted.client", failures: 1, blocked_until_ms: 0 }]);
   await db.batch([{ sql: "DELETE FROM login_throttles" }]);
 }

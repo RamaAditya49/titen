@@ -76,6 +76,9 @@ export async function recordLoginFailure(ctx: RequestContext, keys: { account: s
   account?: { id: string; org_id: string; principal_id: string }) {
   const statements: Stmt[] = [];
   for (const [key, limit, kind] of [[keys.account, 50, "account"], [keys.client, 5, "client"]] as const) {
+    // Eviction can remove a reservation during password work. Recreate it so the failure still counts.
+    statements.push({ sql: `INSERT OR IGNORE INTO login_throttles (identity_hash, failures, blocked_until_ms, touched_at_ms)
+      VALUES (?, 1, -1, ?)`, params: [key, now] });
     const count = `(CASE WHEN blocked_until_ms = -1 OR ? - touched_at_ms >= ${WINDOW_MS} THEN 1 ELSE failures + 1 END)`;
     statements.push({ sql: `UPDATE login_throttles SET
       blocked_until_ms = CASE
