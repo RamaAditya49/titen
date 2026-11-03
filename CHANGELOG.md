@@ -26,6 +26,17 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Security
+
+- Import applies the direct-route authority rules. A membership record needs an organization owner or admin, and only an owner may import the `owner` role. A credential without `*` may import keys only for its own principal.
+- Request bodies are bounded while they are read. A chunked body above 1 MiB returns `PAYLOAD_TOO_LARGE` without buffering the rest. The Bun server and the dashboard adapter also set a runtime body limit.
+- Webhook attempts add `X-Titen-Timestamp` and `X-Titen-Signature-V2`, an HMAC of the timestamp, the delivery id, and the body. Verify V2 and reject a timestamp older than 300 seconds. `X-Titen-Signature` stays for existing receivers.
+- An audit cursor from another organization now returns no entries, the same as an unknown cursor.
+
+### Changed
+
+- ADR 0007 records `mcp:call` as a tool-bundle scope. Its behavior does not change.
+
 ## [0.10.8] — 2026-11-03
 
 schema 27
