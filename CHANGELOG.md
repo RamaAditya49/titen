@@ -26,6 +26,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.9] — 2026-11-03
+
+schema 27
+
+Import, request bodies, webhook signatures, and the audit cursor now close the open findings of [GHSA-27j7-xc9x-322c](https://github.com/RamaAditya49/titen/security/advisories/GHSA-27j7-xc9x-322c).
+
 ### Security
 
 - Import applies the direct-route authority rules. A membership record needs an organization owner or admin, and only an owner may import the `owner` role. A credential without `*` may import keys only for its own principal.
@@ -1641,7 +1647,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.8...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.9...HEAD
+[0.10.9]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.9
 [0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
 [0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
 [0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
