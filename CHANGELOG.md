@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Security
+
+- Dashboard sign-in no longer returns `429 LOGIN_RATE_LIMITED` for everyone when the login throttle table fills up. Attempts with made-up usernames could fill it and lock every operator out. Admission now removes unblocked throttle rows with the fewest recorded failures first, then the oldest. Active blocks are never removed, and an account's failure count survives a full table. Only storage full of active blocks still returns 429. There is no schema change.
+
 ## [0.10.7] — 2026-10-14
 
 schema 27

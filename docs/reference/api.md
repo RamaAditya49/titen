@@ -218,7 +218,8 @@ staged key to its completion and logout routes. Unknown users and wrong
 passwords return the same `INVALID_LOGIN` response. A persistent hashed account
 and client buckets apply progressive delays before password verification.
 Five failures block the client bucket. Fifty failures block the account across clients within a 15-minute window.
-Active blocks remain stored. Full throttle storage and full password-check capacity return HTTP 429.
+Active blocks remain stored. When throttle storage is full, admission removes the unblocked rows with the fewest failures first, then the oldest.
+Storage full of active blocks and full password-check capacity return HTTP 429.
 Successful authentication returns `failed_attempts`. Block transitions write metadata-only `operator_account.login_block` audit records.
 
 `POST /v1/dashboard-sessions/recovery` accepts only `username` without a password.

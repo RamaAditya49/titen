@@ -605,7 +605,8 @@ Register a passkey for every operator. Save the one-time recovery codes outside 
 Configure an edge rate-limit rule for dashboard sign-in and recovery routes.
 Bun permits 20 attempts per client per minute and four concurrent sign-in password checks.
 The SQL throttle permits five failures per client and 50 failures per account within 15 minutes.
-Active blocks are never evicted. A full throttle table returns HTTP 429 before password work.
+Active blocks are never evicted. A full table evicts unblocked rows with the fewest failures first, then the oldest.
+Only a table full of active blocks returns HTTP 429 before password work. Keep the edge rate-limit rule as the first layer.
 
 Bun uses the socket address. Configure `TITEN_LOGIN_CLIENT_IP_HEADER` only for a trusted loopback proxy.
 The proxy must replace that header with one verified client IP. Direct remote clients cannot override socket identity.

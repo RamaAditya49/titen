@@ -53,6 +53,7 @@ export async function admitPasswordAttempt(ctx: RequestContext, keys: { account:
     throw new ApiError(401, "INVALID_LOGIN", "Username or password is invalid.");
   await ctx.app.db.batch([
     { sql: "DELETE FROM login_throttles WHERE blocked_until_ms <= ? AND touched_at_ms <= ?", params: [now, now - WINDOW_MS] },
+    evictForAdmission(keys, now),
     ...[keys.account, keys.client].map((key): Stmt => ({
       sql: `INSERT OR IGNORE INTO login_throttles (identity_hash, failures, blocked_until_ms, touched_at_ms)
         SELECT ?, 1, -1, ? WHERE (SELECT COUNT(*) FROM login_throttles) < ?`, params: [key, now, MAX_BUCKETS],
@@ -61,6 +62,22 @@ export async function admitPasswordAttempt(ctx: RequestContext, keys: { account:
   const admitted = await ctx.app.db.all<{ count: number }>(
     "SELECT COUNT(*) AS count FROM login_throttles WHERE identity_hash IN (?, ?)", [keys.account, keys.client]);
   if (Number(admitted[0]?.count) !== 2) throw loginLimited();
+}
+
+// Full storage must not reject every sign-in, so admission frees exactly the rows it
+// needs. Active blocks and the request's own buckets are never removed. Rows with the
+// fewest failures go first, then the oldest, so a flood of one-failure rows evicts
+// itself instead of resetting a bucket that has already counted real failures.
+function evictForAdmission(keys: { account: string; client: string }, now: number): Stmt {
+  return {
+    sql: `DELETE FROM login_throttles WHERE identity_hash IN (
+      SELECT identity_hash FROM login_throttles
+       WHERE blocked_until_ms <= ? AND identity_hash NOT IN (?, ?)
+       ORDER BY failures, touched_at_ms, identity_hash
+       LIMIT max(0, (SELECT COUNT(*) FROM login_throttles) + 2
+         - (SELECT COUNT(*) FROM login_throttles WHERE identity_hash IN (?, ?)) - ?))`,
+    params: [now, keys.account, keys.client, keys.account, keys.client, MAX_BUCKETS],
+  };
 }
 
 export async function recordLoginFailure(ctx: RequestContext, keys: { account: string; client: string }, now: number,

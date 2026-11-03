@@ -43,4 +43,39 @@ export async function assertLoginSecurity(db: Db, runtime: string) {
   assert.equal((await login("new-client", account.temporaryPassword)).status, 429, "full active storage rejects before password work");
   assert.equal((await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles"))[0]!.count, 4096);
   await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // Storage full of unblocked one-failure rows (what made-up usernames leave behind) must not lock operators out.
+  const rowCount = async () => Number((await db.all<{ count: number }>("SELECT COUNT(*) AS count FROM login_throttles"))[0]!.count);
+  const hasRow = async (id: string) => (await db.all("SELECT 1 FROM login_throttles WHERE identity_hash = ?", [id])).length === 1;
+  const recent = now.getTime() - 60_000;
+  await db.batch([
+    { sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4094)
+      INSERT INTO login_throttles SELECT 'flood-' || printf('%04d', x), 1, 0, ? + x FROM n`, params: [recent] },
+    { sql: "INSERT INTO login_throttles VALUES ('kept-high', 4, 0, ?)", params: [recent - 30_000] },
+    { sql: "INSERT INTO login_throttles VALUES ('kept-blocked', 5, ?, ?)", params: [now.getTime() + 60_000, recent - 30_000] },
+  ]);
+  assert.equal(await rowCount(), 4096);
+  assert.equal((await login("flood-client", account.temporaryPassword)).status, 201, "full unblocked storage still admits sign-in");
+  assert.ok(await rowCount() <= 4096, "storage stays bounded");
+  assert.equal(await hasRow("flood-0001"), false, "the oldest one-failure row is evicted first");
+  assert.equal(await hasRow("flood-0002"), false, "only the needed rows are evicted");
+  assert.equal(await hasRow("flood-0003"), true, "newer one-failure rows survive");
+  assert.equal(await hasRow("kept-high"), true, "rows with more failures outrank older one-failure rows");
+  assert.equal(await hasRow("kept-blocked"), true, "active blocks are never evicted");
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
+
+  // Flooding must not reset an account bucket that already holds more failures than the flood rows.
+  await db.batch([
+    { sql: `WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<4095)
+      INSERT INTO login_throttles SELECT 'flood-' || printf('%04d', x), 1, 0, ? + x FROM n`, params: [recent] },
+    { sql: "INSERT INTO login_throttles VALUES (?, 49, 0, ?)", params: [key, recent - 30_000] },
+  ]);
+  assert.equal((await login("flood-client-2", "incorrect horse battery staple")).status, 401);
+  const accountRow = await db.all<{ failures: number; blocked_until_ms: number }>(
+    "SELECT failures, blocked_until_ms FROM login_throttles WHERE identity_hash = ?", [key]);
+  assert.equal(accountRow[0]?.failures, 50, "the account failure count survives a full table");
+  assert.ok(accountRow[0]!.blocked_until_ms > now.getTime(), "the account ceiling still blocks");
+  assert.equal((await login("client-e", account.temporaryPassword)).status, 401, "the account block applies to new clients");
+  assert.ok(await rowCount() <= 4096, "storage stays bounded");
+  await db.batch([{ sql: "DELETE FROM login_throttles" }]);
 }
