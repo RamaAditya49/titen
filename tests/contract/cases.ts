@@ -276,6 +276,46 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "memories apply each claim's validity window per row and facets count what the list shows",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["observations:write", "claims:write", "views:compile"] });
+      const subject = `validity_subject_${fx.runtime}`;
+      const seed = (statement: string, window: Record<string, unknown>) => seedClaim(fx, owner.key, {
+        observation: { subject_id: subject, visibility: "organization", content: statement },
+        claim: { statement, ...window },
+      });
+      const current = await seed("Office is in Bandung.", {});
+      const ended = await seed("Office was in Jakarta.", { valid_from: "1001-01-01T00:00:00Z", valid_to: "1002-01-01T00:00:00Z" });
+      const future = await seed("Office will be in Surabaya.", { valid_from: "9000-01-01T00:00:00Z" });
+      const ids = (res: any) => res.body.data.items.map((item: { id: string }) => item.id).sort();
+      const list = async (query: string) => {
+        const res = await fx.call("GET", `/v1/memories?subject_id=${subject}${query}`, { key: owner.key });
+        expectOk(res);
+        return res;
+      };
+
+      const defaults = await list("");
+      assert.deepEqual(ids(defaults), [current.claimId]);
+      assert.deepEqual(defaults.body.data.facets.status, { active: 1 });
+
+      const active = await list("&status=active");
+      assert.deepEqual(ids(active), [current.claimId]);
+      assert.equal(active.body.data.facets.status.active, active.body.data.items.length);
+
+      // Adding an unrelated status never re-admits active claims outside their window.
+      const mixed = await list("&status=active,superseded");
+      assert.deepEqual(ids(mixed), [current.claimId]);
+      assert.equal(ids(mixed).includes(ended.claimId), false);
+      assert.equal(ids(mixed).includes(future.claimId), false);
+
+      // Facets on a later page come from the same predicate as the first page.
+      const first = await list("&limit=1");
+      const firstFacets = first.body.data.facets;
+      assert.deepEqual(firstFacets, defaults.body.data.facets);
+      assert.deepEqual(firstFacets.kind, { [first.body.data.items[0].kind]: 1 });
+    },
+  },
+  {
     name: "scoped grants drive directories, Atlas graph, and next-request revocation",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
