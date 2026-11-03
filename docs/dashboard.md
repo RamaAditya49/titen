@@ -186,8 +186,10 @@ browser tests also cover credential isolation, revocation, exact origin checks,
 request-size limits, capability hiding, stale private-state clearing,
 principal-scoped empty results, audited administrator mode, workspace
 visibility, scoped grants and key clamps, masked model diagnostics, structured
-operator collections, semantic-sync readiness, keyboard use, and a 320 px
-viewport.
+operator collections, semantic-sync readiness, keyboard use, a 320 px
+viewport, and one confirmation dialog for every destructive or
+release-changing action that names its target, impact, and recovery, with the
+current session's key marked in API & Keys.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

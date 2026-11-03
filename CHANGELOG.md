@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard destructive actions confirm in one shared dialog instead of the browser's `confirm()` and `prompt()`. The dialog names the target record, its impact, and whether it can be undone. Cancel is focused by default, and required reasons go in a labelled multi-line field. Release activation now asks for confirmation too. The API keys table shows Created and Last used columns and a key-id suffix, and marks **This session**, so identical "Dashboard session" rows and their Revoke buttons are distinguishable. Revoking your own session warns first and then says you revoked it (#356).
+
 ## [0.10.7] — 2026-10-14
 
 schema 27
