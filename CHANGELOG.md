@@ -26,6 +26,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Security
+
+- Dashboard sign-in no longer locks out every operator when the shared throttle table is full. Admission evicts unblocked rows with the fewest recorded failures first and keeps active blocks. Only a table full of active blocks returns `LOGIN_RATE_LIMITED`.
+- The Bun client limiter replaces its oldest client when it tracks 4096 clients, instead of refusing every new client.
+
 ## [0.10.7] — 2026-10-14
 
 schema 27
