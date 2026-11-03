@@ -1,12 +1,11 @@
 ---
 work_id: ghsa-27j7-hardening
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-11-03
 updated: 2026-11-03
-review_after: 2026-11-17
 owner: maintainers
 ---
 # Close the open findings of the 0.2.1 security evaluation
@@ -37,7 +36,8 @@ A credential with `import:write` and `keys:manage` can import a key hash for ano
 - Apply the `addMember` role rules to imported memberships.
 - Apply the `createKey` principal rule to imported credentials.
 - Read request bodies through a bounded stream. Stop at `MAX_BODY_BYTES`.
-- Set `maxRequestBodySize` on `Bun.serve` as a second limit.
+- Set `maxRequestBodySize` on `Bun.serve` and on the dashboard adapter as a second limit.
+  The adapter read its bodies the same way, before sign-in.
 - Add a timestamped webhook signature. Keep the current signature header for existing receivers.
 - Add the organization filter to the audit cursor subquery.
 - Record the `mcp:call` decision in ADR 0007.
@@ -70,8 +70,8 @@ A credential with `import:write` and `keys:manage` can import a key hash for ano
 - **AC-SEC-003 — Unwanted behavior:** If a credential without `*` imports an API key record for another principal identity, then Titen shall return HTTP 403 before mutation.
 - **AC-SEC-004 — Event-driven:** When a credential without `*` imports an API key record for its own principal identity within its scopes and trust ceiling, Titen shall store the key.
 - **AC-SEC-005 — Unwanted behavior:** If a request body without `Content-Length` exceeds `MAX_BODY_BYTES`, then Titen shall return HTTP 413 `PAYLOAD_TOO_LARGE` without reading the rest of the body.
-- **AC-SEC-006 — Ubiquitous:** The Bun runtime shall set `maxRequestBodySize` to twice `MAX_BODY_BYTES`.
-- **AC-SEC-007 — Event-driven:** When Titen sends a webhook attempt, Titen shall send `X-Titen-Timestamp` and `X-Titen-Signature-V2`, an HMAC-SHA256 of `<timestamp>.<delivery id>.<raw body>`.
+- **AC-SEC-006 — Ubiquitous:** The Bun runtime and the dashboard adapter shall refuse a body above twice their read limit before a handler runs.
+- **AC-SEC-007 — Event-driven:** When Titen sends a webhook attempt, Titen shall send `X-Titen-Timestamp` and `X-Titen-Signature-V2`, an HMAC-SHA256 of the timestamp, the delivery id, and the raw body, joined by dots.
 - **AC-SEC-008 — Ubiquitous:** Titen shall keep sending `X-Titen-Signature` as an HMAC-SHA256 of the raw body.
 - **AC-SEC-009 — Event-driven:** When a webhook is registered, Titen shall return the timestamped signing contract with a tolerance of 300 seconds.
 - **AC-SEC-010 — Unwanted behavior:** If an audit cursor names an audit entry of another organization, then Titen shall return no entries.
@@ -84,3 +84,8 @@ A credential with `import:write` and `keys:manage` can import a key hash for ano
 - `pnpm typecheck`, `pnpm test:api`, `pnpm test:integration`, and `pnpm check:workflow` pass on `rama-tuf`.
 - The API reference, the threat model, ADR 0007, and the changelog describe the new behavior.
 - Release and advisory publication stay a separate maintainer decision.
+
+## Delivery
+
+Branch `fix/ghsa-27j7` delivers the change. All acceptance criteria pass on `rama-tuf`.
+The paired plan records the failing runs on the old code and the passing suites.
