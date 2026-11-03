@@ -72,7 +72,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .workspace-option strong { font-size: 11.5px; font-weight: 500; }
 .workspace-option small { color: var(--muted); font-size: 9px; }
 .workspace-menu > p { margin: 0; padding: 8px 11px 9px; color: var(--muted); border-top: 1px solid #efe7d8; font-size: 10.5px; line-height: 1.45; text-wrap: pretty; }
-.sidebar nav { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; padding: 10px 9px 16px; overflow-y: auto; scrollbar-width: thin; }
+/* Scroll shadows: paper covers fade at each scrolled edge, so a clipped side always shows a cue (#350). */
+.sidebar nav { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; min-height: 0; padding: 10px 9px 16px; overflow-y: auto; scrollbar-width: thin;
+  background: linear-gradient(var(--paper) 30%, transparent) top / 100% 28px no-repeat local,
+    linear-gradient(transparent, var(--paper) 70%) bottom / 100% 28px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / .14), transparent) top / 100% 10px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / .14), transparent) bottom / 100% 10px no-repeat scroll; }
 .nav-group-label { margin: 0; padding: 9px 11px 5px; color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .16em; text-transform: uppercase; }
 .nav-group-label:not(:first-child) { padding-top: 14px; }
 .sidebar nav button, .nav-orientation { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; padding: 8px 11px; border: 0; border-radius: 3px; background: transparent; font-size: 13px; text-align: left; }
@@ -85,8 +90,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sidebar nav button[aria-current="page"] small { color: #c97a44; }
 .nav-orientation { color: var(--ink-soft); }
 .nav-alias { color: var(--ink-soft); }
-.credential-note { display: grid; gap: 7px; margin-top: auto; padding: 14px 20px; border-top: 1px solid var(--rule-soft); }
-.profile-button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 0 0 9px; color: var(--ink-soft); background: transparent; border: 0; border-bottom: 1px solid var(--rule-soft); cursor: pointer; text-align: left; }
+/* Identity and Disconnect on one row; the static credential explanation is a disclosure (#350). */
+.credential-note { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; margin-top: auto; padding: 10px 20px; border-top: 1px solid var(--rule-soft); }
+.credential-detail { grid-column: 1 / -1; }
+.credential-detail summary { display: flex; align-items: baseline; gap: 8px; color: var(--muted); cursor: pointer; font: 9px/1.6 "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
+.credential-detail summary strong { letter-spacing: 0; text-transform: none; }
+.credential-detail[open] > span { display: block; padding-top: 5px; }
+.profile-button { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 0; color: var(--ink-soft); background: transparent; border: 0; cursor: pointer; text-align: left; }
 .profile-button:hover, .profile-button[aria-current="page"] { color: var(--accent); }
 .profile-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: 0 0 auto; color: var(--paper); background: var(--ink); border-radius: 3px; font: 9.5px/1 "JetBrains Mono Variable", monospace; font-weight: 700; }
 .profile-button > span:last-child { display: grid; gap: 1px; min-width: 0; }
@@ -448,6 +458,17 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   .context-grid { grid-template-columns: 1fr 1fr; }
   .inline-form { grid-template-columns: 1fr 1fr; }
   .user-admin, .dashboard-split, .model-grid { grid-template-columns: 1fr; }
+}
+/* Laptop-height screens: tighten the nav rhythm so every group heading fits at 1280x720.
+   Targets stay at least 26px tall (WCAG 2.5.8 asks for 24). */
+@media (min-width: 961px) and (max-height: 820px) {
+  .brand-row { min-height: 52px; padding-block: 11px; }
+  .workspace-picker { margin: 9px 13px 4px; }
+  .workspace-picker summary { min-height: 42px; padding-block: 5px; }
+  .sidebar nav { padding-block: 6px 10px; }
+  .sidebar nav button { min-height: 26px; padding-block: 4px; font-size: 12.5px; }
+  .nav-group-label { padding: 6px 11px 3px; }
+  .nav-group-label:not(:first-child) { padding-top: 8px; }
 }
 @media (max-width: 620px) {
   .topbar { align-items: flex-start; min-height: auto; padding: 16px; }

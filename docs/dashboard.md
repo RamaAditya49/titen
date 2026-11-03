@@ -186,8 +186,9 @@ browser tests also cover credential isolation, revocation, exact origin checks,
 request-size limits, capability hiding, stale private-state clearing,
 principal-scoped empty results, audited administrator mode, workspace
 visibility, scoped grants and key clamps, masked model diagnostics, structured
-operator collections, semantic-sync readiness, keyboard use, and a 320 px
-viewport.
+operator collections, semantic-sync readiness, keyboard use, a 320 px
+viewport, and every sidebar navigation group visible at 1280x720 with the
+active area scrolled into view.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

@@ -152,10 +152,11 @@ const lenses = [
             <span class="profile-avatar" data-profile-avatar>OP</span>
             <span><strong data-profile-name>operator</strong><small data-profile-role>profile · principal</small></span>
           </button>
-          <p>Credential boundary</p>
-          <strong data-credential-mode>Server-only</strong>
-          <span data-credential-copy>Passwords and session keys never enter browser storage.</span>
           <button type="button" class="text-button" data-logout aria-label="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-disconnect"></use></svg>Disconnect</button>
+          <details class="credential-detail">
+            <summary><span>Credential boundary</span><strong data-credential-mode>Server-only</strong></summary>
+            <span data-credential-copy>Passwords and session keys never enter browser storage.</span>
+          </details>
         </section>
       </aside>
 
@@ -1545,6 +1546,8 @@ const lenses = [
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = panel.dataset.areaPanel !== id;
         const selected = source ?? all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id && !button.hidden);
         for (const button of all<HTMLButtonElement>("[data-area]")) button.setAttribute("aria-current", button === selected ? "page" : "false");
+        // A short sidebar scrolls; keep the active destination on screen.
+        selected?.scrollIntoView({ block: "nearest" });
         one<HTMLButtonElement>("[data-profile-open]").setAttribute("aria-current", id === "profile" ? "page" : "false");
         const label = selected?.dataset.label ?? (id === "profile" ? "Profile" : "Dashboard");
         text("[data-page-title]", label);
