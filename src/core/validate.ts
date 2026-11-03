@@ -57,7 +57,8 @@ export const LIMITS = {
 
 export const MAX_JSON_DEPTH = 64;
 
-const UNSAFE_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
+/** Terminal and bidirectional controls rejected in free text (#108). Shared with the Bun source importer. */
+export const UNSAFE_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
 
 /** Rejects parser-safe JSON before recursive serializers or hashers see it. */
 export function assertJsonDepth(value: unknown): void {

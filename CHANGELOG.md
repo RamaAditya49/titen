@@ -28,7 +28,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ### Fixed
 
-- Text with Windows line endings is accepted on every write path (REST, `titen_remember`, and the MCP compatibility tools) instead of failing with "unsafe control character". Each CRLF is stored as LF before validation and hashing, so the same note sent with LF or CRLF and the same `source.id` replays to one record. A carriage return not followed by a line feed is still rejected, now with a message that names U+000D. All other #108 controls stay rejected (#354).
+- Text with Windows line endings is accepted on every write path (REST, `titen_remember`, and the MCP compatibility tools) instead of failing with "unsafe control character". Each CRLF is stored as LF before validation and hashing, so the same note sent with LF or CRLF and the same `source.id` replays to one record. `titen import` applies the same rule, so markdown sources saved with Windows line endings import exactly like their LF copies. A carriage return not followed by a line feed is still rejected, now with a message that names U+000D. All other #108 controls stay rejected (#354).
 
 ## [0.10.7] — 2026-10-14
 

@@ -17,6 +17,7 @@ Goal: accept Windows line endings without weakening the #108 control guard.
 - [x] Add `normalizeLineEndings` and apply it in `requireString` and `optionalString` before every check.
 - [x] Reject a remaining CR with a message naming U+000D and the fix.
 - [x] Audit callers for raw `body[field]` reads after validation; none exist in `src/core`.
+- [x] Canonicalize CRLF in the Bun source importer before its control check, reuse the shared `UNSAFE_TEXT`, and drop the parser's lone-CR rewrite (collaborator comment on #354).
 - [x] Document the rule in the API reference and update CHANGELOG.
 
 ## Acceptance evidence map
@@ -27,6 +28,7 @@ Goal: accept Windows line endings without weakening the #108 control guard.
 | AC-VAL-002 | Same case: `progress 10%\rprogress 99%` returns 400 naming U+000D; unit test covers `x\r\r\ny` |
 | AC-VAL-003 | Same case: an LF write with the same `source.id` returns the CRLF write's observation id and the subject holds one row |
 | AC-VAL-004 | Same case: `titen_remember` returns no error and stores LF; `tests/contract/mcp-compat.test.ts` covers `create_entities` and `add_observations` |
+| AC-VAL-006 | `tests/integration/source-import.test.ts` "CRLF sources import exactly like their LF twins…": same `[content, contentHash]` pairs; a lone CR is rejected; red on the first PR revision (`notes.md contains an unsafe Unicode control character`) |
 | AC-VAL-005 | Contract case and unit test: NUL, ESC, DEL, and U+202E stay rejected |
 
 ## Rollback
@@ -35,5 +37,6 @@ Revert the commit. Stored LF rows remain valid; no schema change.
 
 ## Verification
 
-Bun/SQLite and the D1 contract harness after `pnpm build:worker`. No real
+Bun/SQLite, the D1 contract harness after `pnpm build:worker`, and the packed
+tarball through `scripts/verify-pack.sh` (the importer ships in the package). No real
 Cloudflare or VPS deployment was exercised.
