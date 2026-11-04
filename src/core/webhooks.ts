@@ -95,7 +95,16 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
         header: "X-Titen-Signature",
         algorithm: "HMAC-SHA256",
         format: "sha256=<hex>",
-        note: "Compute HMAC-SHA256 of the raw JSON body using your secret to verify deliveries.",
+        note: "Verify X-Titen-Signature-V2. Reject a timestamp more than 300 seconds old, and ignore a repeated X-Titen-Delivery. X-Titen-Signature signs only the raw body and stays for existing receivers.",
+        v2: {
+          header: "X-Titen-Signature-V2",
+          timestamp_header: "X-Titen-Timestamp",
+          delivery_header: "X-Titen-Delivery",
+          signed_content: "<timestamp>.<delivery>.<raw body>",
+          algorithm: "HMAC-SHA256",
+          format: "sha256=<hex>",
+          tolerance_seconds: 300,
+        },
       },
     },
   };
@@ -365,6 +374,10 @@ export async function drainWebhookQueue(options: {
     attempted += 1;
     const payload = row.payload;
     const signature = await signPayload(secret, payload);
+    // V2 binds the attempt time and the stable delivery id to the body, so a
+    // receiver can reject an old capture and drop a repeated delivery.
+    const timestamp = String(Math.floor(options.now.getTime() / 1000));
+    const signatureV2 = await signPayload(secret, `${timestamp}.${row.id}.${payload}`);
     let responseStatus: number | null = null;
     let success = false;
     try {
@@ -373,6 +386,8 @@ export async function drainWebhookQueue(options: {
         headers: {
           "Content-Type": "application/json",
           "X-Titen-Signature": `sha256=${signature}`,
+          "X-Titen-Signature-V2": `sha256=${signatureV2}`,
+          "X-Titen-Timestamp": timestamp,
           "X-Titen-Event": row.kind,
           "X-Titen-Delivery": row.id,
           "X-Titen-Attempt": attemptId,

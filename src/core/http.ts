@@ -5,6 +5,36 @@ import type { AppContext } from "./app";
 
 export const MAX_BODY_BYTES = 1_048_576;
 
+/**
+ * Reads a body as UTF-8 text and stops after `limit` bytes. A chunked body has
+ * no Content-Length, so only the stream can bound it. Returns undefined when
+ * the body is larger than the limit.
+ */
+export async function readBoundedText(request: Request, limit: number): Promise<string | undefined> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined);
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  // Same decoding as Request.text(): UTF-8, replacement characters, BOM removed.
+  return new TextDecoder().decode(bytes);
+}
+
 export interface RequestContext {
   app: AppContext;
   request: Request;
