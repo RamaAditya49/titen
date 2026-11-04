@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard Memories list shows one empty state that matches the situation. With no search or filter, it says no memory is visible yet and that agents add memory through the REST API or MCP. With filters, it names each active search, status, and kind filter and offers **Clear search and filters**. The live status line now reports counts only, so it no longer contradicts the visible message, and the pagination footer is hidden while the first page is empty (#352).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
