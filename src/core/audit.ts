@@ -58,7 +58,11 @@ export async function listAudit(ctx: RequestContext): Promise<Result> {
   let sql = `SELECT id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at
              FROM audit_log WHERE org_id = ?`;
   if (action) { sql += ` AND action = ?`; params.push(action); }
-  if (after) { sql += ` AND (created_at, id) > ((SELECT created_at FROM audit_log WHERE id = ?), ?)`; params.push(after, after); }
+  // The cursor lookup keeps the organization filter, so a foreign id acts like an unknown id.
+  if (after) {
+    sql += ` AND (created_at, id) > ((SELECT created_at FROM audit_log WHERE id = ? AND org_id = ?), ?)`;
+    params.push(after, orgId, after);
+  }
   sql += ` ORDER BY created_at, id LIMIT ?`;
   params.push(limitParam);
 
