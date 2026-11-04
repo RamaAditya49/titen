@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard collection tables (API & Keys, Access) no longer hide their row actions at desktop widths. A collection narrower than its table now shows each row as a label/value record, as on phones, so "Revoke" stays visible in half-width split columns from 961px to 1440px. Status and trust values no longer break mid-word. Any table that still scrolls sideways is a named, keyboard-focusable region with edge shadows (#343).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

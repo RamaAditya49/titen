@@ -926,3 +926,53 @@ test("starts password-independent recovery and shows preceding failed attempts",
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
   await expect(page.locator("[data-login-attempt-notice]")).toContainText("50 failed sign-in attempts");
 });
+
+test("collection tables keep every row action inside their container at desktop widths", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/governance/keys", (route) => route.fulfill({ json: { data: { keys: [
+    { key_id: "key_owner", label: "owner", principal_id: "owner", scopes: ["*"], max_trust: "policy_approved", status: "active" },
+    { key_id: "key_session", label: "Dashboard session", principal_id: "owner", scopes: ["memory:read"], max_trust: "policy_approved", status: "revoked" },
+  ] } } }));
+  await page.route("**/dashboard-api/access/principals", (route) => route.fulfill({ json: { data: { principals: [{
+    principal_id: "user_editor", username: "editor", principal_kind: "human", organization_role: "member", max_trust: "verified", status: "active",
+  }] } } }));
+
+  const clipped = (collection: string) => page.locator(`[data-collection="${collection}"]`).evaluate((section) => {
+    const wrap = section.querySelector(".operator-table-wrap");
+    const bounds = (wrap ?? section).getBoundingClientRect();
+    return [...section.querySelectorAll("tbody button")]
+      .filter((button) => {
+        const box = button.getBoundingClientRect();
+        return box.right > bounds.right + 0.5 || box.left < bounds.left - 0.5;
+      })
+      .map((button) => button.textContent);
+  });
+
+  for (const width of [1440, 1280, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/dashboard/");
+    await page.getByRole("button", { name: "API & Keys" }).click();
+    await expect(page.locator('[data-collection="keys"] tbody tr')).toHaveCount(2);
+    expect(await clipped("keys"), `keys at ${width}px`).toEqual([]);
+    // Enumerated values never break inside a word.
+    const statusLines = await page.locator('[data-collection="keys"] tbody td[data-label="Status"]').evaluateAll((cells) =>
+      cells.map((cell) => {
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+      }));
+    expect(statusLines.every((lines) => lines <= 1), `status wraps at ${width}px: ${statusLines}`).toBe(true);
+
+    await page.getByRole("button", { name: "Access" }).click();
+    await expect(page.locator('[data-collection="principals"] tbody tr')).toHaveCount(1);
+    expect(await clipped("principals"), `principals at ${width}px`).toEqual([]);
+  }
+
+  // Any remaining scroll region is named and reachable by keyboard.
+  const wraps = page.locator(".operator-table-wrap");
+  for (const wrap of await wraps.all()) {
+    await expect(wrap).toHaveAttribute("role", "region");
+    await expect(wrap).toHaveAttribute("tabindex", "0");
+    await expect(wrap).toHaveAttribute("aria-label", /table$/);
+  }
+});
