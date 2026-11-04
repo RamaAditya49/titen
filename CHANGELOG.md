@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard Context form is laid out like the other forms, with labels above shared-style inputs at every width. A compiled pack now says why it is empty or short. It shows unconsolidated observations with the API's `titen_consolidate` hint, items that did not fit the token budget with their reasons, or that no authorized claims matched. The status line reports the item count. The Subject ID field suggests authorized subjects, and Subjects rows offer **Compile context** (#363).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
