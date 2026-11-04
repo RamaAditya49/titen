@@ -410,3 +410,21 @@ test("deleting requires the purge capability and then really removes the record"
     "checkout-api",
   ]);
 });
+
+test("Windows line endings are stored as LF, not rejected as control characters", async () => {
+  const created = await callTool("create_entities", {
+    entities: [{ name: "windows-runner", entityType: "service", observations: ["Readme line\r\nnext"] }],
+  });
+  assert.equal(created.isError, undefined);
+  assert.deepEqual(created.structuredContent.entities[0].observations, ["Readme line\nnext"]);
+  const added = await callTool("add_observations", {
+    observations: [{ entityName: "windows-runner", contents: ["Deploys from\r\nthe release branch"] }],
+  });
+  assert.equal(added.isError, undefined);
+  assert.deepEqual(added.structuredContent.results[0].addedObservations, ["Deploys from\nthe release branch"]);
+  const lone = await callTool("add_observations", {
+    observations: [{ entityName: "windows-runner", contents: ["progress 10%\rprogress 99%"] }],
+  });
+  assert.equal(lone.isError, true);
+  assert.match(lone.content[0]!.text, /carriage return/);
+});

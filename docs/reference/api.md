@@ -347,7 +347,10 @@ stays for existing receivers. A future minor release may remove it. The
   rest is read. The Bun runtime refuses a body above 2 MiB with a plain `413`
   before the app runs, so that response has no Titen envelope.
 - JSON bodies may nest at most 64 object/array levels. Free text rejects unsafe
-  terminal and bidirectional controls while retaining tab and line feed.
+  terminal and bidirectional controls while retaining tab and line feed. A
+  CRLF line ending is stored as LF before validation and hashing, so CRLF and
+  LF text dedupe alike; a carriage return not followed by a line feed is
+  rejected with a message naming U+000D.
 
 Success envelope:
 

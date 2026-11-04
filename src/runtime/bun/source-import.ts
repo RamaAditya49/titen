@@ -21,7 +21,7 @@ import { createApp } from "../../core/app";
 import { canonicalJson } from "../../core/idempotency";
 import { sha256Hex } from "../../core/ids";
 import { schemaState } from "../../core/migrations";
-import type { Visibility } from "../../core/validate";
+import { normalizeLineEndings, UNSAFE_TEXT, type Visibility } from "../../core/validate";
 import { TitenClient, type ObservationRecord } from "../../sdk";
 import { mem0Envelope, secretHits } from "./audit";
 import { createSqliteDb, openDatabase } from "./sqlite";
@@ -50,7 +50,6 @@ export type SourceImportProfile = (typeof SOURCE_IMPORT_PROFILE_IDS)[number];
 const MAX_SELECTED_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
 const MAX_CLAIM_CHARS = 4_000;
-const UNSAFE_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
 
 type ParserFamily = "markdown" | "records" | "honcho" | "agentfile";
 type ClaimKind = "semantic_fact" | "procedural";
@@ -248,6 +247,7 @@ function fail(message: string): never {
 
 function safeText(value: string, locator: string): string {
   if (!value.isWellFormed()) fail(`${locator} contains malformed Unicode`);
+  if (value.includes("\r")) fail(`${locator} contains a carriage return (U+000D) not followed by a line feed`);
   if (UNSAFE_TEXT.test(value)) fail(`${locator} contains an unsafe Unicode control character`);
   return value;
 }
@@ -352,7 +352,9 @@ function readSelectedFiles(input: string, profileId: SourceImportProfile): {
     } catch {
       fail(`${file.locator} must be valid UTF-8 text`);
     }
-    return { ...file, bytes: bytes!.byteLength, text: safeText(text!, file.locator) };
+    // CRLF is a line ending, not a control: canonicalize it before the control check
+    // and the secret scan, exactly as the API does (#354). A lone CR stays rejected.
+    return { ...file, bytes: bytes!.byteLength, text: safeText(normalizeLineEndings(text!), file.locator) };
   });
   const hits = new Map<string, number>();
   for (const file of files)
@@ -395,7 +397,8 @@ function frontmatter(text: string): { body: string; metadata: string | null } {
 }
 
 function markdownEntries(file: SelectedFile, profileId: SourceImportProfile): RawEntry[] {
-  const normalized = file.text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").replace(/^\uFEFF/u, "");
+  // Line endings were canonicalized when the file was read; only a BOM remains to strip.
+  const normalized = file.text.replace(/^\uFEFF/u, "");
   const parsed = frontmatter(normalized);
   const metadata = profileId === "agent-rules@1" && parsed.metadata
     ? `Source applicability metadata (inert):\n${parsed.metadata}`
