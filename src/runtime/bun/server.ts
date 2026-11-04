@@ -1,5 +1,5 @@
 import { ApiError } from "../../core/errors";
-import { failure, newRequestId } from "../../core/http";
+import { failure, MAX_BODY_BYTES, newRequestId } from "../../core/http";
 import { assertCanonicalPath } from "../../core/login-security";
 import { createClientLoginLimit, loginClientAddress } from "./login-rate-limit";
 import { createApp, parseMcpOrigin, ROUTES } from "../../core/app";
@@ -211,6 +211,9 @@ export async function serve(options: ServeOptions) {
       hostname: options.hostname,
       // Extraction may wait up to 45s; keep bounded response headroom above it.
       idleTimeout: 60,
+      // The app answers at MAX_BODY_BYTES with its own 413. This second bound
+      // stops a body that never ends before any handler reads it.
+      maxRequestBodySize: 2 * MAX_BODY_BYTES,
       routes: nativeRoutes,
       fetch: () => failure(new ApiError(400, "NON_CANONICAL_PATH", "Request path must be canonical."), newRequestId()),
     });

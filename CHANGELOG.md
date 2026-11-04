@@ -30,6 +30,23 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 - `GET /v1/memories` applies the claim validity window per row: `active` and `disputed` mean currently valid, whichever other statuses are requested. `status=active,superseded` no longer brings back expired or not-yet-valid active claims, and `facets` now use the same predicate, so `facets.status.active` matches what `status=active` lists. Facets and the validity rule are documented (#347).
 
+## [0.10.9] — 2026-11-03
+
+schema 27
+
+Import, request bodies, webhook signatures, and the audit cursor now close the open findings of [GHSA-27j7-xc9x-322c](https://github.com/RamaAditya49/titen/security/advisories/GHSA-27j7-xc9x-322c).
+
+### Security
+
+- Import applies the direct-route authority rules. A membership record needs an organization owner or admin, and only an owner may import the `owner` role. A credential without `*` may import keys only for its own principal.
+- Request bodies are bounded while they are read. A chunked body above 1 MiB returns `PAYLOAD_TOO_LARGE` without buffering the rest. The Bun server and the dashboard adapter also set a runtime body limit.
+- Webhook attempts add `X-Titen-Timestamp` and `X-Titen-Signature-V2`, an HMAC of the timestamp, the delivery id, and the body. Verify V2 and reject a timestamp older than 300 seconds. `X-Titen-Signature` stays for existing receivers.
+- An audit cursor from another organization now returns no entries, the same as an unknown cursor.
+
+### Changed
+
+- ADR 0007 records `mcp:call` as a tool-bundle scope. Its behavior does not change.
+
 ## [0.10.8] — 2026-11-03
 
 schema 27
@@ -1634,7 +1651,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.8...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.9...HEAD
+[0.10.9]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.9
 [0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
 [0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
 [0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
