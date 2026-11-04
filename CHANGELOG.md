@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `titen import` no longer splits a long entry inside a surrogate pair or grapheme cluster. Entries over 4,000 characters with no nearby whitespace are now cut at the last grapheme boundary, so emoji and ZWJ sequences stay whole. Each chunk is also checked during prepare, so the preview reports a bad chunk instead of `--apply` stopping halfway with "must contain well-formed Unicode" (#358).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
