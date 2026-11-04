@@ -151,9 +151,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .login-intro > div > p:last-child { max-width: 34ch; margin: 20px 0 0; color: #d9cfc1; font-size: 14px; line-height: 1.6; }
 .login-intro-note { max-width: 42ch; margin: 0; color: #a99d90; font: 10px/1.6 "JetBrains Mono Variable", monospace; }
 .login-panel form { display: grid; gap: 16px; align-content: center; width: min(100%, 390px); margin: auto; padding: clamp(30px, 6vw, 64px); }
-.login-panel label, .inline-form label, .user-admin label, .memory-input-grid label, .stack-field, .stack-form label { display: grid; gap: 6px; }
-.login-panel label span, .inline-form label span, .user-admin label span, .memory-input-grid label > span, .stack-field span, .stack-form label > span { font-size: 11px; font-weight: 600; }
-.login-panel input, .inline-form input, .inline-form select, .user-admin input, .user-admin select, .memory-input-grid input, .admin-view-control select, .stack-field select, .stack-form input, .stack-form select, .stack-form textarea { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
+.login-panel label, .inline-form label, .user-admin label, .memory-input-grid label, .input-grid label, .stack-field, .stack-form label { display: grid; gap: 6px; }
+.login-panel label span, .inline-form label span, .user-admin label span, .memory-input-grid label > span, .input-grid label > span, .stack-field span, .stack-form label > span { font-size: 11px; font-weight: 600; }
+.login-panel input, .inline-form input, .inline-form select, .user-admin input, .user-admin select, .memory-input-grid input, .input-grid input, .admin-view-control select, .stack-field select, .stack-form input, .stack-form select, .stack-form textarea { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
 .login-panel form > .primary-button { width: 100%; }
 .login-boundary { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .login-boundary strong { color: var(--ink-soft); font-weight: 620; }
@@ -192,7 +192,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .form-actions span { color: var(--muted); font-size: 11px; }
 .memory-actions { justify-content: flex-start; }
 .area-panel > .query-panel { margin-inline: 28px; }
+/* .input-grid had only a phone rule, so the Context form rendered as one inline run (#363). */
+.input-grid { display: grid; gap: 12px; margin-top: 10px; }
 .context-grid { grid-template-columns: 1fr 1.5fr .5fr 1fr; }
+.context-notices { display: grid; gap: 8px; }
+.context-notices .notice { display: grid; gap: 4px; }
+.context-notices code { overflow-wrap: anywhere; font: 11px "JetBrains Mono Variable", monospace; }
 .inline-form { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)) auto; gap: 12px; align-items: end; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--rule-soft); }
 .inline-form .secondary-button { margin: 0; }
 .live-output { display: grid; gap: 14px; margin-top: 20px; border-top: 1px solid var(--rule-soft); }
