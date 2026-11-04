@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- On laptop-height screens the dashboard sidebar shows every navigation group. At 1280x720, Administration and Governance used to sit below a 190 px credential footer with no scroll cue. The footer is now one row with identity and Disconnect, and the credential explanation sits in a disclosure. The nav rhythm tightens below 820 px of height, keeping targets at least 26 px. The nav shows scroll shadows when it overflows and scrolls the active area into view (#350).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
