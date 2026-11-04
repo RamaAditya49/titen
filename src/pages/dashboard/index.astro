@@ -618,6 +618,16 @@ const lenses = [
             <footer><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="default">Search memories</button></footer>
           </form>
         </dialog>
+        <dialog class="search-dialog danger-dialog" data-danger-dialog aria-labelledby="danger-title" aria-describedby="danger-impact">
+          <form method="dialog" data-danger-form>
+            <header><h2 id="danger-title" data-danger-title>Confirm</h2></header>
+            <dl class="danger-target" data-danger-target></dl>
+            <p id="danger-impact" class="danger-impact" data-danger-impact></p>
+            <p data-danger-recovery></p>
+            <label data-danger-reason hidden><span>Reason (required)</span><textarea name="reason" rows="3" maxlength="2000"></textarea></label>
+            <footer><button class="secondary-button" value="cancel" autofocus>Cancel</button><button class="primary-button danger-button" value="confirm" data-danger-confirm>Confirm</button></footer>
+          </form>
+        </dialog>
       </main>
     </div>
 
@@ -819,6 +829,50 @@ const lenses = [
         else setNotice(one("[data-service-notice]"), errorMessage(error));
       }
 
+      type DangerRequest = {
+        title: string;
+        target: [string, unknown][];
+        impact: string;
+        recovery: string;
+        confirm: string;
+        reason?: boolean;
+      };
+      /**
+       * One confirmation for every destructive or release-changing action: it
+       * names the target, the impact, and the recovery, focuses Cancel, and
+       * collects a required reason in a labelled field (#356).
+       */
+      function confirmDanger(request: DangerRequest): Promise<{ reason?: string } | null> {
+        const dialog = one<HTMLDialogElement>("[data-danger-dialog]");
+        const reasonLabel = one<HTMLLabelElement>("[data-danger-reason]");
+        const reason = reasonLabel.querySelector("textarea")!;
+        const confirmButton = one<HTMLButtonElement>("[data-danger-confirm]");
+        text("[data-danger-title]", request.title);
+        text("[data-danger-impact]", request.impact);
+        text("[data-danger-recovery]", request.recovery);
+        const target = one<HTMLElement>("[data-danger-target]");
+        target.replaceChildren();
+        for (const [label, value] of request.target) {
+          if (value === undefined || value === null || value === "") continue;
+          const term = document.createElement("dt");
+          term.textContent = label;
+          const detail = document.createElement("dd");
+          detail.textContent = String(value);
+          target.append(term, detail);
+        }
+        reasonLabel.hidden = !request.reason;
+        reason.required = Boolean(request.reason);
+        reason.value = "";
+        confirmButton.textContent = request.confirm;
+        confirmButton.disabled = Boolean(request.reason);
+        reason.oninput = () => { confirmButton.disabled = Boolean(request.reason) && !reason.value.trim(); };
+        dialog.returnValue = "";
+        dialog.showModal();
+        return new Promise((resolve) => dialog.addEventListener("close", () => {
+          resolve(dialog.returnValue === "confirm" ? { ...(request.reason ? { reason: reason.value.trim() } : {}) } : null);
+        }, { once: true }));
+      }
+
       function renderMessage(target: HTMLElement, message: string, danger = false) {
         target.replaceChildren();
         const paragraph = document.createElement("p");
@@ -994,7 +1048,15 @@ const lenses = [
               label: `${verb} · ${row.resource_id ?? row.lease_id}`,
               tone: "danger",
               run: async () => {
-                if (!confirm(`${verb} this lease now?`)) return;
+                const confirmed = await confirmDanger({
+                  title: `${verb} lease on ${row.resource_id ?? row.lease_id}?`,
+                  target: [["Lease", row.lease_id], ["Resource", row.resource_id], ["Holder", row.holder_id]],
+                  impact: own ? "Your lease ends now and the resource is free for others."
+                    : "The holder loses this lease now; their next write that relies on it fails.",
+                  recovery: "Releasing cannot be undone; the holder can acquire a new lease.",
+                  confirm: `${verb} lease`,
+                });
+                if (!confirmed) return;
                 try {
                   if (own) await deleteArea(`work/leases/${encodeURIComponent(row.lease_id as string)}`);
                   else await postArea(`work/leases/${encodeURIComponent(row.lease_id as string)}/force-release`, {});
@@ -1009,7 +1071,15 @@ const lenses = [
               label: `${status === "accepted" ? "Accept" : "Reject"} handoff · ${row.subject_id}`,
               tone: status === "rejected" ? "danger" as const : "default" as const,
               run: async () => {
-                if (!confirm(`${status === "accepted" ? "Accept" : "Reject"} this handoff?`)) return;
+                const verb = status === "accepted" ? "Accept" : "Reject";
+                const confirmed = await confirmDanger({
+                  title: `${verb} handoff for ${row.subject_id}?`,
+                  target: [["Handoff", row.handoff_id], ["Subject", row.subject_id], ["From", row.from_principal]],
+                  impact: status === "accepted" ? "You take over this work from the sender." : "The sender keeps this work; the handoff closes.",
+                  recovery: "A resolved handoff cannot be reopened; the sender can create a new one.",
+                  confirm: `${verb} handoff`,
+                });
+                if (!confirmed) return;
                 try {
                   await postArea(`work/handoffs/${encodeURIComponent(row.handoff_id as string)}/resolve`, { status });
                   await loadWork();
@@ -1029,7 +1099,16 @@ const lenses = [
               label: `${decision[0]!.toUpperCase()}${decision.slice(1)} · ${row.claim_id}`,
               tone: decision === "approve" ? "default" as const : "danger" as const,
               run: async () => {
-                const reason = prompt(`Reason to ${decision} this approval:`)?.trim();
+                const title = `${decision[0]!.toUpperCase()}${decision.slice(1)}`;
+                const confirmed = await confirmDanger({
+                  title: `${title} approval for ${row.claim_id}?`,
+                  target: [["Approval", row.approval_id], ["Claim", row.claim_id], ["Version", row.version]],
+                  impact: decision === "approve" ? "The claim becomes eligible for release." : "The claim is no longer approved for release.",
+                  recovery: "Decisions are recorded in the audit log and cannot be edited.",
+                  confirm: `${title} approval`,
+                  reason: true,
+                });
+                const reason = confirmed?.reason;
                 if (!reason) return;
                 try {
                   await postArea(`approvals/${encodeURIComponent(row.approval_id as string)}/decide`, { decision, reason, expected_version: Number(row.version) });
@@ -1053,8 +1132,19 @@ const lenses = [
               label: `${action[0]!.toUpperCase()}${action.slice(1)} · ${row.release_id}`,
               tone: action === "revoke" ? "danger" as const : "default" as const,
               run: async () => {
-                const reason = action === "activate" ? undefined : prompt(`Reason to ${action} this release:`)?.trim();
-                if (action !== "activate" && !reason) return;
+                const title = `${action[0]!.toUpperCase()}${action.slice(1)}`;
+                const confirmed = await confirmDanger({
+                  title: `${title} release ${row.release_id}?`,
+                  target: [["Release", row.release_id], ["Channel", row.channel_id], ["Claim", row.claim_id], ["Audience", row.audience], ["Version", row.version]],
+                  impact: action === "activate" ? "Agents on this channel receive this release on their next request."
+                    : action === "revoke" ? "Agents stop receiving this release on their next request."
+                    : "The release becomes eligible for activation.",
+                  recovery: action === "revoke" ? "Revocation cannot be undone; publish a new release instead." : "The change is recorded in the audit log.",
+                  confirm: `${title} release`,
+                  reason: action !== "activate",
+                });
+                if (!confirmed) return;
+                const reason = confirmed.reason;
                 try {
                   await postArea(`releases/${encodeURIComponent(row.release_id as string)}/${action}`, { expected_version: Number(row.version), ...(reason ? { reason } : {}) });
                   await loadReleases();
@@ -1117,7 +1207,14 @@ const lenses = [
                 label: `Revoke ${row.grant_id}`,
                 tone: "danger",
                 run: async () => {
-                  if (!confirm("Revoke this grant on the next request?")) return;
+                  const confirmed = await confirmDanger({
+                    title: `Revoke grant ${row.grant_id}?`,
+                    target: [["Grant", row.grant_id], ["Principal", row.principal_id], ["Target", [row.target_type, row.target_id].filter(Boolean).join(" ")], ["Permissions", Array.isArray(row.permissions) ? row.permissions.join(" ") : row.permissions]],
+                    impact: "The principal loses these permissions on its next request.",
+                    recovery: "Revocation cannot be undone; create a new grant to restore access.",
+                    confirm: "Revoke grant",
+                  });
+                  if (!confirmed) return;
                   try {
                     await deleteArea(`access/grants/${encodeURIComponent(row.grant_id as string)}`);
                     await loadAccess();
@@ -1133,17 +1230,34 @@ const lenses = [
         renderMessage(target, "Loading masked key metadata…");
         try {
           const payload = await getArea("governance/keys");
-          renderPayload(target, payload, { actions: {
+          const data = payloadData(payload);
+          // Mark the operator's own session so it can be told apart from other "Dashboard session" keys.
+          const keys = Array.isArray(data.keys) ? data.keys.map((value) => value && typeof value === "object"
+            ? { ...value as Record<string, unknown>, current_session: (value as Record<string, unknown>).key_id === principal?.key_id }
+            : value) : data.keys;
+          renderPayload(target, { ...payload, data: { ...data, keys } }, { actions: {
             keys: (row) => {
               if (typeof row.key_id !== "string" || row.status === "revoked") return [];
+              const keyId = row.key_id;
+              const name = `${row.label ?? keyId} …${keyId.slice(-4)}`;
+              const own = row.current_session === true;
               return [{
-                label: `Revoke ${row.label ?? row.key_id}`,
+                label: `Revoke ${name}`,
                 tone: "danger",
                 run: async () => {
-                  if (!confirm("Revoke this API key immediately?")) return;
+                  const confirmed = await confirmDanger({
+                    title: `Revoke key “${name}”?`,
+                    target: [["Key", keyId], ["Principal", row.principal_id], ["Created", formatDate(String(row.created_at)) ?? row.created_at], ["Last used", typeof row.last_used_at === "string" ? formatDate(row.last_used_at) ?? row.last_used_at : "never"]],
+                    impact: own ? "This is your current session. You will be signed out of this dashboard now."
+                      : "Agents using this key get 401 on their next request.",
+                    recovery: "Revocation cannot be undone; issue a new key under Generate a key.",
+                    confirm: "Revoke key",
+                  });
+                  if (!confirmed) return;
                   try {
-                    await deleteArea(`api/keys/${encodeURIComponent(row.key_id as string)}`);
-                    await loadKeys();
+                    await deleteArea(`api/keys/${encodeURIComponent(keyId)}`);
+                    if (own) signedOut("You revoked this session. Sign in again.");
+                    else await loadKeys();
                   } catch (error) { handleError(error, target); }
                 },
               }];
@@ -1877,7 +1991,14 @@ const lenses = [
         }
       });
       one<HTMLButtonElement>("[data-recovery-regenerate]").addEventListener("click", async () => {
-        if (!window.confirm("Invalidate all unused recovery codes and generate a new set?")) return;
+        const confirmed = await confirmDanger({
+          title: "Generate new recovery codes?",
+          target: [["Account", principal?.principal_id]],
+          impact: "Every unused recovery code stops working now.",
+          recovery: "The new codes are shown once; store them before closing this page.",
+          confirm: "Generate new codes",
+        });
+        if (!confirmed) return;
         text("[data-passkey-management-status]", "Generating replacement recovery codes…");
         try {
           const data = payloadData(await regenerateRecoveryCodes());

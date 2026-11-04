@@ -31,6 +31,11 @@ type CollectionSchema = {
 
 const field = (label: string, keys: string[], mono = false): CollectionColumn => ({ label, keys, mono });
 const date = (label: string, keys: string[]): CollectionColumn => ({ label, keys, format: formatDate, mono: true });
+const keyName = (row: DashboardRecord): string => {
+  const id = typeof row.key_id === "string" ? row.key_id : "";
+  const label = typeof row.label === "string" && row.label ? row.label : id;
+  return `${label}${id ? ` …${id.slice(-4)}` : ""}${row.current_session === true ? " · This session" : ""}`;
+};
 
 const schemas: Record<string, CollectionSchema> = {
   projects: {
@@ -138,7 +143,8 @@ const schemas: Record<string, CollectionSchema> = {
   keys: {
     title: "API keys",
     identity: ["label", "key_id"],
-    columns: [field("Key", ["label", "key_id"]), field("Principal", ["principal_id", "issued_by"], true), field("Scopes", ["scopes"]), field("Trust ceiling", ["max_trust"]), field("Status", ["status"])],
+    // A short id suffix and a "This session" mark tell identical "Dashboard session" labels apart (#356).
+    columns: [{ label: "Key", keys: ["label", "key_id"], format: (_value, row) => keyName(row) }, field("Principal", ["principal_id", "issued_by"], true), field("Scopes", ["scopes"]), field("Trust ceiling", ["max_trust"]), field("Status", ["status"]), date("Created", ["created_at"]), date("Last used", ["last_used_at"])],
   },
   peers: {
     title: "Federation peers",

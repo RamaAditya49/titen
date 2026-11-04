@@ -409,6 +409,14 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
 
 .search-dialog { width: min(664px, calc(100% - 32px)); padding: 0; color: var(--ink); background: var(--paper-strong); border: 1px solid #8a7f72; border-radius: 4px; }
 .search-dialog::backdrop { background: rgba(23,19,16,.52); }
+.danger-dialog form > :not(header):not(footer):not(label) { margin: 0 18px; }
+.danger-target { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 12px; }
+.danger-target dt { color: var(--muted); font: 9px/1.8 "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
+.danger-target dd { margin: 0; overflow-wrap: anywhere; font: 11px/1.6 "JetBrains Mono Variable", monospace; }
+.danger-impact { color: var(--danger); font-weight: 600; }
+.danger-dialog textarea { min-height: 72px; padding: 8px 10px; background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 12px/1.5 "Instrument Sans Variable", sans-serif; resize: vertical; }
+.danger-button { background: var(--danger); border-color: var(--danger); }
+.danger-button:disabled { opacity: .5; cursor: not-allowed; }
 .search-dialog form { display: grid; gap: 16px; }
 .search-dialog header { display: flex; align-items: center; gap: 11px; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
 .search-dialog header svg { width: 16px; height: 16px; color: var(--muted); }
