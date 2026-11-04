@@ -3,7 +3,8 @@ import { auditStatement } from "./audit";
 import { authorizeRecordWorkspace, recordAccessParams, recordAccessSql } from "./authorization";
 import { purgedEvidenceGuardStatement } from "./claims";
 import { MAX_BOUND_PARAMS, chunk, type Param, type Stmt } from "./db";
-import { conflict, unresolvedReference, validationError } from "./errors";
+import { conflict, forbidden, unresolvedReference, validationError } from "./errors";
+import { requireOrgRole } from "./governance";
 import { eventStatement } from "./events";
 import {
   derivationClaimKey,
@@ -1090,6 +1091,10 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
       last_used_at: lastUsedAt,
       revoked_at: timestamp(row, "revoked_at", false),
     };
+    // Same rule as POST /v1/keys: only a root credential restores a key for another principal.
+    if (!principal.scopes.includes("*")
+      && (prepared.principal_id !== principal.principalId || prepared.principal_kind !== principal.principalKind))
+      throw forbidden("A managed credential may only reuse its own principal identity.");
     addUnique(keys, prepared.id as string, prepared);
   }
 
@@ -1112,6 +1117,12 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
       created_at: timestamp(row, "created_at"),
     };
     addUnique(memberships, prepared.id as string, prepared);
+  }
+  // Same rules as POST /v1/memberships: the scope alone does not grant a role.
+  if (memberships.size) {
+    const authority = await requireOrgRole(ctx, ["owner", "admin"], "membership.import");
+    if (authority === "admin" && [...memberships.values()].some((row) => row.role === "owner"))
+      throw forbidden("Only an organization owner may assign the owner role.");
   }
   for (const { row } of rawByType.project) {
     const prepared: Prepared = {

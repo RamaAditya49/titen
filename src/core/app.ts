@@ -54,6 +54,7 @@ import {
   failure,
   matchRoute,
   newRequestId,
+  readBoundedText,
   success,
   type RequestContext,
   type Result,
@@ -635,8 +636,8 @@ export function createApp(context: {
         const declared = Number(request.headers.get("content-length") ?? "0");
         if (declared > MAX_BODY_BYTES)
           throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
-        const text = await request.text();
-        if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES)
+        const text = await readBoundedText(request, MAX_BODY_BYTES);
+        if (text === undefined)
           throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
         cachedBody = text;
         return text;
