@@ -546,6 +546,21 @@ export interface KeyRecord {
   status: "pending" | "active" | "expired" | "revoked";
 }
 
+export interface ListKeysOptions {
+  /** Page size, 1 to 500. The server default is 500. */
+  limit?: number;
+  /** `next_cursor` from the previous page. */
+  cursor?: string;
+  /** Lifecycle filter applied before the page limit. Default `all`. */
+  status?: KeyRecord["status"] | "all";
+  principal_id?: string;
+}
+
+export interface KeyPage {
+  keys: KeyRecord[];
+  next_cursor: string | null;
+}
+
 /** Typed convenience methods intentionally kept to the common agent path. */
 export const TITEN_SDK_TYPED_ROUTES = [
   ["health", "GET /healthz"],
@@ -953,8 +968,22 @@ export class TitenClient {
     return this.request<CreatedKey>("POST", "/v1/keys", { json: options });
   }
 
-  async listKeys(): Promise<{ keys: KeyRecord[] }> {
-    return this.request("GET", "/v1/keys");
+  /**
+   * One page of keys, oldest first. Pass the returned `next_cursor` as
+   * `cursor` to reach later keys; it is null on the last page.
+   */
+  async listKeys(options: ListKeysOptions = {}): Promise<KeyPage> {
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) {
+      if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 500)
+        throw new TypeError("key limit must be an integer between 1 and 500");
+      params.set("limit", String(options.limit));
+    }
+    if (options.cursor !== undefined) params.set("cursor", options.cursor);
+    if (options.status !== undefined) params.set("status", options.status);
+    if (options.principal_id !== undefined) params.set("principal_id", options.principal_id);
+    const query = params.size ? `?${params}` : "";
+    return this.request("GET", `/v1/keys${query}`);
   }
 
   async revokeKey(

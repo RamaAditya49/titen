@@ -1,6 +1,6 @@
 import { allowedTrustLevels, createApiKey, keyLifecycleStatus, requestedScopes, requireScope } from "./auth";
 import { auditStatement } from "./audit";
-import { first } from "./db";
+import { chunk, first, type Param } from "./db";
 import { forbidden, notFound, validationError } from "./errors";
 import { newId } from "./ids";
 import { requireOrgRole } from "./governance";
@@ -213,22 +213,100 @@ export async function createKey(ctx: RequestContext): Promise<Result> {
   };
 }
 
+const KEY_STATUSES = ["active", "pending", "expired", "revoked", "all"] as const;
+type KeyStatusFilter = (typeof KEY_STATUSES)[number];
+
+/** Same rules as `keyLifecycleStatus`, expressed in SQL so they run before LIMIT. */
+const KEY_STATUS_SQL: Record<Exclude<KeyStatusFilter, "all">, string> = {
+  revoked: "revoked_at IS NOT NULL",
+  pending: "revoked_at IS NULL AND not_before > ?",
+  expired: "revoked_at IS NULL AND not_before <= ? AND expires_at IS NOT NULL AND expires_at <= ?",
+  active: "revoked_at IS NULL AND not_before <= ? AND (expires_at IS NULL OR expires_at > ?)",
+};
+const KEY_STATUS_BINDS: Record<Exclude<KeyStatusFilter, "all">, number> = {
+  revoked: 0,
+  pending: 1,
+  expired: 2,
+  active: 2,
+};
+
+function encodeKeyCursor(createdAt: string, id: string): string {
+  return btoa(JSON.stringify([createdAt, id]))
+    .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function decodeKeyCursor(value: string | null): { createdAt: string; id: string } | null {
+  if (value === null) return null;
+  try {
+    const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+    const parsed: unknown = JSON.parse(atob(padded));
+    if (!Array.isArray(parsed) || parsed.length !== 2) throw new Error();
+    const [createdAt, id] = parsed;
+    if (typeof createdAt !== "string" || Number.isNaN(Date.parse(createdAt))
+      || typeof id !== "string" || id === "" || id.length > LIMITS.identifier) throw new Error();
+    return { createdAt, id };
+  } catch {
+    throw validationError('Query "cursor" is invalid.');
+  }
+}
+
+/**
+ * Oldest first, keyset-paginated on (created_at, id). The default page size
+ * stays 500 so a caller that never sends a cursor sees the same first page as
+ * before; `next_cursor` reaches every later key (#340).
+ */
 export async function listKeys(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
-  const rows = await ctx.app.db.all<Record<string, unknown>>(
+  const search = ctx.url.searchParams;
+  const rawLimit = search.get("limit") ?? "500";
+  if (!/^\d+$/u.test(rawLimit) || Number(rawLimit) < 1 || Number(rawLimit) > 500)
+    throw validationError('Query "limit" must be an integer between 1 and 500.');
+  const limit = Number(rawLimit);
+  const status = (search.get("status") ?? "all") as KeyStatusFilter;
+  if (!KEY_STATUSES.includes(status))
+    throw validationError('Query "status" must be active, pending, expired, revoked, or all.');
+  const principalId = search.get("principal_id");
+  if (principalId !== null && (!principalId || principalId.length > LIMITS.identifier))
+    throw validationError('Query "principal_id" is invalid.');
+  const cursor = decodeKeyCursor(search.get("cursor"));
+  const now = ctx.app.now().toISOString();
+
+  const where = ["org_id = ?"];
+  const params: Param[] = [principal.orgId];
+  if (status !== "all") {
+    where.push(`(${KEY_STATUS_SQL[status]})`);
+    for (let index = 0; index < KEY_STATUS_BINDS[status]; index += 1) params.push(now);
+  }
+  if (principalId !== null) {
+    where.push("principal_id = ?");
+    params.push(principalId);
+  }
+  if (cursor) {
+    where.push("(created_at > ? OR (created_at = ? AND id > ?))");
+    params.push(cursor.createdAt, cursor.createdAt, cursor.id);
+  }
+  const fetched = await ctx.app.db.all<Record<string, unknown>>(
     `SELECT id, principal_id, principal_kind, label, scopes, max_trust, created_at,
             not_before, expires_at, last_used_at, revoked_at,
             data_target_type, data_target_id, issued_by
-       FROM api_keys WHERE org_id = ? ORDER BY created_at, id LIMIT 500`,
-    [principal.orgId],
+       FROM api_keys WHERE ${where.join(" AND ")} ORDER BY created_at, id LIMIT ?`,
+    [...params, limit + 1],
   );
-  const fenceRows = await ctx.app.db.all<FenceRow & { key_id: string }>(
-    `SELECT f.key_id, f.access, f.target_type, f.pattern
-       FROM api_key_fences f
-       JOIN api_keys k ON k.id = f.key_id
-      WHERE k.org_id = ?`,
-    [principal.orgId],
-  );
+  const rows = fetched.slice(0, limit);
+  const tail = rows[rows.length - 1];
+  const nextCursor = fetched.length > limit && tail
+    ? encodeKeyCursor(String(tail.created_at), String(tail.id))
+    : null;
+  // Fences for this page only, not for every key the org has ever issued.
+  const fenceRows: (FenceRow & { key_id: string })[] = [];
+  for (const ids of chunk(rows.map((row) => String(row.id)))) {
+    fenceRows.push(...await ctx.app.db.all<FenceRow & { key_id: string }>(
+      `SELECT f.key_id, f.access, f.target_type, f.pattern
+         FROM api_key_fences f
+        WHERE f.key_id IN (${ids.map(() => "?").join(", ")})`,
+      ids,
+    ));
+  }
   const fencesByKey = new Map<string, FenceRow[]>();
   for (const fence of fenceRows) {
     const group = fencesByKey.get(fence.key_id) ?? [];
@@ -258,8 +336,9 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
           notBefore: String(row.not_before),
           expiresAt: row.expires_at === null ? null : String(row.expires_at),
           revokedAt: row.revoked_at === null ? null : String(row.revoked_at),
-        }, ctx.app.now().toISOString()),
+        }, now),
       })),
+      next_cursor: nextCursor,
     },
   };
 }
