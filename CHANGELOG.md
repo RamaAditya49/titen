@@ -30,6 +30,23 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 - Text with Windows line endings is accepted on every write path (REST, `titen_remember`, and the MCP compatibility tools) instead of failing with "unsafe control character". Each CRLF is stored as LF before validation and hashing, so the same note sent with LF or CRLF and the same `source.id` replays to one record. `titen import` applies the same rule, so markdown sources saved with Windows line endings import exactly like their LF copies. A carriage return not followed by a line feed is still rejected, now with a message that names U+000D. All other #108 controls stay rejected (#354).
 
+## [0.10.9] — 2026-11-03
+
+schema 27
+
+Import, request bodies, webhook signatures, and the audit cursor now close the open findings of [GHSA-27j7-xc9x-322c](https://github.com/RamaAditya49/titen/security/advisories/GHSA-27j7-xc9x-322c).
+
+### Security
+
+- Import applies the direct-route authority rules. A membership record needs an organization owner or admin, and only an owner may import the `owner` role. A credential without `*` may import keys only for its own principal.
+- Request bodies are bounded while they are read. A chunked body above 1 MiB returns `PAYLOAD_TOO_LARGE` without buffering the rest. The Bun server and the dashboard adapter also set a runtime body limit.
+- Webhook attempts add `X-Titen-Timestamp` and `X-Titen-Signature-V2`, an HMAC of the timestamp, the delivery id, and the body. Verify V2 and reject a timestamp older than 300 seconds. `X-Titen-Signature` stays for existing receivers.
+- An audit cursor from another organization now returns no entries, the same as an unknown cursor.
+
+### Changed
+
+- ADR 0007 records `mcp:call` as a tool-bundle scope. Its behavior does not change.
+
 ## [0.10.8] — 2026-11-03
 
 schema 27
@@ -1634,7 +1651,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.8...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.9...HEAD
+[0.10.9]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.9
 [0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
 [0.10.7]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.7
 [0.10.6]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.6
