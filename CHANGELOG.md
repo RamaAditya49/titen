@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Memory Atlas `workspace_graph` no longer returns 500 on Cloudflare D1 when the view holds 50 or more claims or 100 or more subjects. The subject and link lookups are now chunked under D1's 100-parameter limit, and links are filtered to the selected claims in memory, with the same output and order. Bun was not affected (#364).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
