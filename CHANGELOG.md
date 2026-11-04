@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- A wrong password on the dashboard sign-in screen now says "Username or password is invalid." instead of "Your dashboard session is no longer valid", and a used or mistyped recovery code says so. The failed field is marked `aria-invalid`, linked to the message, and focused. After three failures in the tab, a line repeats the documented delay rule without revealing the account's state. Switching to the passkey or recovery-code panel clears the old message. The session-expiry message still appears for a 401 on an authenticated request (#360).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

@@ -926,3 +926,53 @@ test("starts password-independent recovery and shows preceding failed attempts",
   await expect(page.locator(".app-shell")).toHaveAttribute("data-shell", "private");
   await expect(page.locator("[data-login-attempt-notice]")).toContainText("50 failed sign-in attempts");
 });
+
+test("credential failures say what went wrong, mark the field, and never claim an expired session", async ({ page }) => {
+  let stage = "none";
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", authentication: "session", authenticated: stage !== "none" } }));
+  const secondFactor = {
+    organization_id: "org_rescue", principal_id: "owner", principal_kind: "human", key_id: "key_rescue", scopes: [],
+    max_trust: "asserted", organization_role: "owner", auth_stage: "second_factor", second_factor_required: true,
+  };
+  await page.route("**/dashboard-api/session", (route) => route.request().method() === "POST"
+    ? route.fulfill({ status: 401, json: { error: { code: "INVALID_LOGIN", message: "Username or password is invalid." } } })
+    : route.fulfill({ json: { data: secondFactor } }));
+  await page.route("**/dashboard-api/session/recovery", (route) => {
+    stage = "second_factor";
+    return route.fulfill({ status: 201, json: { data: secondFactor } });
+  });
+  await page.route("**/dashboard-api/session/recovery-code", (route) => route.fulfill({ status: 401, json: { error: { code: "SECOND_FACTOR_INVALID", message: "Second-factor verification failed." } } }));
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+  await page.goto("/dashboard/");
+
+  const form = page.locator("[data-login-form]");
+  const status = page.locator("[data-login-status]");
+  const password = form.locator('input[name="password"]');
+  await form.locator('input[name="username"]').fill("owner");
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await password.fill(`wrong-${attempt}`);
+    await form.getByRole("button", { name: "Continue" }).click();
+    await expect(status).toContainText("Username or password is invalid.");
+    await expect(status).not.toContainText("no longer valid");
+    await expect(password).toHaveAttribute("aria-invalid", "true");
+    await expect(password).toHaveAttribute("aria-describedby", "login-status");
+    await expect(password).toBeFocused();
+    if (attempt < 3) await expect(status).not.toContainText("30 minutes");
+  }
+  await expect(status).toContainText("Repeated failures add a delay of up to 30 minutes, even for the correct password.");
+  // Typing clears the invalid mark.
+  await password.fill("retyping");
+  await expect(password).not.toHaveAttribute("aria-invalid", "true");
+
+  // Switching to the second-factor panel clears the stale sign-in message.
+  await page.getByRole("button", { name: "Use passkey or recovery code" }).click();
+  await expect(page.getByRole("heading", { name: "Verify identity" })).toBeVisible();
+  await expect(status).toHaveText("");
+  const code = page.locator('[data-recovery-form] input[name="recovery_code"]');
+  await code.fill("used-code");
+  await page.getByRole("button", { name: "Use recovery code", exact: true }).click();
+  await expect(page.locator("[data-recovery-status]")).toHaveText("That recovery code is invalid or already used.");
+  await expect(code).toHaveAttribute("aria-invalid", "true");
+  await expect(code).toBeFocused();
+});
