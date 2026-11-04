@@ -27,6 +27,8 @@ import type { Db, Param } from "../../src/core/db";
 import { migrate } from "../../src/core/migrations";
 import { retrieveClaimCandidates, retrieveClaimsByIds } from "../../src/core/retrieval";
 import { loadAuthorizedSources } from "../../src/core/evidence";
+import { countUnconsolidatedObservations } from "../../src/core/context";
+import type { RequestContext } from "../../src/core/http";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import type { Principal } from "../../src/core/auth";
 
@@ -137,5 +139,31 @@ test("authorized-source loading seeks claim_sources before probing observations"
       undefined,
       `source loading drives from observations: ${offender}\nfull plan:\n${plan.join("\n")}`,
     );
+  });
+});
+
+test("the unconsolidated probe is one statement bounded by an index-ordered window", async () => {
+  const probes = await captureSql((db) =>
+    countUnconsolidatedObservations(
+      { principal: PRINCIPAL, app: { db } } as unknown as RequestContext,
+      "sub_plan",
+      null,
+      false,
+      new Date().toISOString(),
+    ),
+  );
+  assert.equal(probes.length, 1, "the probe must issue exactly one statement");
+  await withMigratedStore((explain) => {
+    const plan = explain(probes[0]!);
+    const scan = plan.find((line) => /^SCAN o\b/.test(line));
+    assert.equal(scan, undefined, `probe scans observations: ${scan}\nfull plan:\n${plan.join("\n")}`);
+    assert.ok(
+      plan.some((line) => /SEARCH o USING INDEX observations_scope \(org_id=\? AND subject_id=\? AND ingested_at<\?\)/.test(line)),
+      `expected an observations_scope range for the window:\n${plan.join("\n")}`,
+    );
+    // A sort inside the window would visit every row of the subject before LIMIT applies.
+    const windowSort = plan.find((line) => /TEMP B-TREE FOR (LAST TERM OF )?ORDER BY/.test(line)
+      && plan.indexOf(line) < plan.findIndex((entry) => /observations_scope/.test(entry)) + 2);
+    assert.equal(windowSort, undefined, `window sorts before LIMIT:\n${plan.join("\n")}`);
   });
 });
