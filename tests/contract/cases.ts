@@ -3218,6 +3218,169 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "membership import cannot grant an organization role without authority",
+    async run(fx) {
+      const climber = await fx.provision({
+        principalId: `import_climber_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["import:write", "memberships:write"],
+      });
+      const body = [
+        { type: "titen.export.header", format_version: 4, org_id: climber.orgId },
+        {
+          type: "membership",
+          id: `mbr_import_climber_${fx.runtime}`,
+          workspace_id: null,
+          principal_id: climber.principalId,
+          principal_kind: "human",
+          role: "owner",
+          created_at: "2026-08-01T00:00:00.000Z",
+        },
+      ].map((value) => JSON.stringify(value)).join("\n");
+
+      expectError(await fx.callRaw("POST", "/v1/import", { key: climber.key, body }), 404, "NOT_FOUND");
+      assert.deepEqual(
+        await fx.query(`SELECT id FROM memberships WHERE org_id = ?`, [climber.orgId]),
+        [],
+        "a refused import must not create a membership",
+      );
+    },
+  },
+  {
+    name: "an admin cannot import an owner membership",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const admin = await fx.provision({
+        orgId: owner.orgId,
+        principalId: `import_admin_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["import:write", "memberships:write", "keys:manage"],
+      });
+      expectOk(await fx.call("POST", "/v1/memberships", {
+        key: owner.key,
+        body: { principal_id: admin.principalId, principal_kind: "human", role: "admin" },
+      }), 201);
+      const accomplice = `import_accomplice_${fx.runtime}`;
+      const body = [
+        { type: "titen.export.header", format_version: 4, org_id: owner.orgId },
+        {
+          type: "titen.import.actor_map",
+          source_org_id: owner.orgId,
+          source_actor_id: "source_accomplice",
+          destination_actor_id: accomplice,
+        },
+        {
+          type: "membership",
+          id: `mbr_import_admin_owner_${fx.runtime}`,
+          workspace_id: null,
+          principal_id: "source_accomplice",
+          principal_kind: "human",
+          role: "owner",
+          created_at: "2026-08-01T00:00:00.000Z",
+        },
+      ].map((value) => JSON.stringify(value)).join("\n");
+
+      expectError(await fx.callRaw("POST", "/v1/import", { key: admin.key, body }), 403, "FORBIDDEN");
+      assert.deepEqual(
+        await fx.query(`SELECT role FROM memberships WHERE org_id = ? AND principal_id = ?`, [owner.orgId, accomplice]),
+        [],
+        "only an owner may grant the owner role",
+      );
+    },
+  },
+  {
+    name: "credential import cannot reuse another principal identity",
+    async run(fx) {
+      const owner = await fx.provision({
+        principalId: `import_owner_${fx.runtime}`,
+        principalKind: "human",
+        scopes: ["*"],
+      });
+      const manager = await fx.provision({
+        orgId: owner.orgId,
+        scopes: ["keys:manage", "import:write"],
+        maxTrust: "verified",
+      });
+      const forgedKey = "titen_sk_synthetic_import_principal_reuse";
+      const at = new Date(0).toISOString();
+      const body = [
+        { type: "titen.export.header", format_version: 4, org_id: owner.orgId },
+        {
+          type: "api_key",
+          id: `key_import_principal_reuse_${fx.runtime}`,
+          principal_id: owner.principalId,
+          principal_kind: "human",
+          key_hash: await sha256Hex(forgedKey),
+          label: "synthetic impersonation attempt",
+          scopes: "keys:manage",
+          max_trust: "asserted",
+          created_at: at,
+          not_before: at,
+          expires_at: null,
+          last_used_at: null,
+          revoked_at: null,
+        },
+      ].map((value) => JSON.stringify(value)).join("\n");
+
+      expectError(await fx.callRaw("POST", "/v1/import", { key: manager.key, body }), 403, "FORBIDDEN");
+      expectError(await fx.call("GET", "/v1/keys", { key: forgedKey }), 401, "UNAUTHENTICATED");
+    },
+  },
+  {
+    name: "a managed credential may import a key for its own principal",
+    async run(fx) {
+      const manager = await fx.provision({
+        principalId: `import_self_${fx.runtime}`,
+        principalKind: "agent",
+        scopes: ["keys:manage", "import:write"],
+        maxTrust: "verified",
+      });
+      const restoredKey = "titen_sk_synthetic_import_own_principal";
+      const at = new Date(0).toISOString();
+      const body = [
+        { type: "titen.export.header", format_version: 4, org_id: manager.orgId },
+        {
+          type: "api_key",
+          id: `key_import_own_principal_${fx.runtime}`,
+          principal_id: manager.principalId,
+          principal_kind: "agent",
+          key_hash: await sha256Hex(restoredKey),
+          label: "restored own credential",
+          scopes: "keys:manage",
+          max_trust: "asserted",
+          created_at: at,
+          not_before: at,
+          expires_at: null,
+          last_used_at: null,
+          revoked_at: null,
+        },
+      ].map((value) => JSON.stringify(value)).join("\n");
+
+      expectOk(await fx.callRaw("POST", "/v1/import", { key: manager.key, body }));
+      expectOk(await fx.call("GET", "/v1/keys", { key: restoredKey }));
+    },
+  },
+  {
+    name: "an audit cursor from another organization returns nothing",
+    async run(fx) {
+      const first = await fx.provision({ scopes: ["*"] });
+      const second = await fx.provision({ scopes: ["*"] });
+      const foreignId = `aud_foreign_cursor_${fx.runtime}`;
+      await fx.query(
+        `INSERT INTO audit_log (id, org_id, actor_id, action, resource_type, created_at)
+         VALUES (?, ?, ?, 'cursor.probe', 'organization', '2026-01-01T00:00:00.000Z'),
+                (?, ?, ?, 'cursor.probe', 'organization', '2026-01-02T00:00:00.000Z')`,
+        [foreignId, first.orgId, first.principalId, `aud_own_cursor_${fx.runtime}`, second.orgId, second.principalId],
+      );
+      const own = await fx.call("GET", "/v1/audit?action=cursor.probe", { key: second.key });
+      expectOk(own);
+      assert.equal(own.body.data.entries.length, 1);
+      const probed = await fx.call("GET", `/v1/audit?action=cursor.probe&after=${foreignId}`, { key: second.key });
+      expectOk(probed);
+      assert.deepEqual(probed.body.data.entries, [], "a foreign cursor must behave like an unknown cursor");
+    },
+  },
+  {
     name: "revocation takes effect on the next request and stays scoped",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });

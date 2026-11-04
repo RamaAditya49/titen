@@ -123,6 +123,14 @@ Rules at every boundary:
 - The throttle table is bounded. At capacity it evicts unblocked rows with the
   fewest failures first, so a flood of new usernames cannot lock out operators
   or cheaply reset a partly failed account. Active blocks are never evicted.
+- Import never grants more authority than the direct routes. A membership needs
+  the owner or admin role, and a key for another principal needs `*`.
+- The request body bound applies while the body is read, so a chunked body
+  without `Content-Length` cannot grow process memory past it.
+- Webhook attempts carry a signature over the timestamp, the delivery id, and
+  the body, so a receiver can reject a replayed capture.
+- `mcp:call` is a tool-bundle scope (ADR 0007). Handlers keep their own trust,
+  fence, grant, purge, and consolidation checks.
 - A staged dashboard key cannot call product routes. Concurrent challenge or
   recovery claims produce at most one full session.
 

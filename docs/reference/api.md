@@ -321,6 +321,19 @@ terminal `failed` after five attempts. The drain response includes
 `delivery_attempts`, `delivered`, `pending_deliveries`, `failed_deliveries`,
 `oldest_retry_at`, `oldest_pending_at`, and `semantics: "at_least_once"`.
 
+Every attempt carries two signatures with the webhook secret:
+
+| Header | HMAC-SHA256 input |
+| --- | --- |
+| `X-Titen-Signature-V2` | `<X-Titen-Timestamp>.<X-Titen-Delivery>.<raw body>` |
+| `X-Titen-Signature` | `<raw body>` only |
+
+`X-Titen-Timestamp` is the attempt time in Unix seconds. Verify the V2
+signature, reject a timestamp more than 300 seconds old, and ignore a delivery
+id that you already processed. The body-only signature cannot show a replay. It
+stays for existing receivers. A future minor release may remove it. The
+`signing.v2` object in the registration response describes the same contract.
+
 ## Common behavior
 
 - Base path: `/v1`.
@@ -335,6 +348,10 @@ terminal `failed` after five attempts. The drain response includes
   remains stored for audit. Reuse for a different request is `409`, and another
   principal has an independent key space.
 - Tenant/organization authority never comes from a request body.
+- A request body may hold at most 1 MiB (1,048,576 bytes), with or without
+  `Content-Length`. A larger body returns `413 PAYLOAD_TOO_LARGE` before the
+  rest is read. The Bun runtime refuses a body above 2 MiB with a plain `413`
+  before the app runs, so that response has no Titen envelope.
 - JSON bodies may nest at most 64 object/array levels. Free text rejects unsafe
   terminal and bidirectional controls while retaining tab and line feed.
 
@@ -1489,6 +1506,10 @@ requires `keys:manage` and `export:all`. It exports hashes and complete lifecycl
 metadata, never the one-time raw bearer token. Protect this stream like a
 database backup. Version 4 import requires `keys:manage`, restores the same
 immutable window, monotonic last-use and revocation state, and is idempotent.
+Import applies the same authority rules as the direct routes. Without `*`, a
+credential restores keys only for its own principal identity, and gets `403`
+for any other. Membership records also need an active organization `owner` or
+`admin` role, and only an owner may import the `owner` role.
 
 `POST /v1/import` preflights the complete request before mutation, accepts
 canonical records independent of NDJSON line order, and writes in dependency
