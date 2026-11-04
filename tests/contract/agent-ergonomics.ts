@@ -176,6 +176,22 @@ CASES.push({
     assert.deepEqual(empty.body.data.budget.unconsolidated_observation_ids, [pending.body.data.observation_id]);
     assert.match(empty.body.data.budget.hint, /titen_consolidate/);
 
+    const archival = await fx.call("POST", "/v1/observations", {
+      key: oneKey,
+      body: {
+        subject_id: "team:profile:agent_a",
+        kind: "imported_source",
+        content: "An archival note dated before standard time.",
+        source: { type: "test", ref: "archive:1900" },
+        visibility: "organization",
+        occurred_at: "1900-01-01T00:00:00Z",
+        tz: "Asia/Jakarta",
+      },
+    });
+    assert.equal(archival.status, 201, JSON.stringify(archival.body));
+    assert.equal(archival.body.data.occurred_at_local, "1900-01-01T07:07:00.000+07:07");
+    assert.equal(Date.parse(archival.body.data.occurred_at_local), Date.parse("1900-01-01T00:00:00Z"));
+
     const subjectLookup = await fx.call("POST", "/v1/projects/resolve", {
       key: oneKey,
       body: { reference: "team:profile:agent_a" },
