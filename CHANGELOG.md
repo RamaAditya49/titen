@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `GET /v1/memories` applies the claim validity window per row: `active` and `disputed` mean currently valid, whichever other statuses are requested. `status=active,superseded` no longer brings back expired or not-yet-valid active claims, and `facets` now use the same predicate, so `facets.status.active` matches what `status=active` lists. Facets and the validity rule are documented (#347).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

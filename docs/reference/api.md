@@ -789,13 +789,21 @@ List canonical claims visible to the authenticated principal without compiling
 an Atlas view. The route requires `views:compile`; authorization and retention
 predicates run in SQL before search and pagination. The default lifecycle filter
 is `active,disputed`; `status`, `visibility`, and `kind` accept comma-separated
-values from their documented enums. `q` is bounded lexical FTS over claim
+values from their documented enums. `active` and `disputed` mean currently
+valid: such a claim is listed only while `valid_from <= now < valid_to` (an open
+`valid_to` never ends). The window belongs to each row's own status, so adding
+another status such as `superseded` to the list never re-admits an `active`
+claim outside its window. `q` is bounded lexical FTS over claim
 statements. Semantic/vector retrieval is not required for this operation.
 
 `limit` defaults to 25 and is bounded to 1–100. `after` is an opaque keyset
-cursor over `(created_at,id)` descending order. The response never includes a
-global count; `page.has_more` and `page.next_cursor` describe only the
-authorized result set.
+cursor over `(created_at,id)` descending order. `page.has_more` and
+`page.next_cursor` describe only the authorized result set. `facets.status` and
+`facets.kind` count the authorized claims that match every filter except
+`status` and `kind`, using the same validity rule as the list, so
+`facets.status.active` equals the number of items `status=active` pages through
+with the same other filters. Facets do not depend on `after`; every page reports
+the same values.
 
 ```http
 GET /v1/memories?q=rollback%20smoke&subject_id=subject_123&limit=25
