@@ -276,6 +276,34 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "workspace graph stays within the bound-parameter limit for large views",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      // 105 subjects with one claim each: the old query bound 1 + 2 × claims and
+      // 1 + subjects parameters, past D1's 100-parameter limit (#364).
+      for (let index = 0; index < 105; index += 1) {
+        await seedClaim(fx, owner.key, {
+          observation: { subject_id: `graph_subject_${index}`, visibility: "organization", content: `Graph note ${index}.` },
+          claim: { statement: `Graph claim ${index}.` },
+        });
+      }
+      for (const max_nodes of [undefined, 300]) {
+        const graph = await fx.call("POST", "/v1/memory-views/compile", {
+          key: owner.key, body: { lens: "workspace_graph", ...(max_nodes ? { max_nodes } : {}) },
+        });
+        expectOk(graph);
+        const nodes = graph.body.data.nodes as { type: string }[];
+        if (max_nodes === 300) {
+          assert.equal(nodes.filter((node) => node.type === "claim").length, 105);
+          assert.equal(nodes.filter((node) => node.type === "subject").length, 105);
+          assert.equal(graph.body.data.edges.filter((edge: { relation: string }) => edge.relation === "about").length, 105);
+        } else {
+          assert.ok(nodes.length > 100, `default view returned ${nodes.length} nodes`);
+        }
+      }
+    },
+  },
+  {
     name: "scoped grants drive directories, Atlas graph, and next-request revocation",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });

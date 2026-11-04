@@ -367,11 +367,15 @@ async function workspaceGraph(
     if (!selected.some((claim) => claim.subject_id === removed.subject_id))
       subjectIds.splice(subjectIds.indexOf(removed.subject_id), 1);
   }
-  const subjectRows = subjectIds.length ? await ctx.app.db.all<{ id: string; label: string; created_at: string }>(
-    `SELECT id, label, created_at FROM subjects
-      WHERE org_id = ? AND id IN (${subjectIds.map(() => "?").join(", ")})`,
-    [principal.orgId, ...subjectIds],
-  ) : [];
+  // Chunked: D1 rejects a statement with more than 100 bound parameters (#364).
+  const subjectRows: { id: string; label: string; created_at: string }[] = [];
+  for (const group of chunk(subjectIds, MAX_BOUND_PARAMS - 1)) {
+    subjectRows.push(...await ctx.app.db.all<{ id: string; label: string; created_at: string }>(
+      `SELECT id, label, created_at FROM subjects
+        WHERE org_id = ? AND id IN (${group.map(() => "?").join(", ")})`,
+      [principal.orgId, ...group],
+    ));
+  }
   const subjectById = new Map(subjectRows.map((subject) => [subject.id, subject]));
   const nodes: Node[] = subjectIds.map((id) => ({
     id: `subject:${id}`,
@@ -398,14 +402,21 @@ async function workspaceGraph(
     from: claim.id, to: `subject:${claim.subject_id}`, relation: "about",
   }));
   if (selected.length) {
-    const ids = selected.map((claim) => claim.id);
-    const links = await ctx.app.db.all<{ source_claim_id: string; target_claim_id: string; relation: string }>(
-      `SELECT source_claim_id, target_claim_id, relation FROM claim_links
-        WHERE org_id = ? AND source_claim_id IN (${ids.map(() => "?").join(", ")})
-          AND target_claim_id IN (${ids.map(() => "?").join(", ")})
-        ORDER BY created_at, id`,
-      [principal.orgId, ...ids, ...ids],
-    );
+    // Query by source in chunks and keep only targets inside the view, instead of
+    // binding the id list twice in one statement (#364). Same order as before.
+    type LinkRow = { source_claim_id: string; target_claim_id: string; relation: string; created_at: string; id: string };
+    const links: LinkRow[] = [];
+    for (const group of chunk(selected.map((claim) => claim.id), MAX_BOUND_PARAMS - 1)) {
+      const rows = await ctx.app.db.all<LinkRow>(
+        `SELECT source_claim_id, target_claim_id, relation, created_at, id FROM claim_links
+          WHERE org_id = ? AND source_claim_id IN (${group.map(() => "?").join(", ")})`,
+        [principal.orgId, ...group],
+      );
+      links.push(...rows.filter((row) => claimIds.has(row.target_claim_id)));
+    }
+    // Binary comparison, matching SQLite's default ORDER BY collation.
+    const binary = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+    links.sort((a, b) => binary(a.created_at, b.created_at) || binary(a.id, b.id));
     for (const link of links) edges.push({
       from: link.source_claim_id,
       to: link.target_claim_id,
