@@ -130,6 +130,63 @@ test("the API key reaches only the authorization header and is redacted upstream
   assert.doesNotMatch(output.join(""), new RegExp(secret));
 });
 
+async function bridge(lines: unknown[], fetcher?: (input: string | URL, init?: RequestInit) => Promise<Response>) {
+  async function* input() {
+    yield new TextEncoder().encode(lines.map((line) => JSON.stringify(line)).join("\n"));
+  }
+  const output: string[] = [];
+  await runMcpStdio({ endpoint: `${running.url}/mcp`, apiKey: key, input: input(), fetcher, write: (line) => output.push(line) });
+  return output;
+}
+
+test("a batch on stdin gets the same one-line array that POST /mcp returns", async () => {
+  const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+  const batch = [ping, initialized, tools];
+  const direct = JSON.parse(await http(batch));
+  const output = await bridge([batch]);
+  assert.equal(output.length, 1);
+  const bridged = JSON.parse(output[0]!);
+  assert.ok(Array.isArray(bridged));
+  assert.deepEqual(bridged.map((reply: { id: unknown }) => reply.id), [1, 2]);
+  assert.deepEqual(bridged, direct);
+});
+
+test("a notification-only batch writes nothing", async () => {
+  assert.deepEqual(await bridge([[initialized, { jsonrpc: "2.0", method: "notifications/cancelled", params: {} }]]), []);
+});
+
+test("an initialize inside a batch sets the protocol header for later requests", async () => {
+  const versions: Array<string | null> = [];
+  const output = await bridge([[initialize, { jsonrpc: "2.0", id: 3, method: "ping" }], tools], async (input, init) => {
+    versions.push(new Headers(init?.headers).get("mcp-protocol-version"));
+    return fetch(input, init);
+  });
+  assert.equal(output.length, 2);
+  assert.deepEqual(versions, [null, "2025-06-18"]);
+});
+
+test("a failed batch writes one error per request id", async () => {
+  async function* input() {
+    yield new TextEncoder().encode(JSON.stringify([
+      { jsonrpc: "2.0", id: 4, method: "ping" },
+      initialized,
+      { jsonrpc: "2.0", id: "five", method: "tools/list" },
+    ]));
+  }
+  const output: string[] = [];
+  const realError = console.error;
+  console.error = () => {};
+  try {
+    await runMcpStdio({ endpoint: "http://127.0.0.1:9/mcp", apiKey: "batch-key", input: input(), write: (line) => output.push(line) });
+  } finally {
+    console.error = realError;
+  }
+  assert.deepEqual(output.map((line) => JSON.parse(line)), [
+    { jsonrpc: "2.0", id: 4, error: { code: -32000, message: "Titen MCP request failed." } },
+    { jsonrpc: "2.0", id: "five", error: { code: -32000, message: "Titen MCP request failed." } },
+  ]);
+});
+
 test("unsafe endpoints fail before fetch", async () => {
   async function* empty() {}
   for (const endpoint of [
