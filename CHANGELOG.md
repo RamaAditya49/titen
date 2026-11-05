@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `GET /v1/audit/export` now pages on the same `(created_at, id)` key it orders by. Because audit ids are random, the old id-only cursor skipped some entries and repeated others across pages while still reporting `complete: true`. Following `next_cursor` now returns every entry of the organization exactly once, in the same order as `GET /v1/audit`. An `after` value that names no audit entry in the caller's organization now returns `400 VALIDATION_ERROR` instead of a page that could read as a finished export. ([#368](https://github.com/RamaAditya49/titen/issues/368))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

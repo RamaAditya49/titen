@@ -5727,6 +5727,63 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "a paged audit export returns every entry once in time order",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const other = await fx.provision({ scopes: ["*"] });
+      // Ids deliberately sort against time, and five entries share one timestamp.
+      for (let index = 0; index < 30; index += 1) {
+        const second = Math.min(index, 25);
+        await fx.query(
+          `INSERT INTO audit_log (id, org_id, actor_id, action, resource_type, created_at)
+           VALUES (?, ?, ?, 'export.probe', 'organization', ?)`,
+          [`aud_${String(99 - index).padStart(2, "0")}_${fx.runtime}`, owner.orgId, owner.principalId,
+            `2026-01-01T00:00:${String(second).padStart(2, "0")}.000Z`],
+        );
+      }
+      const listed: string[] = [];
+      let listCursor = "";
+      for (;;) {
+        const page = await fx.call("GET", `/v1/audit?limit=10${listCursor ? `&after=${listCursor}` : ""}`, { key: owner.key });
+        expectOk(page);
+        const entries = page.body.data.entries as Array<{ id: string }>;
+        listed.push(...entries.map((entry) => entry.id));
+        if (entries.length < 10) break;
+        listCursor = page.body.data.cursor;
+      }
+      const exported: Array<{ id: string; created_at: string }> = [];
+      let cursor = "";
+      let header: { next_cursor: string | null; complete: boolean } | undefined;
+      for (let pages = 0; pages < 20; pages += 1) {
+        const response = await fx.call("GET", `/v1/audit/export?limit=10${cursor ? `&after=${cursor}` : ""}`, { key: owner.key });
+        assert.equal(response.status, 200);
+        // A header-only page is a single JSON line, which the harness already parses.
+        const lines = typeof response.body === "string"
+          ? response.body.trim().split("\n").map((line) => JSON.parse(line))
+          : [response.body];
+        header = lines[0];
+        exported.push(...lines.slice(1));
+        if (!header!.next_cursor) break;
+        cursor = header!.next_cursor;
+      }
+      assert.equal(header?.complete, true);
+      const ids = exported.map((entry) => entry.id);
+      assert.equal(new Set(ids).size, ids.length, "no entry may be exported twice");
+      assert.ok(ids.length >= 30);
+      assert.deepEqual(ids, listed, "export and list must agree on rows and order");
+      for (let index = 1; index < exported.length; index += 1) {
+        const previous = exported[index - 1]!;
+        const current = exported[index]!;
+        assert.ok(previous.created_at < current.created_at || (previous.created_at === current.created_at && previous.id < current.id));
+      }
+
+      const unknown = await fx.call("GET", "/v1/audit/export?after=aud_missing", { key: owner.key });
+      expectError(unknown, 400, "VALIDATION_ERROR");
+      const foreign = await fx.call("GET", `/v1/audit/export?after=${ids[0]}`, { key: other.key });
+      expectError(foreign, 400, "VALIDATION_ERROR");
+    },
+  },
+  {
     name: "high-value operations write content-free authenticated audits",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });
