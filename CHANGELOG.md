@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard no longer offers passkey and recovery-code controls that cannot work. When readiness reports WebAuthn disabled, Profile hides passkey registration, last-passkey removal, and recovery-code regeneration and names the `TITEN_WEBAUTHN_*` settings that enable them, and the sign-in screen hides "Use passkey or recovery code". A passkey or recovery request that fails because WebAuthn is unavailable now says so instead of "The operation conflicts with current canonical state." ([#371](https://github.com/RamaAditya49/titen/issues/371))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

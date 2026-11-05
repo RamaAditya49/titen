@@ -527,6 +527,45 @@ test("keeps second-factor sessions outside the product shell until recovery succ
   await expect(page.locator('[data-area="memories"]:not([hidden])').first()).toBeVisible();
 });
 
+test("hides passkey and recovery controls when the deployment has WebAuthn disabled", async ({ page }) => {
+  let authenticated = false;
+  let webauthn: string | undefined = "disabled";
+  const principal = {
+    organization_id: "org_plain", principal_id: "owner", principal_kind: "human", key_id: "key_plain",
+    scopes: ["views:compile"], max_trust: "verified", organization_role: "owner", auth_stage: "full",
+  };
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", endpoint: "titen.internal", authentication: "session", authenticated } }));
+  await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: principal } }));
+  await page.route("**/dashboard-api/session/recovery", (route) => route.fulfill({ status: 409, json: { error: { code: "UPSTREAM_409", message: "The operation conflicts with current canonical state." } } }));
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true, capabilities: webauthn ? { webauthn } : {} } } }));
+  await page.route("**/dashboard-api/memories**", (route) => route.fulfill({ json: { data: {
+    items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {}, facets: {},
+  } } }));
+
+  await page.goto("/dashboard/");
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.locator("[data-start-recovery]")).toBeHidden();
+
+  authenticated = true;
+  await page.reload();
+  await page.locator("[data-profile-open]").click();
+  const disabled = page.locator("[data-passkey-disabled]");
+  await expect(disabled).toBeVisible();
+  await expect(disabled).toContainText("Passkeys are not enabled on this deployment");
+  await expect(disabled).toContainText("TITEN_WEBAUTHN_RP_ID");
+  for (const selector of ["[data-passkey-register-form]", "[data-passkey-password]", "[data-recovery-regenerate]", "[data-passkey-list]"])
+    await expect(page.locator(selector)).toBeHidden();
+
+  // Without a readiness answer the sign-in path stays, and a 409 names the cause.
+  authenticated = false;
+  webauthn = undefined;
+  await page.reload();
+  await page.locator('[data-login-form] input[name="username"]').fill("owner");
+  await page.getByRole("button", { name: "Use passkey or recovery code" }).click();
+  await expect(page.locator("[data-login-status]")).toHaveText("Passkeys are not enabled on this deployment. Password sign-in is unaffected.");
+});
+
 test("registers a passkey and shows recovery codes once in Profile", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "PublicKeyCredential", { value: class PublicKeyCredential {} });
