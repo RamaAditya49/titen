@@ -79,11 +79,25 @@ export async function exportAudit(ctx: RequestContext): Promise<Result> {
   if (!Number.isInteger(limitParam) || limitParam < 1 || limitParam > 5000)
     throw validationError('Query "limit" must be an integer between 1 and 5000.');
 
-  const rows = await ctx.app.db.all<Record<string, unknown>>(
-    `SELECT id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at
-     FROM audit_log WHERE org_id = ? AND id > ? ORDER BY created_at, id LIMIT ?`,
-    [orgId, after, limitParam],
-  );
+  // Page on the same (created_at, id) key the rows are ordered by. Audit ids are
+  // random, so an id-only predicate would skip and repeat rows across pages.
+  const params: (string | number)[] = [orgId];
+  let sql = `SELECT id, actor_id, action, resource_type, resource_id, detail, ip_hint, created_at
+             FROM audit_log WHERE org_id = ?`;
+  if (after) {
+    const anchor = await first<{ created_at: string }>(
+      ctx.app.db,
+      `SELECT created_at FROM audit_log WHERE id = ? AND org_id = ?`,
+      [after, orgId],
+    );
+    // An empty page would read as a finished export, so an unknown cursor is an error.
+    if (!anchor) throw validationError('Query "after" references an unknown audit entry.');
+    sql += ` AND (created_at, id) > (?, ?)`;
+    params.push(anchor.created_at, after);
+  }
+  sql += ` ORDER BY created_at, id LIMIT ?`;
+  params.push(limitParam);
+  const rows = await ctx.app.db.all<Record<string, unknown>>(sql, params);
 
   const lines: string[] = [];
   let cursor = "";
