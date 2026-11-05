@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard Audit & Events now loads when opened and shows the newest audit entries and events first. It follows the API cursor in a bounded walk, pages with Newer and Older, and says when a list is partial instead of presenting the oldest page as the whole log. The filter form submits on Enter or through "Apply filters" and suggests known action names and event kinds. ([#367](https://github.com/RamaAditya49/titen/issues/367))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

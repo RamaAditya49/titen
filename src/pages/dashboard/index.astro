@@ -24,6 +24,16 @@ const lenses = [
   { id: "review_queue", label: "Review queue", needs: "optional", scope: "" },
   { id: "knowledge_release", label: "Knowledge releases", needs: "optional", scope: "releases:read" },
 ];
+// Suggestions only: the filters still accept any action or kind the API records.
+const auditActions = [
+  "dashboard_session.create", "dashboard_session.revoke", "operator_account.create", "operator_account.login_block",
+  "key.revoke", "grant.created", "grant.revoked", "membership.add", "membership.remove", "policy.create",
+  "policy.update", "approval.submit", "release.create", "release.activate", "legal_hold.place", "retention.apply",
+];
+const eventKinds = [
+  "lease.acquired", "lease.released", "handoff.created", "approval.submitted", "policy.created", "policy.updated",
+  "release.created", "release.activated", "legal_hold.placed", "retention.applied", "channel.created",
+];
 ---
 
 <!doctype html>
@@ -582,11 +592,14 @@ const lenses = [
             <button class="secondary-button" type="button" data-audit-refresh>Refresh activity</button>
           </div>
           <form class="inline-form" data-audit-form>
-            <label><span>Audit action (optional)</span><input name="action" maxlength="200" autocomplete="off" /></label>
-            <label><span>Event kind (optional)</span><input name="kind" maxlength="200" autocomplete="off" /></label>
-            <label><span>Limit</span><input name="limit" type="number" min="1" max="200" value="50" required /></label>
+            <label><span>Audit action (optional)</span><input name="action" maxlength="200" autocomplete="off" list="audit-actions" placeholder="e.g. dashboard_session.create" /></label>
+            <label><span>Event kind (optional)</span><input name="kind" maxlength="200" autocomplete="off" list="event-kinds" placeholder="e.g. lease.acquired" /></label>
+            <label><span>Rows per page</span><input name="limit" type="number" min="1" max="200" value="50" required /></label>
+            <button class="primary-button" type="submit">Apply filters</button>
           </form>
-          <div class="live-output" data-audit-output><p>Refresh to reconstruct authorized metadata activity.</p></div>
+          <datalist id="audit-actions">{auditActions.map((action) => <option value={action}></option>)}</datalist>
+          <datalist id="event-kinds">{eventKinds.map((kind) => <option value={kind}></option>)}</datalist>
+          <div class="live-output" data-audit-output><p>Open this area to load the most recent authorized activity.</p></div>
         </section>
 
         <section class="area-panel query-panel" data-area-panel="governance" hidden aria-labelledby="governance-heading">
@@ -872,6 +885,124 @@ const lenses = [
         for (const [name, payload] of results) Object.assign(merged, payloadData(payload));
         renderPayload(target, { data: merged }, options);
         return merged;
+      }
+
+      // The audit and event APIs page oldest first. The dashboard follows their cursor
+      // for a bounded number of requests, then shows the walked rows newest first.
+      const ACTIVITY_PAGE_SIZE = 200;
+      const ACTIVITY_MAX_PAGES = 10;
+      type ActivityFeed = {
+        key: "entries" | "events";
+        path: string;
+        scope: string;
+        filter: [string, string];
+        noun: string;
+        rows: Record<string, unknown>[];
+        cursor: string | null;
+        reachedEnd: boolean;
+        offset: number;
+      };
+      let activityGeneration = 0;
+      async function walkActivity(feed: ActivityFeed, generation: number) {
+        for (let page = 0; page < ACTIVITY_MAX_PAGES; page += 1) {
+          const query = new URLSearchParams({ limit: String(ACTIVITY_PAGE_SIZE) });
+          if (feed.filter[1]) query.set(...feed.filter);
+          if (feed.cursor) query.set("after", feed.cursor);
+          const values = payloadData(await getArea(feed.path, query))[feed.key];
+          if (generation !== activityGeneration) return;
+          const rows = Array.isArray(values)
+            ? values.map((value) => value && typeof value === "object" ? value as Record<string, unknown> : {})
+            : [];
+          feed.rows.push(...rows);
+          const last = rows.at(-1);
+          if (typeof last?.id === "string") feed.cursor = last.id;
+          if (rows.length < ACTIVITY_PAGE_SIZE || typeof last?.id !== "string") {
+            feed.reachedEnd = true;
+            return;
+          }
+        }
+      }
+      function renderActivity(target: HTMLElement, feed: ActivityFeed, pageSize: number, generation: number) {
+        target.replaceChildren();
+        const newestFirst = [...feed.rows].reverse();
+        const shown = newestFirst.slice(feed.offset, feed.offset + pageSize);
+        renderCollection(target, {
+          name: feed.key,
+          rows: shown,
+          emptyMessage: feed.filter[1] ? `No authorized ${feed.noun} match this filter.` : `No authorized ${feed.noun} recorded yet.`,
+        }, true);
+        const total = feed.rows.length;
+        const footer = document.createElement("footer");
+        footer.className = "memory-pagination";
+        footer.dataset.activityFooter = feed.key;
+        const status = document.createElement("span");
+        status.setAttribute("role", "status");
+        status.dataset.activityPage = feed.key;
+        const range = total ? `${feed.offset + 1}–${feed.offset + shown.length}` : "0";
+        status.textContent = feed.reachedEnd
+          ? `Showing ${range} of ${total.toLocaleString()} ${feed.noun}, newest first.`
+          : `Partial view: showing ${range} of the first ${total.toLocaleString()} ${feed.noun}. More recent ${feed.noun} exist and have not loaded yet.`;
+        const controls = document.createElement("span");
+        const button = (label: string, disabled: boolean, onClick: () => void) => {
+          const element = document.createElement("button");
+          element.type = "button";
+          element.className = "secondary-button";
+          element.textContent = label;
+          element.disabled = disabled;
+          element.addEventListener("click", onClick);
+          controls.append(element);
+          return element;
+        };
+        button("Newer", feed.offset === 0, () => {
+          feed.offset = Math.max(0, feed.offset - pageSize);
+          renderActivity(target, feed, pageSize, generation);
+        });
+        button("Older", feed.offset + pageSize >= total, () => {
+          feed.offset += pageSize;
+          renderActivity(target, feed, pageSize, generation);
+        });
+        if (!feed.reachedEnd) {
+          const more = button(`Load more recent ${feed.noun}`, false, async () => {
+            more.disabled = true;
+            status.textContent = `Loading more recent ${feed.noun}…`;
+            try {
+              await walkActivity(feed, generation);
+              if (generation !== activityGeneration) return;
+              feed.offset = 0;
+              renderActivity(target, feed, pageSize, generation);
+            } catch (error) { handleError(error, target); }
+          });
+        }
+        footer.append(status, controls);
+        target.append(footer);
+      }
+      async function loadActivity() {
+        const output = one<HTMLElement>("[data-audit-output]");
+        const form = one<HTMLFormElement>("[data-audit-form]");
+        if (!form.reportValidity()) return;
+        const values = new FormData(form);
+        const pageSize = Number(values.get("limit"));
+        const feed = (key: ActivityFeed["key"], path: string, scope: string, filter: string, noun: string): ActivityFeed => ({
+          key, path, scope, filter: [filter, String(values.get(filter) ?? "").trim()], noun, rows: [], cursor: null, reachedEnd: false, offset: 0,
+        });
+        const feeds = [
+          feed("entries", "audit/log", "audit:read", "action", "audit entries"),
+          feed("events", "audit/events", "events:read", "kind", "events"),
+        ].filter((candidate) => has(candidate.scope));
+        if (!feeds.length) {
+          renderMessage(output, "This principal has no read capability for this area.");
+          return;
+        }
+        const generation = ++activityGeneration;
+        renderMessage(output, "Loading recent activity…");
+        const targets = feeds.map(() => document.createElement("div"));
+        await Promise.all(feeds.map(async (feed, index) => {
+          try {
+            await walkActivity(feed, generation);
+            if (generation === activityGeneration) renderActivity(targets[index]!, feed, pageSize, generation);
+          } catch (error) { handleError(error, targets[index]); }
+        }));
+        if (principal && generation === activityGeneration) output.replaceChildren(...targets);
       }
 
       function formQuery(form: HTMLFormElement): URLSearchParams {
@@ -1565,6 +1696,7 @@ const lenses = [
         if (id === "models") void loadModels();
         if (id === "access") void loadAccess();
         if (id === "api") void loadKeys();
+        if (id === "audit") void loadActivity();
         if (id === "profile") void loadPasskeys();
       }
       function showPrivateSurface() {
@@ -2009,15 +2141,10 @@ const lenses = [
         const target = one<HTMLElement>("[data-work-output]");
         try { renderPayload(target, await getArea("work/checkpoint", query)); } catch (error) { handleError(error, target); }
       });
-      one<HTMLButtonElement>("[data-audit-refresh]").addEventListener("click", async () => {
-        const values = new FormData(one<HTMLFormElement>("[data-audit-form]"));
-        const limit = String(values.get("limit"));
-        const requests: Array<[string, string]> = [];
-        const action = String(values.get("action") ?? "").trim();
-        const kind = String(values.get("kind") ?? "").trim();
-        requests.push([`audit/log?limit=${encodeURIComponent(limit)}${action ? `&action=${encodeURIComponent(action)}` : ""}`, "audit:read"]);
-        requests.push([`audit/events?limit=${encodeURIComponent(limit)}${kind ? `&kind=${encodeURIComponent(kind)}` : ""}`, "events:read"]);
-        try { await loadAvailable(one("[data-audit-output]"), requests); } catch (error) { handleError(error, one("[data-audit-output]")); }
+      one<HTMLButtonElement>("[data-audit-refresh]").addEventListener("click", () => void loadActivity());
+      one<HTMLFormElement>("[data-audit-form]").addEventListener("submit", (event) => {
+        event.preventDefault();
+        void loadActivity();
       });
       one<HTMLButtonElement>("[data-governance-refresh]").addEventListener("click", async () => {
         try { await loadGovernance(); }
