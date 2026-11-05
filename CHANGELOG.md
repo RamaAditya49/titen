@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The `titen mcp` stdio bridge now relays JSON-RPC batches the way `POST /mcp` answers them. A batch on stdin produces the server's response array as one line. A notification-only batch produces nothing. An `initialize` inside a batch sets the negotiated `mcp-protocol-version` for later requests, and a failed batch yields one error per request id instead of a single `id: null` error the client cannot match. ([#372](https://github.com/RamaAditya49/titen/issues/372))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
