@@ -167,7 +167,7 @@ const lenses = [
             <div class="topbar-heading"><h1 data-page-title>Titen dashboard</h1><span class="read-only-badge">authorized</span><span class="javanese" title="titen">ꦠꦶꦠꦺꦤ꧀</span></div>
           </div>
           <div class="topbar-actions">
-            <button type="button" class="search-button" data-search-open aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search or jump to…</span><kbd>⌘K</kbd></button>
+            <button type="button" class="search-button" data-search-open aria-haspopup="dialog" aria-keyshortcuts="Meta+K Control+K" aria-label="Search or jump to (Ctrl K)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search or jump to…</span><kbd data-search-shortcut>Ctrl K</kbd></button>
             <span class="topbar-rule" aria-hidden="true"></span>
             <div class="connection" role="status" aria-live="polite">
               <i data-connection-dot></i>
@@ -612,10 +612,11 @@ const lenses = [
 
         <dialog class="search-dialog" data-search-dialog aria-labelledby="search-heading">
           <form method="dialog" data-search-form>
-            <header><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><h2 id="search-heading">Search memories</h2><button class="dialog-close" value="cancel" aria-label="Close search">Esc</button></header>
-            <label><span>Memory statement</span><input name="query" autocomplete="off" placeholder="rollback smoke, team preference…" /></label>
-            <p>Search is scoped by the authenticated principal. Results outside that authority are not counted or listed.</p>
-            <footer><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="default">Search memories</button></footer>
+            <header><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"></use></svg><h2 id="search-heading">Search or jump to</h2><button type="button" class="dialog-close" data-search-cancel aria-label="Close search">Esc</button></header>
+            <label><span>Area or memory statement</span><input name="query" role="combobox" aria-controls="search-results" aria-expanded="true" aria-autocomplete="list" autocomplete="off" placeholder="Releases, rollback smoke, team preference…" /></label>
+            <ul class="search-results" id="search-results" role="listbox" aria-label="Destinations and memory search" data-search-results></ul>
+            <p>Areas are limited to what this principal can open. Memory search is scoped by the authenticated principal; results outside that authority are not counted or listed.</p>
+            <footer><button class="primary-button" value="default">Go</button><button type="button" class="secondary-button" data-search-cancel>Cancel</button></footer>
           </form>
         </dialog>
       </main>
@@ -1889,21 +1890,100 @@ const lenses = [
       });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);
       one<HTMLButtonElement>("[data-system-refresh]").addEventListener("click", refreshService);
-      one<HTMLButtonElement>("[data-search-open]").addEventListener("click", () => {
+      // The command dialog lists authorized destinations from the visible nav, then a
+      // memory search. Nothing is preselected; Enter takes the highlighted option, or the first.
+      const searchOpen = one<HTMLButtonElement>("[data-search-open]");
+      const searchQuery = searchForm.elements.namedItem("query") as HTMLInputElement;
+      const searchResults = one<HTMLUListElement>("[data-search-results]");
+      type SearchOption = { label: string; run: () => void };
+      let searchOptions: SearchOption[] = [];
+      let searchActive = -1;
+      let searchFocusAfterClose: HTMLElement | null = null;
+      {
+        const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform;
+        const hint = /mac|iphone|ipad|ipod/i.test(platform) ? "⌘K" : "Ctrl K";
+        text("[data-search-shortcut]", hint);
+        searchOpen.setAttribute("aria-label", `Search or jump to (${hint})`);
+      }
+      function searchDestinations(): Array<{ area: string; label: string }> {
+        const seen = new Set<string>();
+        return all<HTMLButtonElement>("[data-product-nav] [data-area]")
+          .filter((button) => !button.hidden && button.dataset.area && button.dataset.label)
+          .filter((button) => !seen.has(button.dataset.area!) && Boolean(seen.add(button.dataset.area!)))
+          .map((button) => ({ area: button.dataset.area!, label: button.dataset.label! }));
+      }
+      function renderSearchOptions() {
+        const query = searchQuery.value.trim();
+        const needle = query.toLowerCase();
+        const destinations = searchDestinations();
+        searchOptions = destinations
+          .filter((destination) => destination.label.toLowerCase().includes(needle) || destination.area.includes(needle))
+          .map((destination) => ({ label: `Go to ${destination.label}`, run: () => {
+            searchFocusAfterClose = null;
+            searchDialog.close();
+            activateArea(destination.area);
+          } }));
+        if (query && destinations.some((destination) => destination.area === "memories"))
+          searchOptions.push({ label: `Search memories for “${query}”`, run: () => {
+            memoryListSearch.value = query;
+            memoryListHistory = [];
+            memoryListCursor = null;
+            searchFocusAfterClose = memoryListSearch;
+            searchDialog.close();
+            activateArea("memories");
+          } });
+        searchActive = Math.min(searchActive, searchOptions.length - 1);
+        searchResults.replaceChildren(...searchOptions.map((option, index) => {
+          const item = document.createElement("li");
+          item.id = `search-option-${index}`;
+          item.setAttribute("role", "option");
+          item.setAttribute("aria-selected", String(index === searchActive));
+          item.textContent = option.label;
+          item.addEventListener("pointerdown", (event) => event.preventDefault());
+          item.addEventListener("click", option.run);
+          return item;
+        }));
+        if (!searchOptions.length) {
+          const empty = document.createElement("li");
+          empty.className = "search-empty";
+          empty.setAttribute("aria-disabled", "true");
+          empty.textContent = "No authorized area matches.";
+          searchResults.append(empty);
+        }
+        if (searchActive >= 0) searchQuery.setAttribute("aria-activedescendant", `search-option-${searchActive}`);
+        else searchQuery.removeAttribute("aria-activedescendant");
+      }
+      searchOpen.addEventListener("click", () => {
+        searchQuery.value = "";
+        searchActive = -1;
+        searchFocusAfterClose = searchOpen;
+        renderSearchOptions();
         searchDialog.showModal();
-        (searchForm.elements.namedItem("query") as HTMLInputElement).focus();
+        searchQuery.focus();
+      });
+      searchDialog.addEventListener("close", () => {
+        // A jump focuses the main region so keyboard users land in the new area.
+        (searchFocusAfterClose ?? one<HTMLElement>("#workspace")).focus();
+        searchFocusAfterClose = searchOpen;
+      });
+      for (const button of all<HTMLButtonElement>("[data-search-cancel]"))
+        button.addEventListener("click", () => searchDialog.close());
+      searchQuery.addEventListener("input", () => {
+        searchActive = -1;
+        renderSearchOptions();
+      });
+      searchQuery.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+        event.preventDefault();
+        if (!searchOptions.length) return;
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        searchActive = searchActive < 0 && step < 0 ? searchOptions.length - 1 : (searchActive + step + searchOptions.length) % searchOptions.length;
+        renderSearchOptions();
+        document.getElementById(`search-option-${searchActive}`)?.scrollIntoView({ block: "nearest" });
       });
       searchForm.addEventListener("submit", (event) => {
-        const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
-        if (submitter?.value !== "default") return;
         event.preventDefault();
-        const query = String(new FormData(searchForm).get("query") ?? "").trim();
-        memoryListSearch.value = query;
-        memoryListHistory = [];
-        memoryListCursor = null;
-        searchDialog.close();
-        activateArea("memories");
-        memoryListSearch.focus();
+        searchOptions[Math.max(0, searchActive)]?.run();
       });
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && workspaceMenu.open) {

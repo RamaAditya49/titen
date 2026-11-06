@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard's "Search or jump to" dialog now does what it says. Enter no longer closes the dialog and discards the query. The dialog lists the areas the principal can open, filtered as you type, and offers to search Memories only when that area is available. Closing it returns focus to the trigger. The shortcut hint reads ⌘K on Apple platforms and Ctrl K elsewhere and is exposed through `aria-keyshortcuts`. At 620px and below the trigger becomes an icon button and no longer covers the breadcrumb. ([#375](https://github.com/RamaAditya49/titen/issues/375))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
