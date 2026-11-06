@@ -186,8 +186,10 @@ browser tests also cover credential isolation, revocation, exact origin checks,
 request-size limits, capability hiding, stale private-state clearing,
 principal-scoped empty results, audited administrator mode, workspace
 visibility, scoped grants and key clamps, masked model diagnostics, structured
-operator collections, semantic-sync readiness, keyboard use, and a 320 px
-viewport.
+operator collections, semantic-sync readiness, keyboard use, a 320 px
+viewport, and WCAG 2.2 target size for row actions. Row actions are at least
+24 px tall (44 px with a coarse pointer), and a destructive action such as
+**Revoke** starts at the far end of the cell, away from **Inspect**.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

@@ -359,6 +359,62 @@ test("renders structured administration and diagnostic facts", async ({ page }) 
   await expect(keyRow).toContainText("views:compile");
 });
 
+async function routeTwoKeys(page: Page) {
+  await page.route("**/dashboard-api/governance/keys**", (route) => route.fulfill({ json: { data: { keys: [
+    { key_id: "key_owner", label: "owner", principal_id: "server_operator", scopes: ["*"], max_trust: "verified", status: "active" },
+    { key_id: "key_session", label: "Dashboard session", principal_id: "server_operator", scopes: ["views:compile"], max_trust: "verified", status: "active" },
+  ] } } }));
+}
+async function rowActionRects(page: Page) {
+  return page.locator('[data-collection="keys"] tbody tr').evaluateAll((rows) => rows.map((row) =>
+    [...row.querySelectorAll(".collection-actions button")].map((button) => {
+      const rect = button.getBoundingClientRect();
+      return { name: button.textContent ?? "", danger: button.classList.contains("danger-action"), x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    })));
+}
+
+test("collection row actions meet the 24px target size and keep Revoke away from Inspect", async ({ page }) => {
+  await mockServerMode(page);
+  await routeTwoKeys(page);
+  await page.goto("/dashboard/#api");
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.locator('[data-collection="keys"] tbody tr')).toHaveCount(2);
+    const rows = await rowActionRects(page);
+    for (const actions of rows) {
+      expect(actions.length).toBeGreaterThanOrEqual(2);
+      for (const action of actions) {
+        expect(action.height, `${action.name} at ${width}px`).toBeGreaterThanOrEqual(24);
+        expect(action.width, `${action.name} at ${width}px`).toBeGreaterThanOrEqual(24);
+      }
+      const inspect = actions.find((action) => action.name.startsWith("Inspect"))!;
+      const revoke = actions.find((action) => action.danger)!;
+      // 2.5.8: a 24px circle centred on Inspect must not reach Revoke's target.
+      const cx = inspect.x + inspect.width / 2;
+      const cy = inspect.y + inspect.height / 2;
+      const dx = Math.max(revoke.x - cx, 0, cx - (revoke.x + revoke.width));
+      const dy = Math.max(revoke.y - cy, 0, cy - (revoke.y + revoke.height));
+      expect(Math.hypot(dx, dy), `Inspect to Revoke at ${width}px`).toBeGreaterThanOrEqual(12);
+    }
+  }
+  await page.locator("[data-logout]").evaluate((button) => { (button as HTMLButtonElement).hidden = false; });
+  const disconnect = (await page.locator("[data-logout]").boundingBox())!;
+  expect(disconnect.height).toBeGreaterThanOrEqual(24);
+});
+
+test("collection row actions grow to 44px for a coarse pointer", async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 900 } });
+  const page = await context.newPage();
+  await mockServerMode(page);
+  await routeTwoKeys(page);
+  await page.goto("/dashboard/#api");
+  await expect(page.locator('[data-collection="keys"] tbody tr')).toHaveCount(2);
+  expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+  for (const actions of await rowActionRects(page))
+    for (const action of actions) expect(action.height, action.name).toBeGreaterThanOrEqual(44);
+  await context.close();
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {

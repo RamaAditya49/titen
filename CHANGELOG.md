@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard row actions (Inspect, Revoke, Release, Approve and similar) meet WCAG 2.2 target size (2.5.8). They were 14px tall and sat 8–10px apart. They are now at least 24px tall (44px with a coarse pointer such as touch), and a destructive action starts at the far end of the cell, away from Inspect. Standalone text buttons such as Disconnect also get a 24px minimum. ([#378](https://github.com/RamaAditya49/titen/issues/378))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
