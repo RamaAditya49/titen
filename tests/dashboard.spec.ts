@@ -359,6 +359,39 @@ test("renders structured administration and diagnostic facts", async ({ page }) 
   await expect(keyRow).toContainText("views:compile");
 });
 
+test("Work, Federation, Approvals and Releases load on open and reference panes keep their prompts", async ({ page }) => {
+  await mockServerMode(page);
+  const requested: string[] = [];
+  const record = (path: string, body: Record<string, unknown>) => page.route(`**/dashboard-api/${path}`, (route) => {
+    requested.push(path);
+    return route.fulfill({ json: { data: body } });
+  });
+  await record("work/leases**", { leases: [] });
+  await record("work/handoffs", { handoffs: [] });
+  await record("federation/peers", { peers: [] });
+  await record("governance/policies", { policies: [] });
+  await record("governance/approvals", { approvals: [] });
+  await record("governance/releases", { releases: [] });
+  await record("subjects**", { subjects: [{ subject_id: "team:shared", label: "Shared" }] });
+  await page.goto("/dashboard/");
+
+  for (const [area, output, paths] of [
+    ["work", "[data-work-output]", ["work/leases**", "work/handoffs"]],
+    ["federation", "[data-federation-output]", ["federation/peers"]],
+    ["governance", "[data-governance-output]", ["governance/policies", "governance/approvals"]],
+    ["releases", "[data-releases-output]", ["governance/releases"]],
+  ] as const) {
+    await page.locator(`[data-area="${area}"]`).click();
+    for (const path of paths) await expect.poll(() => requested.includes(path), `${area} requests ${path}`).toBe(true);
+    await expect(page.locator(`${output} .operator-collection`).first()).toBeVisible();
+    await expect(page.locator(output)).not.toContainText("No live data loaded for this principal");
+  }
+
+  await page.locator('[data-area="subjects"]').click();
+  await expect(page.locator('[data-collection="subjects"] tbody tr')).toHaveCount(1);
+  await expect(page.locator("[data-subject-references]")).toHaveText("Select a subject to inspect its canonical references.");
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
