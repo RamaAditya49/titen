@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard Work, Federation, Approvals and Release policy now load their authorized data when opened, like the other areas, instead of showing "No live data loaded for this principal" until Refresh. The Subjects and Projects reference panes keep their "Select a … to inspect its references" prompt instead of the shared reset text. ([#380](https://github.com/RamaAditya49/titen/issues/380))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
