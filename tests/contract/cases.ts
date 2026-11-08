@@ -1983,6 +1983,80 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "key listing pages through every key with a cursor and filters status before the limit",
+    async run(fx) {
+      const owner = await fx.provision({ principalId: "agent_key_pages_owner", scopes: ["*"] });
+      // 505 old, revoked dashboard-style keys fill the first default page.
+      await fx.query(
+        `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 505)
+         INSERT INTO api_keys (id, org_id, principal_id, principal_kind, key_hash, label, scopes,
+                               max_trust, created_at, revoked_at, not_before, expires_at, issued_by)
+         SELECT k.id || '_old' || n.i, k.org_id, 'old_session_' || n.i, 'human', k.key_hash || '_old' || n.i,
+                'Dashboard session', 'memory:read', 'unverified',
+                '2001-01-01T00:00:00.' || printf('%03d', n.i % 1000) || 'Z',
+                '2001-01-02T00:00:00.000Z', '2001-01-01T00:00:00.000Z', NULL, NULL
+           FROM api_keys k, n WHERE k.id = ?`,
+        [owner.keyId],
+      );
+      const fresh = await fx.call("POST", "/v1/keys", {
+        key: owner.key,
+        body: { label: "newest agent", scopes: ["context:compile"], principal_kind: "agent", principal_id: "agent_key_pages_new" },
+      });
+      expectOk(fresh, 201);
+      const total = (await fx.query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM api_keys WHERE org_id = ?`,
+        [owner.orgId],
+      ))[0]!.n;
+
+      // Default call keeps the old first page: 500 keys, oldest first, plus a cursor.
+      const firstPage = await fx.call("GET", "/v1/keys", { key: owner.key });
+      expectOk(firstPage);
+      assert.equal(firstPage.body.data.keys.length, 500);
+      assert.equal(typeof firstPage.body.data.next_cursor, "string");
+      assert.equal(firstPage.body.data.keys.some((key: { key_id: string }) => key.key_id === fresh.body.data.key_id), false);
+
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const query = cursor ? `?limit=200&cursor=${encodeURIComponent(cursor)}` : "?limit=200";
+        const page = await fx.call("GET", `/v1/keys${query}`, { key: owner.key });
+        expectOk(page);
+        for (const key of page.body.data.keys as { key_id: string }[]) {
+          assert.equal(seen.has(key.key_id), false, `key ${key.key_id} returned twice`);
+          seen.add(key.key_id);
+        }
+        cursor = page.body.data.next_cursor;
+        pages += 1;
+      } while (cursor && pages < 10);
+      assert.equal(cursor, null);
+      assert.equal(seen.size, Number(total));
+      assert.equal(seen.has(fresh.body.data.key_id), true);
+
+      // The status filter runs before LIMIT: the newest active key is on page one.
+      const active = await fx.call("GET", "/v1/keys?status=active&limit=5", { key: owner.key });
+      expectOk(active);
+      const activeIds = active.body.data.keys.map((key: { key_id: string }) => key.key_id);
+      assert.equal(activeIds.includes(fresh.body.data.key_id), true);
+      assert.equal(active.body.data.keys.every((key: { status: string }) => key.status === "active"), true);
+      const revoked = await fx.call("GET", "/v1/keys?status=revoked&limit=1", { key: owner.key });
+      expectOk(revoked);
+      assert.equal(revoked.body.data.keys[0].status, "revoked");
+      assert.equal(typeof revoked.body.data.next_cursor, "string");
+
+      const byPrincipal = await fx.call("GET", "/v1/keys?principal_id=agent_key_pages_new", { key: owner.key });
+      expectOk(byPrincipal);
+      assert.deepEqual(byPrincipal.body.data.keys.map((key: { key_id: string }) => key.key_id), [fresh.body.data.key_id]);
+      assert.equal(byPrincipal.body.data.next_cursor, null);
+      // Element shape is unchanged.
+      assert.deepEqual(Object.keys(byPrincipal.body.data.keys[0]).sort(), Object.keys(firstPage.body.data.keys[0]).sort());
+
+      expectError(await fx.call("GET", "/v1/keys?status=expiredish", { key: owner.key }), 400);
+      expectError(await fx.call("GET", "/v1/keys?limit=501", { key: owner.key }), 400);
+      expectError(await fx.call("GET", "/v1/keys?cursor=not-a-cursor", { key: owner.key }), 400);
+    },
+  },
+  {
     name: "compile reports only authorized unconsolidated observations",
     async run(fx) {
       const owner = await fx.provision({ principalId: "agent_observation_owner" });

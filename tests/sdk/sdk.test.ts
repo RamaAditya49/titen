@@ -224,6 +224,14 @@ test("key management round-trips and a scoped key is enforced", async () => {
 
   const listed = await titen.listKeys();
   assert.ok(!JSON.stringify(listed).includes(created.api_key), "listing leaks no key");
+  const firstPage = await titen.listKeys({ limit: 1 });
+  assert.equal(firstPage.keys.length, 1);
+  assert.equal(typeof firstPage.next_cursor, "string");
+  const secondPage = await titen.listKeys({ limit: 1, cursor: firstPage.next_cursor! });
+  assert.notEqual(secondPage.keys[0]?.key_id, firstPage.keys[0]?.key_id);
+  const mine = await titen.listKeys({ principal_id: created.principal_id, status: "active" });
+  assert.deepEqual(mine.keys.map((key) => key.key_id), [created.key_id]);
+  await assert.rejects(() => titen.listKeys({ limit: 0 }), TypeError);
   const revoked = await titen.revokeKey(created.key_id);
   assert.equal(revoked.revoked, true);
 
