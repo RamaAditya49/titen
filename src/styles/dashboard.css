@@ -124,7 +124,7 @@ h1 { margin: 0; font-size: 23px; font-weight: 600; letter-spacing: -.028em; }
 h2 { margin: 4px 0 0; font-size: 18px; font-weight: 600; letter-spacing: -.022em; }
 h3 { margin: 0 0 10px; font-size: 13px; font-weight: 580; }
 .read-only-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; color: var(--muted); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 3px; font: 10px "JetBrains Mono Variable", monospace; letter-spacing: .06em; text-transform: uppercase; }
-.javanese { color: var(--muted); font: 600 15px/1.5 "Noto Sans Javanese", serif; }
+.javanese { color: var(--muted); font: 600 15px/1.5 "Noto Sans Javanese Variable", "Noto Sans Javanese", serif; }
 .topbar-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .search-button { display: flex; align-items: center; gap: 9px; width: 252px; height: 30px; padding: 0 11px; background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 3px; cursor: pointer; font-family: inherit; }
 .search-button:hover { border-color: var(--muted); }
