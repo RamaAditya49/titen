@@ -38,7 +38,8 @@ test("local timestamps keep fractions and DST offsets", () => {
 });
 
 test("withLocalTimestamps never throws for a presentable record", () => {
-  const out = withLocalTimestamps(
+  // The helper adds *_local fields that its generic return type does not name.
+  const out: Record<string, unknown> = withLocalTimestamps(
     { occurred_at: "1900-01-01T00:00:00Z", ingested_at: "not-a-time" },
     ["occurred_at", "ingested_at"],
     "Asia/Jakarta",
