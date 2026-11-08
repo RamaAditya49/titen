@@ -8995,11 +8995,6 @@ CASES.push({
   name: "channel context compile ranks releases by task, falls back to newest first, and reports omissions",
   async run(fx) {
     const owner = await fx.provision({ scopes: ["*"], maxTrust: "verified" });
-    const admin = await fx.provision({
-      orgId: owner.orgId,
-      scopes: ["governance:read", "governance:write", "releases:read", "releases:write"],
-      maxTrust: "verified",
-    });
     const gateway = await fx.provision({
       orgId: owner.orgId,
       principalKind: "service",
@@ -9016,7 +9011,7 @@ CASES.push({
     });
     const makeChannel = async (label: string, minimumTrust: string) => {
       const created = await fx.call("POST", "/v1/channels", {
-        key: admin.key,
+        key: owner.key,
         body: {
           label: `${label}-${fx.runtime}`,
           gateway_principal_id: gateway.principalId,
