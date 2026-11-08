@@ -5,6 +5,7 @@ import { conflict, forbidden, notFound, unavailable, validationError } from "./e
 import { eventStatement } from "./events";
 import { newId, sha256Hex } from "./ids";
 import type { RequestContext, Result } from "./http";
+import { planFtsQuery } from "./retrieval";
 import { estimateTokens } from "./tokens";
 import {
   CLAIM_KINDS,
@@ -855,6 +856,9 @@ async function verifyCustomerAssertion(ctx: RequestContext, channel: ChannelRow,
   return payload.subject_id;
 }
 
+/** Candidates read after ranking; the rest count as omitted. */
+const RELEASE_CANDIDATES = 200;
+
 export async function compileChannelContext(ctx: RequestContext): Promise<Result> {
   const body = requireObject(await ctx.json());
   const audience = requireEnum(body, "audience", AUDIENCES);
@@ -875,16 +879,13 @@ export async function compileChannelContext(ctx: RequestContext): Promise<Result
   }
 
   const now = ctx.app.now().toISOString();
-  const rows = await ctx.app.db.all<{
-    id: string; claim_id: string; claim_version: number; released_content: string;
-    released_content_hash: string; locale: string | null; valid_from: string;
-    valid_to: string | null;
-  }>(
-    `SELECT r.id, r.claim_id, r.claim_version, r.released_content,
-            r.released_content_hash, r.locale, r.valid_from, r.valid_to
+  // Eligibility runs inside the ranked query. Relevance only orders rows that
+  // authorization, lifecycle, trust, and retention rules already admit.
+  const eligibleFrom = (join: string) => `
        FROM channel_releases r
        JOIN claims c ON c.id = r.claim_id AND c.org_id = r.org_id
        JOIN channels ch ON ch.id = r.channel_id AND ch.org_id = r.org_id
+       ${join}
       WHERE r.org_id = ? AND r.channel_id = ? AND r.audience = ?
         AND r.lifecycle_status = 'active' AND ch.status = 'active'
         AND r.valid_from <= ? AND (r.valid_to IS NULL OR r.valid_to > ?)
@@ -895,15 +896,42 @@ export async function compileChannelContext(ctx: RequestContext): Promise<Result
                                      WHEN 'asserted' THEN 1 ELSE 0 END
         AND NOT EXISTS (SELECT 1 FROM retention_exclusions x
                          WHERE x.org_id = c.org_id AND x.resource_type = 'claim'
-                           AND x.resource_id = c.id)
-      ORDER BY r.activated_at, r.id LIMIT 200`,
-    [principal.orgId, channel.id, audience, now, now],
+                           AND x.resource_id = c.id)`;
+  const eligibleParams: Param[] = [principal.orgId, channel.id, audience, now, now];
+  const match = planFtsQuery(task).match;
+  const rows = await ctx.app.db.all<{
+    id: string; claim_id: string; claim_version: number; released_content: string;
+    released_content_hash: string; locale: string | null; valid_from: string;
+    valid_to: string | null;
+  }>(
+    `${match ? `WITH hits AS (
+       SELECT release_id, bm25(channel_release_fts, 1.0, 0.0, 0.0, 0.0) AS score
+         FROM channel_release_fts
+        WHERE channel_release_fts MATCH (
+                'org_scope : "' || lower(hex(?)) || '0" AND '
+                || 'channel_scope : "' || lower(hex(?)) || '0" AND '
+                || 'released_content : (' || ? || ')'))` : ""}
+     SELECT r.id, r.claim_id, r.claim_version, r.released_content,
+            r.released_content_hash, r.locale, r.valid_from, r.valid_to
+       ${eligibleFrom(match ? "LEFT JOIN hits h ON h.release_id = r.id" : "")}
+      ORDER BY ${match ? "h.score IS NULL, h.score, " : ""}r.activated_at DESC, r.id DESC
+      LIMIT ?`,
+    [...(match ? [principal.orgId, channel.id, match] : []), ...eligibleParams, RELEASE_CANDIDATES],
+  );
+  const total = await first<{ total: number }>(
+    ctx.app.db,
+    `SELECT COUNT(*) AS total ${eligibleFrom("")}`,
+    eligibleParams,
   );
   const items: Record<string, unknown>[] = [];
   let usedTokens = estimateTokens(task) + 32;
+  let budgetExhausted = false;
   for (const row of rows) {
     const tokens = estimateTokens(row.released_content) + 16;
-    if (usedTokens + tokens > maxTokens) continue;
+    if (usedTokens + tokens > maxTokens) {
+      budgetExhausted = true;
+      continue;
+    }
     usedTokens += tokens;
     items.push({
       release_id: row.id,
@@ -914,13 +942,14 @@ export async function compileChannelContext(ctx: RequestContext): Promise<Result
       untrusted: true,
     });
   }
+  const omittedItems = Math.max(0, Number(total?.total ?? 0) - items.length);
   await ctx.app.db.batch([
     auditStatement(principal.orgId, principal.principalId, "channel_context.compile", "channel", now, channel.id,
       JSON.stringify({ audience, release_ids: items.map((item) => item.release_id), used_tokens: usedTokens })),
     eventStatement(principal.orgId, "channel_context.compiled", principal.principalId, "channel", channel.id,
       { audience, release_ids: items.map((item) => item.release_id), used_tokens: usedTokens }, now),
   ]);
-  return { data: { channel_id: channel.id, audience, items, used_tokens: usedTokens, max_tokens: maxTokens, untrusted: true } };
+  return { data: { channel_id: channel.id, audience, items, used_tokens: usedTokens, max_tokens: maxTokens, omitted_items: omittedItems, budget_exhausted: budgetExhausted, untrusted: true } };
 }
 
 // --- Retention, legal hold, and external identity boundary ---------------

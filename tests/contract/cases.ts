@@ -8991,6 +8991,155 @@ CASES.push({
   },
 });
 
+CASES.push({
+  name: "channel context compile ranks releases by task, falls back to newest first, and reports omissions",
+  async run(fx) {
+    const owner = await fx.provision({ scopes: ["*"], maxTrust: "verified" });
+    const admin = await fx.provision({
+      orgId: owner.orgId,
+      scopes: ["governance:read", "governance:write"],
+      maxTrust: "verified",
+    });
+    const gateway = await fx.provision({
+      orgId: owner.orgId,
+      principalKind: "service",
+      scopes: ["channel:compile"],
+    });
+    const subject = `release_rank_${fx.runtime}`;
+    const verified = await seedClaim(fx, owner.key, {
+      observation: { subject_id: subject, content: "Returns evidence for ranking.", trust: "verified" },
+      claim: { statement: "Customers may return unopened items for a refund.", trust: "verified" },
+    });
+    const weak = await seedClaim(fx, owner.key, {
+      observation: { subject_id: subject, content: "Weak evidence for ranking.", trust: "asserted" },
+      claim: { statement: "An unconfirmed returns rumour.", trust: "asserted" },
+    });
+    const makeChannel = async (label: string, minimumTrust: string) => {
+      const created = await fx.call("POST", "/v1/channels", {
+        key: admin.key,
+        body: {
+          label: `${label}-${fx.runtime}`,
+          gateway_principal_id: gateway.principalId,
+          allowed_audiences: ["anonymous"],
+          minimum_trust: minimumTrust,
+        },
+      });
+      expectOk(created, 201);
+      return created.body.data.channel_id as string;
+    };
+    const compile = async (channelId: string, task: string, maxTokens: number) => {
+      const res = await fx.call("POST", `/v1/channels/${channelId}/context/compile`, {
+        key: gateway.key,
+        body: { audience: "anonymous", task, max_tokens: maxTokens },
+      });
+      expectOk(res);
+      return res.body.data as {
+        items: { release_id: string; content: string }[];
+        omitted_items: number;
+        budget_exhausted: boolean;
+      };
+    };
+    const activatedAt = (minute: number) => new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
+    const insertRelease = async (
+      channelId: string,
+      id: string,
+      version: number,
+      content: string,
+      options: { claimId?: string; minute?: number; validFrom?: string; validTo?: string | null } = {},
+    ) => {
+      const at = activatedAt(options.minute ?? version);
+      await fx.query(
+        `INSERT INTO channel_releases
+           (id, org_id, channel, audience, version, status, created_at,
+            channel_id, claim_id, claim_version, released_content,
+            released_content_hash, lifecycle_status, valid_from, valid_to,
+            activated_at, updated_at)
+         VALUES (?, ?, ?, 'anonymous', ?, 'active', ?, ?, ?, 1, ?, ?, 'active', ?, ?, ?, ?)`,
+        [id, owner.orgId, channelId, version, at, channelId, options.claimId ?? verified.claimId,
+          content, `hash_${id}`, options.validFrom ?? "2025-01-01T00:00:00.000Z",
+          options.validTo ?? null, at, at],
+      );
+    };
+
+    // AC-REL-001, AC-REL-003, AC-REL-004: relevance first, newest-first
+    // fallback, and a visible omission count.
+    const small = await makeChannel("rank-small", "verified");
+    const padding = " The carrier updates the tracking page when a parcel leaves the depot.";
+    for (let index = 1; index <= 12; index++)
+      await insertRelease(small, `rel_small_${fx.runtime}_${index}`, index, `Shipping note ${index}.${padding}`);
+    const matching = `rel_small_${fx.runtime}_13`;
+    await insertRelease(small, matching, 13,
+      "Returns: customers may return unopened items within 30 days for a full refund.");
+    const ranked = await compile(small, "What is your returns and refund policy?", 160);
+    assert.equal(ranked.items[0]?.release_id, matching, "the matching release must lead");
+    assert.ok(ranked.omitted_items > 0, "a truncated answer must say so");
+    assert.equal(ranked.budget_exhausted, true);
+
+    const fallback = await compile(small, "?? !!", 4000);
+    assert.deepEqual(
+      fallback.items.map((item) => item.release_id),
+      Array.from({ length: 13 }, (_, index) => `rel_small_${fx.runtime}_${13 - index}`),
+      "a task without terms must return the newest activation first",
+    );
+    assert.equal(fallback.omitted_items, 0);
+    assert.equal(fallback.budget_exhausted, false);
+
+    // AC-REL-002: a release past the 200th activation stays reachable.
+    const large = await makeChannel("rank-large", "verified");
+    await fx.query(
+      `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 250)
+       INSERT INTO channel_releases
+         (id, org_id, channel, audience, version, status, created_at,
+          channel_id, claim_id, claim_version, released_content,
+          released_content_hash, lifecycle_status, valid_from, valid_to,
+          activated_at, updated_at)
+       SELECT ? || i, ?, ?, 'anonymous', i, 'active',
+              strftime('%Y-%m-%dT%H:%M:%fZ', 1767225600 + i * 60, 'unixepoch'),
+              ?, ?, 1,
+              CASE WHEN i = 250 THEN 'Warranty claims need the quokka serial number.'
+                   ELSE 'Shipping note ' || i || ' for the depot.' END,
+              'hash_' || i, 'active', '2025-01-01T00:00:00.000Z', NULL,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 1767225600 + i * 60, 'unixepoch'),
+              strftime('%Y-%m-%dT%H:%M:%fZ', 1767225600 + i * 60, 'unixepoch')
+         FROM n`,
+      [`rel_large_${fx.runtime}_`, owner.orgId, large, large, verified.claimId],
+    );
+    const reached = await compile(large, "Where do I find the quokka serial number?", 32000);
+    assert.equal(reached.items[0]?.release_id, `rel_large_${fx.runtime}_250`);
+    const bounded = await compile(large, "?? !!", 32000);
+    assert.equal(bounded.items.length, 200);
+    assert.equal(bounded.omitted_items, 50, "the candidate bound must be reported");
+    assert.equal(bounded.items[0]?.release_id, `rel_large_${fx.runtime}_250`);
+
+    // AC-REL-005: eligibility gates run before relevance.
+    const gated = await makeChannel("rank-gated", "verified");
+    const good = `rel_gated_${fx.runtime}_good`;
+    await insertRelease(gated, good, 1, "Returns are accepted for thirty days.");
+    await insertRelease(gated, `rel_gated_${fx.runtime}_revoked`, 2, "Returns revoked wording returns returns returns.");
+    await fx.query(
+      `UPDATE channel_releases SET lifecycle_status = 'revoked' WHERE id = ?`,
+      [`rel_gated_${fx.runtime}_revoked`],
+    );
+    await insertRelease(gated, `rel_gated_${fx.runtime}_expired`, 3, "Returns expired wording returns returns returns.", {
+      validFrom: "2025-01-01T00:00:00.000Z",
+      validTo: "2025-06-01T00:00:00.000Z",
+    });
+    await insertRelease(gated, `rel_gated_${fx.runtime}_weak`, 4, "Returns weak wording returns returns returns.", {
+      claimId: weak.claimId,
+    });
+    for (const task of ["returns policy", "?? !!"]) {
+      const result = await compile(gated, task, 4000);
+      assert.deepEqual(result.items.map((item) => item.release_id), [good], task);
+      assert.equal(result.omitted_items, 0);
+    }
+    const indexed = await fx.query<{ release_id: string }>(
+      `SELECT release_id FROM channel_release_fts WHERE release_id LIKE ?`,
+      [`rel_gated_${fx.runtime}_%`],
+    );
+    assert.ok(!indexed.some((row) => row.release_id.endsWith("_revoked")), "a revoked release must leave the index");
+  },
+});
+
 /**
  * Atomicity is a driver guarantee, so it is verified against the driver itself
  * on both runtimes: a batch whose last statement fails must leave nothing.

@@ -1587,6 +1587,59 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE enrichment_jobs ADD COLUMN acked_at TEXT`,
     ],
   },
+  {
+    version: 28,
+    statements: [
+      // Lexical index over released content. It holds active releases only.
+      // Triggers keep it in step on every write path; the channel compile query
+      // still re-checks every eligibility rule, so a stale row cannot leak.
+      `CREATE VIRTUAL TABLE channel_release_fts USING fts5 (
+         released_content,
+         release_id UNINDEXED,
+         org_scope,
+         channel_scope,
+         tokenize = 'porter unicode61 remove_diacritics 2'
+       )`,
+      `INSERT INTO channel_release_fts
+         (released_content, release_id, org_scope, channel_scope)
+       SELECT released_content, id, lower(hex(org_id)) || '0', lower(hex(channel_id)) || '0'
+         FROM channel_releases
+        WHERE lifecycle_status = 'active' AND channel_id IS NOT NULL
+          AND released_content IS NOT NULL`,
+      `CREATE TRIGGER channel_releases_fts_insert
+         AFTER INSERT ON channel_releases
+         WHEN NEW.lifecycle_status = 'active' AND NEW.channel_id IS NOT NULL
+          AND NEW.released_content IS NOT NULL
+         BEGIN
+           INSERT INTO channel_release_fts
+             (released_content, release_id, org_scope, channel_scope)
+           VALUES (NEW.released_content, NEW.id, lower(hex(NEW.org_id)) || '0',
+                   lower(hex(NEW.channel_id)) || '0');
+         END`,
+      `CREATE TRIGGER channel_releases_fts_activate
+         AFTER UPDATE OF lifecycle_status ON channel_releases
+         WHEN NEW.lifecycle_status = 'active' AND OLD.lifecycle_status IS NOT 'active'
+          AND NEW.channel_id IS NOT NULL AND NEW.released_content IS NOT NULL
+         BEGIN
+           DELETE FROM channel_release_fts WHERE release_id = NEW.id;
+           INSERT INTO channel_release_fts
+             (released_content, release_id, org_scope, channel_scope)
+           VALUES (NEW.released_content, NEW.id, lower(hex(NEW.org_id)) || '0',
+                   lower(hex(NEW.channel_id)) || '0');
+         END`,
+      `CREATE TRIGGER channel_releases_fts_deactivate
+         AFTER UPDATE OF lifecycle_status ON channel_releases
+         WHEN OLD.lifecycle_status IS 'active' AND NEW.lifecycle_status IS NOT 'active'
+         BEGIN
+           DELETE FROM channel_release_fts WHERE release_id = OLD.id;
+         END`,
+      `CREATE TRIGGER channel_releases_fts_delete
+         AFTER DELETE ON channel_releases
+         BEGIN
+           DELETE FROM channel_release_fts WHERE release_id = OLD.id;
+         END`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
