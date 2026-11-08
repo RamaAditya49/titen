@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The derivation backfill that runs on every enrichment drain no longer scans every derivation job for each observation. Migration 28 adds a `source_observation_id` column and an index, so a steady-state pass over 20,000 observations takes about 12 ms. ([#376](https://github.com/RamaAditya49/titen/issues/376))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
