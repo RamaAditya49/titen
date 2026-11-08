@@ -9095,6 +9095,7 @@ CASES.push({
     ];
     await checkProjects(owner.key, ownerProjects);
     await checkProjects(wide.key, wideProjects);
+    console.log(JSON.stringify(await fx.query("SELECT grantee_principal_id, target_type, target_id, permissions FROM access_grants WHERE org_id = ?", [owner.orgId])), wide.principalId, narrow.principalId);
     await checkProjects(narrow.key, narrowProjects);
     await checkProjects(wide.key, wideProjects.slice(0, 2), "?limit=2");
     await checkProjects(owner.key, ownerProjects.slice(1, 3), "?q=-p&limit=2");
