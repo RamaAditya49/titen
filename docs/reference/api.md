@@ -703,6 +703,11 @@ index and can lag; `meta.degraded.vector` says whether that query ran.
 
 Optional `tz` (IANA name) or the server setting `TITEN_DISPLAY_TIMEZONE` adds
 parallel `*_local` fields such as `as_of_local`. UTC fields stay unchanged.
+Each `*_local` value parses to the same instant as its UTC field. A historical
+Local Mean Time offset with seconds (Asia/Jakarta in 1920 is +07:07:12) is
+rounded to the minute and the wall clock shifts with it, so
+`1920-01-01T00:00:00Z` in `Asia/Jakarta` is `1920-01-01T07:07:00+07:07`. A value
+that cannot be presented is `null`; presentation never fails the request.
 
 The FTS MATCH includes encoded organization and
 subject scope before BM25, then canonical SQL repeats every authorization and

@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `tz` local-time fields no longer fail on historical Local Mean Time offsets that carry seconds. Such offsets are rounded to the minute with the wall clock shifted, so each `*_local` value keeps the UTC instant, and a value that cannot be presented becomes `null`. Before this, `POST /v1/observations` with an archival `occurred_at` returned 500 after the write committed, and a retry stored duplicate evidence (#337).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
