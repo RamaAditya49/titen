@@ -7,5 +7,5 @@
     "exactOptionalPropertyTypes": false,
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/sdk.ts", "src/core/validate.ts", "tests/sdk/type-contract.ts"]
+  "include": ["src/sdk.ts", "src/core/validate.ts", "src/core/atlas-lenses.ts", "tests/sdk/type-contract.ts"]
 }

@@ -15,6 +15,7 @@ import type {
   Visibility,
 } from "../../src/sdk";
 import { CLAIM_KINDS, TRUST_LEVELS, VISIBILITIES } from "../../src/core/validate";
+import { LENSES } from "../../src/core/atlas-lenses";
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends
@@ -25,10 +26,8 @@ type Equal<Left, Right> =
 const claimKindsStayCanonical: Equal<ClaimKind, (typeof CLAIM_KINDS)[number]> = true;
 const trustStaysCanonical: Equal<Trust, (typeof TRUST_LEVELS)[number]> = true;
 const visibilityStaysCanonical: Equal<Visibility, (typeof VISIBILITIES)[number]> = true;
-const atlasLensesStayComplete: Equal<
-  ViewLens,
-  "evidence_trace" | "neighborhood" | "conflict_freshness" | "review_queue" | "scope_preview" | "knowledge_release"
-> = true;
+// Pinned to the server's own list so a new lens cannot drift out of the SDK (#392).
+const atlasLensesStayComplete: Equal<ViewLens, (typeof LENSES)[number]> = true;
 type MembershipRole = "owner" | "admin" | "member" | "reader";
 const createKeyRoleStaysCanonical: Equal<CreateKeyOptions["membership_role"], MembershipRole | undefined> = true;
 const createdKeyMembershipStaysCanonical: Equal<

@@ -12,8 +12,8 @@ import { notFound, validationError } from "./errors";
 import type { RequestContext, Result } from "./http";
 import { requireObject, optionalString, requireEnum } from "./validate";
 import { requireOrgRole } from "./governance";
+import { LENSES } from "./atlas-lenses";
 
-const LENSES = ["evidence_trace", "neighborhood", "conflict_freshness", "review_queue", "scope_preview", "workspace_graph", "knowledge_release"] as const;
 type Lens = (typeof LENSES)[number];
 const REVIEW_REASONS = ["all", "disputed", "contradiction", "low_confidence", "negative_feedback"] as const;
 const ACCESS_MODES = ["principal", "organization_admin"] as const;

@@ -501,6 +501,7 @@ export type ViewLens =
   | "conflict_freshness"
   | "review_queue"
   | "scope_preview"
+  | "workspace_graph"
   | "knowledge_release";
 
 export interface ViewResult {
@@ -949,6 +950,10 @@ export class TitenClient {
         | "negative_feedback";
       cursor?: string;
       limit?: number;
+      /** `workspace_graph`: the workspace to draw; omit or null for unscoped memory. */
+      workspace_id?: string | null;
+      /** `workspace_graph`: node budget, an integer from 25 to 300 (server default 150). */
+      max_nodes?: number;
       access_mode?: "principal" | "organization_admin";
       administrator_reason?:
         | "incident_response"
