@@ -139,3 +139,55 @@ test("authorized-source loading seeks claim_sources before probing observations"
     );
   });
 });
+
+/**
+ * Directory listings (#338). The old statements aggregated every claim and
+ * observation of the organization before the page filter ran, and `project_id`
+ * had no index. Each probe below must reach the two record tables through an
+ * index, never through a scan.
+ */
+import { listProjectReferences, listProjects, listSubjects } from "../../src/core/directory";
+
+const directoryContext = (db: Db, path: string, params: Record<string, string> = {}) =>
+  ({
+    principal: PRINCIPAL,
+    url: new URL(`http://titen.test${path}`),
+    params,
+    app: { db, now: () => new Date() },
+  }) as never;
+
+const SCANS_RECORDS = /^SCAN (observations|claims|o|c)\b/;
+
+const assertIndexedRecordAccess = (plan: string[], index: RegExp) => {
+  const offender = plan.find((line) => SCANS_RECORDS.test(line));
+  assert.equal(offender, undefined, `directory query scans a record table: ${offender}\nfull plan:\n${plan.join("\n")}`);
+  assert.ok(plan.some((line) => index.test(line)), `expected ${index} in the plan:\n${plan.join("\n")}`);
+};
+
+test("the project directory reaches records through the project index (AC-DIR-001)", async () => {
+  const [statement] = await captureSql((db) => listProjects(directoryContext(db, "/v1/projects?limit=10")));
+  await withMigratedStore((explain) => {
+    assertIndexedRecordAccess(explain(statement!), /SEARCH (claims|c) USING (COVERING )?INDEX claims_project/);
+    assertIndexedRecordAccess(explain(statement!), /SEARCH (observations|o) USING (COVERING )?INDEX observations_project/);
+  });
+});
+
+test("the subject directory reaches records through the subject indexes (AC-DIR-001)", async () => {
+  const [statement] = await captureSql((db) => listSubjects(directoryContext(db, "/v1/subjects?limit=10")));
+  await withMigratedStore((explain) => {
+    assertIndexedRecordAccess(explain(statement!), /SEARCH (claims|c) USING (COVERING )?INDEX claims_scope/);
+    assertIndexedRecordAccess(explain(statement!), /SEARCH (observations|o) USING (COVERING )?INDEX observations_scope/);
+  });
+});
+
+test("project reference probes use the project index (AC-DIR-004)", async () => {
+  for (const id of ["~", "project_plan"]) {
+    const [statement] = await captureSql((db) =>
+      listProjectReferences(directoryContext(db, `/v1/projects/${id}/references`, { id })).catch(() => []),
+    );
+    await withMigratedStore((explain) => {
+      const plan = explain(statement!);
+      assertIndexedRecordAccess(plan, /INDEX (claims|observations)_project/);
+    });
+  }
+});
