@@ -976,3 +976,48 @@ test("collection tables keep every row action inside their container at desktop 
     await expect(wrap).toHaveAttribute("aria-label", /table$/);
   }
 });
+
+test("the sidebar shows every navigation group on a 1280x720 laptop and keeps the active area in view", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: {
+    mode: "live", endpoint: "titen.internal", authentication: "session", authenticated: true,
+  } }));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/dashboard/");
+  await expect(page.locator("[data-product-nav]")).toBeVisible();
+  await expect(page.locator("[data-credential-mode]")).toHaveText("Per-principal session");
+
+  const outside = () => page.locator("[data-product-nav]").evaluate((nav) => {
+    const bounds = nav.getBoundingClientRect();
+    return [...nav.querySelectorAll<HTMLElement>(".nav-group-label, button[data-area]:not([hidden])")]
+      .filter((item) => {
+        const box = item.getBoundingClientRect();
+        return box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5;
+      })
+      .map((item) => item.textContent?.trim().split(/\s+/u)[0]);
+  });
+  expect(await outside()).toEqual([]);
+
+  // The footer keeps identity and Disconnect; the credential explanation is one disclosure away.
+  const footer = page.locator(".credential-note");
+  expect((await footer.boundingBox())!.height).toBeLessThanOrEqual(96);
+  const detail = footer.locator("details");
+  await expect(detail).not.toHaveAttribute("open", "");
+  await detail.locator("summary").click();
+  await expect(footer.locator("[data-credential-copy]")).toBeVisible();
+
+  // When the nav must scroll, the active destination is scrolled into view.
+  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.getByRole("button", { name: /Releases/ }).click();
+  const releases = await page.locator("[data-product-nav]").evaluate((nav) => {
+    const bounds = nav.getBoundingClientRect();
+    const box = nav.querySelector<HTMLElement>('button[data-area="releases"]')!.getBoundingClientRect();
+    return { scrolls: nav.scrollHeight > nav.clientHeight, inView: box.top >= bounds.top - 0.5 && box.bottom <= bounds.bottom + 0.5 };
+  });
+  expect(releases).toEqual({ scrolls: true, inView: true });
+  await page.getByRole("button", { name: /Memories/ }).first().click();
+  await page.reload();
+  await page.getByRole("button", { name: /Releases/ }).focus();
+  await page.keyboard.press("Enter");
+  expect(await page.locator("[data-product-nav]").evaluate((nav) => nav.classList.contains("nav-scrolls") || getComputedStyle(nav).backgroundImage !== "none")).toBe(true);
+});
