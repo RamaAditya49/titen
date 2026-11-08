@@ -9019,6 +9019,12 @@ CASES.push({
        VALUES (?, ?, ?, ?, 'agent', 'member', ?)`,
       [`mbr_dir_${rt}`, owner.orgId, workspaceId, owner.principalId, "2026-08-16T00:00:00.000Z"],
     );
+    // Provisioning gives every key an organization grant; drop it so the grants below decide.
+    await fx.query(
+      `UPDATE access_grants SET revoked_at = ?
+        WHERE org_id = ? AND grantee_principal_id IN (?, ?) AND revoked_at IS NULL`,
+      ["2026-08-16T00:00:00.000Z", owner.orgId, wide.principalId, narrow.principalId],
+    );
     for (const body of [
       { principal_id: wide.principalId, target_type: "organization", permissions: ["read", "write"] },
       { principal_id: narrow.principalId, target_type: "project", target_id: p1, permissions: ["read"] },
@@ -9095,7 +9101,6 @@ CASES.push({
     ];
     await checkProjects(owner.key, ownerProjects);
     await checkProjects(wide.key, wideProjects);
-    console.log(JSON.stringify(await fx.query("SELECT grantee_principal_id, target_type, target_id, permissions FROM access_grants WHERE org_id = ?", [owner.orgId])), wide.principalId, narrow.principalId);
     await checkProjects(narrow.key, narrowProjects);
     await checkProjects(wide.key, wideProjects.slice(0, 2), "?limit=2");
     await checkProjects(owner.key, ownerProjects.slice(1, 3), "?q=-p&limit=2");
