@@ -476,7 +476,11 @@ export async function runMcpStdio(options: StdioOptions = {}): Promise<void> {
       write(failure(null, -32700, "Parse error."));
       return;
     }
+    // POST /mcp answers a batch with an array, so the bridge relays batches as a
+    // whole and owes the client one reply per request id inside them.
+    const batch = Array.isArray(message) ? message as unknown[] : undefined;
     const id = requestId(message);
+    const ids = batch ? batch.map(requestId).filter((value) => value !== undefined) : [];
     try {
       const response = await fetcher(endpoint, {
         method: "POST",
@@ -491,20 +495,22 @@ export async function runMcpStdio(options: StdioOptions = {}): Promise<void> {
         signal: AbortSignal.timeout(30_000),
       });
       const body = (await response.text()).replaceAll(apiKey, "[redacted]");
-      if (id === undefined || body === "") return;
-      const parsed = JSON.parse(body) as {
-        jsonrpc?: unknown;
-        result?: { protocolVersion?: unknown };
-      };
+      if (body === "" || (!batch && id === undefined)) return;
+      type Reply = { jsonrpc?: unknown; id?: unknown; result?: { protocolVersion?: unknown } };
+      const parsed = JSON.parse(body) as Reply | Reply[];
+      const replies = Array.isArray(parsed) ? parsed : [parsed];
       // The status is in the message because a revoked key (401) and a wrong
       // path (404) are otherwise the same sentence. The body is not, because
       // it can carry memory content.
-      if (parsed.jsonrpc !== "2.0")
+      if (!replies.length || replies.some((reply) => reply?.jsonrpc !== "2.0"))
         throw new Error(`HTTP ${response.status} was not a JSON-RPC response`);
-      if (
-        (message as { method?: unknown }).method === "initialize" &&
-        typeof parsed.result?.protocolVersion === "string"
-      ) protocolVersion = parsed.result.protocolVersion;
+      const requests = (batch ?? [message]) as Array<{ id?: unknown; method?: unknown } | null>;
+      const initialize = requests.find((request) => request?.method === "initialize");
+      const initialized = initialize
+        ? replies.find((reply) => batch ? reply?.id === initialize.id : true)
+        : undefined;
+      if (typeof initialized?.result?.protocolVersion === "string")
+        protocolVersion = initialized.result.protocolVersion;
       write(body);
     } catch (error) {
       // A revoked key, a restarted server and a wrong port all produced the
@@ -516,7 +522,8 @@ export async function runMcpStdio(options: StdioOptions = {}): Promise<void> {
           (error instanceof Error ? error.message : String(error)).replaceAll(apiKey, "[redacted]")
         }`,
       );
-      if (id !== undefined) write(failure(id, -32000, "Titen MCP request failed."));
+      if (batch?.length) for (const each of ids) write(failure(each, -32000, "Titen MCP request failed."));
+      else if (id !== undefined) write(failure(id, -32000, "Titen MCP request failed."));
     }
   };
 
