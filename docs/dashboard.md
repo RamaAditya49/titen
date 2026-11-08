@@ -46,7 +46,11 @@ Each area uses the same information order:
 4. Select **Inspect** to open the record inspector.
 5. Open **Technical payload** only when diagnosis needs the complete response.
 
-Projects and Subjects show their canonical references after selection. Work,
+Every area loads its authorized data when it opens; the **Refresh** buttons
+re-fetch. Projects and Subjects show their canonical references after selection
+and a selection prompt before it. "No live data loaded for this principal"
+appears only after sign-out, expiry, or an identity change has cleared private
+data. Work,
 Access, API & Keys, Approvals, and Releases place actions in the affected row.
 Each successful action reloads server state. System and Models show named facts
 instead of generic JSON records.

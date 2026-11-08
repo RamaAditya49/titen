@@ -1217,9 +1217,12 @@ const eventKinds = [
           if (Array.isArray(subjects)) fillContextSubjects(subjects.filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object"));
         } catch { /* suggestions are optional; the field stays free text */ }
       }
+      const SUBJECT_REFERENCES_PROMPT = "Select a subject to inspect its canonical references.";
+      const PROJECT_REFERENCES_PROMPT = "Select a project to inspect its normalized references.";
       async function loadSubjects() {
         const target = one<HTMLElement>("[data-subjects-output]");
         renderMessage(target, "Loading authorized subjects…");
+        renderMessage(one("[data-subject-references]"), SUBJECT_REFERENCES_PROMPT);
         try {
           const payload = await getArea("subjects", formQuery(one<HTMLFormElement>("[data-subjects-form]")));
           const subjects = payloadData(payload).subjects;
@@ -1253,6 +1256,7 @@ const eventKinds = [
       async function loadProjects() {
         const target = one<HTMLElement>("[data-projects-output]");
         renderMessage(target, "Loading authorized projects…");
+        renderMessage(one("[data-project-references]"), PROJECT_REFERENCES_PROMPT);
         try {
           const payload = await getArea("projects", formQuery(one<HTMLFormElement>("[data-projects-form]")));
           const projects = payloadData(payload).projects;
@@ -1278,7 +1282,7 @@ const eventKinds = [
         renderMessage(target, "Loading authorized work state…");
         const requests = [["work/leases?limit=50", "leases:read"], ["work/handoffs", "handoffs:read"]] as Array<[string, string]>;
         const selected = requests.filter(([, scope]) => has(scope));
-        if (!selected.length) return renderMessage(target, "This principal has no read capability for work state.");
+        if (!selected.length) return renderMessage(target, "Leases and handoffs are outside this principal's capabilities. Use Load checkpoint to read a checkpoint.");
         const responses = await Promise.all(selected.map(async ([path]) => payloadData(await getArea(path))));
         const data = Object.assign({}, ...responses);
         renderPayload(target, { data }, { actions: {
@@ -1363,8 +1367,16 @@ const eventKinds = [
           },
         } });
       }
+      async function loadFederation() {
+        const target = one<HTMLElement>("[data-federation-output]");
+        if (!has("federation:read")) return renderMessage(target, "This principal has no read capability for federation peers.");
+        renderMessage(target, "Loading authorized federation peers…");
+        renderPayload(target, await getArea("federation/peers"));
+      }
       async function loadReleases() {
         const target = one<HTMLElement>("[data-releases-output]");
+        if (!has("releases:read")) return renderMessage(target, "This principal has no read capability for releases.");
+        renderMessage(target, "Loading authorized releases…");
         const payload = await getArea("governance/releases");
         renderPayload(target, payload, { actions: {
           releases: (row) => {
@@ -1672,8 +1684,10 @@ const eventKinds = [
         showRecoveryCodes([]);
         one<HTMLElement>("[data-user-credential]").hidden = true;
         text("[data-user-temporary-password]", "");
-        for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]", "[data-subjects-output]", "[data-subject-references]", "[data-projects-output]", "[data-project-references]", "[data-keys-output]", "[data-access-output]", "[data-system-checks]"])
+        for (const selector of ["[data-context-output]", "[data-work-output]", "[data-audit-output]", "[data-governance-output]", "[data-federation-output]", "[data-releases-output]", "[data-subjects-output]", "[data-projects-output]", "[data-keys-output]", "[data-access-output]", "[data-system-checks]"])
           renderMessage(one(selector), "No live data loaded for this principal.");
+        renderMessage(one("[data-subject-references]"), SUBJECT_REFERENCES_PROMPT);
+        renderMessage(one("[data-project-references]"), PROJECT_REFERENCES_PROMPT);
       }
       function updateMemoryRequirements() {
         const selected = one<HTMLInputElement>('input[name="lens"]:checked');
@@ -1942,6 +1956,15 @@ const eventKinds = [
         if (id === "api") void loadKeys();
         if (id === "audit") void loadActivity();
         if (id === "profile") void loadPasskeys();
+        // These loaders throw; route a failure into the panel it was loading.
+        const onOpen: Record<string, [() => Promise<unknown>, string]> = {
+          work: [loadWork, "[data-work-output]"],
+          federation: [loadFederation, "[data-federation-output]"],
+          governance: [loadGovernance, "[data-governance-output]"],
+          releases: [loadReleases, "[data-releases-output]"],
+        };
+        const loader = onOpen[id];
+        if (loader) loader[0]().catch((error) => handleError(error, one(loader[1])));
       }
       function showPrivateSurface() {
         one<HTMLElement>(".app-shell").dataset.shell = "private";
@@ -2533,7 +2556,7 @@ const eventKinds = [
       });
       one<HTMLButtonElement>("[data-federation-refresh]").addEventListener("click", async () => {
         const target = one<HTMLElement>("[data-federation-output]");
-        try { renderPayload(target, await getArea("federation/peers")); } catch (error) { handleError(error, target); }
+        try { await loadFederation(); } catch (error) { handleError(error, target); }
       });
       one<HTMLFormElement>("[data-federation-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
