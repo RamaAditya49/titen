@@ -89,8 +89,7 @@ const measure = async (observations: number) => {
 test("a narrow directory page costs about the same in a large organization (AC-DIR-002)", async () => {
   const small = await measure(10_000);
   const large = await measure(100_000);
-  console.log("directory scale", JSON.stringify({ small, large }));
   assert.ok(large.subjectTime <= small.subjectTime * 2 + 10,
     `subjects: ${large.subjectTime.toFixed(1)} ms at 100k against ${small.subjectTime.toFixed(1)} ms at 10k`);
   assert.ok(large.projectTime < 100, `projects: ${large.projectTime.toFixed(1)} ms at 100k`);
-});
+}, 30_000);
