@@ -29,6 +29,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 ### Fixed
 
 - Webhook delivery now reads the clock for each attempt instead of reusing the start of the drain pass. `X-Titen-Timestamp` is the attempt time, as documented, so a receiver applying the 300-second rule no longer rejects deliveries sent late in a pass with a slow endpoint. Each lease now covers the whole HTTP attempt, so a concurrent drain cannot send the same in-flight delivery again. ([#384](https://github.com/RamaAditya49/titen/issues/384))
+- Event scans now cost the new events of one organization, not every event ever written in the deployment. `event_order` carries `org_id` with an `(org_id, seq)` index, and each webhook keeps a `scanned_seq` mark that moves forward with each delivery pass. `GET /v1/events`, webhook delivery, and federation pull read only the caller's organization above their cursor or mark. An event the webhook owner cannot read when it is first examined is not delivered later. The API and cursor rules are unchanged. ([#361](https://github.com/RamaAditya49/titen/issues/361))
 
 ## [0.10.9] — 2026-11-03
 
