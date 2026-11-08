@@ -120,13 +120,15 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
     afterSequence = Number(cursor.seq);
   }
 
-  const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
-  const params: (string | number | null)[] = [principal.orgId, ...eventAccessParams(principal)];
-
-  if (afterSequence !== null) {
-    conditions.push("eo.seq > ?");
-    params.push(afterSequence);
-  }
+  // eo.org_id with a seq lower bound lets the scan walk only this
+  // organization's range of the ordering index.
+  const conditions: string[] = ["eo.org_id = ?", "e.org_id = ?", eventAccessSql("e"), "eo.seq > ?"];
+  const params: (string | number | null)[] = [
+    principal.orgId,
+    principal.orgId,
+    ...eventAccessParams(principal),
+    afterSequence ?? 0,
+  ];
 
   if (kindFilter) {
     conditions.push("kind = ?");

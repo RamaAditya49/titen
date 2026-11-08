@@ -345,3 +345,78 @@ export async function assertPopulatedV11IntegrityMigration(db: Db): Promise<void
     `SELECT seq FROM event_order WHERE event_id = 'evt_integrity_new'`,
   ), [{ seq: 3 }]);
 }
+
+/**
+ * Migration 28 gives event_order an org_id and webhooks a scanned_seq. Every
+ * existing row must be backfilled and every existing seq must survive, or
+ * replay cursors and webhook watermarks would move.
+ */
+export async function assertPopulatedV27EventOrderMigration(db: Db): Promise<void> {
+  await db.exec(
+    `CREATE TABLE titen_migrations (
+       version INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL
+     )`,
+  );
+  for (const migration of MIGRATIONS.filter(({ version }) => version <= 27)) {
+    await db.batch([
+      ...migration.statements.map((sql) => ({ sql })),
+      {
+        sql: `INSERT INTO titen_migrations (version, applied_at) VALUES (?, ?)`,
+        params: [migration.version, "2026-11-01T00:00:00.000Z"],
+      },
+    ]);
+  }
+  const at = "2026-11-01T00:00:00.000Z";
+  const orgs = ["org_order_a", "org_order_b"];
+  await db.batch([
+    ...orgs.map((id) => ({
+      sql: `INSERT INTO organizations (id, name, created_at) VALUES (?, ?, ?)`,
+      params: [id, id, at],
+    })),
+    // Interleave organizations so a wrong backfill cannot pass by accident.
+    ...[0, 1, 2, 3, 4, 5].map((n) => ({
+      sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+            VALUES (?, ?, 'observation.created', 'agent_order', 'observation', ?, '{}', ?)`,
+      params: [`evt_order_${n}`, orgs[n % 2]!, `obs_order_${n}`, at],
+    })),
+    {
+      sql: `INSERT INTO webhooks (id, org_id, url, secret_hash, events, status, created_at, created_seq)
+            VALUES ('whk_order', 'org_order_b', 'https://hooks.example.com/order', 'hash', '*', 'active', ?, 4)`,
+      params: [at],
+    },
+  ]);
+  const before = await db.all<{ seq: number; event_id: string }>(
+    `SELECT seq, event_id FROM event_order ORDER BY seq`,
+  );
+  assert.equal(before.length, 6);
+
+  assert.equal(await migrate(db), SCHEMA_VERSION);
+
+  const after = await db.all<{ seq: number; event_id: string; org_id: string | null }>(
+    `SELECT seq, event_id, org_id FROM event_order ORDER BY seq`,
+  );
+  assert.deepEqual(
+    after.map(({ seq, event_id }) => ({ seq, event_id })),
+    before,
+    "migration must preserve every existing seq",
+  );
+  assert.deepEqual(
+    after.map(({ org_id }) => org_id),
+    [0, 1, 2, 3, 4, 5].map((n) => orgs[n % 2]),
+    "migration must backfill org_id for every row",
+  );
+  assert.deepEqual(await db.all(
+    `SELECT created_seq, scanned_seq FROM webhooks WHERE id = 'whk_order'`,
+  ), [{ created_seq: 4, scanned_seq: 4 }]);
+
+  // The replaced trigger fills org_id for new events and continues the sequence.
+  await db.batch([{
+    sql: `INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+          VALUES ('evt_order_new', 'org_order_a', 'observation.created', 'agent_order', 'observation', 'obs_order_new', '{}', ?)`,
+    params: [at],
+  }]);
+  assert.deepEqual(await db.all(
+    `SELECT seq, org_id FROM event_order WHERE event_id = 'evt_order_new'`,
+  ), [{ seq: 7, org_id: "org_order_a" }]);
+}

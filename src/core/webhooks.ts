@@ -3,7 +3,7 @@ import { auditStatement } from "./audit";
 import type { Db, Stmt } from "./db";
 import { notFound, validationError, forbidden, unavailable } from "./errors";
 import { newId, sha256Hex } from "./ids";
-import { canPrincipalReadEvent, eventAccessSql } from "./events";
+import { eventAccessSql } from "./events";
 import type { RequestContext, Result } from "./http";
 import { LIMITS, requireObject, requireString } from "./validate";
 import { dispatchWebhook, validateWebhookDestination } from "./webhook-security";
@@ -63,10 +63,13 @@ export async function registerWebhook(ctx: RequestContext): Promise<Result> {
     {
       // created_seq is the delivery watermark: everything already committed is
       // excluded, everything after it is owed, with no dependence on how many
-      // writes share the registration millisecond.
+      // writes share the registration millisecond. scanned_seq starts there and
+      // only moves forward as delivery passes examine newer events.
       sql: `INSERT INTO webhooks
-              (id, org_id, principal_id, url, secret_hash, secret, events, status, failure_count, created_at, created_seq)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, ?, (SELECT COALESCE(MAX(seq), 0) FROM event_order))`,
+              (id, org_id, principal_id, url, secret_hash, secret, events, status, failure_count, created_at, created_seq, scanned_seq)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, ?,
+                    (SELECT COALESCE(MAX(seq), 0) FROM event_order),
+                    (SELECT COALESCE(MAX(seq), 0) FROM event_order))`,
       params: [
         id,
         principal.orgId,
@@ -250,35 +253,73 @@ export async function listDeliveries(ctx: RequestContext): Promise<Result> {
 
 // --- Internal delivery ---
 
-/** Insert stable delivery rows before any outbound request. */
-async function queueEvent(
+/**
+ * Examine each active webhook's new events and insert stable delivery rows
+ * before any outbound request. The scan covers only this organization's events
+ * above the webhook's own high-water mark. The mark moves in the same batch as
+ * the inserts, to the highest sequence examined, so an event is never examined
+ * twice for one webhook and an eligible event is never skipped.
+ */
+async function queueNewEvents(
   db: Db,
   orgId: string,
-  event: { id: string; kind: string; seq: number },
-  now: Date = new Date(),
+  now: Date,
+  limit: number,
   principalId?: string,
-): Promise<void> {
-  const hooks = await db.all<{ id: string; events: string; principal_id: string }>(
-    `SELECT id, events, principal_id FROM webhooks
+): Promise<{ events: number; cursor: string | null }> {
+  const hooks = await db.all<{ id: string }>(
+    `SELECT id FROM webhooks
        WHERE org_id = ? AND status = 'active' AND principal_id IS NOT NULL
-         AND created_seq < ? AND (? IS NULL OR principal_id = ?)`,
-    [orgId, event.seq, principalId ?? null, principalId ?? null],
+         AND scanned_seq IS NOT NULL AND (? IS NULL OR principal_id = ?)`,
+    [orgId, principalId ?? null, principalId ?? null],
   );
-  const statements: Stmt[] = [];
+  if (hooks.length === 0) return { events: 0, cursor: null };
+  // Read the head before scanning. Writes are serialized, so every event at or
+  // below it is visible to the scan and the mark can safely reach it.
+  const [head] = await db.all<{ seq: number }>(
+    `SELECT COALESCE(MAX(seq), 0) AS seq FROM event_order`,
+  );
+  const headSeq = Number(head?.seq ?? 0);
+  const queued = new Map<string, number>();
+  const at = now.toISOString();
   for (const hook of hooks) {
-    const kinds = hook.events.split(",");
-    if (
-      (!kinds.includes("*") && !kinds.includes(event.kind))
-      || !await canPrincipalReadEvent(db, orgId, hook.principal_id, event.id)
-    ) continue;
-    statements.push({
+    const rows = await db.all<{ id: string; seq: number }>(
+      `SELECT e.id, eo.seq
+         FROM webhooks w
+         JOIN event_order eo
+           ON eo.org_id = w.org_id AND eo.seq > w.scanned_seq AND eo.seq <= ?
+         JOIN events e ON e.id = eo.event_id AND e.org_id = w.org_id
+        WHERE w.id = ? AND w.status = 'active'
+          AND ${eventAccessSql("e", "w.principal_id")}
+          AND ((',' || w.events || ',') LIKE '%,*,%' OR (',' || w.events || ',') LIKE '%,' || e.kind || ',%')
+          AND NOT EXISTS (
+            SELECT 1 FROM webhook_deliveries d
+             WHERE d.webhook_id = w.id AND d.event_id = e.id
+          )
+        ORDER BY eo.seq LIMIT ?`,
+      [headSeq, hook.id, limit],
+    );
+    // A full page leaves unexamined events above its last row. A short page
+    // means the whole range up to the head was examined.
+    const examined = rows.length < limit ? headSeq : Number(rows[rows.length - 1]!.seq);
+    const statements: Stmt[] = rows.map((row) => ({
       sql: `INSERT OR IGNORE INTO webhook_deliveries
               (id, webhook_id, event_id, status, attempts, next_retry_at, created_at)
             VALUES (?, ?, ?, 'pending', 0, ?, ?)`,
-      params: [newId("dlv"), hook.id, event.id, now.toISOString(), now.toISOString()],
+      params: [newId("dlv"), hook.id, row.id, at, at],
+    }));
+    statements.push({
+      sql: `UPDATE webhooks SET scanned_seq = ?
+             WHERE id = ? AND status = 'active' AND scanned_seq < ?`,
+      params: [examined, hook.id, examined],
     });
+    await db.batch(statements);
+    for (const row of rows) queued.set(row.id, Number(row.seq));
   }
-  if (statements.length) await db.batch(statements);
+  let cursor: string | null = null;
+  let top = -1;
+  for (const [id, seq] of queued) if (seq > top) { top = seq; cursor = id; }
+  return { events: queued.size, cursor };
 }
 
 interface DueDelivery {
@@ -470,32 +511,20 @@ export async function processWebhooks(options: {
   cipher: RequestContext["app"]["secretCipher"];
   principalId?: string;
 }): Promise<{ events: number; attempted: number; delivered: number; cursor: string | null }> {
-  const events = await options.db.all<{ id: string; kind: string; seq: number }>(
-    `SELECT e.id, e.kind, eo.seq FROM event_order eo JOIN events e ON e.id = eo.event_id
-      WHERE e.org_id = ? AND EXISTS (
-        SELECT 1 FROM webhooks w
-         WHERE w.org_id = e.org_id AND w.status = 'active'
-           AND w.principal_id IS NOT NULL
-           AND (? IS NULL OR w.principal_id = ?)
-           AND ${eventAccessSql("e", "w.principal_id")}
-           AND eo.seq > w.created_seq
-           AND ((',' || w.events || ',') LIKE '%,*,%' OR (',' || w.events || ',') LIKE '%,' || e.kind || ',%')
-           AND NOT EXISTS (
-             SELECT 1 FROM webhook_deliveries d
-              WHERE d.webhook_id = w.id AND d.event_id = e.id
-           )
-      ) ORDER BY eo.seq LIMIT ?`,
-    [options.orgId, options.principalId ?? null, options.principalId ?? null, options.limit],
+  // The durable delivery uniqueness rule makes a repeated scan safe.
+  const queued = await queueNewEvents(
+    options.db,
+    options.orgId,
+    typeof options.now === "function" ? options.now() : options.now,
+    options.limit,
+    options.principalId,
   );
-  // The durable delivery uniqueness rule advances later pages across passes.
-  for (const event of events)
-    await queueEvent(options.db, options.orgId, event, typeof options.now === "function" ? options.now() : options.now, options.principalId);
   const result = await drainWebhookQueue(options);
   return {
-    events: events.length,
+    events: queued.events,
     attempted: result.attempted,
     delivered: result.delivered,
-    cursor: events.at(-1)?.id ?? null,
+    cursor: queued.cursor,
   };
 }
 

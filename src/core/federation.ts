@@ -696,20 +696,25 @@ export async function pullEvents(ctx: RequestContext): Promise<Result> {
   }
 
   // Fetch events after cursor
-  const conditions: string[] = ["e.org_id = ?", eventAccessSql("e")];
+  // eo.org_id with a seq lower bound lets the scan walk only this
+  // organization's range of the ordering index.
+  const conditions: string[] = ["eo.org_id = ?", "e.org_id = ?", eventAccessSql("e")];
   const params: Param[] = [
+    principal.orgId,
     principal.orgId,
     ...eventAccessParams(principal),
   ];
   if (includeMemory) conditions.push("e.resource_type = 'claim'", "e.kind = 'claim.materialized'");
 
+  let sequence = 0;
   if (peer.last_cursor) {
-    const sequence = await resolveEventCursor(ctx.app.db, principal.orgId, peer.last_cursor);
-    if (sequence === undefined)
+    const resolved = await resolveEventCursor(ctx.app.db, principal.orgId, peer.last_cursor);
+    if (resolved === undefined)
       throw conflict("Federation cursor references an unknown event.");
-    conditions.push("eo.seq > ?");
-    params.push(sequence);
+    sequence = resolved;
   }
+  conditions.push("eo.seq > ?");
+  params.push(sequence);
 
   // Canonical bundles can approach the request ceiling by themselves. One
   // claim per opt-in pull guarantees the returned event can be pushed without

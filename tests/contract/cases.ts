@@ -6454,6 +6454,15 @@ export const CASES: Case[] = [
         Number(latest!.seq),
         "registration must record the current event sequence",
       );
+      const [mark] = await fx.query<{ scanned_seq: number }>(
+        `SELECT scanned_seq FROM webhooks WHERE id = ?`,
+        [hookId],
+      );
+      assert.equal(
+        Number(mark!.scanned_seq),
+        Number(latest!.seq),
+        "the scan high-water mark must start at the registration sequence",
+      );
 
       await seedClaim(fx, owner.key, {
         observation: { content: "Evidence recorded after the webhook existed." },
@@ -6499,6 +6508,134 @@ export const CASES: Case[] = [
         [],
         "a webhook must receive every event after its registration sequence, same millisecond included",
       );
+    },
+  },
+  {
+    name: "event paging returns exactly the caller's events in sequence order when other organizations interleave",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const other = await fx.provision({ scopes: ["*"] });
+      for (let n = 0; n < 4; n += 1) {
+        expectOk(await fx.call("POST", "/v1/observations", {
+          key: owner.key,
+          body: observation({ content: `Owner evidence ${n} for the interleaving check.` }),
+        }), 201);
+        for (let m = 0; m < 3; m += 1) {
+          expectOk(await fx.call("POST", "/v1/observations", {
+            key: other.key,
+            body: observation({ content: `Foreign evidence ${n}.${m} between owner events.` }),
+          }), 201);
+        }
+      }
+      const expected = (await fx.query<{ id: string }>(
+        `SELECT e.id FROM event_order eo JOIN events e ON e.id = eo.event_id
+          WHERE e.org_id = ? ORDER BY eo.seq`,
+        [owner.orgId],
+      )).map(({ id }) => id);
+      assert.ok(expected.length >= 4, "the owner must have events to page through");
+      const [foreign] = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM event_order WHERE org_id <> ?`,
+        [owner.orgId],
+      );
+      assert.ok(Number(foreign!.count) >= 12, "foreign events must exist between owner events");
+
+      const seen: string[] = [];
+      let after: string | null = null;
+      for (let page = 0; page < 20; page += 1) {
+        const res: any = await fx.call(
+          "GET",
+          `/v1/events?limit=2${after ? `&after=${after}` : ""}`,
+          { key: owner.key },
+        );
+        expectOk(res);
+        if (res.body.data.events.length === 0) break;
+        seen.push(...res.body.data.events.map((event: any) => event.id));
+        after = res.body.data.cursor;
+      }
+      assert.deepEqual(seen, expected, "paging must return every caller event once, in order");
+
+      // Caught up: the cursor stays put and nothing foreign leaks in.
+      const caughtUp: any = await fx.call("GET", `/v1/events?after=${after}&limit=2`, {
+        key: owner.key,
+      });
+      expectOk(caughtUp);
+      assert.deepEqual(caughtUp.body.data.events, []);
+      assert.equal(caughtUp.body.data.cursor, after);
+
+      // The ordering table carries the owning organization for every row.
+      const [unowned] = await fx.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM event_order eo JOIN events e ON e.id = eo.event_id
+          WHERE eo.org_id IS NOT e.org_id`,
+      );
+      assert.equal(Number(unowned!.count), 0, "event_order.org_id must match the event");
+    },
+  },
+  {
+    name: "a webhook queues each matching event once across several delivery passes",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const other = await fx.provision({ scopes: ["*"] });
+      const hook = await fx.call("POST", "/v1/webhooks", {
+        key: owner.key,
+        body: {
+          url: "https://hooks.example.com/scan-once",
+          secret: "scan-once-hook-secret-value",
+          events: ["observation.created"],
+        },
+      });
+      expectOk(hook, 201);
+      const hookId = hook.body.data.webhook_id;
+      for (let n = 0; n < 5; n += 1) {
+        expectOk(await fx.call("POST", "/v1/observations", {
+          key: owner.key,
+          body: observation({ content: `Owner scan evidence ${n}.` }),
+        }), 201);
+        expectOk(await fx.call("POST", "/v1/observations", {
+          key: other.key,
+          body: observation({ content: `Foreign scan evidence ${n}.` }),
+        }), 201);
+      }
+      const owed = (await fx.query<{ id: string }>(
+        `SELECT e.id FROM event_order eo JOIN events e ON e.id = eo.event_id
+          WHERE e.org_id = ? AND eo.seq > (SELECT created_seq FROM webhooks WHERE id = ?)
+          ORDER BY eo.seq`,
+        [owner.orgId, hookId],
+      )).map(({ id }) => id);
+      assert.equal(owed.length, 5);
+
+      let drained = 0;
+      for (let pass = 0; pass < 6; pass += 1) {
+        const res: any = await fx.call("POST", "/v1/webhooks/deliver?limit=2", {
+          key: owner.key,
+          body: {},
+        });
+        expectOk(res);
+        drained += Number(res.body.data.events_drained);
+      }
+      assert.equal(drained, owed.length, "each owed event is queued by exactly one pass");
+
+      const rows = await fx.query<{ event_id: string }>(
+        `SELECT event_id FROM webhook_deliveries WHERE webhook_id = ?`,
+        [hookId],
+      );
+      assert.deepEqual(
+        rows.map(({ event_id }) => event_id).sort(),
+        [...owed].sort(),
+        "one delivery per matching event, none for foreign events",
+      );
+
+      // The mark has passed every event examined, so a later pass starts there.
+      const [mark] = await fx.query<{ scanned_seq: number; head: number }>(
+        `SELECT scanned_seq, (SELECT MAX(seq) FROM event_order) AS head FROM webhooks WHERE id = ?`,
+        [hookId],
+      );
+      assert.equal(Number(mark!.scanned_seq), Number(mark!.head));
+      const again: any = await fx.call("POST", "/v1/webhooks/deliver?limit=2", {
+        key: owner.key,
+        body: {},
+      });
+      expectOk(again);
+      assert.equal(again.body.data.events_drained, 0);
     },
   },
   // --- v1: Federation ---

@@ -1587,6 +1587,28 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE enrichment_jobs ADD COLUMN acked_at TEXT`,
     ],
   },
+  {
+    version: 28,
+    statements: [
+      // Event scans filter by organization. Carrying org_id on the ordering
+      // table lets them walk one organization's range instead of every event
+      // in the deployment. Global seq stays the single ordering.
+      `ALTER TABLE event_order ADD COLUMN org_id TEXT`,
+      `UPDATE event_order
+          SET org_id = (SELECT e.org_id FROM events e WHERE e.id = event_order.event_id)`,
+      `CREATE INDEX event_order_org_seq ON event_order (org_id, seq)`,
+      `DROP TRIGGER events_assign_order`,
+      `CREATE TRIGGER events_assign_order
+         AFTER INSERT ON events
+         BEGIN
+           INSERT INTO event_order (event_id, org_id) VALUES (NEW.id, NEW.org_id);
+         END`,
+      // Per-webhook high-water mark: every event with seq at or below it has
+      // already been examined for this webhook. Starts at created_seq.
+      `ALTER TABLE webhooks ADD COLUMN scanned_seq INTEGER`,
+      `UPDATE webhooks SET scanned_seq = created_seq`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
