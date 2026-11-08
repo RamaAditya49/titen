@@ -128,38 +128,70 @@ export async function listPrincipals(ctx: RequestContext): Promise<Result> {
   return { data: { principals: rows } };
 }
 
+/**
+ * Counts for one directory entry, read through the record indexes.
+ * `owner` and `key` name the outer columns that scope the probe. The access
+ * predicate stays in the statement, so a count never includes a record the
+ * caller cannot read. Bind order: claims access, then observations access.
+ */
+function visibleStatsSql(owner: string, key: "project_id" | "subject_id", fields: string): string {
+  const match = (alias: string) => key === "project_id"
+    ? `${alias}.project_id IS ${owner}.project_id` : `${alias}.subject_id = ${owner}.subject_id`;
+  return `(SELECT json_object(${fields}) FROM (
+       SELECT c.subject_id AS subject_id, c.created_at AS written FROM claims c
+        WHERE c.org_id = ${owner}.org_id AND ${match("c")} AND ${recordAccessSql("c")}
+       UNION ALL
+       SELECT o.subject_id, o.ingested_at FROM observations o
+        WHERE o.org_id = ${owner}.org_id AND ${match("o")} AND ${recordAccessSql("o")}
+     ))`;
+}
+
+/** True when the caller can read at least one record of the entry named by `owner`. */
+function visibleExistsSql(owner: string, key: "project_id" | "subject_id"): string {
+  const match = (alias: string) => key === "project_id"
+    ? `${alias}.project_id IS ${owner}.project_id` : `${alias}.subject_id = ${owner}.id`;
+  return `(EXISTS (SELECT 1 FROM claims c WHERE c.org_id = ${owner}.org_id AND ${match("c")}
+            AND ${recordAccessSql("c")})
+     OR EXISTS (SELECT 1 FROM observations o WHERE o.org_id = ${owner}.org_id AND ${match("o")}
+            AND ${recordAccessSql("o")}))`;
+}
+
+function readStats(value: unknown): { records: number; subjects: number; last: string | null } {
+  const stats = JSON.parse(String(value ?? "{}")) as { records?: number; subjects?: number; last?: string | null };
+  return { records: Number(stats.records ?? 0), subjects: Number(stats.subjects ?? 0), last: stats.last ?? null };
+}
+
 export async function listProjects(ctx: RequestContext): Promise<Result> {
   const principal = ctx.principal!;
   const q = query(ctx, "q", LIMITS.label)?.toLowerCase() ?? null;
-  const params: Param[] = [principal.orgId, ...recordAccessParams(principal), principal.orgId,
-    ...recordAccessParams(principal), principal.orgId, q, q, limit(ctx)];
+  const access = recordAccessParams(principal);
+  // The page is chosen first, from projects only. Counts then run for the
+  // returned entries alone, so the cost follows the page and not the organization.
   const rows = await ctx.app.db.all<Record<string, unknown>>(
-    `WITH authorized AS (
-       SELECT c.project_id, c.subject_id, c.created_at FROM claims c
-        WHERE c.org_id = ? AND ${recordAccessSql("c")}
-       UNION ALL
-       SELECT o.project_id, o.subject_id, o.ingested_at FROM observations o
-        WHERE o.org_id = ? AND ${recordAccessSql("o")}
-     ), counts AS (
-       SELECT project_id, COUNT(*) AS record_count, COUNT(DISTINCT subject_id) AS subject_count,
-              MAX(created_at) AS last_write FROM authorized GROUP BY project_id
-     ), directory AS (
-       SELECT p.id AS project_id, p.reference, p.created_at, p.default_visibility
-         FROM projects p WHERE p.org_id = ?
-       UNION ALL
-       SELECT NULL, '(unscoped)', NULL, NULL WHERE EXISTS (SELECT 1 FROM counts WHERE project_id IS NULL)
-     )
-     SELECT d.project_id, d.reference, d.created_at,
-            CASE WHEN d.project_id IS NULL THEN NULL
-                 ELSE COALESCE(d.default_visibility, 'private') END AS default_visibility,
-            COALESCE(c.record_count, 0) AS record_count,
-            COALESCE(c.subject_count, 0) AS subject_count, c.last_write
-       FROM directory d JOIN counts c ON c.project_id IS d.project_id
-      WHERE (? IS NULL OR lower(d.reference) LIKE '%' || ? || '%')
-      ORDER BY d.reference, d.project_id LIMIT ?`,
-    params,
+    `SELECT page.project_id, page.reference, page.created_at,
+            CASE WHEN page.project_id IS NULL THEN NULL
+                 ELSE COALESCE(page.default_visibility, 'private') END AS default_visibility,
+            ${visibleStatsSql("page", "project_id",
+              "'records', COUNT(*), 'subjects', COUNT(DISTINCT subject_id), 'last', MAX(written)")} AS stats
+       FROM (
+         SELECT d.org_id, d.project_id, d.reference, d.created_at, d.default_visibility
+           FROM (
+             SELECT p.org_id, p.id AS project_id, p.reference, p.created_at, p.default_visibility
+               FROM projects p WHERE p.org_id = ?
+             UNION ALL
+             SELECT ?, NULL, '(unscoped)', NULL, NULL
+           ) d
+          WHERE (? IS NULL OR lower(d.reference) LIKE '%' || ? || '%')
+            AND ${visibleExistsSql("d", "project_id")}
+          ORDER BY d.reference, d.project_id LIMIT ?
+       ) page
+      ORDER BY page.reference, page.project_id`,
+    [...access, ...access, principal.orgId, principal.orgId, q, q, ...access, ...access, limit(ctx)],
   );
-  return { data: { projects: rows } };
+  return { data: { projects: rows.map(({ stats, ...row }) => {
+    const counted = readStats(stats);
+    return { ...row, record_count: counted.records, subject_count: counted.subjects, last_write: counted.last };
+  }) } };
 }
 
 export async function listProjectReferences(ctx: RequestContext): Promise<Result> {
@@ -190,27 +222,28 @@ export async function listSubjects(ctx: RequestContext): Promise<Result> {
   const q = query(ctx, "q", LIMITS.label)?.toLowerCase() ?? null;
   const type = ctx.url.searchParams.get("type");
   if (type !== null && !SUBJECT_TYPES.includes(type as never)) throw validationError('Query "type" is invalid.');
+  const access = recordAccessParams(principal);
   const rows = await ctx.app.db.all<Record<string, unknown>>(
-    `WITH authorized AS (
-       SELECT c.subject_id, c.created_at FROM claims c WHERE c.org_id = ? AND ${recordAccessSql("c")}
-       UNION ALL
-       SELECT o.subject_id, o.ingested_at FROM observations o WHERE o.org_id = ? AND ${recordAccessSql("o")}
-     ), counts AS (
-       SELECT subject_id, COUNT(*) AS record_count, MAX(created_at) AS last_write
-         FROM authorized GROUP BY subject_id
-     )
-     SELECT s.id AS subject_id, s.type, s.label, s.status, s.created_at,
-            c.record_count, c.last_write,
+    `SELECT page.subject_id, page.type, page.label, page.status, page.created_at,
+            ${visibleStatsSql("page", "subject_id", "'records', COUNT(*), 'last', MAX(written)")} AS stats,
             (SELECT COUNT(*) FROM subject_references r
-              WHERE r.org_id = s.org_id AND r.subject_id = s.id) AS reference_count
-       FROM subjects s JOIN counts c ON c.subject_id = s.id
-      WHERE s.org_id = ? AND (? IS NULL OR s.type = ?)
-        AND (? IS NULL OR lower(s.label) LIKE '%' || ? || '%' OR lower(s.id) LIKE '%' || ? || '%')
-      ORDER BY s.label, s.id LIMIT ?`,
-    [principal.orgId, ...recordAccessParams(principal), principal.orgId,
-      ...recordAccessParams(principal), principal.orgId, type, type, q, q, q, limit(ctx)],
+              WHERE r.org_id = page.org_id AND r.subject_id = page.subject_id) AS reference_count
+       FROM (
+         SELECT s.org_id, s.id AS subject_id, s.type, s.label, s.status, s.created_at
+           FROM subjects s
+          WHERE s.org_id = ? AND (? IS NULL OR s.type = ?)
+            AND (? IS NULL OR lower(s.label) LIKE '%' || ? || '%' OR lower(s.id) LIKE '%' || ? || '%')
+            AND ${visibleExistsSql("s", "subject_id")}
+          ORDER BY s.label, s.id LIMIT ?
+       ) page
+      ORDER BY page.label, page.subject_id`,
+    [...access, ...access, principal.orgId, type, type, q, q, q, ...access, ...access, limit(ctx)],
   );
-  return { data: { subjects: rows } };
+  return { data: { subjects: rows.map(({ stats, ...row }) => {
+    const { reference_count: references, ...entry } = row;
+    const counted = readStats(stats);
+    return { ...entry, record_count: counted.records, last_write: counted.last, reference_count: references };
+  }) } };
 }
 
 export async function listSubjectReferences(ctx: RequestContext): Promise<Result> {

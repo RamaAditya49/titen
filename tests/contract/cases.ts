@@ -5,7 +5,7 @@ import { sha256Hex } from "../../src/core/ids";
 import { signPayload } from "../../src/core/webhooks";
 import { estimateJsonTokens } from "../../src/core/tokens";
 import { TITEN_VERSION } from "../../src/core/version";
-import type { Fixture, Res } from "./harness";
+import { DEFAULT_SCOPES, type Fixture, type Res } from "./harness";
 
 export interface Case {
   name: string;
@@ -9692,6 +9692,162 @@ CASES.push({
       [`rel_gated_${fx.runtime}_%`],
     );
     assert.ok(!indexed.some((row) => row.release_id.endsWith("_revoked")), "a revoked release must leave the index");
+  },
+});
+
+CASES.push({
+  name: "directory counts stay per-caller for private, team, and organization records (AC-DIR-003)",
+  async run(fx) {
+    const rt = fx.runtime;
+    const owner = await fx.provision({ scopes: ["*"] });
+    const scopes = [...DEFAULT_SCOPES, "projects:read", "subjects:read"];
+    const wide = await fx.provision({ orgId: owner.orgId, principalId: `dir_wide_${rt}`, scopes });
+    const narrow = await fx.provision({
+      orgId: owner.orgId, principalId: `dir_narrow_${rt}`, scopes: ["projects:read", "subjects:read"],
+    });
+    const makeProject = async (reference: string) => {
+      const response = await fx.call("POST", "/v1/projects/resolve", {
+        key: owner.key, body: { reference, create: true },
+      });
+      expectOk(response, 201);
+      return response.body.data.project_id as string;
+    };
+    const p1 = await makeProject(`dir/${rt}-p1`);
+    const p2 = await makeProject(`dir/${rt}-p2`);
+    const p3 = await makeProject(`dir/${rt}-p3`);
+    const workspace = await fx.call("POST", "/v1/workspaces", { key: owner.key, body: { name: `dir-${rt}` } });
+    expectOk(workspace, 201);
+    const workspaceId = workspace.body.data.workspace_id as string;
+    await fx.query(
+      `INSERT INTO memberships (id, org_id, workspace_id, principal_id, principal_kind, role, created_at)
+       VALUES (?, ?, ?, ?, 'agent', 'member', ?)`,
+      [`mbr_dir_${rt}`, owner.orgId, workspaceId, owner.principalId, "2026-08-16T00:00:00.000Z"],
+    );
+    // Provisioning gives every key an organization grant; drop it so the grants below decide.
+    await fx.query(
+      `UPDATE access_grants SET revoked_at = ?
+        WHERE org_id = ? AND grantee_principal_id IN (?, ?) AND revoked_at IS NULL`,
+      ["2026-08-16T00:00:00.000Z", owner.orgId, wide.principalId, narrow.principalId],
+    );
+    for (const body of [
+      { principal_id: wide.principalId, target_type: "organization", permissions: ["read", "write"] },
+      { principal_id: narrow.principalId, target_type: "project", target_id: p1, permissions: ["read"] },
+    ]) expectOk(await fx.call("POST", "/v1/grants", { key: owner.key, body }), 201);
+
+    const subject = (n: number) => `dir_${rt}_s${n}`;
+    let serial = 0;
+    const seed = (
+      key: string, n: number, visibility: string, projectId: string | null, extra: Record<string, unknown> = {},
+    ) => {
+      serial += 1;
+      return seedClaim(fx, key, {
+        observation: {
+          subject_id: subject(n), visibility, content: `Directory seed number ${serial} for subject ${n}.`,
+          ...(projectId ? { project_id: projectId } : {}), ...extra,
+        },
+        claim: { statement: `Directory claim number ${serial} for subject ${n}.` },
+      });
+    };
+    const team = { workspace_id: workspaceId };
+    const a = await seed(owner.key, 1, "organization", p1);
+    const b = await seed(owner.key, 1, "private", p1);
+    const c = await seed(owner.key, 2, "team", p1, team);
+    const d = await seed(wide.key, 2, "private", p1);
+    const e = await seed(owner.key, 3, "organization", p1);
+    const f = await seed(owner.key, 2, "private", p2);
+    const g = await seed(owner.key, 4, "organization", p2);
+    const h = await seed(owner.key, 5, "private", p3);
+    const u1 = await seed(owner.key, 1, "organization", null);
+    const u2 = await seed(owner.key, 6, "private", null);
+    type Seed = typeof a;
+
+    const lastWrite = async (seeds: Seed[]) => {
+      const marks = seeds.map(() => "?").join(",");
+      const rows = await fx.query<{ last: string }>(
+        `SELECT MAX(t) AS last FROM (
+           SELECT created_at AS t FROM claims WHERE id IN (${marks})
+           UNION ALL
+           SELECT ingested_at AS t FROM observations WHERE id IN (${marks}))`,
+        [...seeds.map((s) => s.claimId), ...seeds.map((s) => s.observationId)],
+      );
+      return rows[0]!.last;
+    };
+    interface ProjectExpectation {
+      id: string | null; reference: string; records: number; subjects: number; seeds: Seed[];
+    }
+    const checkProjects = async (key: string, expected: ProjectExpectation[], query = "") => {
+      const res = await fx.call("GET", `/v1/projects${query}`, { key });
+      expectOk(res);
+      const rows = res.body.data.projects as Record<string, unknown>[];
+      assert.deepEqual(
+        rows.map((row) => [row.project_id, row.reference, Number(row.record_count), Number(row.subject_count),
+          row.default_visibility]),
+        expected.map((row) => [row.id, row.reference, row.records, row.subjects, row.id ? "private" : null]),
+      );
+      for (const [index, row] of expected.entries())
+        assert.equal(rows[index]!.last_write, await lastWrite(row.seeds));
+    };
+    const unscoped = "(unscoped)";
+    const ref = (n: number) => `dir/${rt}-p${n}`;
+    const ownerProjects: ProjectExpectation[] = [
+      { id: null, reference: unscoped, records: 4, subjects: 2, seeds: [u1, u2] },
+      { id: p1, reference: ref(1), records: 8, subjects: 3, seeds: [a, b, c, e] },
+      { id: p2, reference: ref(2), records: 4, subjects: 2, seeds: [f, g] },
+      { id: p3, reference: ref(3), records: 2, subjects: 1, seeds: [h] },
+    ];
+    const wideProjects: ProjectExpectation[] = [
+      { id: null, reference: unscoped, records: 2, subjects: 1, seeds: [u1] },
+      { id: p1, reference: ref(1), records: 6, subjects: 3, seeds: [a, d, e] },
+      { id: p2, reference: ref(2), records: 2, subjects: 1, seeds: [g] },
+    ];
+    const narrowProjects: ProjectExpectation[] = [
+      { id: p1, reference: ref(1), records: 4, subjects: 2, seeds: [a, e] },
+    ];
+    await checkProjects(owner.key, ownerProjects);
+    await checkProjects(wide.key, wideProjects);
+    await checkProjects(narrow.key, narrowProjects);
+    await checkProjects(wide.key, wideProjects.slice(0, 2), "?limit=2");
+    await checkProjects(owner.key, ownerProjects.slice(1, 3), "?q=-p&limit=2");
+    await checkProjects(wide.key, [], "?q=-p3");
+    await checkProjects(narrow.key, [], `?q=${encodeURIComponent(unscoped)}`);
+
+    interface SubjectExpectation { n: number; records: number; seeds: Seed[] }
+    const checkSubjects = async (key: string, expected: SubjectExpectation[], query = "") => {
+      const res = await fx.call("GET", `/v1/subjects${query}`, { key });
+      expectOk(res);
+      const rows = res.body.data.subjects as Record<string, unknown>[];
+      assert.deepEqual(
+        rows.map((row) => [row.subject_id, Number(row.record_count)]),
+        expected.map((row) => [subject(row.n), row.records]),
+      );
+      for (const [index, row] of expected.entries())
+        assert.equal(rows[index]!.last_write, await lastWrite(row.seeds));
+    };
+    const ownerSubjects: SubjectExpectation[] = [
+      { n: 1, records: 6, seeds: [a, b, u1] },
+      { n: 2, records: 4, seeds: [c, f] },
+      { n: 3, records: 2, seeds: [e] },
+      { n: 4, records: 2, seeds: [g] },
+      { n: 5, records: 2, seeds: [h] },
+      { n: 6, records: 2, seeds: [u2] },
+    ];
+    const wideSubjects: SubjectExpectation[] = [
+      { n: 1, records: 4, seeds: [a, u1] },
+      { n: 2, records: 2, seeds: [d] },
+      { n: 3, records: 2, seeds: [e] },
+      { n: 4, records: 2, seeds: [g] },
+    ];
+    const narrowSubjects: SubjectExpectation[] = [
+      { n: 1, records: 2, seeds: [a] },
+      { n: 3, records: 2, seeds: [e] },
+    ];
+    const q = `?q=dir_${rt}`;
+    await checkSubjects(owner.key, ownerSubjects, q);
+    await checkSubjects(wide.key, wideSubjects, q);
+    await checkSubjects(narrow.key, narrowSubjects, q);
+    await checkSubjects(owner.key, ownerSubjects.slice(0, 2), `${q}&limit=2`);
+    await checkSubjects(wide.key, wideSubjects.slice(0, 3), `${q}&limit=3`);
+    await checkSubjects(narrow.key, [], `?q=${subject(5)}`);
   },
 });
 
