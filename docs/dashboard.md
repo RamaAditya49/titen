@@ -213,9 +213,11 @@ every sidebar navigation group visible at 1280x720 with the active area
 scrolled into view, Memories empty states that distinguish "nothing visible
 yet" from "filtered out" and clear every filter in one action, and one
 confirmation dialog for every destructive or release-changing action that names
-its target, impact, and recovery, with the current session's key marked in API
-& Keys. A collection narrower than its table renders each row as a label/value
-record at any viewport width.
+its target, impact, recovery, with the current session's key marked in API &
+Keys, and WCAG 2.2 target size for row actions. Row actions are at least 24 px
+tall (44 px with a coarse pointer), and a destructive action such as **Revoke**
+starts at the far end of the cell, away from **Inspect**. A collection narrower
+than its table renders each row as a label/value record at any viewport width.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.
