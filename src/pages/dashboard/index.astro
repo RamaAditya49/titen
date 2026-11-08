@@ -204,7 +204,7 @@ const lenses = [
             <button class="primary-button" type="submit">Continue</button>
             <button class="secondary-button" type="button" data-start-recovery>Use passkey or recovery code</button>
             <p class="login-boundary"><strong>Kept off this device.</strong> The adapter exchanges your account for an HttpOnly session and clears both fields after submission.</p>
-            <span data-login-status role="status" aria-live="polite"></span>
+            <span id="login-status" data-login-status role="status" aria-live="polite"></span>
           </form>
           <form data-password-form hidden>
             <label>
@@ -229,7 +229,7 @@ const lenses = [
                 <input name="recovery_code" autocomplete="one-time-code" maxlength="64" required />
               </label>
               <button class="secondary-button" type="submit">Use recovery code</button>
-              <span data-recovery-status role="status" aria-live="polite"></span>
+              <span id="recovery-status" data-recovery-status role="status" aria-live="polite"></span>
             </form>
           </section>
         </section>
@@ -823,6 +823,26 @@ const lenses = [
           return error.message;
         }
         return "The same-origin dashboard adapter is unreachable.";
+      }
+      // Sign-in failures are about the credential, not a session: say so (#360).
+      // The server stays non-disclosing; the delay hint repeats the documented rule only.
+      let loginFailures = 0;
+      function credentialErrorMessage(error: unknown): string {
+        if (error instanceof DashboardApiError) {
+          if (error.code === "INVALID_LOGIN") return "Username or password is invalid.";
+          if (error.code === "LOGIN_RATE_LIMITED") return "Too many sign-in attempts. Try again later.";
+          if (error.code === "SECOND_FACTOR_INVALID") return "That recovery code is invalid or already used.";
+        }
+        return errorMessage(error);
+      }
+      function markInvalid(input: HTMLInputElement, statusId: string) {
+        input.setAttribute("aria-invalid", "true");
+        input.setAttribute("aria-describedby", statusId);
+        input.addEventListener("input", () => {
+          input.removeAttribute("aria-invalid");
+          input.removeAttribute("aria-describedby");
+        }, { once: true });
+        input.focus();
       }
       function handleError(error: unknown, target?: HTMLElement) {
         if (error instanceof DashboardApiError && error.status === 401 && dashboardStatus?.authentication === "session") signedOut(errorMessage(error));
@@ -1790,6 +1810,7 @@ const lenses = [
         one<HTMLElement>("[data-second-factor-panel]").hidden = false;
         text("[data-login-heading]", "Verify identity");
         text("[data-login-copy]", "Use a registered passkey or one unused recovery code.");
+        text("[data-login-status]", "");
         text("[data-passkey-status]", "");
         text("[data-recovery-status]", "");
       }
@@ -1892,10 +1913,15 @@ const lenses = [
         try {
           principal = await login(username.value, password.value);
           password.value = "";
+          loginFailures = 0;
           await refreshService();
         } catch (error) {
           password.value = "";
-          text("[data-login-status]", errorMessage(error));
+          const credential = error instanceof DashboardApiError && error.code === "INVALID_LOGIN";
+          if (credential) loginFailures += 1;
+          text("[data-login-status]", `${credentialErrorMessage(error)}${credential && loginFailures >= 3
+            ? " Repeated failures add a delay of up to 30 minutes, even for the correct password." : ""}`);
+          if (credential) markInvalid(password, "login-status");
         }
       });
       one<HTMLButtonElement>("[data-start-recovery]").addEventListener("click", async () => {
@@ -1907,7 +1933,7 @@ const lenses = [
         try {
           principal = await startRecovery(username.value);
           await refreshService();
-        } catch (error) { text("[data-login-status]", errorMessage(error)); }
+        } catch (error) { text("[data-login-status]", credentialErrorMessage(error)); }
       });
       one<HTMLFormElement>("[data-password-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -1955,7 +1981,8 @@ const lenses = [
           await refreshService();
         } catch (error) {
           code.value = "";
-          text("[data-recovery-status]", errorMessage(error));
+          text("[data-recovery-status]", credentialErrorMessage(error));
+          if (error instanceof DashboardApiError && error.code === "SECOND_FACTOR_INVALID") markInvalid(code, "recovery-status");
         }
       });
       one<HTMLButtonElement>("[data-logout]").addEventListener("click", async () => {
