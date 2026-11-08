@@ -247,7 +247,12 @@ test("a rejecting receiver is recorded as a failure and scheduled for retry", as
   assert.equal(record.response_status, 500, "the receiver's status must be stored");
   assert.equal(record.attempts, 1);
   assert.ok(record.next_retry_at, "a failed delivery must be scheduled for retry");
-  assert.equal(drain.body.data.oldest_retry_at, record.next_retry_at);
+  // oldest_retry_at is the minimum over every pending delivery of this principal.
+  // Retry times now come from each attempt's own finish time, so another hook's
+  // delivery in the same pass can be a few milliseconds earlier, never later.
+  const oldestRetry = Date.parse(drain.body.data.oldest_retry_at);
+  assert.ok(oldestRetry <= Date.parse(record.next_retry_at), "the oldest retry is not after this one");
+  assert.ok(Date.parse(record.next_retry_at) - oldestRetry < 10_000, "both retries come from the same pass");
   assert.equal(record.status, "pending", "it stays pending until attempts are exhausted");
 
   rejectNext = false;

@@ -303,6 +303,49 @@ test("webhook claims are exclusive, retries keep one delivery ID, and disable te
   close();
 });
 
+test("each webhook attempt signs its own start time and holds a lease through the request", async () => {
+  const { db, close } = database();
+  await migrate(db);
+  const cipher = createSecretCipher({ active: "v1", keys: { v1: KEY_ONE } });
+  const ids = Array.from({ length: 6 }, (_, index) => `dlv_${index}`);
+  await seededDelivery(db, await cipher.encrypt("shared-secret-value", "webhook:whk_1"), ids);
+  // A healthy but slow receiver: every request takes 4 s of an injected clock.
+  let clock = Date.parse("2026-07-30T00:01:00Z");
+  const now = () => new Date(clock);
+  const sent: Array<{ delivery: string; timestamp: number; startedAt: number; lease: string }> = [];
+  let second: Promise<unknown> | undefined;
+  const security: WebhookSecurity = {
+    allowedHostnames: ["hooks.example.com"],
+    timeoutMs: 10_000,
+    resolve: async () => ["93.184.216.34"],
+    dispatch: async ({ addresses, init }) => {
+      const headers = new Headers(init.headers);
+      const delivery = headers.get("x-titen-delivery")!;
+      const [row] = await db.all<{ lease_expires_at: string }>(
+        "SELECT lease_expires_at FROM webhook_deliveries WHERE id = ?", [delivery],
+      );
+      sent.push({ delivery, timestamp: Number(headers.get("x-titen-timestamp")), startedAt: clock, lease: row!.lease_expires_at });
+      // A second drain starts while the fifth request is in flight, 16 s into the pass.
+      if (sent.length === 5) second = drainWebhookQueue({ db, orgId: "org_1", now, limit: 50, security, cipher });
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      clock += 4_000;
+      return { response: new Response(null, { status: 200 }), connectedAddress: addresses[0]! };
+    },
+  };
+  await drainWebhookQueue({ db, orgId: "org_1", now, limit: 50, security, cipher });
+  await second;
+
+  for (const attempt of sent) {
+    assert.ok(Math.abs(attempt.timestamp * 1000 - attempt.startedAt) < 1000, `${attempt.delivery} signs its own start time`);
+    assert.ok(Date.parse(attempt.lease) >= attempt.startedAt + 10_000, `${attempt.delivery} lease outlasts the dispatch timeout`);
+  }
+  assert.equal(sent.length, 6, "a concurrent drain never repeats an in-flight delivery");
+  assert.deepEqual([...new Set(sent.map((attempt) => attempt.delivery))].sort(), ids);
+  const [hook] = await db.all<{ status: string; failure_count: number }>("SELECT status, failure_count FROM webhooks WHERE id = 'whk_1'");
+  assert.deepEqual(hook, { status: "active", failure_count: 0 });
+  close();
+});
+
 test("webhook retries stop when the subscriber loses event access", async () => {
   const { db, close } = database();
   await migrate(db);

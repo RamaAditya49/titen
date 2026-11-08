@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Webhook delivery now reads the clock for each attempt instead of reusing the start of the drain pass. `X-Titen-Timestamp` is the attempt time, as documented, so a receiver applying the 300-second rule no longer rejects deliveries sent late in a pass with a slow endpoint. Each lease now covers the whole HTTP attempt, so a concurrent drain cannot send the same in-flight delivery again. ([#384](https://github.com/RamaAditya49/titen/issues/384))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
