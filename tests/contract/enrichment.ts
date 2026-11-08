@@ -11,8 +11,10 @@ import {
   ENRICHMENT_LEASE_MS,
   ENRICHMENT_MAX_LINK_JOBS_PER_EXPORT_OWNER,
   REFLECTION_SCHEMA,
+  scheduleDerivationBackfill,
   scheduleReflections,
 } from "../../src/core/enrichment";
+import { MIGRATIONS } from "../../src/core/migrations";
 import {
   ExtractionProviderError,
   type ExtractionCapability,
@@ -585,6 +587,59 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       WHERE org_id = ? AND input_ids LIKE ?`,
     [importedPrincipal.orgId, `%${importedObservationId}%`],
   ))[0]!.count), 0);
+
+  // AC-ENR-003, AC-ENR-004: backfill recovers each unscheduled observation once.
+  const backfillPrincipal = await provisionWith(db, {
+    scopes: [...DEFAULT_SCOPES, "enrichment:write"],
+  });
+  const backfillClient = clientVia(createApp({
+    db,
+    runtime,
+    now: () => current,
+    migrationsReady: true,
+    secretStorageReady: true,
+  }), "http://derivation-backfill.test");
+  const backfillObservation = await backfillClient.call("POST", "/v1/observations", {
+    key: backfillPrincipal.key,
+    body: {
+      subject_id: "subject_backfill_once",
+      kind: "user_statement",
+      content: "Accepted while extraction was unavailable.",
+      source: { type: "contract_fixture", ref: "contract://enrichment" },
+    },
+  });
+  assert.equal(backfillObservation.status, 201);
+  const backfillJobs = async () => db.all<{ source_observation_id: string | null }>(
+    `SELECT source_observation_id FROM enrichment_jobs WHERE org_id = ?`,
+    [backfillPrincipal.orgId],
+  );
+  assert.deepEqual(await backfillJobs(), []);
+  const runBackfill = () => scheduleDerivationBackfill({
+    db,
+    capability,
+    now: current,
+    limit: 10,
+    orgId: backfillPrincipal.orgId,
+  });
+  assert.equal(await runBackfill(), 1);
+  assert.deepEqual(await backfillJobs(), [
+    { source_observation_id: backfillObservation.body.data.observation_id },
+  ]);
+  assert.equal(await runBackfill(), 0, "a second backfill must schedule nothing");
+  // Simulate a store that existed before the column: clear it, then run the
+  // migration's own backfill statement.
+  await db.batch([{
+    sql: `UPDATE enrichment_jobs SET source_observation_id = NULL WHERE org_id = ?`,
+    params: [backfillPrincipal.orgId],
+  }]);
+  await db.batch(MIGRATIONS.find((migration) => migration.version === 28)!.statements
+    .filter((sql) => /^UPDATE\s+enrichment_jobs/i.test(sql))
+    .map((sql) => ({ sql })));
+  assert.deepEqual(await backfillJobs(), [
+    { source_observation_id: backfillObservation.body.data.observation_id },
+  ]);
+  assert.equal(await runBackfill(), 0, "pre-existing jobs must not be duplicated");
+  assert.equal((await backfillJobs()).length, 1);
 
   const mutablePrincipal = await provisionWith(db, {
     scopes: [...DEFAULT_SCOPES, "enrichment:write"],
@@ -2560,11 +2615,11 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
              prompt_fingerprint, schema_fingerprint, policy_fingerprint, state,
              attempts, max_attempts, next_attempt_at, lease_token,
              lease_expires_at, error_class, output_hash, result_ids, created_at,
-             updated_at)
+             updated_at, source_observation_id)
           SELECT ?, org_id, lane, ?, input_ids, input_hash, subject_id, project_id,
                  workspace_id, actor_id, model_id, model_fingerprint,
                  prompt_fingerprint, ?, policy_fingerprint, 'pending', 0,
-                 max_attempts, ?, NULL, NULL, NULL, NULL, NULL, ?, ?
+                 max_attempts, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, source_observation_id
             FROM enrichment_jobs
            WHERE org_id = ? AND input_ids LIKE ? LIMIT 1`,
     params: [

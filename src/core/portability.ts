@@ -365,7 +365,7 @@ interface ExportEnrichmentJob extends Record<string, unknown> {
   result_ids: string;
 }
 
-async function exportableEnrichmentJobIds(
+export async function exportableEnrichmentJobIds(
   ctx: RequestContext,
   ids: string[],
   wholeDeployment: boolean,
@@ -394,7 +394,7 @@ async function exportableEnrichmentJobIds(
           AND (
             (j.lane = 'derivation' AND EXISTS (
               SELECT 1 FROM observations input_observation
-               WHERE input_observation.id = json_extract(j.input_ids, '$[0].id')
+               WHERE input_observation.id = j.source_observation_id
                  AND input_observation.org_id = j.org_id
                  AND input_observation.content_hash = json_extract(j.input_ids, '$[0].content_hash')
                  AND ${inputObservationAccess}
@@ -1424,8 +1424,9 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
                model_fingerprint, prompt_fingerprint, schema_fingerprint,
                policy_fingerprint, state, attempts, max_attempts,
                next_attempt_at, lease_token, lease_expires_at, error_class,
-               output_hash, result_ids, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'leased', ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+               output_hash, result_ids, created_at, updated_at,
+               source_observation_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'leased', ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
       params: [
         row.id,
         principal.orgId,
@@ -1451,6 +1452,7 @@ export async function importRecords(ctx: RequestContext): Promise<Result> {
         JSON.stringify(row.result_ids),
         row.created_at,
         row.updated_at,
+        row.lane === "derivation" ? (row.input_ids[0]?.id ?? null) : null,
       ],
     });
     statements.push({

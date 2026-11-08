@@ -1587,6 +1587,20 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE enrichment_jobs ADD COLUMN acked_at TEXT`,
     ],
   },
+  {
+    version: 28,
+    statements: [
+      // A plain column, not a generated one: the integrity check reads
+      // PRAGMA table_info, which hides generated columns. Writers set it for
+      // derivation jobs; reflection jobs keep NULL.
+      `ALTER TABLE enrichment_jobs ADD COLUMN source_observation_id TEXT`,
+      `UPDATE enrichment_jobs
+          SET source_observation_id = json_extract(input_ids, '$[0].id')
+        WHERE lane = 'derivation'`,
+      `CREATE INDEX enrichment_jobs_source_observation
+         ON enrichment_jobs (org_id, lane, source_observation_id)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
