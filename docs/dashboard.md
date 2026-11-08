@@ -36,6 +36,12 @@ Memories is available. Enter takes the highlighted option, or the first one
 when nothing is highlighted. Closing the dialog returns focus to the trigger.
 At 620px and below the trigger collapses to an icon button.
 
+At 960px and below the navigation moves into an off-canvas rail. While the
+rail is open, the page behind it is inert and focus moves into the rail. The
+rail closes with its **Close navigation** button, Escape, or a tap outside it,
+and focus returns to the toggle. Choosing an area closes the rail and moves
+focus to the main region.
+
 ## Read operator data
 
 Each area uses the same information order:
