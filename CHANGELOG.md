@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard's Access key clamp preview no longer lists every key the organization ever issued. It appears once a principal is selected and requests only that principal's active keys through the `status` and `principal_id` filters of `GET /v1/keys`, which the adapter now forwards. It shows a Status column, starts with ten rows, and offers "Include expired and revoked (N)". The grant form and the access simulator stay within reach instead of sitting thousands of pixels down the page. ([#391](https://github.com/RamaAditya49/titen/issues/391))
+
 ## [0.10.10] — 2026-11-08
 
 schema 31

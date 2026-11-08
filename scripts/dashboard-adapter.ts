@@ -312,7 +312,7 @@ const readRoutes = new Map<string, { path: string; query: string[] }>([
   ["/dashboard-api/audit/events", { path: "/v1/events", query: ["after", "limit", "kind"] }],
   ["/dashboard-api/audit/log", { path: "/v1/audit", query: ["after", "limit", "action"] }],
   ["/dashboard-api/governance/memberships", { path: "/v1/memberships", query: ["workspace_id"] }],
-  ["/dashboard-api/governance/keys", { path: "/v1/keys", query: [] }],
+  ["/dashboard-api/governance/keys", { path: "/v1/keys", query: ["status", "principal_id", "limit", "cursor"] }],
   ["/dashboard-api/governance/policies", { path: "/v1/policies", query: [] }],
   ["/dashboard-api/governance/approvals", { path: "/v1/claim-approvals", query: [] }],
   ["/dashboard-api/governance/channels", { path: "/v1/channels", query: [] }],
