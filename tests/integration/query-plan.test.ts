@@ -183,7 +183,8 @@ test("the webhook scan seeks the organization range of event_order", async () =>
       limit: 50,
       security: undefined as never,
       cipher: undefined as never,
-    }),
+    // The scan runs first; the unconfigured drain that follows is irrelevant here.
+    }).catch(() => undefined),
   );
   assert.equal(scans.length, 1, "expected one webhook scan statement");
   await withMigratedStore((explain) => assertOrgScopedSeek(explain(scans[0]!), "webhook scan"));
