@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `POST /v1/channels/:id/context/compile` now ranks eligible releases by relevance to `task`, falls back to newest activation first, applies the 200-release bound after ranking, and reports `omitted_items` and `budget_exhausted`. Schema 28 adds a release search index and backfills active releases ([#381](https://github.com/RamaAditya49/titen/issues/381)).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
