@@ -1587,6 +1587,15 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `ALTER TABLE enrichment_jobs ADD COLUMN acked_at TEXT`,
     ],
   },
+  {
+    version: 28,
+    statements: [
+      // The directory and project reference probes count records per project.
+      // Without these indexes each probe scans every record of the organization.
+      `CREATE INDEX observations_project ON observations (org_id, project_id, ingested_at)`,
+      `CREATE INDEX claims_project ON claims (org_id, project_id, created_at)`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
