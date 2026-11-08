@@ -373,9 +373,10 @@ function jobInsert(values: {
              workspace_id, actor_id, model_id, model_fingerprint,
              prompt_fingerprint, schema_fingerprint, policy_fingerprint, state,
              attempts, max_attempts, next_attempt_at, lease_token,
-             lease_expires_at, error_class, result_ids, created_at, updated_at)
+             lease_expires_at, error_class, result_ids, created_at, updated_at,
+             source_observation_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?,
-                  NULL, NULL, NULL, NULL, ?, ?)`,
+                  NULL, NULL, NULL, NULL, ?, ?, ?)`,
     params: [
       values.id,
       values.orgId,
@@ -396,6 +397,7 @@ function jobInsert(values: {
       values.at,
       values.at,
       values.at,
+      values.lane === "derivation" ? (values.inputIds[0]?.id ?? null) : null,
     ],
   };
 }
@@ -504,7 +506,7 @@ export async function scheduleDerivationBackfill(options: {
         AND NOT EXISTS (
           SELECT 1 FROM enrichment_jobs existing
            WHERE existing.org_id = o.org_id AND existing.lane = 'derivation'
-             AND json_extract(existing.input_ids, '$[0].id') = o.id
+             AND existing.source_observation_id = o.id
         )
         AND (o.workspace_id IS NULL OR EXISTS (
           SELECT 1 FROM memberships member

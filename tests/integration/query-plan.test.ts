@@ -27,6 +27,9 @@ import type { Db, Param } from "../../src/core/db";
 import { migrate } from "../../src/core/migrations";
 import { retrieveClaimCandidates, retrieveClaimsByIds } from "../../src/core/retrieval";
 import { loadAuthorizedSources } from "../../src/core/evidence";
+import { scheduleDerivationBackfill } from "../../src/core/enrichment";
+import type { ExtractionCapability } from "../../src/core/extraction";
+import { exportableEnrichmentJobIds } from "../../src/core/portability";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import type { Principal } from "../../src/core/auth";
 
@@ -136,6 +139,55 @@ test("authorized-source loading seeks claim_sources before probing observations"
       offender,
       undefined,
       `source loading drives from observations: ${offender}\nfull plan:\n${plan.join("\n")}`,
+    );
+  });
+});
+
+const SYNTHETIC_CAPABILITY = {
+  modelId: "plan-model",
+  modelFingerprint: "a".repeat(64),
+  providerIdentity: "https://models.example.test/v1",
+  async generate() {
+    return { action: "abstain" };
+  },
+} as unknown as ExtractionCapability;
+
+test("the derivation backfill anti-join seeks enrichment_jobs by source observation", async () => {
+  const [candidates] = await captureSql((db) =>
+    scheduleDerivationBackfill({
+      db,
+      capability: SYNTHETIC_CAPABILITY,
+      now: new Date(),
+      limit: 5,
+    }),
+  );
+  await withMigratedStore((explain) => {
+    const plan = explain(candidates!);
+    assert.ok(
+      plan.some((line) =>
+        /SEARCH existing USING (COVERING )?INDEX enrichment_jobs_source_observation \(org_id=\? AND lane=\? AND source_observation_id=\?\)/.test(line)),
+      `expected an equality seek on source_observation_id:\n${plan.join("\n")}`,
+    );
+  });
+});
+
+test("the export job filter reaches input observations by id without parsing JSON", async () => {
+  const [jobs] = await captureSql((db) =>
+    exportableEnrichmentJobIds(
+      { app: { db }, principal: PRINCIPAL } as never,
+      ["enr_plan"],
+      true,
+    ),
+  );
+  assert.ok(
+    !/input_observation\.id\s*=\s*json_extract/.test(jobs!.sql),
+    "the observation join must use the stored source observation id",
+  );
+  await withMigratedStore((explain) => {
+    const plan = explain(jobs!);
+    assert.ok(
+      plan.some((line) => /SEARCH input_observation USING (INTEGER )?PRIMARY KEY \(\w+=\?\)|SEARCH input_observation USING INDEX \w+ \(id=\?\)/.test(line)),
+      `expected an id seek on input_observation:\n${plan.join("\n")}`,
     );
   });
 });
