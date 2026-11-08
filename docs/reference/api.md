@@ -1232,6 +1232,22 @@ Dynamic balances, inventory, order, payment, ticket state, and customer-private
 context should be fetched through their authoritative tools instead of assumed
 from release memory.
 
+Releases are ranked by `task`. Titen reads the task's terms and orders
+matching releases by lexical relevance, best first. Releases that do not match
+follow, newest activation first, and fill any budget that remains. When `task`
+has no usable terms, every release is ordered newest activation first. Ranking
+only orders releases that are already eligible. Authorization, lifecycle,
+validity window, `minimum_trust`, and retention rules apply before ranking, so
+relevance never admits a release that those rules exclude. Titen considers at
+most 200 releases per request, chosen after ranking.
+
+The response also carries `omitted_items` and `budget_exhausted`.
+`omitted_items` counts eligible releases that the response left out, whether
+`max_tokens` or the 200-release bound excluded them. `budget_exhausted` is
+`true` when at least one considered release did not fit in `max_tokens`.
+`omitted_items` above 0 with `budget_exhausted: false` means the 200-release
+bound truncated the answer.
+
 Eligibility joins the source claim head. A version mismatch, dispute,
 supersession, expiry, or revocation excludes the release immediately even if a
 derived cache/vector or release-status maintenance job is stale.
