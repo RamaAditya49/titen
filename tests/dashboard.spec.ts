@@ -1021,3 +1021,48 @@ test("the sidebar shows every navigation group on a 1280x720 laptop and keeps th
   await page.keyboard.press("Enter");
   expect(await page.locator("[data-product-nav]").evaluate((nav) => nav.classList.contains("nav-scrolls") || getComputedStyle(nav).backgroundImage !== "none")).toBe(true);
 });
+
+for (const width of [1440, 320]) {
+  test(`Memories says which empty state applies and clears every filter at ${width}px`, async ({ page }) => {
+    await mockServerMode(page);
+    const queries: URLSearchParams[] = [];
+    await page.route("**/dashboard-api/memories**", (route) => {
+      queries.push(new URL(route.request().url()).searchParams);
+      return route.fulfill({ json: { data: {
+        items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {}, facets: {},
+        authorization: { principal_id: "server_operator", access_mode: "principal" },
+      } } });
+    });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/dashboard/");
+    const panel = page.locator('[data-area-panel="memories"]');
+    const empty = panel.locator("[data-memory-list-empty]");
+    const status = panel.locator("[data-memory-list-status-text]");
+
+    // Nothing filtered: the "nothing visible yet" state, with no clear-filter advice.
+    await expect(empty).toBeVisible();
+    await expect(empty.locator("strong")).toHaveText("No memories visible to you yet");
+    await expect(empty).toContainText("REST API or MCP");
+    await expect(panel).not.toContainText("clear the filter");
+    await expect(empty.locator("[data-memory-list-clear]")).toBeHidden();
+    await expect(status).toHaveText("0 authorized memories shown.");
+    await expect(panel.locator(".memory-pagination")).toBeHidden();
+
+    // Filtered: name every active filter and offer one control that clears them.
+    await panel.locator("[data-memory-list-search]").fill("zzz-nonexistent");
+    await panel.locator("[data-memory-list-status]").selectOption("revoked");
+    await panel.getByRole("button", { name: "Search", exact: true }).click();
+    await expect(empty.locator("strong")).toHaveText("No memories match");
+    await expect(empty).toContainText('Search "zzz-nonexistent"');
+    await expect(empty).toContainText("Status: Revoked");
+    await expect(status).toHaveText("0 authorized memories shown.");
+    const before = queries.length;
+    await empty.getByRole("button", { name: "Clear search and filters" }).click();
+    await expect(empty.locator("strong")).toHaveText("No memories visible to you yet");
+    await expect(panel.locator("[data-memory-list-search]")).toHaveValue("");
+    await expect(panel.locator("[data-memory-list-status]")).toHaveValue("");
+    expect(queries.length).toBeGreaterThan(before);
+    const last = queries.at(-1)!;
+    expect([last.get("q"), last.get("status"), last.get("kind")]).toEqual([null, null, null]);
+  });
+}

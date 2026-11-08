@@ -379,6 +379,7 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
 .empty-state, .inspector-empty { display: grid; place-content: center; min-height: 246px; padding: 32px; text-align: center; }
 .empty-state strong { font: 600 18px "Bricolage Grotesque Variable", sans-serif; }
 .empty-state p, .inspector-empty { max-width: 45ch; margin: 8px auto 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.empty-state > button { justify-self: center; margin-top: 14px; }
 .result-column > .notice { margin: 0; }
 .record-list { display: grid; border-top: 1px solid var(--rule-soft); }
 .record-list button { display: grid; grid-template-columns: 94px minmax(0, 1fr) auto; gap: 14px; align-items: center; min-width: 0; padding: 13px 20px; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--rule-soft); cursor: pointer; }

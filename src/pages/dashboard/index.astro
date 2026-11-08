@@ -427,12 +427,12 @@ const lenses = [
             <div class="filter-chips" data-memory-facets aria-label="Authorized memory counts"></div>
             <div class="memory-list-status" data-memory-list-status-text role="status" aria-live="polite">Loading authorized memories…</div>
             <div class="loading-state" data-memory-list-loading aria-label="Loading memories"><span></span><span></span><span></span></div>
-            <div class="empty-state" data-memory-list-empty hidden><strong>No authorized memories yet.</strong><p>Try another search or clear the filter. Records outside your authority are not counted.</p></div>
+            <div class="empty-state" data-memory-list-empty hidden><strong data-memory-list-empty-title>No memories visible to you yet</strong><p data-memory-list-empty-copy>Agents add memory through the REST API or MCP. Records outside your authority are never counted.</p><button type="button" class="secondary-button" data-memory-list-clear hidden>Clear search and filters</button></div>
             <div class="notice" data-memory-list-error role="alert" hidden></div>
             <div class="memory-table-wrap" data-memory-list-table hidden>
               <table class="memory-table"><thead><tr><th scope="col">Statement</th><th scope="col">Kind</th><th scope="col">Trust</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody data-memory-list-rows></tbody></table>
             </div>
-            <footer class="memory-pagination"><span data-memory-list-page>Showing authorized records</span><span><button type="button" class="secondary-button" data-memory-list-prev disabled>Previous</button><button type="button" class="secondary-button" data-memory-list-next disabled>Next</button></span></footer>
+            <footer class="memory-pagination" data-memory-list-footer><span data-memory-list-page>Showing authorized records</span><span><button type="button" class="secondary-button" data-memory-list-prev disabled>Previous</button><button type="button" class="secondary-button" data-memory-list-next disabled>Next</button></span></footer>
           </section>
         </section>
 
@@ -1197,7 +1197,21 @@ const lenses = [
         }
         memoryListNext.disabled = !hasMore;
         memoryListPrev.disabled = memoryListHistory.length === 0;
-        text("[data-memory-list-status-text]", records.length ? `${records.length} authorized memories shown${hasMore ? " · more available" : ""}.` : "No authorized memories match these filters.");
+        // One empty state per situation, decided from filters the client already holds (#352).
+        const search = memoryListSearch.value.trim();
+        const filters = [
+          search ? `Search "${search}"` : "",
+          memoryListStatus.value ? `Status: ${memoryListStatus.selectedOptions[0]?.textContent ?? memoryListStatus.value}` : "",
+          memoryKind ? `Kind: ${memoryKindLabel(memoryKind)}` : "",
+        ].filter(Boolean);
+        text("[data-memory-list-empty-title]", filters.length ? "No memories match" : "No memories visible to you yet");
+        text("[data-memory-list-empty-copy]", filters.length
+          ? `${filters.join(" · ")}. Records outside your authority are never counted.`
+          : "Agents add memory through the REST API or MCP. Records outside your authority are never counted.");
+        one<HTMLButtonElement>("[data-memory-list-clear]").hidden = filters.length === 0;
+        // The status line reports counts only, so it never contradicts the empty block.
+        text("[data-memory-list-status-text]", `${records.length} authorized ${records.length === 1 ? "memory" : "memories"} shown${hasMore ? " · more available" : ""}.`);
+        one<HTMLElement>("[data-memory-list-footer]").hidden = records.length === 0 && memoryListHistory.length === 0;
         memoryListPage.textContent = hasMore ? "More authorized records available" : "End of authorized records";
       }
       async function loadMemoryList(after: string | null = null) {
@@ -1927,6 +1941,13 @@ const lenses = [
         event.preventDefault();
         memoryListHistory = [];
         memoryListCursor = null;
+        void loadMemoryList();
+      });
+      one<HTMLButtonElement>("[data-memory-list-clear]").addEventListener("click", () => {
+        memoryListSearch.value = "";
+        memoryListStatus.value = "";
+        memoryKind = "";
+        memoryListHistory = [];
         void loadMemoryList();
       });
       memoryListNext.addEventListener("click", () => {
