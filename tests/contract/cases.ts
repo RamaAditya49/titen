@@ -8997,7 +8997,7 @@ CASES.push({
     const owner = await fx.provision({ scopes: ["*"], maxTrust: "verified" });
     const admin = await fx.provision({
       orgId: owner.orgId,
-      scopes: ["governance:read", "governance:write"],
+      scopes: ["governance:read", "governance:write", "releases:read", "releases:write"],
       maxTrust: "verified",
     });
     const gateway = await fx.provision({
