@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- `GET /v1/projects` and `GET /v1/subjects` choose the page first and count records only for the returned entries. Cost now follows the page size, not the organization size. Counts, `last_write`, and omission of entries with no readable records are unchanged. Migration 28 adds the `observations_project` and `claims_project` indexes, which also serve the project reference checks ([#338](https://github.com/RamaAditya49/titen/issues/338)).
+
 ## [0.10.9] — 2026-11-03
 
 schema 27
