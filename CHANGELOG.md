@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard's phone navigation rail can be closed without choosing an area. It has a visible "Close navigation" button and also closes on Escape or a tap outside it, returning focus to the toggle. While it is open, the page behind it is inert and focus moves into the rail. Choosing an area moves focus to the main region instead of a button that has slid off-screen. The toggle's `aria-controls` now points to the rail. ([#385](https://github.com/RamaAditya49/titen/issues/385))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

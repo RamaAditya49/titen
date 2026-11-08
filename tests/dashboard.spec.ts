@@ -875,6 +875,53 @@ test("capability discovery exposes only authorized areas and clears denial state
   await expect(page.locator("[data-audit-output]")).not.toContainText("aud_live");
 });
 
+test("the phone navigation rail closes on its own control, Escape, or an outside tap, and manages focus", async ({ page }) => {
+  await mockServerMode(page);
+  await page.setViewportSize({ width: 390, height: 760 });
+  await page.goto("/dashboard/");
+  const shell = page.locator(".app-shell");
+  const toggle = page.locator("[data-menu-toggle]");
+  await expect(page.locator("#product-navigation")).toHaveCount(1);
+  await expect(toggle).toHaveAttribute("aria-controls", "product-navigation");
+
+  await toggle.click();
+  await expect(shell).toHaveAttribute("data-nav-open", "");
+  const close = page.getByRole("button", { name: "Close navigation" });
+  await expect(close).toBeVisible();
+  // The rail slides in; hit-test only once it has arrived.
+  await expect(page.locator(".sidebar")).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+  const box = (await close.boundingBox())!;
+  const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("[data-nav-close]") !== null, [box.x + box.width / 2, box.y + box.height / 2]);
+  expect(hit, "the close control is not covered").toBe(true);
+  expect(await page.evaluate(() => (document.querySelector("#workspace") as HTMLElement).inert)).toBe(true);
+  expect(await page.evaluate(() => document.activeElement?.closest(".sidebar") !== null)).toBe(true);
+  await close.click();
+  await expect(shell).not.toHaveAttribute("data-nav-open", "");
+  await expect(toggle).toBeFocused();
+  expect(await page.evaluate(() => (document.querySelector("#workspace") as HTMLElement).inert)).toBe(false);
+
+  await toggle.click();
+  await page.keyboard.press("Escape");
+  await expect(shell).not.toHaveAttribute("data-nav-open", "");
+  await expect(toggle).toBeFocused();
+
+  await toggle.click();
+  await page.mouse.click(380, 500);
+  await expect(shell).not.toHaveAttribute("data-nav-open", "");
+  await expect(toggle).toBeFocused();
+
+  await toggle.click();
+  await page.locator('[data-area="system"]').click();
+  await expect(shell).not.toHaveAttribute("data-nav-open", "");
+  const focused = await page.evaluate(() => {
+    const rect = document.activeElement!.getBoundingClientRect();
+    return { x: rect.x, right: rect.right, width: innerWidth, id: document.activeElement!.id };
+  });
+  expect(focused.id).toBe("workspace");
+  expect(focused.x).toBeGreaterThanOrEqual(0);
+  expect(focused.right).toBeLessThanOrEqual(focused.width);
+});
+
 test("remains keyboard and mobile usable with live product navigation", async ({ page }) => {
   await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ json: { data: view } }));

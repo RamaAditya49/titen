@@ -62,11 +62,12 @@ const lenses = [
     </svg>
     <a class="skip-link" href="#workspace">Skip to workspace</a>
     <div class="app-shell" data-shell="loading">
-      <aside class="sidebar" aria-label="Product areas">
+      <aside class="sidebar" id="product-navigation" aria-label="Product areas">
         <header class="brand-row">
           <img src={titenMark} width="24" height="24" alt="" />
           <strong>titen</strong>
           <span>v{packageJson.version}</span>
+          <button type="button" class="nav-close" data-nav-close aria-label="Close navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></button>
         </header>
 
         <div class="workspace-picker" data-workspace-control hidden>
@@ -159,6 +160,7 @@ const lenses = [
         </section>
       </aside>
 
+      <div class="nav-scrim" data-nav-scrim aria-hidden="true" hidden></div>
       <main id="workspace" class="main-shell" tabindex="-1">
         <header class="topbar">
           <button type="button" class="menu-button" data-menu-toggle aria-controls="product-navigation" aria-expanded="false" aria-label="Open navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></button>
@@ -1541,6 +1543,20 @@ const lenses = [
         const scopes = button.dataset.scopes?.split(" ") ?? [];
         return scopes.some(has);
       }
+      function navOpen(): boolean {
+        return one<HTMLElement>(".app-shell").hasAttribute("data-nav-open");
+      }
+      /** Opens or closes the phone navigation rail; focus moves in on open and back out on close. */
+      function setNav(open: boolean, returnTo: HTMLElement | null = one<HTMLElement>("[data-menu-toggle]")) {
+        one<HTMLElement>(".app-shell").toggleAttribute("data-nav-open", open);
+        one<HTMLButtonElement>("[data-menu-toggle]").setAttribute("aria-expanded", String(open));
+        one<HTMLElement>("[data-nav-scrim]").hidden = !open;
+        one<HTMLElement>("#workspace").inert = open;
+        if (open) {
+          const buttons = all<HTMLButtonElement>("[data-product-nav] [data-area]").filter((button) => !button.hidden);
+          (buttons.find((button) => button.getAttribute("aria-current") === "page") ?? buttons[0] ?? one<HTMLElement>("[data-nav-close]")).focus();
+        } else returnTo?.focus({ preventScroll: true });
+      }
       function activateArea(id: string, source?: HTMLButtonElement) {
         for (const panel of all<HTMLElement>("[data-area-panel]")) panel.hidden = panel.dataset.areaPanel !== id;
         const selected = source ?? all<HTMLButtonElement>("[data-area]").find((button) => button.dataset.area === id && !button.hidden);
@@ -1556,8 +1572,9 @@ const lenses = [
         text("[data-breadcrumb-area]", group);
         text("[data-breadcrumb-page]", label);
         history.replaceState(null, "", `#${id}`);
-        one<HTMLElement>(".app-shell").removeAttribute("data-nav-open");
-        one<HTMLButtonElement>("[data-menu-toggle]").setAttribute("aria-expanded", "false");
+        // Choosing an area from the open rail lands focus in the area, not on a
+        // button that has just slid off-screen.
+        if (navOpen()) setNav(false, one<HTMLElement>("#workspace"));
         if (!principal) return;
         if (id === "memories") void loadMemoryList();
         if (id === "subjects") void loadSubjects();
@@ -1736,12 +1753,12 @@ const lenses = [
         admin: [...readerScopes, "views:compile:all", "observations:write", "claims:write", "feedback:write", "checkpoints:write", "leases:write", "handoffs:write", "keys:manage", "memberships:write", "workspaces:write", "governance:write", "approvals:write", "approvals:approve", "releases:write", "releases:approve", "retention:write", "identity:write", "federation:write", "webhooks:read", "webhooks:write", "export:read", "import:write", "principals:read", "grants:read", "grants:write", "models:read", "models:probe"],
       };
       for (const button of all<HTMLButtonElement>("[data-area]")) button.addEventListener("click", () => activateArea(button.dataset.area!, button));
-      one<HTMLButtonElement>("[data-menu-toggle]").addEventListener("click", (event) => {
-        const button = event.currentTarget as HTMLButtonElement;
-        const shell = one<HTMLElement>(".app-shell");
-        const open = !shell.hasAttribute("data-nav-open");
-        shell.toggleAttribute("data-nav-open", open);
-        button.setAttribute("aria-expanded", String(open));
+      one<HTMLButtonElement>("[data-menu-toggle]").addEventListener("click", () => setNav(!navOpen()));
+      one<HTMLButtonElement>("[data-nav-close]").addEventListener("click", () => setNav(false));
+      one<HTMLElement>("[data-nav-scrim]").addEventListener("click", () => setNav(false));
+      // Widening past the off-canvas breakpoint must not leave the page inert.
+      matchMedia("(max-width: 960px)").addEventListener("change", (event) => {
+        if (!event.matches && navOpen()) setNav(false, null);
       });
       one<HTMLButtonElement>("[data-graph-open-evidence]").addEventListener("click", () => {
         if (!graphSelected || graphSelected.type !== "claim") return;
@@ -1906,6 +1923,10 @@ const lenses = [
         memoryListSearch.focus();
       });
       document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && navOpen()) {
+          setNav(false);
+          return;
+        }
         if (event.key === "Escape" && workspaceMenu.open) {
           workspaceMenu.open = false;
           one<HTMLElement>("[data-workspace-menu] summary").focus();

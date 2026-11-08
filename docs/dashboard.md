@@ -29,6 +29,12 @@ The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
 every request again.
 
+At 960px and below the navigation moves into an off-canvas rail. While the
+rail is open, the page behind it is inert and focus moves into the rail. The
+rail closes with its **Close navigation** button, Escape, or a tap outside it,
+and focus returns to the toggle. Choosing an area closes the rail and moves
+focus to the main region.
+
 ## Read operator data
 
 Each area uses the same information order:

@@ -46,6 +46,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand-row { display: flex; align-items: center; gap: 11px; min-height: 64px; padding: 17px 20px; border-bottom: 1px solid var(--rule-soft); }
 .brand-row img { border-radius: 3px; }
 .brand-row strong { font: 500 13px "JetBrains Mono Variable", monospace; letter-spacing: -.01em; }
+.nav-close { display: none; align-items: center; justify-content: center; width: 32px; height: 32px; margin-left: 4px; padding: 0; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 3px; cursor: pointer; }
+.nav-close svg { width: 16px; height: 16px; }
+.nav-scrim { display: none; }
 .brand-row span { margin-left: auto; color: var(--muted); font: 9.5px "JetBrains Mono Variable", monospace; }
 .workspace-picker { position: relative; z-index: 4; margin: 13px 13px 6px; }
 .workspace-picker details { position: relative; }
@@ -435,6 +438,9 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   .app-shell { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 15; width: min(86vw, 286px); height: 100dvh; border-right: 1px solid var(--rule); transform: translateX(-102%); transition: transform 180ms ease; }
   .app-shell[data-nav-open] .sidebar { transform: translateX(0); box-shadow: 12px 0 40px rgba(23,19,16,.18); }
+  .nav-close { display: inline-flex; }
+  .app-shell[data-nav-open] .nav-scrim:not([hidden]) { position: fixed; inset: 0; z-index: 14; display: block; background: rgba(23,19,16,.32); }
+  .app-shell[data-nav-open] { height: 100dvh; overflow: hidden; }
   .sidebar nav { flex-direction: column; overflow-x: hidden; overflow-y: auto; border-top: 0; }
   .sidebar nav .nav-group-label, .nav-orientation { display: block; }
   .sidebar nav button { flex: 0 0 auto; }
