@@ -6597,7 +6597,8 @@ export const CASES: Case[] = [
       }
       const owed = (await fx.query<{ id: string }>(
         `SELECT e.id FROM event_order eo JOIN events e ON e.id = eo.event_id
-          WHERE e.org_id = ? AND eo.seq > (SELECT created_seq FROM webhooks WHERE id = ?)
+          WHERE e.org_id = ? AND e.kind = 'claim.materialized'
+            AND eo.seq > (SELECT created_seq FROM webhooks WHERE id = ?)
           ORDER BY eo.seq`,
         [owner.orgId, hookId],
       )).map(({ id }) => id);
