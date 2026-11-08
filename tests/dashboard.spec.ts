@@ -448,6 +448,57 @@ test("Work, Federation, Approvals and Releases load on open and reference panes 
   await expect(page.locator("[data-subject-references]")).toHaveText("Select a subject to inspect its canonical references.");
 });
 
+test("System lists failing readiness checks first, names them, and shows each capability once", async ({ page }) => {
+  await mockServerMode(page, { error: { code: "NOT_READY", message: "Service is not ready." }, data: {
+    ready: false,
+    checks: {
+      canonical_sql: "ok",
+      migrations: "invalid or pending (applied 26, expected 27)",
+      signing_secrets: "ok",
+      webauthn: "disabled",
+      semantic_index: "disabled",
+      extraction: "enabled",
+      background_enrichment: "enabled",
+      enrichment_jobs: { state: "terminal_error" },
+    },
+    capabilities: { version: 3, fts: "enabled", vector: "disabled", embedding: "disabled", extraction: "enabled", background_enrichment: "enabled", model: "disabled", webauthn: "disabled" },
+  } });
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ status: 503, json: { error: { code: "NOT_READY", message: "Service is not ready." }, data: {
+    ready: false,
+    checks: {
+      canonical_sql: "ok",
+      migrations: "invalid or pending (applied 26, expected 27)",
+      signing_secrets: "ok",
+      webauthn: "disabled",
+      semantic_index: "disabled",
+      extraction: "enabled",
+      background_enrichment: "enabled",
+      enrichment_jobs: { state: "terminal_error" },
+    },
+    capabilities: { version: 3, fts: "enabled", vector: "disabled", embedding: "disabled", extraction: "enabled", background_enrichment: "enabled", model: "disabled", webauthn: "disabled" },
+  } } }));
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "System" }).click();
+  const checks = page.getByRole("list", { name: "Readiness checks" }).locator("li");
+  await expect(checks.nth(0)).toHaveAttribute("data-state", "error");
+  await expect(checks.nth(1)).toHaveAttribute("data-state", "error");
+  const failing = page.locator('.check-list li[data-state="error"]');
+  await expect(failing.locator("strong")).toHaveText(["Migrations", "Enrichment Jobs"]);
+  await expect(failing.first().locator(".check-state")).toHaveText("Failing");
+  await expect(failing.first()).toContainText("invalid or pending (applied 26, expected 27)");
+  await expect(failing.nth(1)).toContainText("titen jobs list --status terminal_error");
+  await expect(page.locator("[data-service-notice]")).toHaveText("Not ready: migrations, enrichment jobs failing. Open System for details.");
+  // The technical payload keeps the raw JSON; the visible lists must not.
+  expect((await page.locator("[data-system-checks] > section").allTextContents()).join(" ")).not.toContain('{"state"');
+
+  const visible = page.locator("[data-system-checks] > section .check-list strong");
+  const labels = await visible.allTextContents();
+  for (const label of ["Extraction", "Background Enrichment", "Webauthn", "Embedding"])
+    expect(labels.filter((value) => value === label), label).toHaveLength(1);
+  expect(labels).not.toContain("Model");
+  expect(labels).not.toContain("Version");
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {

@@ -404,3 +404,101 @@ export function renderPayloadView(
   if (Object.keys(metadata).length) renderFacts(target, arrays.length || nested.length ? "Response metadata" : "Configuration facts", metadata, true);
   if (!arrays.length && !nested.length && !Object.keys(metadata).length) renderFacts(target, "Response", {}, true);
 }
+
+type CheckState = "error" | "progress" | "ok" | "disabled";
+export interface ReadinessCheck { key: string; label: string; state: CheckState; status: string; detail?: string; hint?: string }
+
+const PASSING: Record<string, string> = { ok: "OK", enabled: "Enabled", idle: "Idle", configured: "Configured" };
+const IN_PROGRESS: Record<string, string> = { backlog: "Working through backlog", index_projection_pending: "Syncing" };
+const CHECK_ORDER: Record<CheckState, number> = { error: 0, progress: 1, ok: 2, disabled: 3 };
+const JOBS_HINT = "Inspect with titen jobs list --status terminal_error; then retry, ack or purge.";
+
+function classify(value: string): { state: CheckState; status: string } {
+  if (value in PASSING) return { state: "ok", status: PASSING[value]! };
+  if (value === "disabled") return { state: "disabled", status: "Disabled (optional)" };
+  if (value in IN_PROGRESS) return { state: "progress", status: IN_PROGRESS[value]! };
+  return { state: "error", status: "Failing" };
+}
+
+/**
+ * Turns readiness `checks` into a status list, failing first. A check that only
+ * repeats an optional capability is left to the capability list unless it fails.
+ */
+export function readinessChecks(checks: DashboardRecord, capabilities: DashboardRecord = {}): ReadinessCheck[] {
+  const rows: ReadinessCheck[] = [];
+  for (const [key, raw] of Object.entries(checks)) {
+    const nested = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as DashboardRecord : undefined;
+    const value = String(nested ? nested.state ?? "unknown" : raw);
+    const { state, status } = classify(value);
+    if (key in capabilities && state !== "error") continue;
+    const extras = nested
+      ? Object.entries(nested).filter(([name]) => name !== "state").map(([name, item]) => `${humanize(name)}: ${formatValue(item)}`)
+      : [];
+    // A failing value is often a diagnostic sentence; keep it verbatim.
+    const detail = [state === "error" && value !== "error" && value !== "failed" ? value : "", ...extras].filter(Boolean).join(" · ");
+    rows.push({
+      key,
+      label: humanize(key),
+      state,
+      status,
+      ...(detail ? { detail } : {}),
+      ...(key === "enrichment_jobs" && value === "terminal_error" ? { hint: JOBS_HINT } : {}),
+    });
+  }
+  return rows.sort((left, right) => CHECK_ORDER[left.state] - CHECK_ORDER[right.state]);
+}
+
+function checkList(label: string, rows: ReadinessCheck[]): HTMLUListElement {
+  const list = document.createElement("ul");
+  list.className = "check-list";
+  list.setAttribute("aria-label", label);
+  for (const row of rows) {
+    const item = document.createElement("li");
+    item.dataset.state = row.state;
+    item.dataset.check = row.key;
+    const mark = document.createElement("span");
+    mark.className = "check-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = row.state === "error" ? "✕" : row.state === "ok" ? "✓" : row.state === "progress" ? "…" : "–";
+    const name = document.createElement("strong");
+    name.textContent = row.label;
+    const status = document.createElement("span");
+    status.className = "check-state";
+    status.textContent = row.status;
+    item.append(mark, name, status);
+    for (const extra of [row.detail, row.hint]) {
+      if (!extra) continue;
+      const note = document.createElement("small");
+      note.textContent = extra;
+      item.append(note);
+    }
+    list.append(item);
+  }
+  return list;
+}
+
+/** Readiness checks as a failing-first status list, then each optional capability once. */
+export function renderReadiness(target: HTMLElement, checks: DashboardRecord, capabilities: DashboardRecord) {
+  target.replaceChildren();
+  const sections: Array<[string, HTMLUListElement]> = [["Checks", checkList("Readiness checks", readinessChecks(checks, capabilities))]];
+  const optional = Object.entries(capabilities)
+    // `version` is not a capability, and `model` is the deprecated alias of `embedding`.
+    .filter(([key]) => key !== "version" && key !== "model")
+    .map(([key, value]) => {
+      const raw = String(value);
+      const { state } = classify(raw);
+      return { key, label: humanize(key), state, status: raw };
+    });
+  sections.push(["Capabilities", checkList("Optional capabilities", optional)]);
+  for (const [title, list] of sections) {
+    const section = document.createElement("section");
+    section.className = "operator-facts";
+    const header = document.createElement("header");
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    header.append(heading);
+    section.append(header, list);
+    target.append(section);
+  }
+  target.append(createTechnicalPayload({ checks, capabilities }));
+}

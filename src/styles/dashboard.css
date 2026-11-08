@@ -253,6 +253,15 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .collection-inspector dt, .collection-inspector dd, .operator-facts dt, .operator-facts dd { margin: 0; padding: 8px 0; border-bottom: 1px solid var(--rule-soft); overflow-wrap: anywhere; }
 .collection-inspector dt, .operator-facts dt { color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .06em; text-transform: uppercase; }
 .collection-inspector dd, .operator-facts dd { font-size: 11px; }
+.check-list { display: grid; margin: 0; padding: 0; border-top: 1px solid var(--rule-soft); list-style: none; }
+.check-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; padding: 8px 10px; border-bottom: 1px solid var(--rule-soft); border-left: 3px solid transparent; font-size: 11px; }
+.check-list li small { grid-column: 2 / -1; color: var(--muted); font: 10px/1.5 "JetBrains Mono Variable", monospace; overflow-wrap: anywhere; }
+.check-list .check-mark { font-weight: 700; text-align: center; }
+.check-list .check-state { color: var(--muted); font: 10px "JetBrains Mono Variable", monospace; }
+.check-list li[data-state="error"] { color: var(--danger); background: #fbf3e2; border-left-color: var(--danger); }
+.check-list li[data-state="error"] .check-state { color: var(--danger); font-weight: 700; }
+.check-list li[data-state="error"] small { color: var(--danger); }
+.check-list li[data-state="progress"] { border-left-color: var(--accent); }
 .collection-inspector .technical-payload { grid-column: 1 / -1; }
 .technical-payload { margin-top: 10px; border: 1px solid var(--rule-soft); }
 .technical-payload summary { padding: 9px 11px; cursor: pointer; color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .06em; text-transform: uppercase; }
@@ -571,5 +580,6 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @media (forced-colors: active) {
+  .check-list li[data-state="error"] { border-left: 3px solid CanvasText; }
   .connection i, .workspace-picker summary, .workspace-menu, .lens-picker span, .service-strip, .query-panel, .atlas-workspace, .metadata-panel, .login-panel, .user-admin, .compile-trace, .search-dialog { border: 1px solid CanvasText; }
 }

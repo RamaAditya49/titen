@@ -681,8 +681,10 @@ const eventKinds = [
       } from "../../lib/dashboard-api";
       import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
       import {
+        readinessChecks,
         renderCollection,
         renderPayloadView,
+        renderReadiness,
       } from "../../lib/dashboard-view";
 
       const one = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
@@ -2111,14 +2113,19 @@ const eventKinds = [
           text("[data-system-revision]", revisionLabel);
           text("[data-system-connection]", connectionLabel);
           text("[data-system-endpoint]", dashboardStatus.endpoint ?? "same-origin adapter");
-          renderPayload(one("[data-system-checks]"), { data: {
-            checks: payloadData(readiness.payload).checks ?? {},
-            capabilities: payloadData(readiness.payload).capabilities ?? {},
-          } });
+          const readinessData = payloadData(readiness.payload);
+          const asRecord = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+          const checks = asRecord(readinessData.checks);
+          const capabilities = asRecord(readinessData.capabilities);
+          renderReadiness(one("[data-system-checks]"), checks, capabilities);
+          const failing = readinessChecks(checks, capabilities).filter((check) => check.state === "error")
+            .map((check) => check.label.toLowerCase());
           one<HTMLElement>("[data-connection-dot]").className = health.ok && readiness.ok ? "ok" : "warn";
           setNotice(notice, semanticSyncing
             ? "Canonical requests are ready while the semantic index finishes syncing."
-            : readiness.ok ? undefined : "The process is reachable but not ready. Product requests may fail until readiness recovers.");
+            : readiness.ok ? undefined
+            : failing.length ? `Not ready: ${failing.join(", ")} failing. Open System for details.`
+            : "The process is reachable but not ready. Product requests may fail until readiness recovers.");
         } catch (error) {
           if (error instanceof DashboardApiError && error.status === 401
             && dashboardStatus?.authentication === "session") return signedOut(errorMessage(error));
