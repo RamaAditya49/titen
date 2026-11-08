@@ -189,10 +189,12 @@ visibility, scoped grants and key clamps, masked model diagnostics, structured
 operator collections, semantic-sync readiness, keyboard use, a 320 px viewport,
 row actions that stay inside half-width collection columns at 1024-1440 px,
 every sidebar navigation group visible at 1280x720 with the active area
-scrolled into view, and Memories empty states that distinguish "nothing visible
-yet" from "filtered out" and clear every filter in one action. A collection
-narrower than its table renders each row as a label/value record at any
-viewport width.
+scrolled into view, Memories empty states that distinguish "nothing visible
+yet" from "filtered out" and clear every filter in one action, and one
+confirmation dialog for every destructive or release-changing action that names
+its target, impact, and recovery, with the current session's key marked in API
+& Keys. A collection narrower than its table renders each row as a label/value
+record at any viewport width.
 
 Rollback is stopping the optional adapter or restoring the previous dashboard
 image. Neither action mutates canonical memory.

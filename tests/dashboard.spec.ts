@@ -737,8 +737,8 @@ test("logs in per principal, wires all fifteen destinations, adds a user once, a
   await expect(page.locator('[data-collection="handoffs"] h3')).toHaveText("Handoffs");
   const handoffRow = page.locator('[data-collection="handoffs"] tbody tr').filter({ hasText: "subject_live" });
   await expect(handoffRow.getByRole("button", { name: "Accept handoff · subject_live" })).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
   await handoffRow.getByRole("button", { name: "Accept handoff · subject_live" }).click();
+  await page.locator("dialog[data-danger-dialog]").getByRole("button", { name: "Accept handoff" }).click();
   await expect.poll(() => calls.includes("handoff:accepted")).toBe(true);
 
   await page.locator('[data-area="audit"]').click();
@@ -753,15 +753,17 @@ test("logs in per principal, wires all fifteen destinations, adds a user once, a
   await expect(page.getByText("policies_live", { exact: true })).toBeVisible();
   const approvalRow = page.locator('[data-collection="approvals"] tbody tr').filter({ hasText: "clm_live" });
   await expect(approvalRow.getByRole("button", { name: "Approve · clm_live" })).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept("Independent browser review passed."));
   await approvalRow.getByRole("button", { name: "Approve · clm_live" }).click();
+  await page.locator("dialog[data-danger-dialog]").getByLabel("Reason (required)").fill("Independent browser review passed.");
+  await page.locator("dialog[data-danger-dialog]").getByRole("button", { name: "Approve approval" }).click();
   await expect.poll(() => calls.includes("approval:approve")).toBe(true);
   await page.locator('[data-area="releases"]').click();
   await page.getByRole("button", { name: "Refresh releases" }).click();
   const releaseRow = page.locator('[data-collection="releases"] tbody tr').filter({ hasText: "release_live" });
   await expect(releaseRow.getByRole("button", { name: "Approve · release_live" })).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept("Release wording reviewed."));
   await releaseRow.getByRole("button", { name: "Approve · release_live" }).click();
+  await page.locator("dialog[data-danger-dialog]").getByLabel("Reason (required)").fill("Release wording reviewed.");
+  await page.locator("dialog[data-danger-dialog]").getByRole("button", { name: "Approve release" }).click();
   await expect.poll(() => calls.includes("release:approve")).toBe(true);
   await page.locator('[data-area="access"]').click();
   await page.locator('[data-user-form] input[name="username"]').fill("new.reader");
@@ -1066,3 +1068,89 @@ for (const width of [1440, 320]) {
     expect([last.get("q"), last.get("status"), last.get("kind")]).toEqual([null, null, null]);
   });
 }
+
+test("key revocation names its target, marks this session, and confirms in a dialog", async ({ page }) => {
+  await mockServerMode(page);
+  const nativeDialogs: string[] = [];
+  page.on("dialog", (dialog) => { nativeDialogs.push(dialog.message()); void dialog.dismiss(); });
+  const session = (id: string, created: string, used: string) => ({
+    key_id: id, label: "Dashboard session", principal_id: "server_operator", principal_kind: "human",
+    scopes: ["*"], max_trust: "policy_approved", status: "active", created_at: created, last_used_at: used,
+  });
+  await page.route("**/dashboard-api/governance/keys", (route) => route.fulfill({ json: { data: { keys: [
+    session("key_old_a1b2", "2026-11-01T08:00:00Z", "2026-11-01T09:00:00Z"),
+    session("key_server", "2026-11-03T10:15:00Z", "2026-11-03T10:20:00Z"),
+    session("key_mid_c3d4", "2026-11-02T08:00:00Z", "2026-11-02T09:00:00Z"),
+  ] } } }));
+  const revoked: string[] = [];
+  await page.route("**/dashboard-api/api/keys/**", (route) => {
+    revoked.push(new URL(route.request().url()).pathname.split("/").at(-1)!);
+    return route.fulfill({ json: { data: { revoked: true } } });
+  });
+
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: "API & Keys" }).click();
+  const rows = page.locator('[data-collection="keys"] tbody tr');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.filter({ hasText: "This session" })).toHaveCount(1);
+  await expect(rows.filter({ hasText: "This session" })).toContainText("…rver");
+  await expect(page.locator('[data-collection="keys"] thead')).toContainText("Last used");
+  const names = await page.locator('[data-collection="keys"] tbody button.danger-action').allTextContents();
+  expect(names).toHaveLength(3);
+  expect(new Set(names).size).toBe(3);
+
+  // Cancel is the default, and nothing is revoked.
+  const dialog = page.locator("dialog[data-danger-dialog]");
+  await rows.filter({ hasText: "…a1b2" }).locator("button.danger-action").click();
+  await expect(dialog).toHaveAttribute("open", "");
+  await expect(dialog).toContainText("…a1b2");
+  await expect(dialog).toContainText("401");
+  await expect(dialog).toContainText("cannot be undone");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toHaveAttribute("open", "");
+  expect(revoked).toEqual([]);
+
+  // Revoking the current session warns first, then says the operator did it.
+  await rows.filter({ hasText: "This session" }).locator("button.danger-action").click();
+  await expect(dialog).toContainText("signed out");
+  await dialog.getByRole("button", { name: "Revoke key" }).click();
+  await expect.poll(() => revoked).toEqual(["key_server"]);
+  await expect(page.locator("body")).toContainText("You revoked this session. Sign in again.");
+  expect(nativeDialogs).toEqual([]);
+});
+
+test("release activation and reasoned decisions use the confirmation dialog", async ({ page }) => {
+  await mockServerMode(page);
+  const nativeDialogs: string[] = [];
+  page.on("dialog", (dialog) => { nativeDialogs.push(dialog.message()); void dialog.dismiss(); });
+  await page.route("**/dashboard-api/governance/releases", (route) => route.fulfill({ json: { data: { releases: [
+    { release_id: "rel_approved", channel_id: "chan_main", claim_id: "claim_1", audience: "agents", status: "approved", version: 2 },
+  ] } } }));
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  await page.route("**/dashboard-api/releases/**", (route) => {
+    posts.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() });
+    return route.fulfill({ json: { data: {} } });
+  });
+  await page.goto("/dashboard/");
+  await page.getByRole("button", { name: /Releases/ }).click();
+  await page.locator("[data-releases-refresh]").click();
+  const dialog = page.locator("dialog[data-danger-dialog]");
+
+  await page.getByRole("button", { name: "Activate · rel_approved" }).click();
+  await expect(dialog).toHaveAttribute("open", "");
+  await expect(dialog).toContainText("rel_approved");
+  expect(posts).toEqual([]);
+  await dialog.getByRole("button", { name: "Activate release" }).click();
+  await expect.poll(() => posts.map((post) => post.path)).toEqual(["/dashboard-api/releases/rel_approved/activate"]);
+
+  // A reason is collected in a labelled field, and confirm stays disabled until it is filled.
+  await page.getByRole("button", { name: "Revoke · rel_approved" }).click();
+  const confirm = dialog.getByRole("button", { name: "Revoke release" });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel("Reason (required)").fill("Superseded by a corrected claim");
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+  await expect.poll(() => posts.at(-1)?.body.reason).toBe("Superseded by a corrected claim");
+  expect(nativeDialogs).toEqual([]);
+});
