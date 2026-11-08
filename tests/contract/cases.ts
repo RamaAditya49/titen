@@ -6516,15 +6516,15 @@ export const CASES: Case[] = [
       const owner = await fx.provision({ scopes: ["*"] });
       const other = await fx.provision({ scopes: ["*"] });
       for (let n = 0; n < 4; n += 1) {
-        expectOk(await fx.call("POST", "/v1/observations", {
-          key: owner.key,
-          body: observation({ content: `Owner evidence ${n} for the interleaving check.` }),
-        }), 201);
+        await seedClaim(fx, owner.key, {
+            observation: { content: `Owner evidence ${n} for the interleaving check.` },
+            claim: { statement: `Owner evidence ${n} for the interleaving check.` },
+          });
         for (let m = 0; m < 3; m += 1) {
-          expectOk(await fx.call("POST", "/v1/observations", {
-            key: other.key,
-            body: observation({ content: `Foreign evidence ${n}.${m} between owner events.` }),
-          }), 201);
+          await seedClaim(fx, other.key, {
+            observation: { content: `Foreign evidence ${n}.${m} between owner events.` },
+            claim: { statement: `Foreign evidence ${n}.${m} between owner events.` },
+          });
         }
       }
       const expected = (await fx.query<{ id: string }>(
@@ -6580,20 +6580,20 @@ export const CASES: Case[] = [
         body: {
           url: "https://hooks.example.com/scan-once",
           secret: "scan-once-hook-secret-value",
-          events: ["observation.created"],
+          events: ["claim.materialized"],
         },
       });
       expectOk(hook, 201);
       const hookId = hook.body.data.webhook_id;
       for (let n = 0; n < 5; n += 1) {
-        expectOk(await fx.call("POST", "/v1/observations", {
-          key: owner.key,
-          body: observation({ content: `Owner scan evidence ${n}.` }),
-        }), 201);
-        expectOk(await fx.call("POST", "/v1/observations", {
-          key: other.key,
-          body: observation({ content: `Foreign scan evidence ${n}.` }),
-        }), 201);
+        await seedClaim(fx, owner.key, {
+            observation: { content: `Owner scan evidence ${n}.` },
+            claim: { statement: `Owner scan evidence ${n}.` },
+          });
+        await seedClaim(fx, other.key, {
+            observation: { content: `Foreign scan evidence ${n}.` },
+            claim: { statement: `Foreign scan evidence ${n}.` },
+          });
       }
       const owed = (await fx.query<{ id: string }>(
         `SELECT e.id FROM event_order eo JOIN events e ON e.id = eo.event_id
