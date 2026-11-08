@@ -292,10 +292,13 @@ interface DueDelivery {
   payload: string;
 }
 
+/** A fixed instant, or a clock read once per delivery attempt. */
+export type WebhookClock = Date | (() => Date);
+
 export async function drainWebhookQueue(options: {
   db: Db;
   orgId: string;
-  now: Date;
+  now: WebhookClock;
   limit: number;
   security: RequestContext["app"]["webhookSecurity"];
   cipher: RequestContext["app"]["secretCipher"];
@@ -303,7 +306,12 @@ export async function drainWebhookQueue(options: {
 }): Promise<{ attempted: number; delivered: number }> {
   if (!options.security) throw unavailable("Webhook delivery security is not configured.");
   if (!options.cipher) throw unavailable("Signing-secret encryption is not configured.");
-  const nowString = options.now.toISOString();
+  // Each attempt can take up to the dispatch timeout, so per-attempt values (the
+  // signed timestamp, the lease, retry times) read the clock again instead of
+  // reusing the pass start.
+  const fixed = options.now;
+  const clock = typeof fixed === "function" ? fixed : () => fixed;
+  const nowString = clock().toISOString();
   await options.db.batch([{
     sql: `UPDATE webhook_deliveries
              SET status = 'expired', next_retry_at = NULL,
@@ -347,7 +355,9 @@ export async function drainWebhookQueue(options: {
     const timeoutMs = Math.max(1, Math.min(options.security.timeoutMs ?? WEBHOOK_TIMEOUT_MS, WEBHOOK_TIMEOUT_MS));
     const lease = newId("wlease");
     const attemptId = newId("wattempt");
-    const leaseExpires = new Date(options.now.getTime() + timeoutMs + WEBHOOK_LEASE_MARGIN_MS).toISOString();
+    const attemptNow = clock();
+    const attemptString = attemptNow.toISOString();
+    const leaseExpires = new Date(attemptNow.getTime() + timeoutMs + WEBHOOK_LEASE_MARGIN_MS).toISOString();
     await options.db.batch([
       {
         sql: `UPDATE webhook_deliveries
@@ -361,8 +371,8 @@ export async function drainWebhookQueue(options: {
                     WHERE sibling.webhook_id = ? AND sibling.id <> ?
                       AND sibling.status = 'pending' AND sibling.lease_expires_at > ?
                  )`,
-        params: [lease, leaseExpires, attemptId, nowString, row.id, nowString, nowString,
-          row.webhook_id, row.webhook_id, row.id, nowString],
+        params: [lease, leaseExpires, attemptId, attemptString, row.id, attemptString, attemptString,
+          row.webhook_id, row.webhook_id, row.id, attemptString],
       },
     ]);
     const claimed = await first<{ lease_token: string | null }>(
@@ -376,7 +386,7 @@ export async function drainWebhookQueue(options: {
     const signature = await signPayload(secret, payload);
     // V2 binds the attempt time and the stable delivery id to the body, so a
     // receiver can reject an old capture and drop a repeated delivery.
-    const timestamp = String(Math.floor(options.now.getTime() / 1000));
+    const timestamp = String(Math.floor(attemptNow.getTime() / 1000));
     const signatureV2 = await signPayload(secret, `${timestamp}.${row.id}.${payload}`);
     let responseStatus: number | null = null;
     let success = false;
@@ -400,11 +410,13 @@ export async function drainWebhookQueue(options: {
     } catch {
       success = false;
     }
+    const finishedNow = clock();
+    const finishedString = finishedNow.toISOString();
     const attempts = row.attempts + 1;
     const status = success ? "success" : attempts >= MAX_ATTEMPTS ? "failed" : "pending";
     const nextRetry =
       !success && attempts < MAX_ATTEMPTS
-        ? new Date(options.now.getTime() + RETRY_DELAYS_MS[attempts - 1]!).toISOString()
+        ? new Date(finishedNow.getTime() + RETRY_DELAYS_MS[attempts - 1]!).toISOString()
         : null;
     const hook: Stmt = success
       ? {
@@ -412,7 +424,7 @@ export async function drainWebhookQueue(options: {
                  WHERE id = ? AND EXISTS (
                    SELECT 1 FROM webhook_deliveries WHERE id = ? AND lease_token = ?
                  )`,
-          params: [nowString, row.webhook_id, row.id, lease],
+          params: [finishedString, row.webhook_id, row.id, lease],
         }
       : {
           sql: `UPDATE webhooks
@@ -422,7 +434,7 @@ export async function drainWebhookQueue(options: {
                  WHERE id = ? AND EXISTS (
                    SELECT 1 FROM webhook_deliveries WHERE id = ? AND lease_token = ?
                  )`,
-          params: [nowString, MAX_CONSECUTIVE_FAILURES, row.webhook_id, row.id, lease],
+          params: [finishedString, MAX_CONSECUTIVE_FAILURES, row.webhook_id, row.id, lease],
         };
     await options.db.batch([
       hook,
@@ -440,7 +452,7 @@ export async function drainWebhookQueue(options: {
                WHERE webhook_id = ? AND status = 'pending'
                  AND (lease_expires_at IS NULL OR lease_expires_at <= ?)
                  AND EXISTS (SELECT 1 FROM webhooks WHERE id = ? AND status = 'disabled')`,
-        params: [row.webhook_id, nowString, row.webhook_id],
+        params: [row.webhook_id, finishedString, row.webhook_id],
       },
     ]);
     if (success) delivered += 1;
@@ -452,7 +464,7 @@ export async function drainWebhookQueue(options: {
 export async function processWebhooks(options: {
   db: Db;
   orgId: string;
-  now: Date;
+  now: WebhookClock;
   limit: number;
   security: RequestContext["app"]["webhookSecurity"];
   cipher: RequestContext["app"]["secretCipher"];
@@ -477,7 +489,7 @@ export async function processWebhooks(options: {
   );
   // The durable delivery uniqueness rule advances later pages across passes.
   for (const event of events)
-    await queueEvent(options.db, options.orgId, event, options.now, options.principalId);
+    await queueEvent(options.db, options.orgId, event, typeof options.now === "function" ? options.now() : options.now, options.principalId);
   const result = await drainWebhookQueue(options);
   return {
     events: events.length,
@@ -496,7 +508,7 @@ export async function drainWebhooks(ctx: RequestContext): Promise<Result> {
   const result = await processWebhooks({
     db: ctx.app.db,
     orgId,
-    now: ctx.app.now(),
+    now: () => ctx.app.now(),
     limit,
     security: ctx.app.webhookSecurity,
     cipher: ctx.app.secretCipher,

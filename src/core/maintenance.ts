@@ -377,11 +377,11 @@ export async function indexPendingForOrg(
 async function deliverPending(
   db: Db,
   limit: number,
-  now: Date,
+  now: () => Date,
   security?: WebhookSecurity,
   cipher?: SecretCipher,
 ): Promise<{ delivered: number; errors: string[] }> {
-  const nowString = now.toISOString();
+  const nowString = now().toISOString();
   const orgs = await db.all<{ org_id: string }>(
     `SELECT org_id FROM (
        SELECT w.org_id, COALESCE(d.next_retry_at, d.created_at) AS due_at
@@ -524,7 +524,8 @@ export async function runMaintenance(options: {
       const delivery = await deliverPending(
         options.db,
         limit,
-        maintenanceNow,
+        // Delivery reads the clock per attempt; a pass can outlast one dispatch timeout.
+        sourceNow,
         options.webhookSecurity,
         options.secretCipher,
       );
