@@ -57,7 +57,8 @@ export const LIMITS = {
 
 export const MAX_JSON_DEPTH = 64;
 
-const UNSAFE_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
+/** Terminal and bidirectional controls rejected in free text (#108). Shared with the Bun source importer. */
+export const UNSAFE_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
 
 /** Rejects parser-safe JSON before recursive serializers or hashers see it. */
 export function assertJsonDepth(value: unknown): void {
@@ -74,9 +75,20 @@ export function assertJsonDepth(value: unknown): void {
   }
 }
 
+/**
+ * CRLF is a line ending, not a control sequence. It becomes LF before the
+ * #108 check and before any hash, so Windows text is accepted and dedupes with
+ * its LF twin. A lone CR (which can overwrite a terminal line) stays rejected.
+ */
+export function normalizeLineEndings(value: string): string {
+  return value.includes("\r") ? value.replaceAll("\r\n", "\n") : value;
+}
+
 function assertSafeString(value: string, field: string): void {
   if (!value.isWellFormed())
     throw validationError(`Field "${field}" must contain well-formed Unicode.`);
+  if (value.includes("\r"))
+    throw validationError(`Field "${field}" contains a carriage return (U+000D) not followed by a line feed. Use "\\n" line endings.`);
   if (UNSAFE_TEXT.test(value))
     throw validationError(`Field "${field}" contains an unsafe control character.`);
 }
@@ -97,9 +109,10 @@ export function requireString(
   maxLength: number,
   path = field,
 ): string {
-  const value = body[field];
-  if (value === undefined) throw validationError(`Field "${path}" is required.`);
-  if (typeof value !== "string") throw validationError(`Field "${path}" must be a string.`);
+  const raw = body[field];
+  if (raw === undefined) throw validationError(`Field "${path}" is required.`);
+  if (typeof raw !== "string") throw validationError(`Field "${path}" must be a string.`);
+  const value = normalizeLineEndings(raw);
   if (value.trim() === "") throw validationError(`Field "${path}" must be a non-empty string.`);
   if (value.length > maxLength)
     throw validationError(`Field "${path}" exceeds ${maxLength} characters.`);
@@ -113,9 +126,10 @@ export function optionalString(
   maxLength: number,
   path = field,
 ): string | null {
-  const value = body[field];
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string") throw validationError(`Field "${path}" must be a string when present.`);
+  const raw = body[field];
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "string") throw validationError(`Field "${path}" must be a string when present.`);
+  const value = normalizeLineEndings(raw);
   if (value.trim() === "")
     throw validationError(`Field "${path}" must be a non-empty string when present.`);
   if (value.length > maxLength)

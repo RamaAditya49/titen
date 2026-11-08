@@ -503,3 +503,22 @@ test("served apply uses the same handlers and imported evidence is recallable wi
     await running.stop();
   }
 });
+
+test("CRLF sources import exactly like their LF twins and a lone CR is still rejected", async () => {
+  const base = join(root, "line-endings");
+  const text = "# Deploys\n\nProduction deploys require a rollback smoke.\n\n# Releases\n\nVersion checks run first.\n";
+  const lf = write(join(base, "lf", "notes.md"), text);
+  const crlf = write(join(base, "crlf", "notes.md"), text.replaceAll("\n", "\r\n"));
+  const fromLf = await prepareSourceImport({ path: lf, profile: "markdown@1", subject: "line-endings" });
+  const fromCrlf = await prepareSourceImport({ path: crlf, profile: "markdown@1", subject: "line-endings" });
+  assert.equal(fromCrlf.entries.length, 2);
+  assert.deepEqual(
+    fromCrlf.entries.map((entry) => [entry.content, entry.contentHash]),
+    fromLf.entries.map((entry) => [entry.content, entry.contentHash]),
+  );
+  const lone = write(join(base, "lone.md"), "progress 10%\rprogress 99%\n");
+  await assert.rejects(
+    prepareSourceImport({ path: lone, profile: "markdown@1", subject: "line-endings" }),
+    /carriage return/,
+  );
+});
