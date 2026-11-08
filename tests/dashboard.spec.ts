@@ -399,7 +399,8 @@ test("System lists failing readiness checks first, names them, and shows each ca
   await expect(failing.first()).toContainText("invalid or pending (applied 26, expected 27)");
   await expect(failing.nth(1)).toContainText("titen jobs list --status terminal_error");
   await expect(page.locator("[data-service-notice]")).toHaveText("Not ready: migrations, enrichment jobs failing. Open System for details.");
-  await expect(page.locator("[data-system-checks] > section")).not.toContainText('{"state"');
+  // The technical payload keeps the raw JSON; the visible lists must not.
+  expect((await page.locator("[data-system-checks] > section").allTextContents()).join(" ")).not.toContain('{"state"');
 
   const visible = page.locator("[data-system-checks] > section .check-list strong");
   const labels = await visible.allTextContents();

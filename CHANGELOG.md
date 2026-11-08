@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard System status no longer shows failing readiness checks in the same plain style as passing ones. Checks render as a status list with failing checks first, each with a text status and a non-colour marker. The service notice names the failing checks. `enrichment_jobs` reads as words instead of raw JSON and points to `titen jobs list --status terminal_error` on a terminal error. Each optional capability is listed once. ([#383](https://github.com/RamaAditya49/titen/issues/383))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

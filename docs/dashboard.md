@@ -42,7 +42,11 @@ Each area uses the same information order:
 Projects and Subjects show their canonical references after selection. Work,
 Access, API & Keys, Approvals, and Releases place actions in the affected row.
 Each successful action reloads server state. System and Models show named facts
-instead of generic JSON records.
+instead of generic JSON records. System lists readiness checks failing first,
+each with a text status and a marker (✕ failing, ✓ OK, – disabled), and names
+the failing checks in the service notice. A terminal enrichment-job error points
+to `titen jobs list --status terminal_error`. Each optional capability appears
+once, under Capabilities.
 
 The dashboard separates Audit entries from domain events. It also separates
 Federation peers from their exchange log. This prevents similar response keys
