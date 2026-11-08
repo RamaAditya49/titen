@@ -877,6 +877,79 @@ test("capability discovery exposes only authorized areas and clears denial state
   await expect(page.locator("[data-audit-output]")).not.toContainText("aud_live");
 });
 
+test("audit activity opens on the newest entries, pages by cursor, and says when the walk is partial", async ({ page }) => {
+  const principal = {
+    organization_id: "org_audit",
+    principal_id: "auditor",
+    principal_kind: "human",
+    key_id: "key_audit",
+    scopes: ["audit:read", "events:read"],
+    max_trust: "asserted",
+    organization_role: "reader",
+  };
+  const entries = Array.from({ length: 450 }, (_, index) => ({
+    id: `aud_${String(index).padStart(3, "0")}`,
+    action: index % 2 ? "key.revoke" : "dashboard_session.create",
+    actor_id: "auditor",
+    created_at: new Date(Date.UTC(2026, 10, 1) + index * 60_000).toISOString(),
+  }));
+  let endless = false;
+  const logRequests: URL[] = [];
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", endpoint: "titen.internal", authentication: "server", authenticated: true } }));
+  await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: principal } }));
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+  await page.route("**/dashboard-api/audit/events**", (route) => route.fulfill({ json: { data: { events: [{ id: "evt_1", kind: "lease.acquired" }], cursor: "evt_1" } } }));
+  await page.route("**/dashboard-api/audit/log**", (route) => {
+    const url = new URL(route.request().url());
+    logRequests.push(url);
+    const limit = Number(url.searchParams.get("limit"));
+    const action = url.searchParams.get("action");
+    if (endless) {
+      const start = logRequests.length * limit;
+      const rows = Array.from({ length: limit }, (_, index) => ({ id: `aud_x${start + index}`, action: "key.revoke", created_at: "2026-11-01T00:00:00.000Z" }));
+      return route.fulfill({ json: { data: { entries: rows, cursor: rows.at(-1)!.id } } });
+    }
+    const matching = entries.filter((entry) => !action || entry.action === action);
+    const after = url.searchParams.get("after");
+    const start = after ? matching.findIndex((entry) => entry.id === after) + 1 : 0;
+    const rows = matching.slice(start, start + limit);
+    return route.fulfill({ json: { data: { entries: rows, cursor: rows.at(-1)?.id ?? null } } });
+  });
+  await page.goto("/dashboard/");
+
+  const rows = page.locator('[data-collection="entries"] tbody tr');
+  await expect(rows.first()).toContainText("aud_449");
+  expect(logRequests).toHaveLength(3);
+  expect(logRequests.every((url) => url.searchParams.get("limit") === "200")).toBe(true);
+  await expect(rows).toHaveCount(50);
+  const status = page.locator('[data-activity-page="entries"]');
+  await expect(status).toHaveText("Showing 1–50 of 450 audit entries, newest first.");
+  const footer = page.locator('[data-activity-footer="entries"]');
+  await expect(footer.getByRole("button", { name: "Newer" })).toBeDisabled();
+  await footer.getByRole("button", { name: "Older" }).click();
+  await expect(rows.first()).toContainText("aud_399");
+  await expect(status).toHaveText("Showing 51–100 of 450 audit entries, newest first.");
+  await expect(page.locator('[data-activity-page="events"]')).toHaveText("Showing 1–1 of 1 events, newest first.");
+
+  logRequests.length = 0;
+  await page.locator('[data-audit-form] input[name="action"]').fill("key.revoke");
+  await page.locator('[data-audit-form] input[name="action"]').press("Enter");
+  await expect(status).toHaveText("Showing 1–50 of 225 audit entries, newest first.");
+  expect(logRequests.every((url) => url.searchParams.get("action") === "key.revoke")).toBe(true);
+  await expect(rows.first()).toContainText("aud_449");
+
+  endless = true;
+  logRequests.length = 0;
+  await page.locator('[data-audit-form] input[name="action"]').fill("");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(status).toContainText("Partial view: showing 1–50 of the first 2,000 audit entries.");
+  expect(logRequests).toHaveLength(10);
+  await footer.getByRole("button", { name: "Load more recent audit entries" }).click();
+  await expect(status).toContainText("of the first 4,000 audit entries");
+  expect(logRequests).toHaveLength(20);
+});
+
 test("remains keyboard and mobile usable with live product navigation", async ({ page }) => {
   await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ json: { data: view } }));

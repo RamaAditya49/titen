@@ -48,6 +48,13 @@ The dashboard separates Audit entries from domain events. It also separates
 Federation peers from their exchange log. This prevents similar response keys
 from receiving the wrong operator label.
 
+Audit & Events loads when it opens and lists the newest entries first. The audit
+and event APIs page oldest first, so the dashboard follows their cursor for at
+most ten requests of 200 rows per list, then pages the result with Newer and
+Older. If a list has more rows than that walk reaches, its footer says the view
+is partial and offers to load more recent entries. The filter form submits on
+Enter or with Apply filters and suggests known audit actions and event kinds.
+
 ![Structured Projects directory](./assets/screenshots/dashboard-operator-projects.png)
 
 On a phone, each table becomes a linear record list. The page does not require
