@@ -26,6 +26,9 @@ export function openDatabase(
     database = new Database(path, open);
     if (!readonly) protectDatabaseFiles(path);
     if (!readonly) {
+      // Set the wait first. Switching to WAL or recovering a WAL file takes a
+      // lock, and without a timeout a concurrent opener fails with SQLITE_BUSY.
+      database.run("PRAGMA busy_timeout = 5000");
       database.run("PRAGMA journal_mode = WAL");
       // A successful response means its canonical transaction survived process,
       // OS, and power loss. Keep that durability choice explicit rather than
@@ -36,7 +39,6 @@ export function openDatabase(
       // no long-lived reader prevents recycling. Keep it explicit and tested.
       database.run("PRAGMA wal_autocheckpoint = 1000");
       database.run("PRAGMA foreign_keys = ON");
-      database.run("PRAGMA busy_timeout = 5000");
       protectDatabaseFiles(path);
     }
     return database;
