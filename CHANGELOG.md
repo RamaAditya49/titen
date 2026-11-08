@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard topbar wordmark now loads Noto Sans Javanese from the dashboard origin, so it renders correctly shaped without a system Javanese font. Assistive technology skips it as decoration. ([#345](https://github.com/RamaAditya49/titen/issues/345))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

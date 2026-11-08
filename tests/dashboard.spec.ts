@@ -53,6 +53,26 @@ test("starts disconnected without fixtures, secrets, storage, or external reques
   expect(requests.every((url) => new URL(url).hostname === "127.0.0.1")).toBe(true);
 });
 
+test("renders the Javanese wordmark with a bundled font as hidden decoration", async ({ page }) => {
+  const fontRequests: { url: string; status: number }[] = [];
+  page.on("response", (response) => {
+    if (/noto-sans-javanese-javanese.*\.woff2/.test(response.url())) fontRequests.push({ url: response.url(), status: response.status() });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/dashboard/");
+  const wordmark = page.locator("span.javanese");
+  await expect(wordmark).toBeVisible();
+  await expect(wordmark).toHaveAttribute("aria-hidden", "true");
+  await expect(wordmark).not.toHaveAttribute("title", /.*/);
+  const loaded = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return document.fonts.check('600 15px "Noto Sans Javanese Variable"', "ꦠꦶꦠꦺꦤ꧀");
+  });
+  expect(loaded).toBe(true);
+  expect(fontRequests.length).toBeGreaterThan(0);
+  expect(fontRequests.every((item) => item.status === 200 && new URL(item.url).hostname === "127.0.0.1")).toBe(true);
+});
+
 test("loads Memories as a searchable list and opens one record in Atlas", async ({ page }) => {
   await mockServerMode(page);
   let compileCalls = 0;
