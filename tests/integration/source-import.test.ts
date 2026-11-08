@@ -522,3 +522,40 @@ test("CRLF sources import exactly like their LF twins and a lone CR is still rej
     /carriage return/,
   );
 });
+
+test("long entries split on code-point and grapheme boundaries and apply cleanly", async () => {
+  const base = join(root, "long-entries");
+  const rocket = write(join(base, "rocket.md"), `${"x".repeat(3999)}\u{1F680}${"y".repeat(200)}\n`);
+  const prepared = await prepareSourceImport({ path: rocket, profile: "markdown@1", subject: "long" });
+  assert.equal(prepared.entries.length, 2);
+  for (const entry of prepared.entries) assert.equal(entry.content.isWellFormed(), true);
+  assert.equal(prepared.entries.map((entry) => entry.content).join(""), `${"x".repeat(3999)}\u{1F680}${"y".repeat(200)}`);
+
+  // A ZWJ family emoji straddling the cut stays in one chunk.
+  const family = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+  const zwj = write(join(base, "family.md"), `${"x".repeat(3997)}${family}${"y".repeat(50)}\n`);
+  const zwjPrepared = await prepareSourceImport({ path: zwj, profile: "markdown@1", subject: "long" });
+  assert.equal(zwjPrepared.entries.some((entry) => entry.content.includes(family)), true);
+  assert.equal(zwjPrepared.entries.map((entry) => entry.content).join(""), `${"x".repeat(3997)}${family}${"y".repeat(50)}`);
+
+  // JSON profiles use the same splitter.
+  const record = json(join(base, "mem0.json"), { results: [{ id: "long-1", memory: `${"z".repeat(3999)}\u{1F680}tail`, created_at: "2026-08-01T10:00:00Z" }] });
+  const recordPrepared = await prepareSourceImport({ path: record, profile: "mem0-json@1", subject: "long" });
+  for (const entry of recordPrepared.entries) assert.equal(entry.content.isWellFormed(), true);
+
+  // Apply writes both chunks instead of stopping on "well-formed Unicode".
+  const directory = mkdtempSync(join(tmpdir(), "titen-long-apply-"));
+  const dbPath = join(directory, "titen.db");
+  const handle = openDatabase(dbPath);
+  const db = createSqliteDb(handle);
+  await migrate(db);
+  const owner = await provisionWith(db, { scopes: ["*"] });
+  handle.close();
+  const applied = await applySourceImport(prepared, { apiKey: owner.key, dbPath });
+  assert.equal(JSON.stringify(applied).includes("well-formed"), false);
+  const check = openDatabase(dbPath);
+  const count = check.query("SELECT COUNT(*) AS n FROM observations WHERE subject_id = 'long'").get() as { n: number };
+  check.close();
+  rmSync(directory, { recursive: true, force: true });
+  assert.equal(count.n, 2);
+});
