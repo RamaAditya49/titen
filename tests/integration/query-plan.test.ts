@@ -32,6 +32,9 @@ import type { RequestContext } from "../../src/core/http";
 import { scheduleDerivationBackfill } from "../../src/core/enrichment";
 import type { ExtractionCapability } from "../../src/core/extraction";
 import { exportableEnrichmentJobIds } from "../../src/core/portability";
+import { listEvents } from "../../src/core/events";
+import { runMaintenance } from "../../src/core/maintenance";
+import { processWebhooks } from "../../src/core/webhooks";
 import { createSqliteDb, openDatabase } from "../../src/runtime/bun/sqlite";
 import type { Principal } from "../../src/core/auth";
 
@@ -218,4 +221,72 @@ test("the export job filter reaches input observations by id without parsing JSO
       `expected an id seek on input_observation:\n${plan.join("\n")}`,
     );
   });
+});
+
+/**
+ * Event scans must walk one organization's range of the ordering index.
+ * Without `org_id` in the seek, SQLite fell back to `rowid>?` over the whole
+ * deployment, so one idle webhook made every pass cost all events ever written.
+ */
+const captureScans = async (run: (db: Db) => Promise<unknown>) => {
+  const captured: { sql: string; params: Param[] }[] = [];
+  const stub: Db = {
+    all: async (sql: string, params?: Param[]) => {
+      captured.push({ sql, params: params ?? [] });
+      if (/SELECT id FROM webhooks/.test(sql)) return [{ id: "whk_plan" }] as never;
+      if (/MAX\(seq\)/.test(sql)) return [{ seq: 5 }] as never;
+      return [];
+    },
+    batch: async () => {},
+    exec: async () => {},
+  };
+  await run(stub);
+  return captured.filter(({ sql }) => /event_order/.test(sql) && /eo\.seq >/.test(sql));
+};
+
+const assertOrgScopedSeek = (plan: string[], label: string) => {
+  const seek = plan.find((line) => /event_order/.test(line));
+  assert.ok(seek, `${label}: no event_order step in the plan:\n${plan.join("\n")}`);
+  assert.match(
+    seek!,
+    /USING (COVERING )?INDEX event_order_org_seq \(org_id=\? AND seq>\?/,
+    `${label}: expected an (org_id, seq) range, got ${seek}\nfull plan:\n${plan.join("\n")}`,
+  );
+};
+
+test("the webhook scan seeks the organization range of event_order", async () => {
+  const scans = await captureScans((db) =>
+    processWebhooks({
+      db,
+      orgId: "org_plan",
+      now: new Date(),
+      limit: 50,
+      security: undefined as never,
+      cipher: undefined as never,
+    // The scan runs first; the unconfigured drain that follows is irrelevant here.
+    }).catch(() => undefined),
+  );
+  assert.equal(scans.length, 1, "expected one webhook scan statement");
+  await withMigratedStore((explain) => assertOrgScopedSeek(explain(scans[0]!), "webhook scan"));
+});
+
+test("the maintenance webhook selection seeks the organization range of event_order", async () => {
+  const scans = await captureScans((db) =>
+    runMaintenance({ db, deliverWebhooks: true, now: new Date() }),
+  );
+  const selection = scans.filter(({ sql }) => /JOIN event_order eo ON/.test(sql));
+  assert.equal(selection.length, 1, "expected one maintenance selection statement");
+  await withMigratedStore((explain) => assertOrgScopedSeek(explain(selection[0]!), "maintenance selection"));
+});
+
+test("listing events seeks the organization range of event_order", async () => {
+  const scans = await captureScans((db) =>
+    listEvents({
+      app: { db },
+      url: new URL("https://titen.test/v1/events?limit=50"),
+      principal: PRINCIPAL,
+    } as never),
+  );
+  assert.equal(scans.length, 1, "expected one event listing statement");
+  await withMigratedStore((explain) => assertOrgScopedSeek(explain(scans[0]!), "event listing"));
 });

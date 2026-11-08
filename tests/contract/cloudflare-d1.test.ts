@@ -16,6 +16,7 @@ import {
   assertLegacyTeamRowsRefuseMigration,
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
+  assertPopulatedV27EventOrderMigration,
 } from "./integrity-migration";
 import { acquireD1Lane, D1RunDiagnostics } from "./d1-harness";
 import { assertConcurrentWriterDurability, PAYLOADS, WRITERS } from "./durability";
@@ -551,6 +552,25 @@ test("a populated schema-v14 D1 database preserves genuine semantic outage evide
     await migrationRuntime.ready;
     const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
     await assertPopulatedV14SemanticOutageMigration(migrationDb);
+  } finally {
+    await migrationRuntime.dispose();
+    rmSync(migrationPersist, { recursive: true, force: true });
+  }
+});
+
+test("a populated schema-v27 D1 database backfills event_order.org_id and keeps every seq", async () => {
+  const migrationPersist = mkdtempSync(join(tmpdir(), "titen-d1-event-order-migration-"));
+  const migrationRuntime = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    compatibilityDate: "2026-07-01",
+    d1Databases: { DB: "titen-event-order-migration" },
+    d1Persist: migrationPersist,
+  });
+  try {
+    await migrationRuntime.ready;
+    const migrationDb = createD1Db((await migrationRuntime.getD1Database("DB")) as never);
+    await assertPopulatedV27EventOrderMigration(migrationDb);
   } finally {
     await migrationRuntime.dispose();
     rmSync(migrationPersist, { recursive: true, force: true });

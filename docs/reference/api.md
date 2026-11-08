@@ -313,6 +313,11 @@ delivery is owed for every event committed after it. Eligibility never depends
 on comparing wall-clock timestamps, so events written in the same millisecond as
 the registration are delivered rather than dropped.
 
+Each webhook also keeps a scan mark. A delivery pass examines only events that
+are newer than the mark, and only for the webhook's own organization, then moves
+the mark forward. An event is examined once per webhook. An event that the
+webhook owner cannot read at that moment is not owed later.
+
 Canonical writes enqueue durable delivery rows before outbound I/O. Claims are
 atomic leases that recover after expiry. `X-Titen-Delivery` is stable across
 retries; `X-Titen-Attempt` changes per network attempt. Delivery is

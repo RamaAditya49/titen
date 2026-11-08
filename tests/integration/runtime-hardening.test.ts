@@ -15,6 +15,7 @@ import {
   assertLegacyTeamRowsRefuseMigration,
   assertPopulatedV11IntegrityMigration,
   assertPopulatedV14SemanticOutageMigration,
+  assertPopulatedV27EventOrderMigration,
 } from "../contract/integrity-migration";
 import { fakeVectors } from "../contract/harness";
 
@@ -319,6 +320,13 @@ test("a pre-workspace SQLite database refuses to migrate its team rows into sile
   const database = openDatabase(join(temporary(), "titen.db"));
   const db = createSqliteDb(database);
   await assertLegacyTeamRowsRefuseMigration(db);
+  database.close();
+});
+
+test("a populated schema-v27 SQLite database backfills event_order.org_id and keeps every seq", async () => {
+  const database = openDatabase(join(temporary(), "titen.db"));
+  const db = createSqliteDb(database);
+  await assertPopulatedV27EventOrderMigration(db);
   database.close();
 });
 

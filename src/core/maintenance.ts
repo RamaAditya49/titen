@@ -393,7 +393,7 @@ async function deliverPending(
        UNION ALL
        SELECT w.org_id, e.created_at AS due_at
          FROM webhooks w
-         JOIN event_order eo ON eo.seq > w.created_seq
+         JOIN event_order eo ON eo.org_id = w.org_id AND eo.seq > w.scanned_seq
          JOIN events e ON e.id = eo.event_id AND e.org_id = w.org_id
         WHERE w.status = 'active' AND w.principal_id IS NOT NULL
           AND ${eventAccessSql("e", "w.principal_id")}
