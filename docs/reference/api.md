@@ -724,9 +724,14 @@ estimates for the items that were selected. `budget` reports
 `selected_items`, authorized `omitted_items`, `deduplicated_items`, the
 explicit `budget_exhausted` boolean, and `omissions`. It also reports
 `unconsolidated_observations`: the authorized observations in the effective
-subject/project scope that no claim cites yet. When that count is above zero
-the pack also lists `unconsolidated_observation_ids` (at most 20) and
-`budget.hint` telling the caller to consolidate. When the token budget excludes
+subject/project scope that no claim cites yet. The probe inspects only the
+500 newest observations of the subject that the caller may read, ingested at or
+before the compile's `as_of`,
+so its cost does not grow with the subject's history. When that window is full,
+`budget.unconsolidated_observations_capped` is `true` and the count covers the
+window only; older unconsolidated observations may exist. When the count is
+above zero the pack also lists `unconsolidated_observation_ids` (the oldest 20
+in the window) and `budget.hint` telling the caller to consolidate. When the token budget excludes
 every item, `budget.hint` names the smallest omitted item's token size. Use
 `max_tokens` of at least 800 for a normal pack. Context items remain claims, not
 raw observations; a successful `POST /v1/observations` is durable evidence and

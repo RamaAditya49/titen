@@ -29,6 +29,9 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 ### Fixed
 
 - `tz` local-time fields no longer fail on historical Local Mean Time offsets that carry seconds. Such offsets are rounded to the minute with the wall clock shifted, so each `*_local` value keeps the UTC instant, and a value that cannot be presented becomes `null`. Before this, `POST /v1/observations` with an archival `occurred_at` returned 500 after the write committed, and a retry stored duplicate evidence (#337).
+### Changed
+
+- Context compile no longer scans a subject's entire observation history to report `budget.unconsolidated_observations`. One statement now inspects the 500 newest caller-readable observations at or before the compile's `as_of` and sets `budget.unconsolidated_observations_capped: true` when that window is full. On a subject with 200,000 unconsolidated observations, median compile latency on Bun dropped from 382 ms to 2.9 ms (2.4 ms for a subject with none). Observations ingested after a historical `at` are no longer counted (#339).
 
 ## [0.10.9] — 2026-11-03
 
