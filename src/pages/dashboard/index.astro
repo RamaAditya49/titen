@@ -400,6 +400,10 @@ const eventKinds = [
               <h3>Passkeys and recovery</h3>
               <p>Register more than one passkey. Store the one-time recovery codes away from this browser.</p>
             </div>
+            <div class="passkey-disabled" data-passkey-disabled hidden>
+              <strong data-passkey-disabled-title>Passkeys are not enabled on this deployment</strong>
+              <span data-passkey-disabled-copy>An administrator can enable them by setting <code>TITEN_WEBAUTHN_RP_ID</code>, <code>TITEN_WEBAUTHN_ORIGIN</code> and <code>TITEN_WEBAUTHN_RP_NAME</code> and restarting the dashboard. Password sign-in is unaffected.</span>
+            </div>
             <form class="inline-form" data-passkey-register-form>
               <label><span>Passkey label</span><input name="label" maxlength="80" required placeholder="Work laptop" /></label>
               <button class="primary-button" type="submit">Register passkey</button>
@@ -717,6 +721,31 @@ const eventKinds = [
       let memoryKind = "";
       let graphSelected: AtlasNode | null = null;
       let webauthnEnabled = false;
+      // Readiness reports "enabled", "disabled", or a configuration diagnostic; "unknown" until it answers.
+      let webauthnState = "unknown";
+      function applyWebauthnState(readinessPayload: Record<string, unknown>) {
+        const capabilities = payloadData(readinessPayload).capabilities;
+        const state = capabilities && typeof capabilities === "object" && !Array.isArray(capabilities)
+          ? (capabilities as Record<string, unknown>).webauthn : undefined;
+        webauthnState = typeof state === "string" ? state : "unknown";
+        webauthnEnabled = webauthnState === "enabled";
+        // Sign-in hides the passkey path only on an explicit "disabled", so an unreachable
+        // readiness check never strands an account that relies on its passkey.
+        one<HTMLButtonElement>("[data-start-recovery]").hidden = webauthnState === "disabled";
+        for (const selector of ["[data-passkey-register-form]", ".passkey-confirmation", "[data-passkey-list]", "[data-recovery-regenerate]"])
+          one<HTMLElement>(selector).hidden = !webauthnEnabled;
+        one<HTMLElement>("[data-passkey-disabled]").hidden = webauthnEnabled;
+        if (webauthnState !== "disabled" && !webauthnEnabled) {
+          text("[data-passkey-disabled-title]", "Passkeys are unavailable on this deployment");
+          text("[data-passkey-disabled-copy]", "WebAuthn did not report ready. Check System readiness for the configuration diagnostic. Password sign-in is unaffected.");
+        }
+      }
+      const WEBAUTHN_UNAVAILABLE = "Passkeys are not enabled on this deployment. Password sign-in is unaffected.";
+      function passkeyErrorMessage(error: unknown): string {
+        if (error instanceof DashboardApiError && error.status === 409
+          && (error.code === "WEBAUTHN_UNAVAILABLE" || !webauthnEnabled)) return WEBAUTHN_UNAVAILABLE;
+        return errorMessage(error);
+      }
 
       const text = (selector: string, value: string) => { one<HTMLElement>(selector).textContent = value; };
       const has = (scope: string) => Boolean(principal?.scopes.includes("*") || principal?.scopes.includes(scope));
@@ -813,7 +842,7 @@ const eventKinds = [
                 text("[data-passkey-management-status]", "Passkey removed.");
               } catch (error) {
                 password.value = "";
-                text("[data-passkey-management-status]", errorMessage(error));
+                text("[data-passkey-management-status]", passkeyErrorMessage(error));
               }
             });
             row.append(copy, remove);
@@ -841,13 +870,13 @@ const eventKinds = [
       // Sign-in failures are about the credential, not a session: say so (#360).
       // The server stays non-disclosing; the delay hint repeats the documented rule only.
       let loginFailures = 0;
-      function credentialErrorMessage(error: unknown): string {
+      function credentialErrorMessage(error: unknown, fallback: (error: unknown) => string = errorMessage): string {
         if (error instanceof DashboardApiError) {
           if (error.code === "INVALID_LOGIN") return "Username or password is invalid.";
           if (error.code === "LOGIN_RATE_LIMITED") return "Too many sign-in attempts. Try again later.";
           if (error.code === "SECOND_FACTOR_INVALID") return "That recovery code is invalid or already used.";
         }
-        return errorMessage(error);
+        return fallback(error);
       }
       function markInvalid(input: HTMLInputElement, statusId: string) {
         input.setAttribute("aria-invalid", "true");
@@ -2022,7 +2051,11 @@ const eventKinds = [
           text("[data-credential-copy]", dashboardStatus.authentication === "session"
             ? "The password is verified once; a short-lived API key stays only in adapter memory."
             : "The browser uses a bounded server-side adapter key.");
-          if (dashboardStatus.authentication === "session" && !dashboardStatus.authenticated) return signedOut();
+          if (dashboardStatus.authentication === "session" && !dashboardStatus.authenticated) {
+            signedOut();
+            void checkService("readiness").then((readiness) => applyWebauthnState(readiness.payload), () => undefined);
+            return;
+          }
           principal = await getSession();
           if (principal.password_change_required) return showPasswordChange();
           if (principal.auth_stage === "second_factor" || principal.second_factor_required)
@@ -2037,10 +2070,7 @@ const eventKinds = [
           const healthLabel = health.ok ? serviceDetail(health.payload, "status") ?? "Healthy" : `Error ${health.status}`;
           const runtimeLabel = serviceDetail(health.payload, "runtime") ?? "healthz";
           const semanticSyncing = semanticDiagnostic(readiness.payload) === "index_projection_pending";
-          const readinessCapabilities = payloadData(readiness.payload).capabilities;
-          webauthnEnabled = Boolean(readinessCapabilities && typeof readinessCapabilities === "object"
-            && !Array.isArray(readinessCapabilities)
-            && (readinessCapabilities as Record<string, unknown>).webauthn === "enabled");
+          applyWebauthnState(readiness.payload);
           const readinessLabel = readiness.ok
             ? semanticSyncing ? "Ready · semantic syncing" : "Ready"
             : `Not ready · ${readiness.status}`;
@@ -2128,7 +2158,7 @@ const eventKinds = [
         try {
           principal = await startRecovery(username.value);
           await refreshService();
-        } catch (error) { text("[data-login-status]", credentialErrorMessage(error)); }
+        } catch (error) { text("[data-login-status]", credentialErrorMessage(error, passkeyErrorMessage)); }
       });
       one<HTMLFormElement>("[data-password-form]").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -2161,7 +2191,7 @@ const eventKinds = [
           );
           await refreshService();
         } catch (error) {
-          text("[data-passkey-status]", errorMessage(error));
+          text("[data-passkey-status]", passkeyErrorMessage(error));
         }
       });
       one<HTMLFormElement>("[data-recovery-form]").addEventListener("submit", async (event) => {
@@ -2176,7 +2206,7 @@ const eventKinds = [
           await refreshService();
         } catch (error) {
           code.value = "";
-          text("[data-recovery-status]", credentialErrorMessage(error));
+          text("[data-recovery-status]", credentialErrorMessage(error, passkeyErrorMessage));
           if (error instanceof DashboardApiError && error.code === "SECOND_FACTOR_INVALID") markInvalid(code, "recovery-status");
         }
       });
@@ -2226,7 +2256,7 @@ const eventKinds = [
           await loadPasskeys();
           text("[data-passkey-management-status]", "Passkey registered.");
         } catch (error) {
-          text("[data-passkey-management-status]", errorMessage(error));
+          text("[data-passkey-management-status]", passkeyErrorMessage(error));
         }
       });
       one<HTMLButtonElement>("[data-recovery-regenerate]").addEventListener("click", async () => {
@@ -2244,7 +2274,7 @@ const eventKinds = [
           showRecoveryCodes(data.recovery_codes);
           text("[data-passkey-management-status]", "Recovery codes replaced. Store them now.");
         } catch (error) {
-          text("[data-passkey-management-status]", errorMessage(error));
+          text("[data-passkey-management-status]", passkeyErrorMessage(error));
         }
       });
       one<HTMLButtonElement>("[data-reconnect]").addEventListener("click", refreshService);

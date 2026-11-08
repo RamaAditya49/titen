@@ -278,6 +278,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .passkey-management p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .passkey-management .inline-form { margin: 0; }
 .passkey-confirmation { display: grid; gap: 6px; }
+.passkey-disabled { display: grid; gap: 4px; padding: 10px 12px; background: var(--paper-strong); border: 1px solid var(--rule); border-left: 3px solid var(--accent); border-radius: 2px; font-size: 11px; line-height: 1.5; }
+.passkey-disabled code { font: 10px "JetBrains Mono Variable", monospace; }
 .passkey-confirmation span { font-size: 11px; font-weight: 600; }
 .passkey-confirmation input { width: 100%; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 11px "JetBrains Mono Variable", monospace; }
 .passkey-management [data-passkey-list], .passkey-management .one-time-credential { grid-column: 1 / -1; }

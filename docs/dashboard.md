@@ -130,6 +130,13 @@ product shell stays hidden until a passkey or unused recovery code succeeds.
 Regeneration invalidates all prior recovery codes. Removing the last passkey
 requires the current password.
 
+When readiness reports WebAuthn as `disabled`, Profile hides the passkey and
+recovery-code controls and names the `TITEN_WEBAUTHN_*` variables that enable
+them, and the sign-in screen hides **Use passkey or recovery code**. Password
+sign-in is unaffected. If readiness does not answer, the sign-in path stays
+available, and a passkey request that the deployment rejects says that passkeys
+are not enabled instead of reporting a canonical-state conflict.
+
 `titen bootstrap` creates username `owner` and prints a random temporary
 password once. A temporary password opens only the **Set a new password** page;
 the private sidebar, topbar, and product routes remain unavailable. The change
