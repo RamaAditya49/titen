@@ -1204,3 +1204,74 @@ test("credential failures say what went wrong, mark the field, and never claim a
   await expect(code).toHaveAttribute("aria-invalid", "true");
   await expect(code).toBeFocused();
 });
+
+test("Context lays out its form and explains why a compiled pack is empty or short", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/subjects**", (route) => route.fulfill({ json: { data: { subjects: [
+    { subject_id: "user:ux-demo-alpha", label: "UX demo alpha", type: "human", record_count: 1 },
+    { subject_id: "project:ux-demo-beta", label: "UX demo beta", type: "concept", record_count: 1 },
+  ] } } }));
+  const budgets: Record<string, Record<string, unknown>> = {
+    "user:ux-demo-alpha": { max_tokens: 1200, used_tokens: 0, selected_items: 0, omitted_items: 0, deduplicated_items: 0,
+      unconsolidated_observations: 2, hint: "call titen_consolidate (or remember with consolidate: true)", budget_exhausted: false, omissions: [] },
+    "project:ux-demo-beta": { max_tokens: 1200, used_tokens: 1150, selected_items: 1, omitted_items: 2, deduplicated_items: 0,
+      unconsolidated_observations: 0, budget_exhausted: true, omissions: [
+        { claim_id: "clm_a", tokens: 400, reason: "token_budget" }, { claim_id: "clm_b", tokens: 300, reason: "token_budget" }] },
+    "user:typo": { max_tokens: 1200, used_tokens: 0, selected_items: 0, omitted_items: 0, deduplicated_items: 0,
+      unconsolidated_observations: 0, budget_exhausted: false, omissions: [] },
+  };
+  await page.route("**/dashboard-api/context/compile", async (route) => {
+    const body = route.request().postDataJSON();
+    const budget = budgets[body.subject_id];
+    await route.fulfill({ json: { data: { items: body.subject_id === "project:ux-demo-beta" ? [{ claim_id: "clm_c", statement: "Kept item", kind: "semantic_fact", tokens: 1150 }] : [], conflicts: [], budget } } });
+  });
+
+  for (const width of [1440, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/dashboard/");
+    if (width <= 960) await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.locator('[data-area="context"]').click();
+    const form = page.locator("[data-context-form]");
+    const layout = await form.evaluate((element) => {
+      const grid = element.querySelector(".input-grid")!;
+      const stacked = [...grid.querySelectorAll("label")].every((label) =>
+        label.querySelector("span")!.getBoundingClientRect().bottom <= label.querySelector("input")!.getBoundingClientRect().top + 0.5);
+      return { display: getComputedStyle(grid).display, stacked, noScroll: document.documentElement.scrollWidth <= window.innerWidth };
+    });
+    expect(layout, `layout at ${width}px`).toEqual({ display: "grid", stacked: true, noScroll: true });
+  }
+
+  const form = page.locator("[data-context-form]");
+  const output = page.locator("[data-context-output]");
+  const status = page.locator("[data-context-status]");
+  // Subject suggestions come from the authorized Subjects directory.
+  await expect.poll(() => form.locator('input[name="subject_id"]').evaluate((input: HTMLInputElement) =>
+    [...(input.list?.options ?? [])].map((option) => option.value))).toEqual(["user:ux-demo-alpha", "project:ux-demo-beta"]);
+
+  const compile = async (subject: string) => {
+    await form.locator('input[name="subject_id"]').fill(subject);
+    await form.locator('input[name="task"]').fill("deploy window");
+    await form.getByRole("button", { name: "Compile context" }).click();
+  };
+  await compile("user:ux-demo-alpha");
+  await expect(output).toContainText("2 observations for this subject are not yet consolidated");
+  await expect(output.locator("code")).toHaveText("call titen_consolidate (or remember with consolidate: true)");
+  await expect(status).toHaveText("Compiled · 0 items");
+
+  await compile("project:ux-demo-beta");
+  await expect(output).toContainText("2 items did not fit the 1,200-token budget");
+  await expect(output).toContainText("clm_a");
+  await expect(status).toHaveText("Compiled · 1 item");
+
+  await compile("user:typo");
+  await expect(output).toContainText("No authorized claims matched this subject and task.");
+  await expect(output).not.toContainText("not yet consolidated");
+
+  // Subjects offers a row action that opens Context with the subject filled in (narrow layout).
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.locator('[data-area="subjects"]').click();
+  await page.getByRole("button", { name: "Compile context for UX demo beta" }).click();
+  await expect(page.locator('[data-area-panel="context"]')).toBeVisible();
+  await expect(form.locator('input[name="subject_id"]')).toHaveValue("project:ux-demo-beta");
+  await expect(form.locator('input[name="task"]')).toBeFocused();
+});

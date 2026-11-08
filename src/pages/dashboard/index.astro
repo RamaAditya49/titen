@@ -553,7 +553,8 @@ const lenses = [
           </div>
           <form data-context-form>
             <div class="input-grid context-grid">
-              <label><span>Subject ID</span><input name="subject_id" maxlength="200" autocomplete="off" required /></label>
+              <label><span>Subject ID</span><input name="subject_id" maxlength="200" autocomplete="off" list="context-subjects" required /></label>
+              <datalist id="context-subjects" data-context-subjects></datalist>
               <label><span>Task</span><input name="task" maxlength="2000" autocomplete="off" required /></label>
               <label><span>Token budget</span><input name="max_tokens" type="number" min="128" max="32000" value="1200" required /></label>
               <label><span>Project ID (optional)</span><input name="project_id" maxlength="200" autocomplete="off" /></label>
@@ -927,6 +928,40 @@ const lenses = [
         summary.textContent = `${budget.selected_items ?? 0} selected · ${budget.omitted_items ?? 0} omitted · ${budget.deduplicated_items ?? 0} deduplicated`;
         meter.append(title, progress, summary);
         target.append(meter);
+        // Say why a pack is empty or short, from the fields the API already returns (#363).
+        const notices = document.createElement("section");
+        notices.className = "context-notices";
+        const notice = (heading: string, detail?: string, code?: string) => {
+          const box = document.createElement("div");
+          box.className = "notice";
+          box.setAttribute("role", "status");
+          const strong = document.createElement("strong");
+          strong.textContent = heading;
+          box.append(strong);
+          if (detail || code) {
+            const line = document.createElement("span");
+            if (detail) line.append(document.createTextNode(detail));
+            if (code) { const snippet = document.createElement("code"); snippet.textContent = code; line.append(snippet); }
+            box.append(line);
+          }
+          notices.append(box);
+        };
+        const unconsolidated = Number(budget.unconsolidated_observations ?? 0);
+        if (unconsolidated > 0) notice(
+          `${unconsolidated.toLocaleString()} ${unconsolidated === 1 ? "observation for this subject is" : "observations for this subject are"} not yet consolidated into claims, so ${unconsolidated === 1 ? "it" : "they"} cannot be selected.`,
+          typeof budget.hint === "string" ? "Agent hint: " : undefined,
+          typeof budget.hint === "string" ? budget.hint : undefined,
+        );
+        const omissions = Array.isArray(budget.omissions) ? budget.omissions as Record<string, unknown>[] : [];
+        const omitted = Math.max(Number(budget.omitted_items ?? 0), omissions.length);
+        if (budget.budget_exhausted === true || omissions.length > 0) notice(
+          `${omitted.toLocaleString()} ${omitted === 1 ? "item" : "items"} did not fit the ${maximum.toLocaleString()}-token budget.`,
+          omissions.map((omission) => `${omission.claim_id} (${omission.tokens} tokens, ${omission.reason})`).join(" · "),
+        );
+        const selected = Number(budget.selected_items ?? 0);
+        if (selected === 0 && unconsolidated === 0 && omitted === 0 && Number(budget.deduplicated_items ?? 0) === 0)
+          notice("No authorized claims matched this subject and task.");
+        if (notices.childElementCount) target.append(notices);
         const records = document.createElement("div");
         target.append(records);
         renderPayload(records, { data: { items: data.items ?? [], conflicts: data.conflicts ?? [], instructions: data.instructions, policy_snapshot: data.policy_snapshot } });
@@ -1004,6 +1039,23 @@ const lenses = [
           target.append(button);
         }
       }
+      /** Authorized subject ids as Context suggestions; nothing outside the caller's directory. */
+      function fillContextSubjects(rows: Record<string, unknown>[]) {
+        const list = one<HTMLDataListElement>("[data-context-subjects]");
+        list.replaceChildren(...rows.filter((row) => typeof row.subject_id === "string").map((row) => {
+          const option = document.createElement("option");
+          option.value = row.subject_id as string;
+          if (typeof row.label === "string") option.label = row.label;
+          return option;
+        }));
+      }
+      async function loadContextSubjects() {
+        if (!has("subjects:read")) return;
+        try {
+          const subjects = payloadData(await getArea("subjects")).subjects;
+          if (Array.isArray(subjects)) fillContextSubjects(subjects.filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object"));
+        } catch { /* suggestions are optional; the field stays free text */ }
+      }
       async function loadSubjects() {
         const target = one<HTMLElement>("[data-subjects-output]");
         renderMessage(target, "Loading authorized subjects…");
@@ -1013,10 +1065,20 @@ const lenses = [
           const rows = Array.isArray(subjects)
             ? subjects.map((value) => value && typeof value === "object" ? value as Record<string, unknown> : {})
             : [];
+          fillContextSubjects(rows);
           renderCollection(target, {
             name: "subjects",
             rows,
             emptyMessage: "No authorized subject identities returned.",
+            actions: (row) => typeof row.subject_id !== "string" ? [] : [{
+              label: `Compile context for ${row.label ?? row.subject_id}`,
+              run: () => {
+                activateArea("context");
+                const form = one<HTMLFormElement>("[data-context-form]");
+                (form.elements.namedItem("subject_id") as HTMLInputElement).value = row.subject_id as string;
+                (form.elements.namedItem("task") as HTMLInputElement).focus();
+              },
+            }],
             inspect: async (row) => {
               if (typeof row.subject_id !== "string") return;
               const references = one<HTMLElement>("[data-subject-references]");
@@ -1712,6 +1774,7 @@ const lenses = [
         if (!principal) return;
         if (id === "memories") void loadMemoryList();
         if (id === "subjects") void loadSubjects();
+        if (id === "context") void loadContextSubjects();
         if (id === "projects") void loadProjects();
         if (id === "models") void loadModels();
         if (id === "access") void loadAccess();
@@ -2165,7 +2228,13 @@ const lenses = [
         if (project) body.project_id = project;
         const target = one<HTMLElement>("[data-context-output]");
         renderMessage(target, "Compiling authorized context…");
-        try { renderContext(target, await postArea("context/compile", body)); text("[data-context-status]", "Live context compiled."); }
+        try {
+          const compiled = await postArea("context/compile", body);
+          renderContext(target, compiled);
+          const items = payloadData(compiled).items;
+          const count = Array.isArray(items) ? items.length : 0;
+          text("[data-context-status]", `Compiled · ${count} ${count === 1 ? "item" : "items"}`);
+        }
         catch (error) { handleError(error, target); }
       });
       one<HTMLButtonElement>("[data-work-refresh]").addEventListener("click", async () => {
