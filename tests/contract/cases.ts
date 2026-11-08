@@ -276,6 +276,81 @@ export const CASES: Case[] = [
     },
   },
   {
+    name: "principal directory and project and subject references answer only for readable records",
+    async run(fx) {
+      const owner = await fx.provision({ scopes: ["*"] });
+      const reader = await fx.provision({
+        orgId: owner.orgId,
+        principalId: `directory_reader_${fx.runtime}`,
+        scopes: ["views:compile", "projects:read", "subjects:read", "principals:read"],
+      });
+
+      const principals = await fx.call("GET", "/v1/principals", { key: owner.key });
+      expectOk(principals);
+      const listed = principals.body.data.principals as Array<{ principal_id: string; key_count: number }>;
+      const readerRow = listed.find((row) => row.principal_id === reader.principalId);
+      assert.ok(readerRow, "the owner lists the reader");
+      assert.ok(Number(readerRow!.key_count) >= 1, "the reader's active key is counted");
+      const filtered = await fx.call("GET", `/v1/principals?q=${encodeURIComponent(`directory_reader_${fx.runtime}`.toUpperCase())}`, { key: owner.key });
+      expectOk(filtered);
+      assert.deepEqual(filtered.body.data.principals.map((row: any) => row.principal_id), [reader.principalId]);
+      // A non-admin is answered like a missing route, and the denial is audited.
+      expectError(await fx.call("GET", "/v1/principals", { key: reader.key }), 404, "NOT_FOUND");
+      const denied = await fx.query<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM audit_log WHERE org_id = ? AND actor_id = ? AND action = 'principal.list.denied'",
+        [owner.orgId, reader.principalId],
+      );
+      assert.equal(Number(denied[0]!.count), 1);
+
+      const resolve = async (reference: string) => {
+        const response = await fx.call("POST", "/v1/projects/resolve", { key: owner.key, body: { reference, create: true } });
+        expectOk(response, 201);
+        return response.body.data.project_id as string;
+      };
+      const visibleProject = await resolve(`directory/${fx.runtime}-visible`);
+      const privateProject = await resolve(`directory/${fx.runtime}-private`);
+      const visibleSubject = `directory_subject_${fx.runtime}_visible`;
+      const privateSubject = `directory_subject_${fx.runtime}_private`;
+      await seedClaim(fx, owner.key, {
+        observation: { subject_id: visibleSubject, project_id: visibleProject, visibility: "organization",
+          content: "The reader may see where this record lives." },
+        claim: { statement: "The reader may see where this record lives." },
+      });
+      expectOk(await fx.call("POST", "/v1/observations", {
+        key: owner.key,
+        body: observation({ subject_id: privateSubject, project_id: privateProject, visibility: "private",
+          content: "Only the owner can read this record." }),
+      }), 201);
+
+      const projectRefs = await fx.call("GET", `/v1/projects/${visibleProject}/references`, { key: reader.key });
+      expectOk(projectRefs);
+      assert.equal(projectRefs.body.data.project_id, visibleProject);
+      assert.ok(projectRefs.body.data.references.some((ref: any) => ref.value === `directory/${fx.runtime}-visible`));
+      const subjectRefs = await fx.call("GET", `/v1/subjects/${visibleSubject}/references`, { key: reader.key });
+      expectOk(subjectRefs);
+      assert.equal(subjectRefs.body.data.subject_id, visibleSubject);
+      assert.ok(Array.isArray(subjectRefs.body.data.references));
+
+      // Existence is not revealed: private-only and unknown targets read the same.
+      for (const path of [
+        `/v1/projects/${privateProject}/references`,
+        `/v1/projects/prj_missing_${fx.runtime}/references`,
+        `/v1/subjects/${privateSubject}/references`,
+        `/v1/subjects/missing_${fx.runtime}/references`,
+      ]) expectError(await fx.call("GET", path, { key: reader.key }), 404, "NOT_FOUND");
+      expectOk(await fx.call("GET", `/v1/projects/${privateProject}/references`, { key: owner.key }));
+
+      expectError(await fx.call("GET", "/v1/projects/~/references", { key: reader.key }), 404, "NOT_FOUND");
+      await seedClaim(fx, owner.key, {
+        observation: { subject_id: visibleSubject, visibility: "organization", content: "An unscoped record." },
+        claim: { statement: "An unscoped record." },
+      });
+      const unscoped = await fx.call("GET", "/v1/projects/~/references", { key: reader.key });
+      expectOk(unscoped);
+      assert.equal(unscoped.body.data.project_id, null);
+    },
+  },
+  {
     name: "scoped grants drive directories, Atlas graph, and next-request revocation",
     async run(fx) {
       const owner = await fx.provision({ scopes: ["*"] });

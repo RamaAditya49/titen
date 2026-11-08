@@ -327,6 +327,58 @@ export async function assertWebAuthnContract(db: Db, runtime: string) {
   });
   assert.equal(disabledRecovery.status, 201, "recovery must survive disabled WebAuthn configuration");
 
+  const fullKey = disabledRecovery.body.data.api_key as string;
+  const passkeys = await call("GET", "/v1/operator-accounts/current/passkeys", { key: fullKey });
+  assert.equal(passkeys.status, 200);
+  assert.equal(passkeys.body.data.credentials.length, 1);
+  const [listedPasskey] = passkeys.body.data.credentials;
+  assert.deepEqual(Object.keys(listedPasskey).sort(), ["backed_up", "created_at", "device_type", "id", "label", "last_used_at"]);
+  assert.equal(listedPasskey.id, registration.body.data.credential.id);
+  assert.equal(listedPasskey.label, "Primary device");
+  assert.equal(typeof listedPasskey.backed_up, "boolean");
+  assert.notEqual(listedPasskey.last_used_at, null, "a used passkey reports when it was last used");
+  assert.equal(JSON.stringify(passkeys.body).includes("credential-primary"), false, "the raw credential id stays server-side");
+
+  // Regeneration must invalidate every code of the previous generation.
+  const previousCodes = registration.body.data.recovery_codes as string[];
+  const regenerated = await call("POST", "/v1/operator-accounts/current/recovery-codes", { key: fullKey, body: {} });
+  assert.equal(regenerated.status, 201);
+  const freshCodes = regenerated.body.data.recovery_codes as string[];
+  assert.equal(freshCodes.length, 8);
+  assert.equal(new Set(freshCodes).size, 8);
+  assert.equal(freshCodes.some((code) => previousCodes.includes(code)), false);
+  const [regeneratedState] = await db.all<{ unused: number; generations: number; outside_current: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM operator_recovery_codes WHERE account_id = ? AND used_at_ms IS NULL) AS unused,
+       (SELECT COUNT(*) FROM operator_recovery_generations WHERE account_id = ?) AS generations,
+       (SELECT COUNT(*) FROM operator_recovery_codes c WHERE c.account_id = ? AND c.generation_id NOT IN (
+          SELECT generation_id FROM operator_recovery_generations WHERE account_id = ?)) AS outside_current`,
+    [account.accountId, account.accountId, account.accountId, account.accountId],
+  );
+  assert.deepEqual(
+    { unused: Number(regeneratedState!.unused), generations: Number(regeneratedState!.generations), outside_current: Number(regeneratedState!.outside_current) },
+    { unused: 8, generations: 1, outside_current: 0 },
+  );
+  const [regenerateAudit] = await db.all<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM audit_log WHERE action = 'operator_account.recovery_regenerate' AND resource_id = ?",
+    [account.accountId],
+  );
+  assert.equal(Number(regenerateAudit!.count), 1);
+  const oldCodeStage = await call("POST", "/v1/dashboard-sessions", { body: { username: account.username, password } });
+  const oldCode = await call("POST", "/v1/dashboard-sessions/current/recovery-code", {
+    key: oldCodeStage.body.data.api_key,
+    body: { recovery_code: previousCodes[7] },
+  });
+  assert.equal(oldCode.status, 401, "an unused code from the previous generation is rejected");
+  assert.equal(oldCode.body.error.code, "SECOND_FACTOR_INVALID");
+  const newCodeStage = await call("POST", "/v1/dashboard-sessions", { body: { username: account.username, password } });
+  const newCode = await call("POST", "/v1/dashboard-sessions/current/recovery-code", {
+    key: newCodeStage.body.data.api_key,
+    body: { recovery_code: freshCodes[0] },
+  });
+  assert.equal(newCode.status, 201);
+  assert.equal(newCode.body.data.auth_stage, "full");
+
   const lastCredentialId = registration.body.data.credential.id as string;
   const noConfirmation = await call("DELETE", `/v1/operator-accounts/current/passkeys/${lastCredentialId}`, {
     key: disabledRecovery.body.data.api_key,
@@ -343,4 +395,12 @@ export async function assertWebAuthnContract(db: Db, runtime: string) {
   });
   assert.equal(noSecondFactor.status, 201);
   assert.equal(noSecondFactor.body.data.auth_stage, "full");
+  const emptyPasskeys = await call("GET", "/v1/operator-accounts/current/passkeys", { key: noSecondFactor.body.data.api_key });
+  assert.equal(emptyPasskeys.status, 200);
+  assert.deepEqual(emptyPasskeys.body.data.credentials, []);
+  const withoutPasskey = await call("POST", "/v1/operator-accounts/current/recovery-codes", {
+    key: noSecondFactor.body.data.api_key,
+    body: {},
+  });
+  assert.equal(withoutPasskey.status, 409, "recovery codes require a registered passkey");
 }

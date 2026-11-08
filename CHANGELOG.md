@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Regenerating recovery codes now deletes the previous codes explicitly in the same batch, instead of relying on a foreign-key cascade that a connection without `PRAGMA foreign_keys` would skip. Contract tests on Bun and D1 now cover regeneration (old codes rejected, new codes accepted, a passkey required), the passkey list, `GET /v1/principals`, and project and subject references, including 404 for records the caller cannot read. ([#386](https://github.com/RamaAditya49/titen/issues/386))
+
 ## [0.10.9] — 2026-11-03
 
 schema 27

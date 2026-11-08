@@ -377,6 +377,9 @@ export async function regenerateRecoveryCodes(ctx: RequestContext): Promise<Resu
   const generationId = newId("rcg");
   const recovery = await recoverySet(account, generationId, now);
   await ctx.app.db.batch([
+    // Invalidate the old codes explicitly rather than relying on the foreign-key
+    // cascade, which a connection without PRAGMA foreign_keys would skip.
+    { sql: `DELETE FROM operator_recovery_codes WHERE account_id = ?`, params: [account.id] },
     { sql: `DELETE FROM operator_recovery_generations WHERE account_id = ?`, params: [account.id] },
     {
       sql: `INSERT INTO operator_recovery_generations
