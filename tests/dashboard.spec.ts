@@ -989,6 +989,83 @@ test("audit activity opens on the newest entries, pages by cursor, and says when
   expect(logRequests).toHaveLength(20);
 });
 
+test("the command dialog searches on Enter, jumps to authorized areas, and returns focus", async ({ page }) => {
+  await mockServerMode(page);
+  const memoryQueries: string[] = [];
+  await page.route("**/dashboard-api/memories**", (route) => {
+    memoryQueries.push(new URL(route.request().url()).searchParams.get("q") ?? "");
+    return route.fulfill({ json: { data: { items: [], page: { limit: 25, has_more: false, next_cursor: null }, query: {}, facets: {} } } });
+  });
+  await page.goto("/dashboard/");
+  await page.locator('[data-area="system"]').click();
+  const trigger = page.locator("[data-search-open]");
+  await expect(trigger.locator("kbd")).toHaveText("Ctrl K");
+  await expect(trigger).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
+  await expect(trigger).toHaveAccessibleName("Search or jump to (Ctrl K)");
+
+  await page.keyboard.press("Control+k");
+  const dialog = page.locator("[data-search-dialog]");
+  const query = dialog.getByRole("combobox");
+  await expect(query).toBeFocused();
+  await query.fill("rollback");
+  await query.press("Enter");
+  await expect(dialog).not.toBeVisible();
+  await expect(page.locator('[data-area="memories"]').first()).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("[data-memory-list-search]")).toHaveValue("rollback");
+  await expect.poll(() => memoryQueries.includes("rollback")).toBe(true);
+  await expect(page.locator("[data-memory-list-search]")).toBeFocused();
+
+  await page.keyboard.press("Control+k");
+  await query.fill("Releases");
+  await expect(dialog.getByRole("option")).toHaveText(["Go to Release policy", "Search memories for “Releases”"]);
+  await query.press("ArrowDown");
+  await expect(dialog.getByRole("option", { name: "Go to Release policy" })).toHaveAttribute("aria-selected", "true");
+  await query.press("Enter");
+  await expect(page.locator('[data-area="releases"][aria-current="page"]')).toBeVisible();
+
+  await trigger.click();
+  await query.fill("zzz-nothing");
+  await expect(dialog.getByRole("option")).toHaveText(["Search memories for “zzz-nothing”"]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await dialog.getByRole("button", { name: "Close search" }).click();
+  await expect(trigger).toBeFocused();
+});
+
+test("the command dialog offers only authorized destinations and fits beside a 320px breadcrumb", async ({ page }) => {
+  const principal = {
+    organization_id: "org_audit", principal_id: "auditor", principal_kind: "human", key_id: "key_audit",
+    scopes: ["audit:read"], max_trust: "asserted", organization_role: "reader",
+  };
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", endpoint: "titen.internal", authentication: "server", authenticated: true } }));
+  await page.route("**/dashboard-api/session", (route) => route.fulfill({ json: { data: principal } }));
+  await page.route("**/dashboard-api/health", (route) => route.fulfill({ json: { data: { status: "ok" } } }));
+  await page.route("**/dashboard-api/readiness", (route) => route.fulfill({ json: { data: { ready: true } } }));
+  await page.route("**/dashboard-api/audit/**", (route) => route.fulfill({ json: { data: { entries: [], events: [] } } }));
+  await page.goto("/dashboard/");
+  const trigger = page.locator("[data-search-open]");
+  await expect(trigger).toBeVisible();
+  const box = (await trigger.boundingBox())!;
+  const crumb = (await page.locator(".breadcrumb").boundingBox())!;
+  const overlaps = box.x < crumb.x + crumb.width && crumb.x < box.x + box.width
+    && box.y < crumb.y + crumb.height && crumb.y < box.y + box.height;
+  expect(overlaps).toBe(false);
+
+  await trigger.click();
+  const dialog = page.locator("[data-search-dialog]");
+  // An empty query lists every destination this principal can open, and nothing else.
+  const options = dialog.getByRole("option");
+  await expect(options.first()).toHaveText("Go to Audit & Events");
+  const labels = await options.allTextContents();
+  expect(labels.some((label) => label.includes("Release policy"))).toBe(false);
+  await dialog.getByRole("combobox").fill("release");
+  await expect(dialog.getByRole("option")).toHaveCount(0);
+  await expect(dialog.locator(".search-empty")).toHaveText("No authorized area matches.");
+});
+
 test("remains keyboard and mobile usable with live product navigation", async ({ page }) => {
   await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", (route) => route.fulfill({ json: { data: view } }));

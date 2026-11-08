@@ -29,6 +29,13 @@ The navigation hides an area when the signed-in principal has none of its
 capabilities. That is presentation only: the API authenticates and authorizes
 every request again.
 
+**Search or jump to** in the topbar opens with ⌘K on Apple platforms or Ctrl K
+elsewhere. It lists the areas the navigation currently shows. Typing filters
+them by name, and the last option searches Memories for the typed text when
+Memories is available. Enter takes the highlighted option, or the first one
+when nothing is highlighted. Closing the dialog returns focus to the trigger.
+At 620px and below the trigger collapses to an icon button.
+
 ## Read operator data
 
 Each area uses the same information order:
