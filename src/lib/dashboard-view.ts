@@ -277,6 +277,11 @@ export function renderCollection(target: HTMLElement, definition: CollectionDefi
 
   const wrap = document.createElement("div");
   wrap.className = "operator-table-wrap";
+  // A named, focusable region, so keyboard and screen-reader users can reach
+  // and scroll columns that do not fit.
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", `${heading.textContent} table`);
+  wrap.tabIndex = 0;
   const table = document.createElement("table");
   table.className = "operator-table";
   const head = document.createElement("thead");
