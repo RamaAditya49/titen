@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard Work and Federation lookups no longer wipe the area's lists. **Find checkpoint** and **Load peer log** render in their own region, with a heading that echoes the query, so leases, handoffs, and peers stay visible. A miss reads "No current checkpoint for subject …, agent …, kind …" or "No exchange log for peer …" instead of "The authorized resource was not found". Checkpoint kind is now a choice of the four supported kinds. Handoff rows offer **Find checkpoint** and peer rows offer **View log**, and the Agent ID and Peer ID fields suggest IDs already loaded. ([#399](https://github.com/RamaAditya49/titen/issues/399))
+
 ## [0.10.10] — 2026-11-08
 
 schema 31
