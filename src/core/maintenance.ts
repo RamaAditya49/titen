@@ -393,7 +393,10 @@ async function deliverPending(
        UNION ALL
        SELECT w.org_id, e.created_at AS due_at
          FROM webhooks w
-         JOIN event_order eo ON eo.org_id = w.org_id AND eo.seq > w.scanned_seq
+         -- With statistics SQLite prefers the global rowid range over this
+         -- index (#396); INDEXED BY pins the per-organization seek and fails
+         -- loudly if the index is ever renamed.
+         JOIN event_order eo INDEXED BY event_order_org_seq ON eo.org_id = w.org_id AND eo.seq > w.scanned_seq
          JOIN events e ON e.id = eo.event_id AND e.org_id = w.org_id
         WHERE w.status = 'active' AND w.principal_id IS NOT NULL
           AND ${eventAccessSql("e", "w.principal_id")}
