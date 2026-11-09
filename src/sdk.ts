@@ -555,6 +555,8 @@ export interface ListKeysOptions {
   /** Lifecycle filter applied before the page limit. Default `all`. */
   status?: KeyRecord["status"] | "all";
   principal_id?: string;
+  /** Only keys that this principal issued, including derived keys. */
+  issued_by?: string;
 }
 
 export interface KeyPage {
@@ -987,6 +989,7 @@ export class TitenClient {
     if (options.cursor !== undefined) params.set("cursor", options.cursor);
     if (options.status !== undefined) params.set("status", options.status);
     if (options.principal_id !== undefined) params.set("principal_id", options.principal_id);
+    if (options.issued_by !== undefined) params.set("issued_by", options.issued_by);
     const query = params.size ? `?${params}` : "";
     return this.request("GET", `/v1/keys${query}`);
   }

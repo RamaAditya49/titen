@@ -528,10 +528,13 @@ test("Access previews only the selected principal's active key clamps, bounded, 
   const keyRequests: URLSearchParams[] = [];
   const key = (index: number, status: string) => ({
     key_id: `key_${status}_${index}`, label: status === "active" ? `Agent key ${index}` : "Dashboard session",
-    principal_id: "agent_a", scopes: ["views:compile"], max_trust: "asserted", status, data_target_type: "organization",
+    principal_id: "agent_a", issued_by: "owner_1", scopes: ["views:compile"], max_trust: "asserted", status, data_target_type: "organization",
   });
   const active = Array.from({ length: 12 }, (_, index) => key(index, "active"));
   const expired = Array.from({ length: 40 }, (_, index) => key(index, "expired"));
+  const derived = { ...key(0, "active"), key_id: "key_derived", label: "Derived agent key", principal_id: "agent_b", issued_by: "agent_a" };
+  const selfIssued = { ...key(0, "active"), key_id: "key_self", label: "Self-issued key", principal_id: "agent_a", issued_by: "agent_a" };
+  const everyKey = [...active, selfIssued, derived, ...expired];
   await page.route("**/dashboard-api/access/principals**", (route) => route.fulfill({ json: { data: { principals: [
     { principal_id: "agent_a", principal_kind: "agent", username: null, key_count: 12 },
   ] } } }));
@@ -539,7 +542,10 @@ test("Access previews only the selected principal's active key clamps, bounded, 
   await page.route("**/dashboard-api/governance/keys**", (route) => {
     const query = new URL(route.request().url()).searchParams;
     keyRequests.push(query);
-    const keys = query.get("status") === "active" ? active : [...active, ...expired];
+    const keys = everyKey.filter((row) =>
+      (query.get("status") !== "active" || row.status === "active")
+      && (!query.has("principal_id") || row.principal_id === query.get("principal_id"))
+      && (!query.has("issued_by") || row.issued_by === query.get("issued_by")));
     return route.fulfill({ json: { data: { keys, next_cursor: null } } });
   });
   await page.goto("/dashboard/#access");
@@ -550,23 +556,25 @@ test("Access previews only the selected principal's active key clamps, bounded, 
   await page.locator("[data-access-principal]").selectOption("agent_a");
   const preview = page.locator('[data-collection="key_clamp_preview"]');
   await expect(preview.locator("tbody tr")).toHaveCount(10);
-  expect(keyRequests.every((query) => query.get("principal_id") === "agent_a")).toBe(true);
+  expect(keyRequests.every((query) => query.get("principal_id") === "agent_a" || query.get("issued_by") === "agent_a")).toBe(true);
+  expect(keyRequests.some((query) => query.get("issued_by") === "agent_a")).toBe(true);
   expect(keyRequests.some((query) => query.get("status") === "active")).toBe(true);
   await expect(preview.locator("thead")).toContainText("Status");
   await expect(preview.locator('tbody td[data-label="Status"]').first()).toHaveText("active");
   const footer = preview.locator("[data-key-clamp-footer]");
-  await expect(footer.getByRole("status")).toHaveText("Showing 10 of 12 active keys.");
+  await expect(footer.getByRole("status")).toHaveText("Showing 10 of 14 active keys.");
   await expect(footer.getByRole("button", { name: "Include expired and revoked (40)" })).toBeVisible();
   const panelTop = (await page.locator('[data-area-panel="access"]').boundingBox())!.y;
   const simulatorTop = (await page.locator("[data-access-simulator]").boundingBox())!.y;
   expect(simulatorTop - panelTop).toBeLessThan(5000);
 
-  await footer.getByRole("button", { name: "Show all 12 active keys" }).click();
-  await expect(preview.locator("tbody tr")).toHaveCount(12);
+  await footer.getByRole("button", { name: "Show all 14 active keys" }).click();
+  await expect(preview.locator("tbody tr")).toHaveCount(14);
+  await expect(preview).toContainText("Derived agent key");
   await preview.locator("[data-key-clamp-footer]").getByRole("button", { name: "Include expired and revoked (40)" }).click();
-  await expect(preview.locator("[data-key-clamp-footer]").getByRole("status")).toHaveText("Showing 10 of 52 keys.");
-  await preview.locator("[data-key-clamp-footer]").getByRole("button", { name: "Show all 52 keys" }).click();
-  await expect(preview.locator("tbody tr")).toHaveCount(52);
+  await expect(preview.locator("[data-key-clamp-footer]").getByRole("status")).toHaveText("Showing 10 of 54 keys.");
+  await preview.locator("[data-key-clamp-footer]").getByRole("button", { name: "Show all 54 keys" }).click();
+  await expect(preview.locator("tbody tr")).toHaveCount(54);
   await expect(preview.locator('tbody td[data-label="Status"]', { hasText: "expired" })).toHaveCount(40);
 });
 

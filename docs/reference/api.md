@@ -142,9 +142,10 @@ nullable `last_used_at`, issuer, declared data target, and
 come oldest first, keyset-paginated on `(created_at, key_id)`: `limit` (1-500,
 default 500) sets the page size, and `data.next_cursor` is an opaque string to
 pass back as `cursor` for the next page, or `null` on the last page. `status`
-(`active`, `pending`, `expired`, `revoked`, or the default `all`) and
-`principal_id` filter before the page limit. Fences are read only for the keys
-on the returned page. The
+(`active`, `pending`, `expired`, `revoked`, or the default `all`),
+`principal_id`, and `issued_by` filter before the page limit. `issued_by`
+selects the keys that a principal issued; that issuer's grants clamp those
+derived keys. Fences are read only for the keys on the returned page. The
 effective target is re-evaluated against the issuer's current grants on every
 request; revoking an issuer grant narrows every derived key without a sweep.
 

@@ -2250,10 +2250,27 @@ export const CASES: Case[] = [
       expectOk(byPrincipal);
       assert.deepEqual(byPrincipal.body.data.keys.map((key: { key_id: string }) => key.key_id), [fresh.body.data.key_id]);
       assert.equal(byPrincipal.body.data.next_cursor, null);
+      // The issuer filter returns the keys a principal issued. The fresh key names its issuer in the list row.
+      const issuer = byPrincipal.body.data.keys[0].issued_by as string;
+      assert.equal(typeof issuer, "string");
+      const byIssuerAndPrincipal = await fx.call(
+        "GET", `/v1/keys?issued_by=${encodeURIComponent(issuer)}&principal_id=agent_key_pages_new`, { key: owner.key });
+      expectOk(byIssuerAndPrincipal);
+      assert.deepEqual(byIssuerAndPrincipal.body.data.keys.map((key: { key_id: string }) => key.key_id), [fresh.body.data.key_id]);
+      const byUnknownIssuer = await fx.call("GET", "/v1/keys?issued_by=agent_key_pages_new", { key: owner.key });
+      expectOk(byUnknownIssuer);
+      assert.deepEqual(byUnknownIssuer.body.data.keys, []);
+      assert.equal(byUnknownIssuer.body.data.next_cursor, null);
+      // Another organization cannot reach this issuer's keys through the filter.
+      const outsider = await fx.provision({ principalId: "agent_key_pages_outsider", scopes: ["*"] });
+      const crossOrg = await fx.call("GET", `/v1/keys?issued_by=${encodeURIComponent(issuer)}`, { key: outsider.key });
+      expectOk(crossOrg);
+      assert.deepEqual(crossOrg.body.data.keys, []);
       // Element shape is unchanged.
       assert.deepEqual(Object.keys(byPrincipal.body.data.keys[0]).sort(), Object.keys(firstPage.body.data.keys[0]).sort());
 
       expectError(await fx.call("GET", "/v1/keys?status=expiredish", { key: owner.key }), 400);
+      expectError(await fx.call("GET", "/v1/keys?issued_by=", { key: owner.key }), 400);
       expectError(await fx.call("GET", "/v1/keys?limit=501", { key: owner.key }), 400);
       expectError(await fx.call("GET", "/v1/keys?cursor=not-a-cursor", { key: owner.key }), 400);
     },

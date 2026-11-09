@@ -1563,22 +1563,32 @@ const eventKinds = [
           picker.value = [...picker.options].some((option) => option.value === selected) ? selected : "";
           const grants = picker.value && has("grants:read") ? await getArea("access/grants", new URLSearchParams({ principal_id: picker.value })) : { data: { grants: [] } };
           if (picker.value !== accessKeys.principal) accessKeys = { principal: picker.value, expanded: false, inactive: false };
-          // The server filters by principal and status before its page limit; the
-          // browser never downloads every key the organization has issued.
+          // The server filters by status and by principal (keys the principal holds)
+          // or issuer (keys the principal issued) before its page limit; the browser
+          // never downloads every key the organization has issued.
           let preview: { rows: Record<string, unknown>[]; active: number; hidden: number; more: boolean } | undefined;
           if (picker.value && has("keys:manage")) {
-            const scoped = async (status: string) => payloadData(await getArea("governance/keys",
-              new URLSearchParams({ status, principal_id: picker.value, limit: "500" })));
-            const [active, everything] = await Promise.all([scoped("active"), scoped("all")]);
+            const scoped = async (status: string, filter: "principal_id" | "issued_by") => payloadData(await getArea("governance/keys",
+              new URLSearchParams({ status, [filter]: picker.value, limit: "500" })));
+            const [activeHeld, activeIssued, allHeld, allIssued] = await Promise.all([
+              scoped("active", "principal_id"), scoped("active", "issued_by"),
+              scoped("all", "principal_id"), scoped("all", "issued_by"),
+            ]);
             const rowsOf = (data: Record<string, unknown>) => Array.isArray(data.keys)
               ? data.keys.filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object") : [];
-            const activeRows = rowsOf(active);
-            const allRows = rowsOf(everything);
+            const merge = (...pages: Record<string, unknown>[]) => {
+              const byId = new Map<string, Record<string, unknown>>();
+              for (const row of pages.flatMap(rowsOf)) byId.set(String(row.key_id), row);
+              return [...byId.values()].sort((a, b) =>
+                String(a.created_at).localeCompare(String(b.created_at)) || String(a.key_id).localeCompare(String(b.key_id)));
+            };
+            const activeRows = merge(activeHeld, activeIssued);
+            const allRows = merge(allHeld, allIssued);
             preview = {
               rows: accessKeys.inactive ? allRows : activeRows,
               active: activeRows.length,
               hidden: allRows.length - activeRows.length,
-              more: Boolean(everything.next_cursor),
+              more: Boolean(allHeld.next_cursor || allIssued.next_cursor),
             };
           }
           const shownKeys = preview ? (accessKeys.expanded ? preview.rows : preview.rows.slice(0, ACCESS_KEY_PREVIEW)) : undefined;

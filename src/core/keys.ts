@@ -268,6 +268,9 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
   const principalId = search.get("principal_id");
   if (principalId !== null && (!principalId || principalId.length > LIMITS.identifier))
     throw validationError('Query "principal_id" is invalid.');
+  const issuedBy = search.get("issued_by");
+  if (issuedBy !== null && (!issuedBy || issuedBy.length > LIMITS.identifier))
+    throw validationError('Query "issued_by" is invalid.');
   const cursor = decodeKeyCursor(search.get("cursor"));
   const now = ctx.app.now().toISOString();
 
@@ -280,6 +283,10 @@ export async function listKeys(ctx: RequestContext): Promise<Result> {
   if (principalId !== null) {
     where.push("principal_id = ?");
     params.push(principalId);
+  }
+  if (issuedBy !== null) {
+    where.push("issued_by = ?");
+    params.push(issuedBy);
   }
   if (cursor) {
     where.push("(created_at > ? OR (created_at = ? AND id > ?))");
