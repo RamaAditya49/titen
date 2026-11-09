@@ -275,10 +275,24 @@ function upstreamMessage(status: number): string {
   if (status === 403) return "This principal is not authorized for the selected operation.";
   if (status === 404) return "The requested authorized resource was not found.";
   if (status === 409) return "The operation conflicts with current canonical state.";
-  if (status === 429) return "Too many sign-in attempts. Try again later.";
+  if (status === 429) return "Too many requests. Wait a moment and try again.";
   if (status === 503) return "Titen is not ready.";
   if (status === 400 || status === 413) return "Titen rejected the bounded request.";
   return "Titen did not return a usable response.";
+}
+/**
+ * Specific reasons the browser may see. Only fixed, server-owned codes and
+ * messages are recognized here, and the reply text is the adapter's own, so no
+ * upstream text crosses this boundary.
+ */
+const PROVIDER_NOT_ENABLED = new Set(["The extraction provider is not enabled.", "The embedding provider is not enabled."]);
+function knownUpstreamError(path: string, payload: Record<string, unknown>): { code: string; message: string } | undefined {
+  const upstream = payload.error && typeof payload.error === "object" ? payload.error as Record<string, unknown> : {};
+  if (path !== "/v1/models/probe") return;
+  if (upstream.code === "RATE_LIMITED")
+    return { code: "PROBE_RATE_LIMITED", message: "Wait ten seconds before probing a model provider again." };
+  if (typeof upstream.message === "string" && PROVIDER_NOT_ENABLED.has(upstream.message))
+    return { code: "PROVIDER_NOT_ENABLED", message: "This model provider is not enabled on this deployment." };
 }
 async function proxyJson(request: Request, path: string, init?: RequestInit): Promise<Response> {
   if (!enabled) return error(503, "DASHBOARD_DISCONNECTED", "Live dashboard integration is not enabled.");
@@ -291,6 +305,8 @@ async function proxyJson(request: Request, path: string, init?: RequestInit): Pr
     if (!payload || typeof payload !== "object") return error(502, "UPSTREAM_UNAVAILABLE", "Titen returned invalid JSON.", clear);
     if (!response.ok) {
       const status = [400, 401, 403, 404, 409, 413, 429, 503].includes(response.status) ? response.status : 502;
+      const known = knownUpstreamError(path, payload as Record<string, unknown>);
+      if (known) return error(status, known.code, known.message, clear);
       const code = status === 401 && sessionMode ? "DASHBOARD_AUTH_REQUIRED" : `UPSTREAM_${status}`;
       return error(status, code, upstreamMessage(status), clear);
     }

@@ -348,8 +348,8 @@ const eventKinds = [
         <section class="area-panel query-panel" data-area-panel="models" hidden aria-labelledby="models-heading">
           <div class="section-heading"><div><p class="eyebrow">Operations / immutable startup snapshot</p><h2 id="models-heading">Extraction and embedding models</h2></div><button class="secondary-button" type="button" data-models-refresh>Refresh configuration</button></div>
           <div class="model-grid">
-            <section><h3>Extraction model</h3><div class="live-output" data-extraction-model><p>Load the effective non-secret tuple.</p></div><button class="secondary-button" type="button" data-model-probe="extraction">Probe extraction</button></section>
-            <section><h3>Embedding model</h3><div class="live-output" data-embedding-model><p>Load the configured and stored fingerprints.</p></div><button class="secondary-button" type="button" data-model-probe="embedding">Probe embedding</button></section>
+            <section><h3>Extraction model</h3><div class="live-output" data-extraction-model><p>Load the effective non-secret tuple.</p></div><button class="secondary-button" type="button" data-model-probe="extraction">Probe extraction</button><p class="panel-note" data-model-probe-note="extraction" id="model-probe-note-extraction" hidden></p></section>
+            <section><h3>Embedding model</h3><div class="live-output" data-embedding-model><p>Load the configured and stored fingerprints.</p></div><button class="secondary-button" type="button" data-model-probe="embedding">Probe embedding</button><p class="panel-note" data-model-probe-note="embedding" id="model-probe-note-embedding" hidden></p></section>
           </div>
           <span data-model-status role="status"></span>
           <details class="metadata-panel"><summary>Generated restart configuration</summary><pre data-model-env>No configuration loaded.</pre></details>
@@ -1415,6 +1415,45 @@ const eventKinds = [
           },
         } });
       }
+      const MODEL_PROBE_COOLDOWN_S = 10;
+      let modelProbeCooldown: ReturnType<typeof setInterval> | undefined;
+      /** A group that is not enabled cannot be probed; say why instead of offering a control that fails. */
+      function gateModelProbe(group: string, snapshot: Record<string, unknown> | undefined, variables: string) {
+        const button = one<HTMLButtonElement>(`[data-model-probe="${group}"]`);
+        const note = one<HTMLElement>(`[data-model-probe-note="${group}"]`);
+        const state = snapshot?.state;
+        const blocked = typeof state === "string" && state !== "enabled";
+        button.dataset.modelProbeBlocked = String(blocked);
+        button.disabled = blocked || modelProbeCooldown !== undefined;
+        note.hidden = !blocked;
+        note.textContent = !blocked ? "" : state === "disabled"
+          ? `Not configured. Set ${variables} and restart to enable probing.`
+          : `Not available (${state}). Check System readiness before probing.`;
+        if (blocked) button.setAttribute("aria-describedby", note.id);
+        else button.removeAttribute("aria-describedby");
+      }
+      /** The server allows one probe per principal every ten seconds, across both groups. */
+      function startModelProbeCooldown() {
+        if (modelProbeCooldown) clearInterval(modelProbeCooldown);
+        let remaining = MODEL_PROBE_COOLDOWN_S;
+        const buttons = all<HTMLButtonElement>("[data-model-probe]");
+        const render = () => {
+          for (const button of buttons) {
+            button.disabled = remaining > 0 || button.dataset.modelProbeBlocked === "true";
+            const label = `Probe ${button.dataset.modelProbe}`;
+            button.textContent = remaining > 0 && button.dataset.modelProbeBlocked !== "true" ? `${label} again in ${remaining} s` : label;
+          }
+        };
+        render();
+        modelProbeCooldown = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(modelProbeCooldown);
+            modelProbeCooldown = undefined;
+          }
+          render();
+        }, 1000);
+      }
       async function loadModels() {
         text("[data-model-status]", "Loading immutable startup snapshot…");
         try {
@@ -1424,19 +1463,24 @@ const eventKinds = [
           renderPayload(one("[data-embedding-model]"), { data: data.embedding as Record<string, unknown> });
           const extraction = data.extraction as Record<string, unknown> | undefined;
           const embedding = data.embedding as Record<string, unknown> | undefined;
-          const lines = [
-            extraction?.base_url ? `TITEN_EXTRACT_BASE_URL=${extraction.base_url}` : "",
-            extraction?.model ? `TITEN_EXTRACT_MODEL=${extraction.model}` : "",
-            extraction?.model_fingerprint ? `TITEN_EXTRACT_MODEL_FINGERPRINT=${extraction.model_fingerprint}` : "",
-            extraction?.response_mode ? `TITEN_EXTRACT_RESPONSE_MODE=${extraction.response_mode}` : "",
-            extraction?.api_key === "set" ? "TITEN_EXTRACT_API_KEY=<set as secret>" : "",
-            embedding?.base_url ? `TITEN_EMBED_BASE_URL=${embedding.base_url}` : "",
-            embedding?.model ? `TITEN_EMBED_MODEL=${embedding.model}` : "",
-            embedding?.dimensions ? `TITEN_EMBED_DIMS=${embedding.dimensions}` : "",
-            embedding?.revision ? `TITEN_EMBED_REVISION=${embedding.revision}` : "",
-            embedding?.profile ? `TITEN_EMBED_PROFILE=${embedding.profile}` : "",
-            embedding?.minimum_cosine !== null && embedding?.minimum_cosine !== undefined ? `TITEN_EMBED_MIN_COSINE=${embedding.minimum_cosine}` : "",
-            embedding?.api_key === "set" ? "TITEN_EMBED_API_KEY=<set as secret>" : "",
+          gateModelProbe("extraction", extraction, "TITEN_EXTRACT_*");
+          gateModelProbe("embedding", embedding, "TITEN_EMBED_*");
+          // A disabled group still reports defaults (response mode); they are not configuration to copy.
+          const extractionSet = extraction?.state !== "disabled";
+          const embeddingSet = embedding?.state !== "disabled";
+          const lines = !extractionSet && !embeddingSet ? [] : [
+            extractionSet && extraction?.base_url ? `TITEN_EXTRACT_BASE_URL=${extraction.base_url}` : "",
+            extractionSet && extraction?.model ? `TITEN_EXTRACT_MODEL=${extraction.model}` : "",
+            extractionSet && extraction?.model_fingerprint ? `TITEN_EXTRACT_MODEL_FINGERPRINT=${extraction.model_fingerprint}` : "",
+            extractionSet && extraction?.response_mode ? `TITEN_EXTRACT_RESPONSE_MODE=${extraction.response_mode}` : "",
+            extractionSet && extraction?.api_key === "set" ? "TITEN_EXTRACT_API_KEY=<set as secret>" : "",
+            embeddingSet && embedding?.base_url ? `TITEN_EMBED_BASE_URL=${embedding.base_url}` : "",
+            embeddingSet && embedding?.model ? `TITEN_EMBED_MODEL=${embedding.model}` : "",
+            embeddingSet && embedding?.dimensions ? `TITEN_EMBED_DIMS=${embedding.dimensions}` : "",
+            embeddingSet && embedding?.revision ? `TITEN_EMBED_REVISION=${embedding.revision}` : "",
+            embeddingSet && embedding?.profile ? `TITEN_EMBED_PROFILE=${embedding.profile}` : "",
+            embeddingSet && embedding?.minimum_cosine !== null && embedding?.minimum_cosine !== undefined ? `TITEN_EMBED_MIN_COSINE=${embedding.minimum_cosine}` : "",
+            embeddingSet && embedding?.api_key === "set" ? "TITEN_EMBED_API_KEY=<set as secret>" : "",
           ].filter(Boolean);
           text("[data-model-env]", lines.length ? lines.join("\n") : "# FTS-only mode; no model tuple configured.");
           text("[data-model-status]", "Configuration loaded. Changes are applied only by restart.");
@@ -2620,7 +2664,14 @@ const eventKinds = [
         try {
           const response = await postArea("models/probe", { group: button.dataset.modelProbe! });
           text("[data-model-status]", JSON.stringify(payloadData(response)));
-        } catch (error) { text("[data-model-status]", errorMessage(error)); }
+          startModelProbeCooldown();
+        } catch (error) {
+          const code = error instanceof DashboardApiError ? error.code : "";
+          // The adapter's own wording for these codes names the real cause.
+          text("[data-model-status]", code === "PROBE_RATE_LIMITED" || code === "PROVIDER_NOT_ENABLED"
+            ? (error as DashboardApiError).message : errorMessage(error));
+          if (code !== "PROVIDER_NOT_ENABLED") startModelProbeCooldown();
+        }
       });
       one<HTMLButtonElement>("[data-access-refresh]").addEventListener("click", loadAccess);
       one<HTMLSelectElement>("[data-access-principal]").addEventListener("change", (event) => {

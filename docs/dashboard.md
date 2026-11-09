@@ -105,6 +105,11 @@ Models is an immutable diagnostic view. It masks secrets, reports configuration
 and fingerprint drift, generates restart-only environment text, and performs
 one rate-limited audited probe. It never updates model settings or canonical
 memory from the browser.
+A group whose startup state is not `enabled` cannot be probed, and its button
+says which variables enable it. After a probe both buttons count down the
+ten-second limit, which applies per principal across both groups. A probe that
+is rate-limited or hits a provider that is not enabled says so, rather than
+reporting a sign-in limit or a readiness failure.
 
 ## Run disconnected
 

@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard Models no longer offers probes that cannot succeed or reports the wrong cause when one fails. Probe buttons are disabled for a group that is not enabled and name the variables that enable it. A ten-second countdown follows each probe. A probe that is rate-limited now says to wait instead of "Too many sign-in attempts", and a probe of a provider that is not enabled says so instead of "Titen is not ready". The adapter maps these known server codes to its own fixed wording and still forwards no upstream text. Its generic 429 message no longer mentions sign-in. When no model is configured, the generated restart configuration reads FTS-only instead of a lone response-mode variable. ([#395](https://github.com/RamaAditya49/titen/issues/395))
+
 ## [0.10.10] — 2026-11-08
 
 schema 31

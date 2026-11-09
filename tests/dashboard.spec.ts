@@ -519,6 +519,40 @@ test("System lists failing readiness checks first, names them, and shows each ca
   expect(labels).not.toContain("Version");
 });
 
+test("Models disables probes for unconfigured providers and names the real failure", async ({ page }) => {
+  await mockServerMode(page);
+  let extractionState = "disabled";
+  await page.route("**/dashboard-api/models/config", (route) => route.fulfill({ json: { data: {
+    immutable_startup_snapshot: true,
+    extraction: { state: extractionState, response_mode: "json_schema", api_key: "unset" },
+    embedding: { state: "disabled", vector_state: "disabled", api_key: "unset" },
+  } } }));
+  let probes = 0;
+  await page.route("**/dashboard-api/models/probe", (route) => {
+    probes += 1;
+    return route.fulfill({ status: 429, json: { error: { code: "PROBE_RATE_LIMITED", message: "Wait ten seconds before probing a model provider again." } } });
+  });
+  await page.goto("/dashboard/#models");
+  const extraction = page.locator('[data-model-probe="extraction"]');
+  const embedding = page.locator('[data-model-probe="embedding"]');
+  await expect(extraction).toBeDisabled();
+  await expect(embedding).toBeDisabled();
+  await expect(page.locator('[data-model-probe-note="extraction"]')).toHaveText("Not configured. Set TITEN_EXTRACT_* and restart to enable probing.");
+  await expect(embedding).toHaveAccessibleDescription("Not configured. Set TITEN_EMBED_* and restart to enable probing.");
+  await expect(page.locator("[data-model-env]")).toHaveText("# FTS-only mode; no model tuple configured.");
+
+  extractionState = "enabled";
+  await page.getByRole("button", { name: "Refresh configuration" }).click();
+  await expect(extraction).toBeEnabled();
+  await expect(embedding).toBeDisabled();
+  await extraction.click();
+  await expect(page.locator("[data-model-status]")).toHaveText("Wait ten seconds before probing a model provider again.");
+  await expect(page.locator("[data-model-status]")).not.toContainText("sign-in");
+  await expect(extraction).toBeDisabled();
+  await expect(extraction).toHaveText(/Probe extraction again in \d+ s/);
+  expect(probes).toBe(1);
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {
