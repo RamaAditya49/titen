@@ -245,7 +245,8 @@ const captureScans = async (run: (db: Db) => Promise<unknown>) => {
 };
 
 const assertOrgScopedSeek = (plan: string[], label: string) => {
-  const seek = plan.find((line) => /event_order/.test(line));
+  // A rowid-range plan names only the alias ("SEARCH eo USING INTEGER PRIMARY KEY").
+  const seek = plan.find((line) => /event_order|\b(SEARCH|SCAN) eo\b/.test(line));
   assert.ok(seek, `${label}: no event_order step in the plan:\n${plan.join("\n")}`);
   assert.match(
     seek!,
@@ -274,9 +275,68 @@ test("the maintenance webhook selection seeks the organization range of event_or
   const scans = await captureScans((db) =>
     runMaintenance({ db, deliverWebhooks: true, now: new Date() }),
   );
-  const selection = scans.filter(({ sql }) => /JOIN event_order eo ON/.test(sql));
+  const selection = scans.filter(({ sql }) => /JOIN event_order eo\b/.test(sql));
   assert.equal(selection.length, 1, "expected one maintenance selection statement");
   await withMigratedStore((explain) => assertOrgScopedSeek(explain(selection[0]!), "maintenance selection"));
+});
+
+/**
+ * The empty-store guards above pass while a populated store still regresses
+ * (#396): once ANALYZE has statistics, SQLite prefers event_order's INTEGER
+ * PRIMARY KEY range (`seq > w.scanned_seq`, every organization's rows) over
+ * the (org_id, seq) index. This store holds one quiet webhook organization and
+ * a busy one with many events, then runs ANALYZE before explaining.
+ */
+const withAnalyzedEventStore = async (run: (explain: (q: { sql: string; params: Param[] }) => string[]) => void) => {
+  const directory = mkdtempSync(join(tmpdir(), "titen-query-plan-events-"));
+  const database = openDatabase(join(directory, "titen.db"));
+  try {
+    await migrate(createSqliteDb(database));
+    database.run(`INSERT INTO organizations (id, name, created_at) VALUES
+      ('org_plan', 'Quiet', '2026-01-01T00:00:00.000Z'), ('org_busy', 'Busy', '2026-01-01T00:00:00.000Z')`);
+    database.run(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 20000)
+      INSERT INTO events (id, org_id, kind, actor_id, resource_type, resource_id, payload, created_at)
+      SELECT 'evt_busy_' || i, 'org_busy', 'claim.materialized', 'actor', 'claim', 'clm_' || i, '{}',
+             strftime('%Y-%m-%dT%H:%M:%fZ', '2026-01-01', '+' || i || ' seconds') FROM n`);
+    database.run(`INSERT INTO webhooks (id, org_id, principal_id, url, secret_hash, secret, events, status, created_at, created_seq, scanned_seq)
+      VALUES ('whk_plan', 'org_plan', 'prn_plan', 'https://hooks.example.com/a', 'hash', 'secret', '*', 'active',
+              '2026-01-01T00:00:00.000Z', 0, 0)`);
+    database.run("ANALYZE");
+    run(({ sql, params }) =>
+      database
+        .query(`EXPLAIN QUERY PLAN ${sql}`)
+        .all(...(params as never[]))
+        .map((row) => (row as { detail: string }).detail),
+    );
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+};
+
+test("with statistics, the maintenance selection, webhook scan, and event listing still seek (org_id, seq) (#396)", async () => {
+  const selection = (await captureScans((db) => runMaintenance({ db, deliverWebhooks: true, now: new Date() })))
+    .filter(({ sql }) => /JOIN event_order eo/.test(sql));
+  assert.equal(selection.length, 1, "expected one maintenance selection statement");
+  const scans = await captureScans((db) =>
+    processWebhooks({
+      db, orgId: "org_plan", now: new Date(), limit: 50,
+      security: undefined as never, cipher: undefined as never,
+    }).catch(() => undefined),
+  );
+  assert.equal(scans.length, 1, "expected one webhook scan statement");
+  const listing = await captureScans((db) =>
+    listEvents({
+      app: { db },
+      url: new URL("https://titen.test/v1/events?limit=50"),
+      principal: PRINCIPAL,
+    } as never),
+  );
+  await withAnalyzedEventStore((explain) => {
+    assertOrgScopedSeek(explain(selection[0]!), "maintenance selection (analyzed)");
+    assertOrgScopedSeek(explain(scans[0]!), "webhook scan (analyzed)");
+    assertOrgScopedSeek(explain(listing[0]!), "event listing (analyzed)");
+  });
 });
 
 test("listing events seeks the organization range of event_order", async () => {

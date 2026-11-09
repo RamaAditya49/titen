@@ -139,7 +139,7 @@ export async function listEvents(ctx: RequestContext): Promise<Result> {
 
   const sql = `SELECT e.id, e.kind, e.actor_id, e.resource_type, e.resource_id,
       e.payload, e.created_at
-    FROM event_order eo JOIN events e ON e.id = eo.event_id
+    FROM event_order eo INDEXED BY event_order_org_seq JOIN events e ON e.id = eo.event_id
     WHERE ${conditions.join(" AND ")}
     ORDER BY eo.seq
     LIMIT ?`;

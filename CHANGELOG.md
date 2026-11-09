@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Webhook and event scans now always read `event_order` through the per-organization `event_order_org_seq` index. Once SQLite had statistics (`ANALYZE`), it preferred the global `seq` rowid range. Each maintenance pass, webhook scan, `/v1/events` listing and federation pull for a quiet organization then walked every other organization's events, which #361 had meant to stop. The queries pin the index with `INDEXED BY`, which also fails loudly if the index is renamed. A query-plan test now checks the plans on an analyzed store with a busy neighbouring organization. ([#396](https://github.com/RamaAditya49/titen/issues/396))
+
 ## [0.10.10] — 2026-11-08
 
 schema 31

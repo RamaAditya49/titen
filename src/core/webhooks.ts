@@ -286,7 +286,7 @@ async function queueNewEvents(
     const rows = await db.all<{ id: string; seq: number }>(
       `SELECT e.id, eo.seq
          FROM webhooks w
-         JOIN event_order eo
+         JOIN event_order eo INDEXED BY event_order_org_seq
            ON eo.org_id = w.org_id AND eo.seq > w.scanned_seq AND eo.seq <= ?
          JOIN events e ON e.id = eo.event_id AND e.org_id = w.org_id
         WHERE w.id = ? AND w.status = 'active'
