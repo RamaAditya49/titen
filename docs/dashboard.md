@@ -53,7 +53,13 @@ Each area uses the same information order:
 5. Open **Technical payload** only when diagnosis needs the complete response.
 
 Every area loads its authorized data when it opens; the **Refresh** buttons
-re-fetch. Projects and Subjects show their canonical references after selection
+re-fetch. The Work checkpoint lookup and the Federation peer-log lookup render
+in their own region below the form, so the lease, handoff, and peer lists stay
+visible. The result heading echoes the query, and a miss is worded as "No
+current checkpoint for …" or "No exchange log for peer …". Checkpoint kind is a
+choice of `task_state`, `conversation`, `workflow`, or `cursor`. Handoff rows
+offer **Find checkpoint**, peer rows offer **View log**, and both ID fields
+suggest IDs already listed. Projects and Subjects show their canonical references after selection
 and a selection prompt before it. "No live data loaded for this principal"
 appears only after sign-out, expiry, or an identity change has cleared private
 data. Work,

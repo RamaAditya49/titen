@@ -310,12 +310,15 @@ test("separates federation peers from the exchange log", async ({ page }) => {
 
   await page.locator('[data-federation-form] input[name="peer_id"]').fill("peer_primary");
   await page.locator("[data-federation-form]").getByRole("button", { name: "Load peer log" }).click();
-  await expect(output.locator('[data-collection="federation_entries"] h3')).toHaveText("Exchange log");
-  await expect(output.getByRole("columnheader")).toHaveText([
+  // The log renders in its own region; the peer list stays (#399).
+  const log = page.locator("[data-federation-log]");
+  await expect(log.locator('[data-collection="federation_entries"] h3')).toHaveText("Exchange log");
+  await expect(log.getByRole("columnheader")).toHaveText([
     "ID", "Direction", "Resource", "Resource ID", "Status", "Time", "Action",
   ]);
-  await expect(output).toContainText("exchange_01");
-  await expect(output).not.toContainText("Metadata activity");
+  await expect(log).toContainText("exchange_01");
+  await expect(log).not.toContainText("Metadata activity");
+  await expect(output.locator('[data-collection="peers"]')).toBeVisible();
 });
 
 test("renders structured administration and diagnostic facts", async ({ page }) => {
@@ -599,6 +602,57 @@ test("Models disables probes for unconfigured providers and names the real failu
   await expect(extraction).toBeDisabled();
   await expect(extraction).toHaveText(/Probe extraction again in \d+ s/);
   expect(probes).toBe(1);
+});
+
+test("Work and Federation lookups render beside their lists and word a miss as a miss", async ({ page }) => {
+  await mockServerMode(page);
+  const checkpointQueries: URLSearchParams[] = [];
+  await page.route("**/dashboard-api/work/leases**", (route) => route.fulfill({ json: { data: { leases: [
+    { lease_id: "lease_live", resource_id: "subject_live", holder_id: "agent_holder", status: "active" },
+  ] } } }));
+  await page.route("**/dashboard-api/work/handoffs", (route) => route.fulfill({ json: { data: { handoffs: [
+    { handoff_id: "handoff_live", subject_id: "user:alpha", from_principal: "agent_sender", to_principal: "someone_else", status: "pending" },
+  ] } } }));
+  await page.route("**/dashboard-api/work/checkpoint**", (route) => {
+    checkpointQueries.push(new URL(route.request().url()).searchParams);
+    return route.fulfill({ status: 404, json: { error: { code: "UPSTREAM_404", message: "The requested authorized resource was not found." } } });
+  });
+  await page.route("**/dashboard-api/federation/peers", (route) => route.fulfill({ json: { data: { peers: [
+    { peer_id: "peer_primary", name: "Primary VPS", status: "active" },
+  ] } } }));
+  await page.route("**/dashboard-api/federation/log**", (route) => route.fulfill({ json: { data: { entries: [
+    { id: "exchange_01", direction: "received", resource_type: "claim", resource_id: "clm_remote", status: "success" },
+  ] } } }));
+
+  await page.goto("/dashboard/#work");
+  await expect(page.locator('[data-collection="leases"]')).toBeVisible();
+  const kind = page.locator('[data-checkpoint-form] select[name="kind"]');
+  await expect(kind.locator("option")).toHaveText(["task_state", "conversation", "workflow", "cursor"]);
+  await expect(page.locator("[data-checkpoint-agents] option")).toHaveCount(3);
+
+  await page.locator('[data-checkpoint-form] input[name="subject_id"]').fill("user:alpha");
+  await page.locator('[data-checkpoint-form] input[name="agent_id"]').fill("agent_sender");
+  await kind.selectOption("workflow");
+  await page.getByRole("button", { name: "Find checkpoint", exact: true }).click();
+  const result = page.locator("[data-checkpoint-result]");
+  await expect(result).toContainText("No current checkpoint for subject user:alpha, agent agent_sender, kind workflow.");
+  await expect(result).not.toContainText("authorized resource");
+  await expect(page.locator('[data-collection="leases"]')).toBeVisible();
+  await expect(page.locator('[data-collection="handoffs"]')).toBeVisible();
+
+  const handoffRow = page.locator('[data-collection="handoffs"] tbody tr').filter({ hasText: "user:alpha" });
+  await page.locator('[data-checkpoint-form] select[name="kind"]').selectOption("task_state");
+  await handoffRow.getByRole("button", { name: "Find checkpoint · user:alpha" }).click();
+  await expect.poll(() => checkpointQueries.length).toBe(2);
+  expect(Object.fromEntries(checkpointQueries[1]!)).toEqual({ subject_id: "user:alpha", agent_id: "agent_sender", kind: "task_state" });
+
+  await page.locator('[data-area="federation"]').click();
+  const peers = page.locator('[data-collection="peers"]');
+  await peers.getByRole("button", { name: "View log · peer_primary" }).click();
+  const log = page.locator("[data-federation-log]");
+  await expect(log.locator("h3").first()).toHaveText("Exchange log · peer_primary");
+  await expect(log).toContainText("exchange_01");
+  await expect(peers).toBeVisible();
 });
 
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {

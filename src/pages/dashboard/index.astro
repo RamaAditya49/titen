@@ -26,6 +26,8 @@ const lenses = [
   { id: "knowledge_release", label: "Knowledge releases", needs: "optional", scope: "releases:read" },
 ];
 // Suggestions only: the filters still accept any action or kind the API records.
+// Mirrors CHECKPOINT_KINDS in src/core/checkpoints.ts; the API accepts no other kind.
+const checkpointKinds = ["task_state", "conversation", "workflow", "cursor"];
 const auditActions = [
   "dashboard_session.create", "dashboard_session.revoke", "operator_account.create", "operator_account.login_block",
   "key.revoke", "grant.created", "grant.revoked", "membership.add", "membership.remove", "policy.create",
@@ -588,10 +590,12 @@ const eventKinds = [
           </div>
           <form class="inline-form" data-checkpoint-form>
             <label><span>Subject ID</span><input name="subject_id" maxlength="200" autocomplete="off" required /></label>
-            <label><span>Agent ID</span><input name="agent_id" maxlength="200" autocomplete="off" required /></label>
-            <label><span>Kind</span><input name="kind" maxlength="100" autocomplete="off" required /></label>
+            <label><span>Agent ID</span><input name="agent_id" maxlength="200" autocomplete="off" list="checkpoint-agents" required /></label>
+            <label><span>Kind</span><select name="kind" required>{checkpointKinds.map((kind) => <option value={kind}>{kind}</option>)}</select></label>
             <button class="secondary-button" type="submit">Find checkpoint</button>
           </form>
+          <datalist id="checkpoint-agents" data-checkpoint-agents></datalist>
+          <section class="live-output compact-output" data-checkpoint-result aria-live="polite" hidden></section>
           <div class="live-output" data-work-output><p>Refresh to load the work contracts available to this principal.</p></div>
         </section>
 
@@ -625,10 +629,12 @@ const eventKinds = [
             <button class="secondary-button" type="button" data-federation-refresh>Refresh peers</button>
           </div>
           <form class="inline-form" data-federation-form>
-            <label><span>Peer ID</span><input name="peer_id" maxlength="200" autocomplete="off" required /></label>
+            <label><span>Peer ID</span><input name="peer_id" maxlength="200" autocomplete="off" list="federation-peers" required /></label>
             <label><span>Log limit</span><input name="limit" type="number" min="1" max="200" value="50" required /></label>
             <button class="secondary-button" type="submit">Load peer log</button>
           </form>
+          <datalist id="federation-peers" data-federation-peers></datalist>
+          <section class="live-output compact-output" data-federation-log aria-live="polite" hidden></section>
           <div class="live-output" data-federation-output><p>Refresh to load peers registered by this principal.</p></div>
         </section>
 
@@ -1290,6 +1296,12 @@ const eventKinds = [
         if (!selected.length) return renderMessage(target, "Leases and handoffs are outside this principal's capabilities. Use Load checkpoint to read a checkpoint.");
         const responses = await Promise.all(selected.map(async ([path]) => payloadData(await getArea(path))));
         const data = Object.assign({}, ...responses);
+        const rowsOf = (value: unknown) => Array.isArray(value)
+          ? value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object") : [];
+        fillSuggestions("[data-checkpoint-agents]", [
+          ...rowsOf(data.handoffs).flatMap((row) => [row.from_principal, row.to_principal]),
+          ...rowsOf(data.leases).map((row) => row.holder_id),
+        ]);
         renderPayload(target, { data }, { actions: {
           leases: (row) => {
             if (!has("leases:write") || typeof row.lease_id !== "string" || row.status !== "active") return [];
@@ -1319,8 +1331,12 @@ const eventKinds = [
             }];
           },
           handoffs: (row) => {
-            if (!has("handoffs:write") || typeof row.handoff_id !== "string" || row.status !== "pending" || row.to_principal !== principal?.principal_id) return [];
-            return (["accepted", "rejected"] as const).map((status) => ({
+            const lookup = has("checkpoints:read") && typeof row.subject_id === "string" ? [{
+              label: `Find checkpoint · ${row.subject_id}`,
+              run: async () => findCheckpoint(row.subject_id as string, String(row.from_principal ?? row.to_principal ?? "")),
+            }] : [];
+            if (!has("handoffs:write") || typeof row.handoff_id !== "string" || row.status !== "pending" || row.to_principal !== principal?.principal_id) return lookup;
+            return [...lookup, ...(["accepted", "rejected"] as const).map((status) => ({
               label: `${status === "accepted" ? "Accept" : "Reject"} handoff · ${row.subject_id}`,
               tone: status === "rejected" ? "danger" as const : "default" as const,
               run: async () => {
@@ -1338,9 +1354,41 @@ const eventKinds = [
                   await loadWork();
                 } catch (error) { handleError(error, target); }
               },
-            }));
+            }))];
           },
         } });
+      }
+      /** Suggestions for a lookup field from IDs the area has already loaded. */
+      function fillSuggestions(selector: string, values: unknown[]) {
+        const unique = [...new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0))].sort();
+        // Value only: browsers suggest the value, and an empty label keeps the
+        // hidden option out of the page's text.
+        one<HTMLDataListElement>(selector).replaceChildren(...unique.map((value) => new Option("", value)));
+      }
+      /**
+       * Lookups render beside the area's lists, never over them, and say what was
+       * asked so a miss reads as a miss rather than an authorization failure.
+       */
+      async function renderLookup(region: HTMLElement, heading: string, missing: string, load: () => Promise<Record<string, unknown>>) {
+        region.hidden = false;
+        region.replaceChildren();
+        const title = document.createElement("h3");
+        title.textContent = heading;
+        const body = document.createElement("div");
+        region.append(title, body);
+        renderMessage(body, "Loading…");
+        try {
+          renderPayload(body, await load());
+        } catch (error) {
+          if (error instanceof DashboardApiError && error.status === 404) renderMessage(body, missing);
+          else handleError(error, body);
+        }
+      }
+      function findCheckpoint(subjectId: string, agentId: string) {
+        const form = one<HTMLFormElement>("[data-checkpoint-form]");
+        (form.elements.namedItem("subject_id") as HTMLInputElement).value = subjectId;
+        (form.elements.namedItem("agent_id") as HTMLInputElement).value = agentId;
+        form.requestSubmit();
       }
       async function loadGovernance() {
         const target = one<HTMLElement>("[data-governance-output]");
@@ -1376,7 +1424,20 @@ const eventKinds = [
         const target = one<HTMLElement>("[data-federation-output]");
         if (!has("federation:read")) return renderMessage(target, "This principal has no read capability for federation peers.");
         renderMessage(target, "Loading authorized federation peers…");
-        renderPayload(target, await getArea("federation/peers"));
+        const payload = await getArea("federation/peers");
+        const peers = payloadData(payload).peers;
+        fillSuggestions("[data-federation-peers]", Array.isArray(peers)
+          ? peers.map((row) => row && typeof row === "object" ? (row as Record<string, unknown>).peer_id : undefined) : []);
+        renderPayload(target, payload, { actions: {
+          peers: (row) => typeof row.peer_id !== "string" ? [] : [{
+            label: `View log · ${row.peer_id}`,
+            run: async () => {
+              const form = one<HTMLFormElement>("[data-federation-form]");
+              (form.elements.namedItem("peer_id") as HTMLInputElement).value = row.peer_id as string;
+              form.requestSubmit();
+            },
+          }],
+        } });
       }
       async function loadReleases() {
         const target = one<HTMLElement>("[data-releases-output]");
@@ -1759,6 +1820,12 @@ const eventKinds = [
         one<HTMLElement>("[data-relationships]").replaceChildren();
       }
       function clearPrivateState() {
+        for (const selector of ["[data-checkpoint-result]", "[data-federation-log]"]) {
+          const region = one<HTMLElement>(selector);
+          region.replaceChildren();
+          region.hidden = true;
+        }
+        for (const selector of ["[data-checkpoint-agents]", "[data-federation-peers]"]) one<HTMLElement>(selector).replaceChildren();
         setNotice(one("[data-login-attempt-notice]"));
         clearMemory();
         workspaceMenu.open = false;
@@ -2637,8 +2704,11 @@ const eventKinds = [
         const values = new FormData(form);
         const query = new URLSearchParams();
         for (const field of ["subject_id", "agent_id", "kind"]) query.set(field, String(values.get(field)).trim());
-        const target = one<HTMLElement>("[data-work-output]");
-        try { renderPayload(target, await getArea("work/checkpoint", query)); } catch (error) { handleError(error, target); }
+        const [subject, agent, kind] = ["subject_id", "agent_id", "kind"].map((field) => query.get(field)!);
+        await renderLookup(one("[data-checkpoint-result]"),
+          `Checkpoint · ${subject} · ${agent} · ${kind}`,
+          `No current checkpoint for subject ${subject}, agent ${agent}, kind ${kind}.`,
+          () => getArea("work/checkpoint", query));
       });
       one<HTMLButtonElement>("[data-audit-refresh]").addEventListener("click", () => void loadActivity());
       one<HTMLFormElement>("[data-audit-form]").addEventListener("submit", (event) => {
@@ -2687,11 +2757,9 @@ const eventKinds = [
         event.preventDefault();
         const values = new FormData(event.currentTarget as HTMLFormElement);
         const query = new URLSearchParams({ peer_id: String(values.get("peer_id")).trim(), limit: String(values.get("limit")) });
-        const target = one<HTMLElement>("[data-federation-output]");
-        try {
-          const response = await getArea("federation/log", query);
-          renderPayload(target, { data: { federation_entries: payloadData(response).entries ?? [] } });
-        } catch (error) { handleError(error, target); }
+        const peer = query.get("peer_id")!;
+        await renderLookup(one("[data-federation-log]"), `Exchange log · ${peer}`, `No exchange log for peer ${peer}.`,
+          async () => ({ data: { federation_entries: payloadData(await getArea("federation/log", query)).entries ?? [] } }));
       });
       one<HTMLButtonElement>("[data-releases-refresh]").addEventListener("click", async () => {
         const target = one<HTMLElement>("[data-releases-output]");
