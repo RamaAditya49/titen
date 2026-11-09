@@ -1442,6 +1442,8 @@ const eventKinds = [
           text("[data-model-status]", "Configuration loaded. Changes are applied only by restart.");
         } catch (error) { text("[data-model-status]", errorMessage(error)); }
       }
+      const ACCESS_KEY_PREVIEW = 10;
+      let accessKeys = { principal: "", expanded: false, inactive: false };
       async function loadAccess() {
         const target = one<HTMLElement>("[data-access-output]");
         renderMessage(target, "Loading principals and grants…");
@@ -1455,13 +1457,27 @@ const eventKinds = [
             picker.add(new Option(`${row.username ?? row.principal_id} · ${row.principal_kind}`, row.principal_id));
           picker.value = [...picker.options].some((option) => option.value === selected) ? selected : "";
           const grants = picker.value && has("grants:read") ? await getArea("access/grants", new URLSearchParams({ principal_id: picker.value })) : { data: { grants: [] } };
-          const keyData = has("keys:manage") ? payloadData(await getArea("governance/keys")) : { keys: [] };
-          const selectedKeys = Array.isArray(keyData.keys) ? keyData.keys.filter((value) => {
-            if (!picker.value || !value || typeof value !== "object") return !picker.value;
-            const row = value as Record<string, unknown>;
-            return row.principal_id === picker.value || row.issued_by === picker.value;
-          }) : [];
-          renderPayload(target, { data: { principals, ...(payloadData(grants)), key_clamp_preview: selectedKeys } }, { actions: {
+          if (picker.value !== accessKeys.principal) accessKeys = { principal: picker.value, expanded: false, inactive: false };
+          // The server filters by principal and status before its page limit; the
+          // browser never downloads every key the organization has issued.
+          let preview: { rows: Record<string, unknown>[]; active: number; hidden: number; more: boolean } | undefined;
+          if (picker.value && has("keys:manage")) {
+            const scoped = async (status: string) => payloadData(await getArea("governance/keys",
+              new URLSearchParams({ status, principal_id: picker.value, limit: "500" })));
+            const [active, everything] = await Promise.all([scoped("active"), scoped("all")]);
+            const rowsOf = (data: Record<string, unknown>) => Array.isArray(data.keys)
+              ? data.keys.filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object") : [];
+            const activeRows = rowsOf(active);
+            const allRows = rowsOf(everything);
+            preview = {
+              rows: accessKeys.inactive ? allRows : activeRows,
+              active: activeRows.length,
+              hidden: allRows.length - activeRows.length,
+              more: Boolean(everything.next_cursor),
+            };
+          }
+          const shownKeys = preview ? (accessKeys.expanded ? preview.rows : preview.rows.slice(0, ACCESS_KEY_PREVIEW)) : undefined;
+          renderPayload(target, { data: { principals, ...(payloadData(grants)), ...(shownKeys ? { key_clamp_preview: shownKeys } : {}) } }, { actions: {
             grants: (row) => {
               if (!has("grants:write") || typeof row.grant_id !== "string" || row.revoked_at) return [];
               return [{
@@ -1484,6 +1500,42 @@ const eventKinds = [
               }];
             },
           } });
+          if (has("keys:manage") && !picker.value) {
+            const prompt = document.createElement("p");
+            prompt.className = "panel-note";
+            prompt.dataset.keyClampPrompt = "";
+            prompt.textContent = "Select a principal to preview its key clamps.";
+            target.append(prompt);
+          }
+          const section = target.querySelector<HTMLElement>('[data-collection="key_clamp_preview"]');
+          if (preview && section) {
+            const footer = document.createElement("footer");
+            footer.className = "memory-pagination";
+            footer.dataset.keyClampFooter = "";
+            const status = document.createElement("span");
+            status.setAttribute("role", "status");
+            const total = preview.rows.length;
+            const noun = accessKeys.inactive ? "keys" : "active keys";
+            status.textContent = `Showing ${shownKeys!.length} of ${total.toLocaleString()} ${noun}${preview.more && accessKeys.inactive ? " (more exist)" : ""}.`;
+            const controls = document.createElement("span");
+            const control = (label: string, onClick: () => void) => {
+              const button = document.createElement("button");
+              button.type = "button";
+              button.className = "secondary-button";
+              button.textContent = label;
+              button.addEventListener("click", onClick);
+              controls.append(button);
+            };
+            if (!accessKeys.expanded && total > ACCESS_KEY_PREVIEW)
+              control(`Show all ${total.toLocaleString()} ${noun}`, () => { accessKeys.expanded = true; void loadAccess(); });
+            if (preview.hidden > 0)
+              control(accessKeys.inactive
+                ? "Hide expired and revoked"
+                : `Include expired and revoked (${preview.hidden.toLocaleString()}${preview.more ? "+" : ""})`,
+              () => { accessKeys.inactive = !accessKeys.inactive; accessKeys.expanded = false; void loadAccess(); });
+            footer.append(status, controls);
+            section.append(footer);
+          }
         } catch (error) { handleError(error, target); }
       }
       async function loadKeys() {

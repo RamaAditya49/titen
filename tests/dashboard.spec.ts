@@ -341,7 +341,7 @@ test("renders structured administration and diagnostic facts", async ({ page }) 
     permissions: ["read", "write"],
     status: "active",
   }] } } }));
-  await page.route("**/dashboard-api/governance/keys", (route) => route.fulfill({ json: { data: { keys: [{
+  await page.route("**/dashboard-api/governance/keys**", (route) => route.fulfill({ json: { data: { keys: [{
     key_id: "key_editor",
     label: "Editor CLI",
     principal_id: "user_editor",
@@ -517,6 +517,54 @@ test("System lists failing readiness checks first, names them, and shows each ca
     expect(labels.filter((value) => value === label), label).toHaveLength(1);
   expect(labels).not.toContain("Model");
   expect(labels).not.toContain("Version");
+});
+
+test("Access previews only the selected principal's active key clamps, bounded, with a status column", async ({ page }) => {
+  await mockServerMode(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const keyRequests: URLSearchParams[] = [];
+  const key = (index: number, status: string) => ({
+    key_id: `key_${status}_${index}`, label: status === "active" ? `Agent key ${index}` : "Dashboard session",
+    principal_id: "agent_a", scopes: ["views:compile"], max_trust: "asserted", status, data_target_type: "organization",
+  });
+  const active = Array.from({ length: 12 }, (_, index) => key(index, "active"));
+  const expired = Array.from({ length: 40 }, (_, index) => key(index, "expired"));
+  await page.route("**/dashboard-api/access/principals**", (route) => route.fulfill({ json: { data: { principals: [
+    { principal_id: "agent_a", principal_kind: "agent", username: null, key_count: 12 },
+  ] } } }));
+  await page.route("**/dashboard-api/access/grants**", (route) => route.fulfill({ json: { data: { grants: [] } } }));
+  await page.route("**/dashboard-api/governance/keys**", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    keyRequests.push(query);
+    const keys = query.get("status") === "active" ? active : [...active, ...expired];
+    return route.fulfill({ json: { data: { keys, next_cursor: null } } });
+  });
+  await page.goto("/dashboard/#access");
+  await expect(page.locator("[data-key-clamp-prompt]")).toHaveText("Select a principal to preview its key clamps.");
+  await expect(page.locator('[data-collection="key_clamp_preview"]')).toHaveCount(0);
+  expect(keyRequests, "no organization-wide key download before a principal is chosen").toHaveLength(0);
+
+  await page.locator("[data-access-principal]").selectOption("agent_a");
+  const preview = page.locator('[data-collection="key_clamp_preview"]');
+  await expect(preview.locator("tbody tr")).toHaveCount(10);
+  expect(keyRequests.every((query) => query.get("principal_id") === "agent_a")).toBe(true);
+  expect(keyRequests.some((query) => query.get("status") === "active")).toBe(true);
+  await expect(preview.locator("thead")).toContainText("Status");
+  await expect(preview.locator('tbody td[data-label="Status"]').first()).toHaveText("active");
+  const footer = preview.locator("[data-key-clamp-footer]");
+  await expect(footer.getByRole("status")).toHaveText("Showing 10 of 12 active keys.");
+  await expect(footer.getByRole("button", { name: "Include expired and revoked (40)" })).toBeVisible();
+  const panelTop = (await page.locator('[data-area-panel="access"]').boundingBox())!.y;
+  const simulatorTop = (await page.locator("[data-access-simulator]").boundingBox())!.y;
+  expect(simulatorTop - panelTop).toBeLessThan(5000);
+
+  await footer.getByRole("button", { name: "Show all 12 active keys" }).click();
+  await expect(preview.locator("tbody tr")).toHaveCount(12);
+  await preview.locator("[data-key-clamp-footer]").getByRole("button", { name: "Include expired and revoked (40)" }).click();
+  await expect(preview.locator("[data-key-clamp-footer]").getByRole("status")).toHaveText("Showing 10 of 52 keys.");
+  await preview.locator("[data-key-clamp-footer]").getByRole("button", { name: "Show all 52 keys" }).click();
+  await expect(preview.locator("tbody tr")).toHaveCount(52);
+  await expect(preview.locator('tbody td[data-label="Status"]', { hasText: "expired" })).toHaveCount(40);
 });
 
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {

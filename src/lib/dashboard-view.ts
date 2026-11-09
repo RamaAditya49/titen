@@ -138,7 +138,7 @@ const schemas: Record<string, CollectionSchema> = {
   key_clamp_preview: {
     title: "Key clamp preview",
     identity: ["label", "key_id"],
-    columns: [field("Key", ["label", "key_id"]), field("Principal", ["principal_id", "issued_by"], true), field("Scopes", ["scopes"]), field("Trust ceiling", ["max_trust"]), field("Target", ["data_target_id", "data_target_type"], true)],
+    columns: [field("Key", ["label", "key_id"]), field("Status", ["status"]), field("Principal", ["principal_id", "issued_by"], true), field("Scopes", ["scopes"]), field("Trust ceiling", ["max_trust"]), field("Target", ["data_target_id", "data_target_type"], true)],
   },
   keys: {
     title: "API keys",

@@ -99,7 +99,10 @@ principals and active grants, preview derived-key clamps, and simulate a known
 record's `read`, `write`, or `approve` decision. A selected workspace filters
 team-visible records; organization-visible memory remains present in every
 workspace. Revoking an issuer grant narrows its derived keys on the next
-request.
+request. The key clamp preview appears once a principal is selected. It requests
+only that principal's active keys through the `status` and `principal_id`
+filters of `GET /v1/keys`, shows each key's status, and starts with ten rows.
+**Include expired and revoked (N)** adds the inactive keys for an audit.
 
 Models is an immutable diagnostic view. It masks secrets, reports configuration
 and fingerprint drift, generates restart-only environment text, and performs
