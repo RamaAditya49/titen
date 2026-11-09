@@ -22,6 +22,7 @@ const dbPath = join(directory, "titen.db");
 let running: Awaited<ReturnType<typeof serve>>;
 let handle: ReturnType<typeof openDatabase>;
 let titen: TitenClient;
+let orgId: string;
 
 beforeAll(async () => {
   running = await serve({
@@ -34,6 +35,7 @@ beforeAll(async () => {
   handle = openDatabase(dbPath);
   const provisioned = await provisionWith(createSqliteDb(handle), { scopes: ["*"] });
   titen = new TitenClient({ url: running.url, key: provisioned.key });
+  orgId = provisioned.orgId;
 });
 
 afterAll(async () => {
@@ -173,6 +175,72 @@ test("claim lifecycle calls resolve through the client", async () => {
 
   const revoked = await titen.revoke(second.claims[0].claim_id, 1, "policy change");
   assert.equal(revoked.status, "revoked");
+});
+
+test("expire resolves through the client and a stale version is a typed conflict", async () => {
+  const observation = await titen.observe({
+    subject_id: "user_sdk_expire",
+    kind: "user_statement",
+    content: "The staging freeze ends on Friday.",
+    source: { type: "chat", ref: "contract://sdk-expire" },
+    trust: "verified",
+  });
+  const created = await titen.consolidate("user_sdk_expire", [
+    { kind: "procedural", statement: "Staging is frozen until Friday.",
+      sources: [{ observation_id: observation.observation_id, relation: "supports" }] },
+  ]);
+  const claimId = created.claims[0].claim_id;
+  await assert.rejects(titen.expire(claimId, 7, "stale version"), (error: unknown) =>
+    error instanceof TitenError && error.status === 409 && error.code === "CONFLICT");
+  const expired = await titen.expire(claimId, 1, "freeze lifted");
+  assert.equal(expired.claim_id, claimId);
+  assert.equal(expired.status, "expired");
+  assert.equal(typeof expired.valid_to, "string");
+});
+
+test("leases acquire, renew, conflict across principals, and release through the client", async () => {
+  const lease = { resource_type: "subject", resource_id: "user_sdk_lease", purpose: "sdk round trip", ttl_seconds: 60 };
+  const first = await titen.acquireLease(lease);
+  assert.match(first.lease_id, /^lease_/);
+  assert.equal(first.renewed, false);
+  const renewed = await titen.acquireLease(lease);
+  assert.equal(renewed.lease_id, first.lease_id);
+  assert.equal(renewed.renewed, true);
+
+  const other = await provisionWith(createSqliteDb(handle), { orgId, scopes: ["*"], principalId: "sdk_lease_rival" });
+  const rival = new TitenClient({ url: running.url, key: other.key });
+  await assert.rejects(rival.acquireLease(lease), (error: unknown) =>
+    error instanceof TitenError && error.status === 409 && error.code === "CONFLICT");
+
+  const released = await titen.releaseLease(first.lease_id);
+  assert.equal(released.lease_id, first.lease_id);
+  assert.equal(typeof released.released_at, "string");
+  const taken = await rival.acquireLease(lease);
+  assert.equal(taken.renewed, false);
+});
+
+test("compileView reaches the neighborhood and workspace_graph lenses without casts", async () => {
+  const observation = await titen.observe({
+    subject_id: "user_sdk_view",
+    kind: "user_statement",
+    content: "Deploys need a rollback plan.",
+    source: { type: "chat", ref: "contract://sdk-view" },
+    trust: "verified",
+    visibility: "organization",
+  });
+  await titen.consolidate("user_sdk_view", [
+    { kind: "procedural", statement: "Every deploy needs a rollback plan.",
+      sources: [{ observation_id: observation.observation_id, relation: "supports" }] },
+  ]);
+  const neighborhood = await titen.compileView("neighborhood", { subject_id: "user_sdk_view" });
+  assert.equal(neighborhood.lens, "neighborhood");
+  assert.ok(neighborhood.nodes.some((node) => node.type === "claim"));
+  const graph = await titen.compileView("workspace_graph", { workspace_id: null, max_nodes: 25 });
+  assert.equal(graph.lens, "workspace_graph");
+  assert.ok(Array.isArray(graph.nodes));
+  assert.equal(graph.metadata.workspace_id, null);
+  await assert.rejects(titen.compileView("workspace_graph", { max_nodes: 10 }), (error: unknown) =>
+    error instanceof TitenError && error.status === 400);
 });
 
 test("key management round-trips and a scoped key is enforced", async () => {

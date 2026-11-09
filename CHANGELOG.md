@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- The SDK's `compileView` types now match the server. `ViewLens` includes `workspace_graph`, and the options accept `workspace_id` and `max_nodes`, so TypeScript callers can request the workspace graph without casting to `any`. The SDK type contract now pins `ViewLens` to the server's lens list, and `expire`, `acquireLease`, `releaseLease` and `compileView` gained round-trip tests against a real server. ([#392](https://github.com/RamaAditya49/titen/issues/392))
+
 ## [0.10.10] — 2026-11-08
 
 schema 31
