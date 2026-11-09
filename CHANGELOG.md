@@ -26,6 +26,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.11] — 2026-11-09
+
+schema 31
+
+This release closes 5 issues: dashboard usability in Access, Models, Work, and Federation, SDK types for the workspace graph, and the event index on stores with statistics. It adds no migration.
+
 ### Added
 
 - `GET /v1/keys` accepts `issued_by`, which returns the keys a principal issued, including derived keys clamped by that principal's grants. The SDK's `listKeys` passes it through.
@@ -1711,7 +1717,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.10...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.11...HEAD
+[0.10.11]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.11
 [0.10.10]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.10
 [0.10.9]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.9
 [0.10.8]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.8
