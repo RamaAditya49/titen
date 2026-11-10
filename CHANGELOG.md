@@ -26,6 +26,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.12] — 2026-11-10
+
+schema 31
+
+This release closes 3 issues: the purge cascade no longer redacts a claim that only cites the purged evidence as a contradiction, and the dashboard fixes the Releases approval view and the reference panes. It adds no migration.
+
 ### Fixed
 
 - `DELETE /v1/observations/:id` no longer redacts a claim that cites the observation only as `contradicts`. Before, a purge redacted and revoked every claim that cited the observation in any relation. A disputed claim lost its statement when someone purged its contradicting evidence, although its supporting evidence was intact. Now only claims that cite the observation as `supports` or `qualifies` are redacted and revoked. The `dependent_claims_redacted` count follows the same rule. A legal hold on any claim that cites the observation, in any relation, still blocks the purge. The fix works forward only. A claim that an earlier purge already redacted cannot be restored. ([#404](https://github.com/RamaAditya49/titen/issues/404))
@@ -1723,7 +1729,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.11...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.12...HEAD
+[0.10.12]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.12
 [0.10.11]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.11
 [0.10.10]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.10
 [0.10.9]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.9
