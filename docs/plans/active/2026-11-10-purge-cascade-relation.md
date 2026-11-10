@@ -16,7 +16,7 @@ Goal: a purge redacts only the claims whose statement depends on the purged obse
 
 - [ ] Add a failing contract case: one claim with two `supports` sources and one `contradicts` source; purge the contradicting source.
 - [ ] Narrow `dependentClaim` in `purgeObservation` to relations `supports` and `qualifies`.
-- [ ] Apply the same relation filter in the legal-hold preflight.
+- [ ] Keep the legal-hold preflight relation-blind. It must agree with the trigger `record_history_purge_respects_holds`.
 - [ ] Add contract cases for the `supports`, `qualifies`, legal-hold, and evidence-listing criteria.
 - [ ] Update `docs/reference/api.md` and CHANGELOG.
 
