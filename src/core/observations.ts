@@ -677,8 +677,12 @@ export async function purgeObservation(ctx: RequestContext): Promise<Result> {
      WHERE h.org_id = ? AND h.record_type = 'observation'
        AND h.record_id = ? AND h.change_kind = 'purge'
   )`;
+  // A claim depends on evidence that supports or qualifies it. A claim that only
+  // cites the observation as a contradiction keeps its statement and status.
   const dependentClaim = `EXISTS (
-    SELECT 1 FROM claim_sources s WHERE s.claim_id = c.id AND s.observation_id = ?
+    SELECT 1 FROM claim_sources s
+     WHERE s.claim_id = c.id AND s.observation_id = ?
+       AND s.relation IN ('supports', 'qualifies')
   )`;
   const statements: Stmt[] = [
     {
