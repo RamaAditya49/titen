@@ -532,8 +532,12 @@ An operator credential with the explicit `observations:purge` scope can
 irreversibly tombstone readable evidence in its organization. The atomic write
 retains the observation ID, original content hash, source metadata, and history;
 removes FTS content; queues a vector delete; redacts and revokes dependent
-claims; and appends a content-free audit/event record. An active legal hold on
-the observation or any dependent claim blocks the purge. Foreign IDs return the
+claims; and appends a content-free audit/event record. A dependent claim is a
+claim that cites the observation as `supports` or `qualifies`. A claim that
+cites it only as `contradicts` keeps its statement and status, and the
+tombstoned source stays listed in its evidence with the content hash and
+without the original content. An active legal hold on the observation, or on
+any claim that cites it in any relation, blocks the purge. Foreign IDs return the
 same `404` as missing IDs. Ordinary agent and MCP keys should never receive
 this scope, and no MCP forget tool exists.
 
@@ -1124,7 +1128,7 @@ existing exclusion and, for a claim hold, exclusions on its supporting
 observations; a metadata audit records that restoration. Retention cannot race
 an active direct or dependent-claim hold back into exclusion.
 `DELETE /v1/observations/:id` also rejects a hold on the observation or any
-dependent claim. Retention does not perform implicit physical deletion.
+claim that cites it in any relation. Retention does not perform implicit physical deletion.
 
 Release statuses are `draft`, `approved`, `active`, `suspended`, `replaced`,
 `expired`, and `revoked`. Source eligibility can suspend an active release
@@ -1438,8 +1442,8 @@ Relation text is not searched, which is also true of the server being replaced.
 
 **Deleting is a purge.** `delete_entities`, `delete_observations` and
 `delete_relations` purge the underlying observations: content becomes
-irrecoverable, the row's hash and history survive, and dependent claims are
-revoked. Those three tools require `observations:purge` in addition to
+irrecoverable, the row's hash and history survive, and dependent claims (claims
+that cite the observation as `supports` or `qualifies`) are revoked. Those three tools require `observations:purge` in addition to
 `mcp:call`, so a credential that may write memory cannot destroy it by way of
 the compatibility surface.
 
