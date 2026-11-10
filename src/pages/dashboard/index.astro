@@ -651,6 +651,7 @@ const eventKinds = [
           <form method="dialog" data-danger-form>
             <header><h2 id="danger-title" data-danger-title>Confirm</h2></header>
             <dl class="danger-target" data-danger-target></dl>
+            <figure class="danger-content" data-danger-content hidden><figcaption data-danger-content-caption></figcaption><pre data-danger-content-text></pre></figure>
             <p id="danger-impact" class="danger-impact" data-danger-impact></p>
             <p data-danger-recovery></p>
             <label data-danger-reason hidden><span>Reason (required)</span><textarea name="reason" rows="3" maxlength="2000"></textarea></label>
@@ -869,8 +870,11 @@ const eventKinds = [
         element.hidden = !message;
         element.textContent = message ?? "";
       }
+      // Codes the adapter answers with its own fixed wording; the status mapping below would hide it.
+      const ADAPTER_EXPLAINED = new Set(["RELEASE_PROPOSER", "PROBE_RATE_LIMITED", "PROVIDER_NOT_ENABLED"]);
       function errorMessage(error: unknown): string {
         if (error instanceof DashboardApiError) {
+          if (ADAPTER_EXPLAINED.has(error.code)) return error.message;
           if (error.status === 401) return "Your dashboard session is no longer valid. Sign in again.";
           if (error.status === 403) return "This principal is not authorized for that operation.";
           if (error.status === 404) return "The authorized resource was not found.";
@@ -912,6 +916,8 @@ const eventKinds = [
         recovery: string;
         confirm: string;
         reason?: boolean;
+        /** The exact text an action publishes or withdraws, shown in full. */
+        content?: { caption: string; text: string };
       };
       /**
        * One confirmation for every destructive or release-changing action: it
@@ -936,6 +942,10 @@ const eventKinds = [
           detail.textContent = String(value);
           target.append(term, detail);
         }
+        const content = one<HTMLElement>("[data-danger-content]");
+        content.hidden = !request.content;
+        text("[data-danger-content-caption]", request.content?.caption ?? "");
+        text("[data-danger-content-text]", request.content?.text ?? "");
         reasonLabel.hidden = !request.reason;
         reason.required = Boolean(request.reason);
         reason.value = "";
@@ -1443,11 +1453,33 @@ const eventKinds = [
         const target = one<HTMLElement>("[data-releases-output]");
         if (!has("releases:read")) return renderMessage(target, "This principal has no read capability for releases.");
         renderMessage(target, "Loading authorized releases…");
-        const payload = await getArea("governance/releases");
-        renderPayload(target, payload, { actions: {
+        // Channel labels are a convenience: a principal that cannot list channels still sees ids.
+        const [payload, channels] = await Promise.all([
+          getArea("governance/releases"),
+          getArea("governance/channels").then((value) => payloadData(value).channels, () => []),
+        ]);
+        const channelLabels = new Map<string, string>();
+        for (const channel of Array.isArray(channels) ? channels : []) {
+          if (!channel || typeof channel !== "object") continue;
+          const row = channel as Record<string, unknown>;
+          const id = row.channel_id ?? row.id;
+          const label = row.label ?? row.name;
+          if (typeof id === "string" && typeof label === "string") channelLabels.set(id, label);
+        }
+        const data = payloadData(payload);
+        const releases = Array.isArray(data.releases) ? data.releases.map((value) => {
+          if (!value || typeof value !== "object") return value;
+          const row = value as Record<string, unknown>;
+          const label = typeof row.channel_id === "string" ? channelLabels.get(row.channel_id) : undefined;
+          return label ? { ...row, channel_label: `${label} (${row.channel_id})` } : row;
+        }) : data.releases;
+        renderPayload(target, { ...payload, data: { ...data, releases } }, { actions: {
           releases: (row) => {
             if (!has("releases:approve") || typeof row.release_id !== "string") return [];
             const status = String(row.status);
+            const ownDraft = (status === "draft" || status === "suspended") && row.proposed_by === principal?.principal_id;
+            // Separation of duties: the server refuses the proposer's own approval.
+            if (ownDraft) return [{ label: "Awaiting approval by another release approver", note: true }];
             const actions = status === "draft" || status === "suspended" ? ["approve"]
               : status === "approved" ? ["activate", "revoke"] : status === "active" ? ["revoke"] : [];
             return actions.map((action) => ({
@@ -1457,7 +1489,14 @@ const eventKinds = [
                 const title = `${action[0]!.toUpperCase()}${action.slice(1)}`;
                 const confirmed = await confirmDanger({
                   title: `${title} release ${row.release_id}?`,
-                  target: [["Release", row.release_id], ["Channel", row.channel_id], ["Claim", row.claim_id], ["Audience", row.audience], ["Version", row.version]],
+                  target: [["Release", row.release_id], ["Channel", row.channel_label ?? row.channel_id], ["Claim", row.claim_id],
+                    ["Audience", row.audience], ["Locale", row.locale],
+                    ["Valid", row.valid_from || row.valid_to ? `${row.valid_from ?? "now"} → ${row.valid_to ?? "open-ended"}` : undefined],
+                    ["Proposed by", row.proposed_by], ["Proposal reason", row.proposal_reason], ["Version", row.version]],
+                  ...(typeof row.released_content === "string" ? { content: {
+                    caption: action === "revoke" ? "Text agents and customers stop receiving" : "Text agents and customers will receive",
+                    text: row.released_content,
+                  } } : {}),
                   impact: action === "activate" ? "Agents on this channel receive this release on their next request."
                     : action === "revoke" ? "Agents stop receiving this release on their next request."
                     : "The release becomes eligible for activation.",

@@ -64,6 +64,12 @@ and a selection prompt before it. "No live data loaded for this principal"
 appears only after sign-out, expiry, or an identity change has cleared private
 data. Work,
 Access, API & Keys, Approvals, and Releases place actions in the affected row.
+Releases show each release's content (two lines in the list, complete in the
+inspector) and its channel label. The approve, activate, and revoke
+confirmation shows the full text that agents and customers receive, with
+locale, validity window, proposer, and proposal reason. A release's proposer
+sees "Awaiting approval by another release approver" instead of **Approve**,
+and a separation-of-duties refusal says so instead of "not authorized".
 Each successful action reloads server state. System and Models show named facts
 instead of generic JSON records. System lists readiness checks failing first,
 each with a text status and a marker (✕ failing, ✓ OK, – disabled), and names

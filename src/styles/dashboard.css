@@ -457,6 +457,11 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
 .danger-target { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 12px; }
 .danger-target dt { color: var(--muted); font: 9px/1.8 "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
 .danger-target dd { margin: 0; overflow-wrap: anywhere; font: 11px/1.6 "JetBrains Mono Variable", monospace; }
+.danger-content { margin: 0; padding: 10px 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; }
+.danger-content figcaption { margin-bottom: 6px; color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
+.danger-content pre { max-height: 40vh; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 "JetBrains Mono Variable", monospace; }
+[data-collection="releases"] td[data-label="Content"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.collection-note { color: var(--muted); font-size: 11px; }
 .danger-impact { color: var(--danger); font-weight: 600; }
 .danger-dialog textarea { min-height: 72px; padding: 8px 10px; background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 12px/1.5 "Instrument Sans Variable", sans-serif; resize: vertical; }
 .danger-button { background: var(--danger); border-color: var(--danger); }

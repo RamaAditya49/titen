@@ -288,6 +288,8 @@ function upstreamMessage(status: number): string {
 const PROVIDER_NOT_ENABLED = new Set(["The extraction provider is not enabled.", "The embedding provider is not enabled."]);
 function knownUpstreamError(path: string, payload: Record<string, unknown>): { code: string; message: string } | undefined {
   const upstream = payload.error && typeof payload.error === "object" ? payload.error as Record<string, unknown> : {};
+  if (/^\/v1\/knowledge-releases\/[^/]+\/approve$/u.test(path) && upstream.message === "The release proposer cannot approve it.")
+    return { code: "RELEASE_PROPOSER", message: "You proposed this release; another approver must approve it." };
   if (path !== "/v1/models/probe") return;
   if (upstream.code === "RATE_LIMITED")
     return { code: "PROBE_RATE_LIMITED", message: "Wait ten seconds before probing a model provider again." };
