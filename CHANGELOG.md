@@ -29,6 +29,7 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 ### Fixed
 
 - Dashboard Releases now shows what an approver is publishing. The list has a Content column and channel labels, and the approve, activate, and revoke confirmation shows the full released text with its locale, validity window, proposer, and proposal reason. A release's proposer no longer sees an **Approve** that the server always refuses; the row says another approver must approve. If the server does refuse for separation of duties, the message names that rule instead of the generic "not authorized". The adapter maps the release proposer refusal to its own fixed wording. ([#401](https://github.com/RamaAditya49/titen/issues/401))
+- Dashboard Subjects and Projects reference panes no longer hang on "Loading authorized references…". The dashboard adapter encoded the ID a second time, so a subject such as `user:alice` was requested as `user%253Aalice` and got a 404. The adapter now decodes the path segment once before re-encoding it, and rejects a malformed escape with 400. A failed request now shows an error in the pane, and a subject or project with no references says so by name. ([#403](https://github.com/RamaAditya49/titen/issues/403))
 
 ## [0.10.11] — 2026-11-09
 
