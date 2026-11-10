@@ -1266,13 +1266,25 @@ const eventKinds = [
             }],
             inspect: async (row) => {
               if (typeof row.subject_id !== "string") return;
-              const references = one<HTMLElement>("[data-subject-references]");
-              renderMessage(references, "Loading authorized references…");
-              renderPayload(references, await getArea(`subjects/${encodeURIComponent(row.subject_id as string)}/references`));
+              await loadReferences("subjects", row.subject_id, one<HTMLElement>("[data-subject-references]"), `subject ${row.subject_id}`);
             },
           });
         }
         catch (error) { handleError(error, target); }
+      }
+      /** A references pane always ends in references, an empty state, or an error (#403). */
+      async function loadReferences(kind: "subjects" | "projects", id: string, pane: HTMLElement, label: string) {
+        renderMessage(pane, "Loading authorized references…");
+        try {
+          const payload = await getArea(`${kind}/${encodeURIComponent(id)}/references`);
+          const references = payloadData(payload).references;
+          if (Array.isArray(references) && references.length === 0) renderMessage(pane, `No canonical references for ${label}.`);
+          else renderPayload(pane, payload);
+        } catch (error) {
+          if (error instanceof DashboardApiError && error.status === 404)
+            renderMessage(pane, `No readable records for ${label}; its references cannot be shown.`, true);
+          else handleError(error, pane);
+        }
       }
       async function loadProjects() {
         const target = one<HTMLElement>("[data-projects-output]");
@@ -1290,9 +1302,8 @@ const eventKinds = [
             emptyMessage: "No authorized project scopes returned.",
             inspect: async (row) => {
               const id = typeof row.project_id === "string" ? row.project_id : "~";
-              const references = one<HTMLElement>("[data-project-references]");
-              renderMessage(references, "Loading authorized references…");
-              renderPayload(references, await getArea(`projects/${encodeURIComponent(id)}/references`));
+              await loadReferences("projects", id, one<HTMLElement>("[data-project-references]"),
+                id === "~" ? "unscoped memory" : `project ${row.reference ?? id}`);
             },
           });
         }

@@ -630,8 +630,13 @@ const server = Bun.serve({ hostname: "127.0.0.1", port, maxRequestBodySize: 2 * 
       return path ? proxyJson(request, path) : error(400, "INVALID_REQUEST", "Query parameters are not allowlisted.");
     }
     const reference = url.pathname.match(/^\/dashboard-api\/(projects|subjects)\/([^/]+)\/references$/u);
-    if (reference && [...url.searchParams].length === 0)
-      return proxyJson(request, `/v1/${reference[1]}/${encodeURIComponent(reference[2]!)}/references`);
+    if (reference && [...url.searchParams].length === 0) {
+      // The pathname keeps the browser's percent-encoding; decode it once so
+      // re-encoding does not turn "user%3Aalice" into "user%253Aalice".
+      let id: string;
+      try { id = decodeURIComponent(reference[2]!); } catch { return error(400, "INVALID_REQUEST", "The reference id is not valid percent-encoding."); }
+      return proxyJson(request, `/v1/${reference[1]}/${encodeURIComponent(id)}/references`);
+    }
   }
   if (url.pathname.startsWith("/dashboard-api/")) return error(404, "NOT_FOUND", "Route is not allowlisted.");
   return staticFile(raw);

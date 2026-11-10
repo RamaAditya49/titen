@@ -663,6 +663,40 @@ test("Work and Federation lookups render beside their lists and word a miss as a
   await expect(peers).toBeVisible();
 });
 
+test("reference panes always resolve: data, an empty state, or a visible error", async ({ page }) => {
+  await mockServerMode(page);
+  const referenceRequests: string[] = [];
+  await page.route(/\/dashboard-api\/subjects(\?.*)?$/, (route) => route.fulfill({ json: { data: { subjects: [
+    { subject_id: "user:alice", label: "Alice" }, { subject_id: "user:bob", label: "Bob" },
+  ] } } }));
+  await page.route("**/dashboard-api/subjects/*/references", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    referenceRequests.push(path);
+    return path.includes("alice")
+      ? route.fulfill({ status: 404, json: { error: { code: "UPSTREAM_404", message: "The requested authorized resource was not found." } } })
+      : route.fulfill({ json: { data: { subject_id: "user:bob", references: [] } } });
+  });
+  await page.route(/\/dashboard-api\/projects(\?.*)?$/, (route) => route.fulfill({ json: { data: { projects: [
+    { project_id: "prj_web", reference: "team/web" },
+  ] } } }));
+  await page.route("**/dashboard-api/projects/*/references", (route) => route.fulfill({ status: 500, json: { error: { code: "UPSTREAM_UNAVAILABLE", message: "Titen did not return a usable response." } } }));
+
+  await page.goto("/dashboard/#subjects");
+  const pane = page.locator("[data-subject-references]");
+  await page.getByRole("button", { name: "Inspect Alice" }).click();
+  await expect(pane).not.toContainText("Loading", { timeout: 2000 });
+  await expect(pane).toContainText("No readable records for subject user:alice");
+  expect(referenceRequests).toContain("/dashboard-api/subjects/user%3Aalice/references");
+  await page.getByRole("button", { name: "Inspect Bob" }).click();
+  await expect(pane).toHaveText("No canonical references for subject user:bob.");
+
+  await page.locator('[data-area="projects"]').click();
+  const projectPane = page.locator("[data-project-references]");
+  await page.getByRole("button", { name: /^Inspect / }).first().click();
+  await expect(projectPane).not.toContainText("Loading", { timeout: 2000 });
+  await expect(projectPane).toContainText("Titen did not return a usable response.");
+});
+
 test("renders live Memories and clears stale private data on disconnect", async ({ page }) => {
   const service = await mockServerMode(page);
   await page.route("**/dashboard-api/atlas/compile", async (route) => {

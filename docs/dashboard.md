@@ -60,7 +60,10 @@ current checkpoint for …" or "No exchange log for peer …". Checkpoint kind i
 choice of `task_state`, `conversation`, `workflow`, or `cursor`. Handoff rows
 offer **Find checkpoint**, peer rows offer **View log**, and both ID fields
 suggest IDs already listed. Projects and Subjects show their canonical references after selection
-and a selection prompt before it. "No live data loaded for this principal"
+and a selection prompt before it. A references pane always ends in the
+references, "No canonical references for …", or a visible error; it never stays
+on its loading text. IDs such as `user:alice` are encoded exactly once on the
+way to the API. "No live data loaded for this principal"
 appears only after sign-out, expiry, or an identity change has cleared private
 data. Work,
 Access, API & Keys, Approvals, and Releases place actions in the affected row.
