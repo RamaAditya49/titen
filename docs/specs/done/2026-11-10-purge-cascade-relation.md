@@ -1,12 +1,11 @@
 ---
 work_id: purge-cascade-relation
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-11-10
 updated: 2026-11-10
-review_after: 2026-11-17
 owner: maintainers
 ---
 # Purge cascade follows the source relation
@@ -54,3 +53,8 @@ observation as both `contradicts` and `supports` is dependent.
 The contract suite covers each criterion on Bun SQLite and on the D1 harness.
 The existing purge and legal-hold cases still pass. `docs/reference/api.md`
 states the dependency definition.
+
+## Completion evidence
+
+All six acceptance criteria passed on Bun SQLite and on the D1 harness; the
+paired plan maps each to its contract case.

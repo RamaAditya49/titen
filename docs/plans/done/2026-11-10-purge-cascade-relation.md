@@ -1,14 +1,13 @@
 ---
 work_id: purge-cascade-relation
-status: active
-stage: implement
-outcome: pending
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-11-10
 updated: 2026-11-10
-review_after: 2026-11-17
 owner: maintainers
-spec: docs/specs/active/2026-11-10-purge-cascade-relation.md
+spec: docs/specs/done/2026-11-10-purge-cascade-relation.md
 ---
 # Purge cascade relation plan
 
@@ -38,5 +37,5 @@ cited claim.
 
 ## Verification
 
-`pnpm test:api` and `pnpm test:integration` on `rama-tuf`, and
-`pnpm check:workflow`.
+On `rama-tuf`: `pnpm typecheck` passed, `pnpm test:api` passed (D1 harness 9, contract and SDK 185), `pnpm test:integration` passed (308), and
+`pnpm check:workflow` passed. The new contradicting-source case failed before the fix. One unrelated atlas case failed once and passed on two reruns.
