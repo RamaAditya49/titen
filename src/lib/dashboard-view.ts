@@ -2,8 +2,10 @@ export type DashboardRecord = Record<string, unknown>;
 
 export type CollectionAction = {
   label: string;
-  run: () => Promise<void> | void;
+  run?: () => Promise<void> | void;
   tone?: "default" | "danger";
+  /** Renders the label as plain text in place of a control the row cannot use. */
+  note?: boolean;
 };
 
 export type CollectionColumn = {
@@ -123,7 +125,7 @@ const schemas: Record<string, CollectionSchema> = {
   releases: {
     title: "Release lifecycle",
     identity: ["release_id", "label"],
-    columns: [field("Release", ["release_id", "label"], true), field("Channel", ["channel_id"], true), field("Claim", ["claim_id"], true), field("Audience", ["audience"]), field("Status", ["status"]), field("Version", ["version"], true), date("Updated", ["updated_at", "created_at"])],
+    columns: [field("Release", ["release_id", "label"], true), field("Content", ["released_content"]), field("Channel", ["channel_label", "channel_id"]), field("Claim", ["claim_id"], true), field("Audience", ["audience"]), field("Status", ["status"]), field("Version", ["version"], true), date("Updated", ["updated_at", "created_at"])],
   },
   principals: {
     title: "Principals",
@@ -334,13 +336,21 @@ export function renderCollection(target: HTMLElement, definition: CollectionDefi
     });
     actionsCell.append(inspect);
     for (const action of definition.actions?.(row, index) ?? []) {
+      if (action.note || !action.run) {
+        const note = document.createElement("span");
+        note.className = "collection-note";
+        note.textContent = action.label;
+        actionsCell.append(note);
+        continue;
+      }
+      const run = action.run;
       const button = document.createElement("button");
       button.type = "button";
       button.className = `text-button${action.tone === "danger" ? " danger-action" : ""}`;
       button.textContent = action.label;
       button.addEventListener("click", async () => {
         button.disabled = true;
-        try { await action.run(); } finally { button.disabled = false; }
+        try { await run(); } finally { button.disabled = false; }
       });
       actionsCell.append(button);
     }

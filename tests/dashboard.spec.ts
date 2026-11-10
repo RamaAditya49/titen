@@ -1695,6 +1695,43 @@ test("release activation and reasoned decisions use the confirmation dialog", as
   expect(nativeDialogs).toEqual([]);
 });
 
+test("releases show the content to approve and keep the proposer from approving their own draft", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/governance/releases", (route) => route.fulfill({ json: { data: { releases: [
+    { release_id: "rel_own", channel_id: "chn_web", claim_id: "claim_1", audience: "anonymous", status: "draft", version: 1,
+      proposed_by: "server_operator", released_content: "Own draft text.", locale: "en" },
+    { release_id: "rel_peer", channel_id: "chn_web", claim_id: "claim_2", audience: "anonymous", status: "draft", version: 1,
+      proposed_by: "editor", proposal_reason: "Quarterly policy refresh", locale: "id-ID",
+      valid_from: "2026-11-10T00:00:00Z", released_content: "Returns are accepted within 30 days of delivery." },
+  ] } } }));
+  await page.route("**/dashboard-api/governance/channels", (route) => route.fulfill({ json: { data: { channels: [
+    { channel_id: "chn_web", label: "Synthetic web channel" },
+  ] } } }));
+  await page.route("**/dashboard-api/releases/**", (route) => route.fulfill({ status: 403, json: {
+    error: { code: "RELEASE_PROPOSER", message: "You proposed this release; another approver must approve it." },
+  } }));
+  await page.goto("/dashboard/#releases");
+  const table = page.locator('[data-collection="releases"]');
+  const own = table.locator("tbody tr").filter({ hasText: "rel_own" });
+  const peer = table.locator("tbody tr").filter({ hasText: "rel_peer" });
+  await expect(peer.locator('td[data-label="Content"]')).toHaveText("Returns are accepted within 30 days of delivery.");
+  await expect(peer.locator('td[data-label="Channel"]')).toContainText("Synthetic web channel");
+  await expect(own.getByRole("button", { name: /^Approve/ })).toHaveCount(0);
+  await expect(own).toContainText("Awaiting approval by another release approver");
+
+  await peer.getByRole("button", { name: "Approve · rel_peer" }).click();
+  const dialog = page.locator("dialog[data-danger-dialog]");
+  await expect(dialog).toHaveAttribute("open", "");
+  await expect(dialog.locator("[data-danger-content]")).toContainText("Text agents and customers will receive");
+  await expect(dialog.locator("[data-danger-content-text]")).toHaveText("Returns are accepted within 30 days of delivery.");
+  await expect(dialog).toContainText("id-ID");
+  await expect(dialog).toContainText("editor");
+  await expect(dialog).toContainText("Quarterly policy refresh");
+  await dialog.getByLabel("Reason (required)").fill("Reviewed the text");
+  await dialog.getByRole("button", { name: "Approve release" }).click();
+  await expect(page.locator("[data-releases-output]")).toContainText("You proposed this release; another approver must approve it.");
+});
+
 test("credential failures say what went wrong, mark the field, and never claim an expired session", async ({ page }) => {
   let stage = "none";
   await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", authentication: "session", authenticated: stage !== "none" } }));

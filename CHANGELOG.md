@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard Releases now shows what an approver is publishing. The list has a Content column and channel labels, and the approve, activate, and revoke confirmation shows the full released text with its locale, validity window, proposer, and proposal reason. A release's proposer no longer sees an **Approve** that the server always refuses; the row says another approver must approve. If the server does refuse for separation of duties, the message names that rule instead of the generic "not authorized". The adapter maps the release proposer refusal to its own fixed wording. ([#401](https://github.com/RamaAditya49/titen/issues/401))
+
 ## [0.10.11] — 2026-11-09
 
 schema 31
