@@ -2,9 +2,11 @@
 work_id: purge-cascade-relation
 status: active
 stage: implement
+outcome: pending
 complexity: complex
 created: 2026-11-10
 updated: 2026-11-10
+review_after: 2026-11-17
 owner: maintainers
 spec: docs/specs/active/2026-11-10-purge-cascade-relation.md
 ---
