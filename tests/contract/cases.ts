@@ -8652,6 +8652,172 @@ export const CASES: Case[] = [
   },
 ];
 
+/** Appends one observation and returns its id. */
+async function purgeRelationObservation(fx: Fixture, key: string, subject: string, content: string) {
+  const res = await fx.call("POST", "/v1/observations", {
+    key,
+    body: observation({ subject_id: subject, content }),
+  });
+  expectOk(res, 201);
+  return res.body.data.observation_id as string;
+}
+
+/** Consolidates one claim that cites the given sources. */
+async function purgeRelationClaim(
+  fx: Fixture,
+  key: string,
+  subject: string,
+  statement: string,
+  sources: Array<{ observation_id: string; relation: string }>,
+) {
+  const res = await fx.call("POST", "/v1/consolidations", {
+    key,
+    body: { subject_id: subject, claims: [{ kind: "procedural", statement, confidence: 0.9, sources }] },
+  });
+  expectOk(res, 201);
+  return res.body.data.claims[0] as { claim_id: string; status: string };
+}
+
+async function purgeRelationClaimState(fx: Fixture, claimId: string) {
+  const rows = await fx.query<{
+    statement: string; status: string; version: number; history: number; revoked_events: number;
+  }>(
+    `SELECT c.statement, c.status, c.version,
+            (SELECT COUNT(*) FROM record_history WHERE record_id = c.id AND change_kind = 'evidence_purged') AS history,
+            (SELECT COUNT(*) FROM events WHERE resource_id = c.id AND kind = 'claim.revoked') AS revoked_events
+       FROM claims c WHERE c.id = ?`,
+    [claimId],
+  );
+  const row = rows[0]!;
+  return {
+    statement: row.statement,
+    status: row.status,
+    version: Number(row.version),
+    history: Number(row.history),
+    revoked_events: Number(row.revoked_events),
+  };
+}
+
+CASES.push({
+  name: "purging a contradicting source keeps the claim, and purging a supporting source revokes it",
+  async run(fx) {
+    const operator = await fx.provision({ scopes: ["*"] });
+    const subject = "purge-relation-subject";
+    const supportA = await purgeRelationObservation(fx, operator.key, subject, "Relation support alpha note.");
+    const supportB = await purgeRelationObservation(fx, operator.key, subject, "Relation support beta note.");
+    const against = await purgeRelationObservation(fx, operator.key, subject, "Relation contradiction gamma note.");
+    const created = await purgeRelationClaim(fx, operator.key, subject, "Relation widget statement stays readable.", [
+      { observation_id: supportA, relation: "supports" },
+      { observation_id: supportB, relation: "supports" },
+      { observation_id: against, relation: "contradicts" },
+    ]);
+    assert.equal(created.status, "disputed");
+    const claimId = created.claim_id;
+    const compileBody = { subject_id: subject, task: "relation widget statement", max_tokens: 900 };
+    const compiledBefore = await fx.call("POST", "/v1/context/compile", { key: operator.key, body: compileBody });
+    expectOk(compiledBefore);
+    const idsBefore = compiledBefore.body.data.items.map((item: { claim_id: string }) => item.claim_id);
+    assert.ok(idsBefore.includes(claimId), "the disputed claim must be compiled before the purge");
+    const before = await purgeRelationClaimState(fx, claimId);
+
+    // AC-PRG-001 and AC-PRG-004: the contradicting source goes, the claim stays.
+    const purgedAgainst = await fx.call("DELETE", `/v1/observations/${against}`, { key: operator.key });
+    expectOk(purgedAgainst);
+    assert.equal(purgedAgainst.body.data.dependent_claims_redacted, 0);
+    assert.deepEqual(await purgeRelationClaimState(fx, claimId), before);
+    assert.equal(before.statement, "Relation widget statement stays readable.");
+    assert.equal(before.status, "disputed");
+    assert.equal(before.history, 0);
+    assert.equal(before.revoked_events, 0);
+    const compiledAfter = await fx.call("POST", "/v1/context/compile", { key: operator.key, body: compileBody });
+    expectOk(compiledAfter);
+    assert.ok(
+      compiledAfter.body.data.items.some((item: { claim_id: string }) => item.claim_id === claimId),
+      "the claim must still be compiled after its contradicting source is purged",
+    );
+    const evidence = await fx.call("GET", `/v1/claims/${claimId}/evidence`, { key: operator.key });
+    expectOk(evidence);
+    assert.equal(evidence.body.data.claim.claim, "Relation widget statement stays readable.");
+    assert.equal(evidence.body.data.evidence.supporting.length, 2);
+    assert.equal(evidence.body.data.evidence.contradicting.length, 1);
+    const tombstone = evidence.body.data.evidence.contradicting[0];
+    assert.equal(tombstone.observation_id, against);
+    assert.match(tombstone.content_hash, /^[0-9a-f]{64}$/);
+    assert.equal(tombstone.content, `[redacted sha256:${tombstone.content_hash}]`);
+    assert.ok(!JSON.stringify(evidence.body).includes("Relation contradiction gamma note."));
+
+    // AC-PRG-002: a supporting source goes, the claim is redacted and revoked.
+    const purgedSupport = await fx.call("DELETE", `/v1/observations/${supportA}`, { key: operator.key });
+    expectOk(purgedSupport);
+    assert.equal(purgedSupport.body.data.dependent_claims_redacted, 1);
+    const revoked = await purgeRelationClaimState(fx, claimId);
+    assert.equal(revoked.statement, "[redacted: purged evidence]");
+    assert.equal(revoked.status, "revoked");
+    assert.equal(revoked.version, before.version + 1);
+    assert.equal(revoked.history, 1);
+    assert.equal(revoked.revoked_events, 1);
+  },
+});
+
+CASES.push({
+  name: "purging a qualifying source redacts and revokes the claim",
+  async run(fx) {
+    const operator = await fx.provision({ scopes: ["*"] });
+    const subject = "purge-qualifies-subject";
+    const support = await purgeRelationObservation(fx, operator.key, subject, "Qualifier support delta note.");
+    const qualifier = await purgeRelationObservation(fx, operator.key, subject, "Qualifier scope epsilon note.");
+    const created = await purgeRelationClaim(fx, operator.key, subject, "Qualifier widget statement holds.", [
+      { observation_id: support, relation: "supports" },
+      { observation_id: qualifier, relation: "qualifies" },
+    ]);
+    const purged = await fx.call("DELETE", `/v1/observations/${qualifier}`, { key: operator.key });
+    expectOk(purged);
+    assert.equal(purged.body.data.dependent_claims_redacted, 1);
+    const state = await purgeRelationClaimState(fx, created.claim_id);
+    assert.equal(state.statement, "[redacted: purged evidence]");
+    assert.equal(state.status, "revoked");
+    assert.equal(state.history, 1);
+    assert.equal(state.revoked_events, 1);
+  },
+});
+
+CASES.push({
+  name: "a legal hold on a claim blocks the purge of its supporting and contradicting sources",
+  async run(fx) {
+    const operator = await fx.provision({ scopes: ["*"] });
+    const subject = "purge-hold-relation-subject";
+    const support = await purgeRelationObservation(fx, operator.key, subject, "Held support zeta note.");
+    const against = await purgeRelationObservation(fx, operator.key, subject, "Held contradiction eta note.");
+    const created = await purgeRelationClaim(fx, operator.key, subject, "Held widget statement stays put.", [
+      { observation_id: support, relation: "supports" },
+      { observation_id: against, relation: "contradicts" },
+    ]);
+    const hold = await fx.call("POST", "/v1/legal-holds", {
+      key: operator.key,
+      body: { resource_type: "claim", resource_id: created.claim_id, reason: "Synthetic hold for purge test." },
+    });
+    expectOk(hold, 201);
+    const before = await purgeRelationClaimState(fx, created.claim_id);
+    const contentOf = async (id: string) =>
+      (await fx.query<{ content: string }>(`SELECT content FROM observations WHERE id = ?`, [id]))[0]!.content;
+    const contentBefore = [await contentOf(support), await contentOf(against)];
+
+    // AC-PRG-003: the hold is relation-blind, so a contradicting source is refused.
+    expectError(await fx.call("DELETE", `/v1/observations/${against}`, { key: operator.key }), 409, "CONFLICT");
+    // AC-PRG-006: a supporting source is refused.
+    expectError(await fx.call("DELETE", `/v1/observations/${support}`, { key: operator.key }), 409, "CONFLICT");
+
+    assert.deepEqual(await purgeRelationClaimState(fx, created.claim_id), before);
+    assert.deepEqual([await contentOf(support), await contentOf(against)], contentBefore);
+    const purges = await fx.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM record_history
+        WHERE record_id IN (?, ?) AND change_kind = 'purge'`,
+      [support, against],
+    );
+    assert.equal(Number(purges[0]!.count), 0);
+  },
+});
+
 CASES.push({
   name: "dashboard list surfaces enforce server-side hard caps",
   async run(fx) {
