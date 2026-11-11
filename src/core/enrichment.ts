@@ -143,6 +143,16 @@ export type FailureClass =
   | "unsafe_output"
   | "source_changed";
 
+/**
+ * Failure classes that an operator can fix: the provider is down, refuses the
+ * request, or breaks the protocol. Only these classes mark readiness.
+ */
+export const OPERATOR_FAILURE_CLASSES = [
+  "provider_unavailable",
+  "provider_rejected",
+  "provider_protocol",
+] as const satisfies readonly FailureClass[];
+
 export class EnrichmentFailure extends Error {
   constructor(
     readonly failureClass: FailureClass,
@@ -1465,7 +1475,10 @@ async function failJob(
   now: Date,
   outputHash: string | null = null,
 ): Promise<"retried" | "failed" | "lease_lost"> {
-  const terminal = !failure.retryable || job.attempts >= job.max_attempts;
+  // A rejected output gets one automatic second run: model output varies between runs.
+  const retryable = failure.retryable
+    || (failure.failureClass === "unsafe_output" && job.attempts <= 1);
+  const terminal = !retryable || job.attempts >= job.max_attempts;
   const next = new Date(
     now.getTime() + Math.min(RETRY_MAX_MS, RETRY_BASE_MS * (2 ** Math.max(0, job.attempts - 1))),
   ).toISOString();
@@ -1481,7 +1494,8 @@ async function failJob(
       terminal ? "failed" : "pending",
       terminal ? at : next,
       failure.failureClass,
-      outputHash,
+      // A job that returns to pending records no hash: its next run records its own.
+      terminal ? outputHash : null,
       at,
       job.id,
       job.lease_token,

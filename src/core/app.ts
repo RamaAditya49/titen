@@ -74,7 +74,7 @@ import { backgroundRepairState } from "./maintenance";
 import type { WebhookSecurity } from "./webhook-security";
 import type { SecretCipher } from "./secrets";
 import { snapshotExtractionCapability, type ExtractionCapability } from "./extraction";
-import { drainEnrichmentRoute } from "./enrichment";
+import { drainEnrichmentRoute, OPERATOR_FAILURE_CLASSES } from "./enrichment";
 import { createWebAuthnRuntime, type WebAuthnRuntime } from "./webauthn";
 import {
   activateKnowledgeRelease,
@@ -444,9 +444,12 @@ async function readiness(ctx: RequestContext): Promise<Result> {
         backlog: number;
       }>(
         `SELECT
-           EXISTS(SELECT 1 FROM enrichment_jobs WHERE state = 'failed' AND acked_at IS NULL) AS failed,
+           EXISTS(SELECT 1 FROM enrichment_jobs
+                   WHERE state = 'failed' AND acked_at IS NULL
+                     AND error_class IN (${OPERATOR_FAILURE_CLASSES.map(() => "?").join(", ")})) AS failed,
            EXISTS(SELECT 1 FROM enrichment_jobs
                    WHERE state IN ('pending', 'leased')) AS backlog`,
+        [...OPERATOR_FAILURE_CLASSES],
       );
       checks.enrichment_jobs = {
         state: ctx.app.modelCapabilities.extraction === "configured_error"

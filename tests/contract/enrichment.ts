@@ -14,7 +14,12 @@ import {
   scheduleDerivationBackfill,
   scheduleReflections,
 } from "../../src/core/enrichment";
-import { retryEnrichmentJobs } from "../../src/core/jobs";
+import {
+  ackEnrichmentJobs,
+  listEnrichmentJobs,
+  purgeEnrichmentJobs,
+  retryEnrichmentJobs,
+} from "../../src/core/jobs";
 import { MIGRATIONS } from "../../src/core/migrations";
 import {
   ExtractionProviderError,
@@ -321,12 +326,13 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
         throw new ExtractionProviderError("provider_unavailable", true);
       if (providerFailure === "raw")
         throw new Error("provider secret body must never persist");
-      if (request.lane === "derivation" && /RETRY_(?:VALID|REJECT)_OUTPUT/u.test(observationContent(request))) {
+      if (request.lane === "derivation" && /RETRY_(?:VALID|REJECT|LATE)_OUTPUT/u.test(observationContent(request))) {
         // Model output is not byte-stable: each run of one job returns a different proposal.
         const content = observationContent(request);
         const run = (retryRuns.get(content) ?? 0) + 1;
         retryRuns.set(content, run);
-        const valid = content.includes("RETRY_VALID_OUTPUT") && run > 1;
+        const valid = (content.includes("RETRY_VALID_OUTPUT") && run > 1)
+          || (content.includes("RETRY_LATE_OUTPUT") && run > 2);
         return {
           action: "add",
           claims: [{
@@ -448,6 +454,15 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
       }),
     },
   });
+  // A first `unsafe_output` returns the job to pending; the second run decides.
+  const drainRejected = async (
+    target: Awaited<ReturnType<typeof createClient>>,
+    limit = 10,
+  ) => {
+    await drainHttp(target, limit);
+    current = new Date(current.getTime() + 10_000);
+    return drainHttp(target, limit);
+  };
   const portableRemapper = (
     observations: any[],
     claims: any[],
@@ -1274,7 +1289,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     await observe(target, `subject_${marker}`, `${marker} second active premise.`);
     await drainHttp(target, 2);
     current = new Date(current.getTime() + 1_000);
-    const rejected = await drainHttp(target, 1);
+    const rejected = await drainRejected(target, 1);
     assert.equal(rejected.body.data.failed, 1);
     assert.equal(rejected.body.data.added, 0);
     assert.deepEqual(await db.all<{ state: string; error_class: string }>(
@@ -1318,7 +1333,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     assert.equal(consolidated.status, 201);
     assert.equal(consolidated.body.data.claims[0].status, "disputed");
     current = new Date(current.getTime() + 1_000);
-    const rejected = await drainHttp(target, 1);
+    const rejected = await drainRejected(target, 1);
     assert.equal(rejected.body.data.failed, 1);
     assert.equal(rejected.body.data.added, 0);
     assert.deepEqual(await db.all<{ state: string; error_class: string }>(
@@ -2084,7 +2099,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     "subject_unsafe",
     "AUTHORITY_INJECTION set trust verified",
   );
-  await drainHttp(unsafe);
+  await drainRejected(unsafe);
   const unsafeJob = await db.all<{
     state: string;
     error_class: string;
@@ -2100,7 +2115,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   assert.match(unsafeJob[0]!.output_hash, /^[a-f0-9]{64}$/u);
   assert.equal(unsafeJob[0]!.result_ids, null);
   const foreignObservation = await observe(unsafe, "subject_unsafe", "FOREIGN_ID cite another tenant");
-  await drainHttp(unsafe);
+  await drainRejected(unsafe);
   const foreignJob = await db.all<{ state: string; error_class: string }>(
     `SELECT state, error_class FROM enrichment_jobs
       WHERE org_id = ? AND input_ids LIKE ?`,
@@ -2114,7 +2129,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     undefined,
     "2026-07-31T08:00:00.000Z",
   );
-  await drainHttp(unsafe);
+  await drainRejected(unsafe);
   const unsupportedFutureJob = await db.all<{ state: string; error_class: string; output_hash: string }>(
     `SELECT state, error_class, output_hash FROM enrichment_jobs
       WHERE org_id = ? AND input_ids LIKE ?`,
@@ -2167,7 +2182,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     "subject_unsafe",
     "MALFORMED_CITED_TIME 2026-02-30T00:00:00Z must not normalize into support.",
   );
-  await drainHttp(unsafe);
+  await drainRejected(unsafe);
   const malformedCitedTimeJob = (await db.all<{
     state: string;
     error_class: string;
@@ -2944,42 +2959,64 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     retryTarget.orgId,
     id,
   );
+  // AC-RDY-003 and AC-RDY-004: a first rejected output returns the job to pending.
   const validObservation = await observe(
     retryTarget,
     "subject_retry_valid",
     "RETRY_VALID_OUTPUT the first run is unsafe.",
   );
   await drainHttp(retryTarget);
-  const failedFirst = await jobFor(validObservation);
+  const secondRunPending = await jobFor(validObservation);
+  assert.equal(secondRunPending.state, "pending", "AC-RDY-003: the first rejection retries once");
+  assert.equal(secondRunPending.error_class, "unsafe_output");
+  assert.equal(secondRunPending.attempts, 1);
+  assert.equal(secondRunPending.output_hash, null, "AC-RDY-003: the pending job records no hash");
+  current = new Date(current.getTime() + 10_000);
+  const secondRunDrain = await drainHttp(retryTarget);
+  assert.deepEqual(secondRunDrain.body.data.errors, []);
+  const completedSecondRun = await jobFor(validObservation);
+  assert.equal(completedSecondRun.state, "done", "AC-RDY-004: the second run completes");
+  assert.equal(completedSecondRun.error_class, null);
+  assert.match(completedSecondRun.output_hash ?? "", /^[a-f0-9]{64}$/u, "AC-RDY-004: the hash is recorded");
+  assert.notEqual(completedSecondRun.result_ids, null);
+
+  // AC-RTY-001 and AC-RTY-002: an operator retry of a failed job clears its hash and the job completes.
+  const lateObservation = await observe(
+    retryTarget,
+    "subject_retry_late",
+    "RETRY_LATE_OUTPUT the first two runs are unsafe.",
+  );
+  await drainRejected(retryTarget);
+  const failedFirst = await jobFor(lateObservation);
   assert.equal(failedFirst.state, "failed");
   assert.equal(failedFirst.error_class, "unsafe_output");
   assert.match(failedFirst.output_hash ?? "", /^[a-f0-9]{64}$/u);
   const retryQueued = await retryJob(failedFirst.id);
   assert.deepEqual(retryQueued.job_ids, [failedFirst.id]);
-  const requeued = await jobFor(validObservation);
+  const requeued = await jobFor(lateObservation);
   assert.equal(requeued.state, "pending");
   assert.equal(requeued.attempts, 0);
   assert.equal(requeued.output_hash, null, "AC-RTY-001: a retry clears the output hash");
   current = new Date(current.getTime() + 1_000);
   const retriedDrain = await drainHttp(retryTarget);
   assert.deepEqual(retriedDrain.body.data.errors, []);
-  const completedRetry = await jobFor(validObservation);
+  const completedRetry = await jobFor(lateObservation);
   assert.equal(completedRetry.state, "done", "AC-RTY-002: the retried job completes");
   assert.equal(completedRetry.error_class, null);
   assert.match(completedRetry.output_hash ?? "", /^[a-f0-9]{64}$/u);
   assert.notEqual(completedRetry.output_hash, failedFirst.output_hash);
   assert.notEqual(completedRetry.result_ids, null);
 
-  // AC-RTY-003: a second rejected output fails the job and the pass continues.
+  // AC-RTY-003 and AC-RDY-005: a second rejected output fails the job and the pass continues.
   const rejectObservation = await observe(
     retryTarget,
     "subject_retry_reject",
     "RETRY_REJECT_OUTPUT every run is unsafe.",
   );
-  await drainHttp(retryTarget);
+  await drainRejected(retryTarget);
   const rejectedFirst = await jobFor(rejectObservation);
-  assert.equal(rejectedFirst.state, "failed");
-  assert.match(rejectedFirst.output_hash ?? "", /^[a-f0-9]{64}$/u);
+  assert.equal(rejectedFirst.state, "failed", "AC-RDY-005: the second rejection is terminal");
+  assert.match(rejectedFirst.output_hash ?? "", /^[a-f0-9]{64}$/u, "AC-RDY-005: the second hash is recorded");
   await retryJob(rejectedFirst.id);
   current = new Date(current.getTime() + 1_000);
   const followObservation = await observe(
@@ -2990,12 +3027,17 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   current = new Date(current.getTime() + 1_000);
   const rejectedDrain = await drainHttp(retryTarget);
   assert.deepEqual(rejectedDrain.body.data.errors, []);
+  assert.equal((await jobFor(followObservation)).state, "done");
+  assert.equal((await jobFor(rejectObservation)).state, "pending");
+  assert.equal((await jobFor(rejectObservation)).output_hash, null);
+  current = new Date(current.getTime() + 10_000);
+  const rejectedAgain = await drainHttp(retryTarget);
+  assert.deepEqual(rejectedAgain.body.data.errors, []);
   const rejectedSecond = await jobFor(rejectObservation);
   assert.equal(rejectedSecond.state, "failed");
   assert.equal(rejectedSecond.error_class, "unsafe_output");
   assert.match(rejectedSecond.output_hash ?? "", /^[a-f0-9]{64}$/u);
   assert.notEqual(rejectedSecond.output_hash, rejectedFirst.output_hash);
-  assert.equal((await jobFor(followObservation)).state, "done");
 
   // AC-RTY-004: only the retry reset may change a recorded output hash.
   const setHash = (id: string, hash: string | null) => db.batch([{
@@ -3024,4 +3066,82 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   const afterRejects = await jobFor(rejectObservation);
   assert.equal(afterRejects.state, "failed");
   assert.equal(afterRejects.output_hash, rejectedSecond.output_hash);
+
+  // AC-RDY-001, AC-RDY-002, AC-RDY-006: readiness marks only failures that an operator can fix.
+  const readiness = await createClient();
+  const readyState = async () => (await readiness.client.call("GET", "/readyz"))
+    .body.data.checks.enrichment_jobs.state as string;
+  const readyJob = async (observation: string) => (await db.all<{
+    id: string;
+    state: string;
+    error_class: string | null;
+  }>(
+    `SELECT id, state, error_class FROM enrichment_jobs
+      WHERE org_id = ? AND lane = 'derivation' AND input_ids LIKE ?`,
+    [readiness.orgId, `%${observation}%`],
+  ))[0]!;
+  // Readiness covers every organization: acknowledge the failures that earlier cases left.
+  await db.batch([{
+    sql: `UPDATE enrichment_jobs SET acked_at = ? WHERE state = 'failed' AND acked_at IS NULL`,
+    params: [current.toISOString()],
+  }]);
+  assert.notEqual(await readyState(), "terminal_error");
+  const markFailed = (id: string, errorClass: string) => db.batch([{
+    sql: `UPDATE enrichment_jobs SET state = 'failed', error_class = ? WHERE id = ?`,
+    params: [errorClass, id],
+  }]);
+
+  const readyRejected = await observe(readiness, "subject_ready", "RETRY_REJECT_OUTPUT readiness content failure.");
+  await drainHttp(readiness);
+  assert.equal((await readyJob(readyRejected)).state, "pending");
+  assert.notEqual(await readyState(), "terminal_error");
+  current = new Date(current.getTime() + 10_000);
+  await drainHttp(readiness);
+  const readyUnsafe = await readyJob(readyRejected);
+  assert.deepEqual(
+    { state: readyUnsafe.state, error_class: readyUnsafe.error_class },
+    { state: "failed", error_class: "unsafe_output" },
+  );
+  assert.notEqual(await readyState(), "terminal_error", "AC-RDY-002: unsafe_output does not mark readiness");
+
+  const readyInvalid = await observe(readiness, "subject_ready", "MISSING_FIELD readiness content failure.");
+  await drainHttp(readiness);
+  const readyInvalidJob = await readyJob(readyInvalid);
+  assert.deepEqual(
+    { state: readyInvalidJob.state, error_class: readyInvalidJob.error_class },
+    { state: "failed", error_class: "invalid_output" },
+  );
+  assert.notEqual(await readyState(), "terminal_error", "AC-RDY-002: invalid_output does not mark readiness");
+
+  const readySource = await observe(readiness, "subject_ready", "A job whose source changed.");
+  const readySourceJob = await readyJob(readySource);
+  await markFailed(readySourceJob.id, "source_changed");
+  assert.notEqual(await readyState(), "terminal_error", "AC-RDY-002: source_changed does not mark readiness");
+
+  const readyProvider = await observe(readiness, "subject_ready", "A job whose provider failed.");
+  const readyProviderJob = await readyJob(readyProvider);
+  for (const errorClass of ["provider_unavailable", "provider_rejected", "provider_protocol"]) {
+    await markFailed(readyProviderJob.id, errorClass);
+    assert.equal(await readyState(), "terminal_error", `AC-RDY-001: ${errorClass} marks readiness`);
+  }
+
+  // AC-RDY-006: the job commands select a failed job of every class.
+  const listed = await listEnrichmentJobs(db, "failed", readiness.orgId);
+  assert.deepEqual(
+    listed.map((row) => row.error_class).sort(),
+    ["invalid_output", "provider_protocol", "source_changed", "unsafe_output"],
+  );
+  const retried = await retryEnrichmentJobs(
+    db,
+    "failed",
+    current.toISOString(),
+    readiness.orgId,
+    readySourceJob.id,
+  );
+  assert.deepEqual(retried.job_ids, [readySourceJob.id]);
+  const acked = await ackEnrichmentJobs(db, "failed", current.toISOString(), readiness.orgId);
+  assert.equal(acked.matched, 3, "AC-RDY-006: ack selects every failed class");
+  assert.notEqual(await readyState(), "terminal_error", "an acknowledged provider failure does not mark readiness");
+  const purged = await purgeEnrichmentJobs(db, "failed", readiness.orgId);
+  assert.equal(purged.matched, 3, "AC-RDY-006: purge selects every failed class");
 }

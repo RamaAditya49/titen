@@ -26,6 +26,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Changed
+
+- `/readyz` now reports `enrichment_jobs: terminal_error` only for a failed job that an operator can fix. These are the classes `provider_unavailable`, `provider_rejected`, and `provider_protocol`. A failed job with the class `unsafe_output`, `invalid_output`, or `source_changed` no longer marks readiness. The job stays `failed`. `titen jobs list`, `retry`, `ack`, and `purge` still select every failed job.
+- A job that fails with `unsafe_output` on its first attempt now returns to `pending` one time. The model output varies between runs, so the second run often passes. The first failed run records no output hash. A second `unsafe_output` failure is terminal and records the hash of the second output.
+
 ## [0.10.14] — 2026-11-11
 
 schema 32

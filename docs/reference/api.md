@@ -579,7 +579,13 @@ Jobs keep immutable input, model, prompt, schema, and policy fingerprints plus
 an output hash and result IDs, never raw prompts or model responses. A recorded
 output hash cannot change. The one exception is `titen jobs retry`: it returns a
 failed job to `pending` and clears the output hash, so the next run can record a
-new output. Imported
+new output. A job whose first run fails with `unsafe_output` returns to
+`pending` one time and records no output hash; a second `unsafe_output` failure
+is terminal and records its hash. `GET /readyz` reports `enrichment_jobs:
+terminal_error` only while an unacknowledged failed job has the class
+`provider_unavailable`, `provider_rejected`, or `provider_protocol`; the failed
+classes `unsafe_output`, `invalid_output`, and `source_changed` leave readiness
+unchanged. Imported
 observations are provenance restores and are excluded from automatic recovery
 backfill; submit a new observation explicitly if restored v1/v2 evidence should
 be considered new enrichment input. Format-v3 restores carry their original
