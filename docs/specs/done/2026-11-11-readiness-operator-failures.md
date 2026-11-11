@@ -1,9 +1,8 @@
 ---
 work_id: readiness-operator-failures
-status: active
-stage: implement
-outcome: pending
-review_after: 2026-11-18
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-11-11
 updated: 2026-11-11
