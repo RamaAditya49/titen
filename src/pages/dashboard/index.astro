@@ -691,6 +691,7 @@ const eventKinds = [
       } from "../../lib/dashboard-api";
       import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
       import {
+        type CollectionAction,
         readinessChecks,
         renderCollection,
         renderPayloadView,
@@ -871,7 +872,7 @@ const eventKinds = [
         element.textContent = message ?? "";
       }
       // Codes the adapter answers with its own fixed wording; the status mapping below would hide it.
-      const ADAPTER_EXPLAINED = new Set(["RELEASE_PROPOSER", "PROBE_RATE_LIMITED", "PROVIDER_NOT_ENABLED"]);
+      const ADAPTER_EXPLAINED = new Set(["RELEASE_PROPOSER", "APPROVAL_SUBMITTER", "PROBE_RATE_LIMITED", "PROVIDER_NOT_ENABLED"]);
       function errorMessage(error: unknown): string {
         if (error instanceof DashboardApiError) {
           if (ADAPTER_EXPLAINED.has(error.code)) return error.message;
@@ -1033,7 +1034,7 @@ const eventKinds = [
       async function loadAvailable(
         target: HTMLElement,
         requests: Array<[string, string]>,
-        options: Parameters<typeof renderPayloadView>[2] = {},
+        options: Parameters<typeof renderPayloadView>[2] | ((merged: Record<string, unknown>) => Parameters<typeof renderPayloadView>[2]) = {},
       ): Promise<Record<string, unknown>> {
         renderMessage(target, "Loading authorized live data…");
         const selected = requests.filter(([, scope]) => has(scope));
@@ -1044,7 +1045,7 @@ const eventKinds = [
         const results = await Promise.all(selected.map(async ([path]) => [path.split("/").at(-1)!, await getArea(path)] as const));
         const merged: Record<string, unknown> = {};
         for (const [name, payload] of results) Object.assign(merged, payloadData(payload));
-        renderPayload(target, { data: merged }, options);
+        renderPayload(target, { data: merged }, typeof options === "function" ? options(merged) : options);
         return merged;
       }
 
@@ -1413,33 +1414,56 @@ const eventKinds = [
       }
       async function loadGovernance() {
         const target = one<HTMLElement>("[data-governance-output]");
-        await loadAvailable(target, [["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"]], { actions: {
-          approvals: (row) => {
-            if (!has("approvals:approve") || typeof row.approval_id !== "string" || !["pending", "approved"].includes(String(row.status))) return [];
-            const decisions = row.status === "pending" ? ["approve", "reject"] : ["revoke"];
-            return decisions.map((decision) => ({
-              label: `${decision[0]!.toUpperCase()}${decision.slice(1)} · ${row.claim_id}`,
-              tone: decision === "approve" ? "default" as const : "danger" as const,
-              run: async () => {
-                const title = `${decision[0]!.toUpperCase()}${decision.slice(1)}`;
-                const confirmed = await confirmDanger({
-                  title: `${title} approval for ${row.claim_id}?`,
-                  target: [["Approval", row.approval_id], ["Claim", row.claim_id], ["Version", row.version]],
-                  impact: decision === "approve" ? "The claim becomes eligible for release." : "The claim is no longer approved for release.",
-                  recovery: "Decisions are recorded in the audit log and cannot be edited.",
-                  confirm: `${title} approval`,
-                  reason: true,
-                });
-                const reason = confirmed?.reason;
-                if (!reason) return;
-                try {
-                  await postArea(`approvals/${encodeURIComponent(row.approval_id as string)}/decide`, { decision, reason, expected_version: Number(row.version) });
-                  await loadGovernance();
-                } catch (error) { handleError(error, target); }
-              },
-            }));
+        await loadAvailable(target, [["governance/policies", "governance:read"], ["governance/approvals", "approvals:read"]], (merged) => {
+          // Policy rules are known only to principals that can list policies; without them the
+          // server stays the authority and the adapter names the rule if it refuses.
+          const independent = new Map<string, boolean>();
+          for (const policy of Array.isArray(merged.policies) ? merged.policies as Record<string, unknown>[] : [])
+            if (typeof policy?.policy_id === "string" && typeof policy.independent_approval === "boolean")
+              independent.set(policy.policy_id, policy.independent_approval);
+          return { actions: { approvals: (row) => approvalActions(row, independent, target) } };
+        });
+      }
+      function reviewClaimEvidence(claimId: string, subjectId = "") {
+        const lens = one<HTMLInputElement>('[data-memory-form] input[value="evidence_trace"]');
+        lens.checked = true;
+        updateMemoryRequirements();
+        (memoryForm.elements.namedItem("subject_id") as HTMLInputElement).value = subjectId;
+        (memoryForm.elements.namedItem("focus_id") as HTMLInputElement).value = claimId;
+        activateArea("atlas");
+        memoryForm.requestSubmit();
+      }
+      function approvalActions(row: Record<string, unknown>, independent: Map<string, boolean>, target: HTMLElement): CollectionAction[] {
+        if (typeof row.claim_id !== "string") return [];
+        const review: CollectionAction[] = has("views:compile")
+          ? [{ label: `Review evidence · ${row.claim_id}`, run: () => reviewClaimEvidence(row.claim_id as string) }] : [];
+        if (!has("approvals:approve") || typeof row.approval_id !== "string" || !["pending", "approved"].includes(String(row.status))) return review;
+        // Independent approval: the server refuses a decision by the submitter.
+        if (row.status === "pending" && row.submitted_by === principal?.principal_id && independent.get(String(row.policy_id)) === true)
+          return [...review, { label: "Awaiting a decision by another approver", note: true }];
+        const decisions = row.status === "pending" ? ["approve", "reject"] : ["revoke"];
+        return [...review, ...decisions.map((decision) => ({
+          label: `${decision[0]!.toUpperCase()}${decision.slice(1)} · ${row.claim_id}`,
+          tone: decision === "approve" ? "default" as const : "danger" as const,
+          run: async () => {
+            const title = `${decision[0]!.toUpperCase()}${decision.slice(1)}`;
+            const confirmed = await confirmDanger({
+              title: `${title} approval for ${row.claim_id}?`,
+              target: [["Approval", row.approval_id], ["Claim", row.claim_id], ["Policy", row.policy_id],
+                ["Submitted by", row.submitted_by], ["Submission reason", row.submission_reason], ["Version", row.version]],
+              impact: decision === "approve" ? "The claim becomes eligible for release." : "The claim is no longer approved for release.",
+              recovery: "Decisions are recorded in the audit log and cannot be edited.",
+              confirm: `${title} approval`,
+              reason: true,
+            });
+            const reason = confirmed?.reason;
+            if (!reason) return;
+            try {
+              await postArea(`approvals/${encodeURIComponent(row.approval_id as string)}/decide`, { decision, reason, expected_version: Number(row.version) });
+              await loadGovernance();
+            } catch (error) { handleError(error, target); }
           },
-        } });
+        }))];
       }
       async function loadFederation() {
         const target = one<HTMLElement>("[data-federation-output]");
@@ -1757,13 +1781,7 @@ const eventKinds = [
         target.append(mark, document.createTextNode(value.slice(index + needle.length)));
       }
       function openMemoryInAtlas(record: MemoryRecord) {
-        const lens = one<HTMLInputElement>('[data-memory-form] input[value="evidence_trace"]');
-        lens.checked = true;
-        updateMemoryRequirements();
-        (memoryForm.elements.namedItem("subject_id") as HTMLInputElement).value = record.subject_id;
-        (memoryForm.elements.namedItem("focus_id") as HTMLInputElement).value = record.id;
-        activateArea("atlas");
-        memoryForm.requestSubmit();
+        reviewClaimEvidence(record.id, record.subject_id);
       }
       function renderMemoryList(records: MemoryRecord[], hasMore: boolean) {
         memoryListRows.replaceChildren();

@@ -290,6 +290,8 @@ function knownUpstreamError(path: string, payload: Record<string, unknown>): { c
   const upstream = payload.error && typeof payload.error === "object" ? payload.error as Record<string, unknown> : {};
   if (/^\/v1\/knowledge-releases\/[^/]+\/approve$/u.test(path) && upstream.message === "The release proposer cannot approve it.")
     return { code: "RELEASE_PROPOSER", message: "You proposed this release; another approver must approve it." };
+  if (/^\/v1\/claim-approvals\/[^/]+\/decide$/u.test(path) && upstream.message === "The submitter cannot decide this approval.")
+    return { code: "APPROVAL_SUBMITTER", message: "You submitted this claim; another approver must decide it." };
   if (path !== "/v1/models/probe") return;
   if (upstream.code === "RATE_LIMITED")
     return { code: "PROBE_RATE_LIMITED", message: "Wait ten seconds before probing a model provider again." };

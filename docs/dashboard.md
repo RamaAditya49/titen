@@ -73,6 +73,16 @@ confirmation shows the full text that agents and customers receive, with
 locale, validity window, proposer, and proposal reason. A release's proposer
 sees "Awaiting approval by another release approver" instead of **Approve**,
 and a separation-of-duties refusal says so instead of "not authorized".
+Approvals list each policy's claim kind, minimum trust, and independent-approval
+setting, and a disabled policy reads as muted, italic, with Enabled "No". The
+approval queue shows each submission's reason and policy, and **Review
+evidence** opens the claim's Evidence trace in Atlas. The approve, reject, and
+revoke confirmation shows the submitter and submission reason. Under an
+independent-approval policy the submitter sees "Awaiting a decision by another
+approver" instead of **Approve** and **Reject**, and a refusal for that rule
+says so instead of "not authorized". The queue does not show the claim's
+statement, because the approvals API does not return it; read it in the
+evidence trace.
 Each successful action reloads server state. System and Models show named facts
 instead of generic JSON records. System lists readiness checks failing first,
 each with a text status and a marker (✕ failing, ✓ OK, – disabled), and names

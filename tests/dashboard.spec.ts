@@ -1766,6 +1766,66 @@ test("releases show the content to approve and keep the proposer from approving 
   await expect(page.locator("[data-releases-output]")).toContainText("You proposed this release; another approver must approve it.");
 });
 
+test("approvals show what is decided, keep the submitter from deciding, and name each policy's rules", async ({ page }) => {
+  await mockServerMode(page);
+  await page.route("**/dashboard-api/governance/policies", (route) => route.fulfill({ json: { data: { policies: [
+    { policy_id: "pol_strict", kind: "claim_approval", scope_type: "organization", scope_id: null, claim_kind: "semantic_fact",
+      minimum_trust: "verified", independent_approval: true, enabled: false, version: 2 },
+    { policy_id: "pol_open", kind: "claim_approval", scope_type: "organization", scope_id: null, claim_kind: "semantic_fact",
+      minimum_trust: "asserted", independent_approval: true, enabled: true, version: 1 },
+  ] } } }));
+  await page.route("**/dashboard-api/governance/approvals", (route) => route.fulfill({ json: { data: { approvals: [
+    { approval_id: "apr_own", claim_id: "claim_own", claim_version: 1, policy_id: "pol_open", status: "pending",
+      submitted_by: "server_operator", submission_reason: "My own submission", version: 1, submitted_at: "2026-11-10T00:00:00Z" },
+    { approval_id: "apr_peer", claim_id: "claim_peer", claim_version: 1, policy_id: "pol_open", status: "pending",
+      submitted_by: "editor", submission_reason: "Verified against the signed contract", version: 1, submitted_at: "2026-11-10T00:00:00Z" },
+  ] } } }));
+  await page.route("**/dashboard-api/approvals/**", (route) => route.fulfill({ status: 403, json: {
+    error: { code: "APPROVAL_SUBMITTER", message: "You submitted this claim; another approver must decide it." },
+  } }));
+  let compiled: Record<string, unknown> | undefined;
+  await page.route("**/dashboard-api/atlas/compile", (route) => {
+    compiled = route.request().postDataJSON();
+    return route.fulfill({ json: { data: { lens: "evidence_trace", focus_id: "claim_peer", nodes: [], edges: [] } } });
+  });
+  await page.goto("/dashboard/#governance");
+
+  const policies = page.locator('[data-collection="policies"]');
+  const strict = policies.locator("tbody tr").filter({ hasText: "pol_strict" });
+  await expect(strict.locator('td[data-label="Minimum trust"]')).toHaveText("verified");
+  await expect(strict.locator('td[data-label="Independent approval"]')).toHaveText("Yes");
+  await expect(strict.locator('td[data-label="Claim kind"]')).toHaveText("semantic_fact");
+  await expect(strict).toHaveAttribute("data-disabled", "");
+  const open = policies.locator("tbody tr").filter({ hasText: "pol_open" });
+  await expect(open.locator('td[data-label="Minimum trust"]')).toHaveText("asserted");
+  await expect(open).not.toHaveAttribute("data-disabled");
+
+  const approvals = page.locator('[data-collection="approvals"]');
+  const own = approvals.locator("tbody tr").filter({ hasText: "claim_own" });
+  const peer = approvals.locator("tbody tr").filter({ hasText: "claim_peer" });
+  await expect(own.getByRole("button", { name: /^(Approve|Reject)/ })).toHaveCount(0);
+  await expect(own).toContainText("Awaiting a decision by another approver");
+  await expect(peer.locator('td[data-label="Reason"]')).toHaveText("Verified against the signed contract");
+
+  await peer.getByRole("button", { name: "Review evidence · claim_peer" }).click();
+  await expect(page.locator('[data-area="atlas"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-memory-form] input[value="evidence_trace"]')).toBeChecked();
+  await expect.poll(() => compiled?.focus_id).toBe("claim_peer");
+  expect(compiled?.lens).toBe("evidence_trace");
+
+  // The server stays the authority: its refusal is shown with the rule it applied.
+  await page.locator('[data-area="governance"]').click();
+  await peer.getByRole("button", { name: "Approve · claim_peer" }).click();
+  const dialog = page.locator("dialog[data-danger-dialog]");
+  await expect(dialog).toHaveAttribute("open", "");
+  await expect(dialog).toContainText("Verified against the signed contract");
+  await expect(dialog).toContainText("editor");
+  await dialog.getByLabel("Reason (required)").fill("Read the evidence");
+  await dialog.getByRole("button", { name: "Approve approval" }).click();
+  await expect(page.locator("[data-governance-output]")).toContainText("You submitted this claim; another approver must decide it.");
+
+});
+
 test("credential failures say what went wrong, mark the field, and never claim an expired session", async ({ page }) => {
   let stage = "none";
   await page.route("**/dashboard-api/status", (route) => route.fulfill({ json: { mode: "live", authentication: "session", authenticated: stage !== "none" } }));

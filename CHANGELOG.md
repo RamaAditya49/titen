@@ -26,6 +26,10 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard Approvals now shows what an approver is deciding and why a decision is refused. Policies list their claim kind, minimum trust, and independent-approval setting, and disabled policies are de-emphasized. The approval queue shows each submission's reason and policy, and **Review evidence** opens the claim's Evidence trace in Atlas. The decision confirmation shows the submitter and submission reason. Under an independent-approval policy, the submitter no longer sees an **Approve** or **Reject** that the server always refuses; the row says another approver must decide. If the server does refuse a submitter's decision, the message names that rule instead of the generic "not authorized". The adapter maps that refusal to its own fixed wording. ([#407](https://github.com/RamaAditya49/titen/issues/407))
+
 ## [0.10.12] — 2026-11-10
 
 schema 31
