@@ -576,7 +576,10 @@ D1 invocation budget. Bun timers and a provisioned Cloudflare Cron Trigger call
 the same shared core automatically.
 
 Jobs keep immutable input, model, prompt, schema, and policy fingerprints plus
-an output hash and result IDs, never raw prompts or model responses. Imported
+an output hash and result IDs, never raw prompts or model responses. A recorded
+output hash cannot change. The one exception is `titen jobs retry`: it returns a
+failed job to `pending` and clears the output hash, so the next run can record a
+new output. Imported
 observations are provenance restores and are excluded from automatic recovery
 backfill; submit a new observation explicitly if restored v1/v2 evidence should
 be considered new enrichment input. Format-v3 restores carry their original

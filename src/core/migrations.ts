@@ -1685,6 +1685,27 @@ export const MIGRATIONS: { version: number; statements: string[] }[] = [
       `CREATE INDEX claims_project ON claims (org_id, project_id, created_at)`,
     ],
   },
+  {
+    version: 32,
+    statements: [
+      // A retry returns a failed job to pending. Model output is not byte-stable,
+      // so the retried run records a different output hash. The old trigger
+      // rejected that write and left the job leased. The new trigger permits one
+      // change of a recorded hash: the reset to NULL by a retry.
+      `DROP TRIGGER enrichment_jobs_output_immutable`,
+      // Only an operator retry gives a pending or leased job a recorded hash.
+      `UPDATE enrichment_jobs SET output_hash = NULL
+        WHERE state IN ('pending', 'leased') AND output_hash IS NOT NULL`,
+      `CREATE TRIGGER enrichment_jobs_output_immutable
+         BEFORE UPDATE OF output_hash ON enrichment_jobs
+         WHEN OLD.output_hash IS NOT NULL AND NEW.output_hash IS NOT OLD.output_hash
+          AND NOT (NEW.output_hash IS NULL AND OLD.state = 'failed'
+                   AND NEW.state = 'pending' AND NEW.attempts = 0)
+         BEGIN
+           SELECT RAISE(ABORT, 'ENRICHMENT_OUTPUT_IMMUTABLE');
+         END`,
+    ],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

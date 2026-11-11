@@ -78,7 +78,7 @@ export async function retryEnrichmentJobs(
     sql: `UPDATE enrichment_jobs
              SET state = 'pending', attempts = 0, error_class = NULL,
                  next_attempt_at = ?, updated_at = ?, acked_at = NULL,
-                 lease_token = NULL, lease_expires_at = NULL
+                 lease_token = NULL, lease_expires_at = NULL, output_hash = NULL
            WHERE id IN (${marks}) AND state = 'failed'`,
     params: [at, at, ...ids],
   }]);

@@ -14,6 +14,7 @@ import {
   scheduleDerivationBackfill,
   scheduleReflections,
 } from "../../src/core/enrichment";
+import { retryEnrichmentJobs } from "../../src/core/jobs";
 import { MIGRATIONS } from "../../src/core/migrations";
 import {
   ExtractionProviderError,
@@ -294,6 +295,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   let holdNext = false;
   let calls = 0;
   let concurrentDuplicateCalls = 0;
+  const retryRuns = new Map<string, number>();
   const modelRevision = "a".repeat(64);
   const providerIdentity = "https://models.example.test/v1";
   const capability: ExtractionCapability = {
@@ -319,6 +321,23 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
         throw new ExtractionProviderError("provider_unavailable", true);
       if (providerFailure === "raw")
         throw new Error("provider secret body must never persist");
+      if (request.lane === "derivation" && /RETRY_(?:VALID|REJECT)_OUTPUT/u.test(observationContent(request))) {
+        // Model output is not byte-stable: each run of one job returns a different proposal.
+        const content = observationContent(request);
+        const run = (retryRuns.get(content) ?? 0) + 1;
+        retryRuns.set(content, run);
+        const valid = content.includes("RETRY_VALID_OUTPUT") && run > 1;
+        return {
+          action: "add",
+          claims: [{
+            kind: "semantic_fact",
+            statement: `Retry run ${run} output.`,
+            evidence_ids: [valid ? observationId(request) : "obs_foreign"],
+            valid_from: null,
+            valid_to: null,
+          }],
+        };
+      }
       if (request.lane === "derivation" && observationContent(request).includes("CYCLIC_OUTPUT")) {
         const cyclic: Record<string, unknown> = {};
         cyclic.self = cyclic;
@@ -2903,4 +2922,106 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     }]),
     /ENRICHMENT_OUTPUT_IMMUTABLE/u,
   );
+
+  // A retried job records the output of its new run (AC-RTY-001 to AC-RTY-004).
+  const retryTarget = await createClient();
+  const jobFor = async (observation: string) => (await db.all<{
+    id: string;
+    state: string;
+    attempts: number;
+    error_class: string | null;
+    output_hash: string | null;
+    result_ids: string | null;
+  }>(
+    `SELECT id, state, attempts, error_class, output_hash, result_ids FROM enrichment_jobs
+      WHERE org_id = ? AND lane = 'derivation' AND input_ids LIKE ?`,
+    [retryTarget.orgId, `%${observation}%`],
+  ))[0]!;
+  const retryJob = async (id: string) => retryEnrichmentJobs(
+    db,
+    "failed",
+    current.toISOString(),
+    retryTarget.orgId,
+    id,
+  );
+  const validObservation = await observe(
+    retryTarget,
+    "subject_retry_valid",
+    "RETRY_VALID_OUTPUT the first run is unsafe.",
+  );
+  await drainHttp(retryTarget);
+  const failedFirst = await jobFor(validObservation);
+  assert.equal(failedFirst.state, "failed");
+  assert.equal(failedFirst.error_class, "unsafe_output");
+  assert.match(failedFirst.output_hash ?? "", /^[a-f0-9]{64}$/u);
+  const firstRetry = await retryJob(failedFirst.id);
+  assert.deepEqual(firstRetry.job_ids, [failedFirst.id]);
+  const requeued = await jobFor(validObservation);
+  assert.equal(requeued.state, "pending");
+  assert.equal(requeued.attempts, 0);
+  assert.equal(requeued.output_hash, null, "AC-RTY-001: a retry clears the output hash");
+  current = new Date(current.getTime() + 1_000);
+  const retriedDrain = await drainHttp(retryTarget);
+  assert.deepEqual(retriedDrain.body.data.errors, []);
+  const completedRetry = await jobFor(validObservation);
+  assert.equal(completedRetry.state, "done", "AC-RTY-002: the retried job completes");
+  assert.equal(completedRetry.error_class, null);
+  assert.match(completedRetry.output_hash ?? "", /^[a-f0-9]{64}$/u);
+  assert.notEqual(completedRetry.output_hash, failedFirst.output_hash);
+  assert.notEqual(completedRetry.result_ids, null);
+
+  // AC-RTY-003: a second rejected output fails the job and the pass continues.
+  const rejectObservation = await observe(
+    retryTarget,
+    "subject_retry_reject",
+    "RETRY_REJECT_OUTPUT every run is unsafe.",
+  );
+  await drainHttp(retryTarget);
+  const rejectedFirst = await jobFor(rejectObservation);
+  assert.equal(rejectedFirst.state, "failed");
+  assert.match(rejectedFirst.output_hash ?? "", /^[a-f0-9]{64}$/u);
+  await retryJob(rejectedFirst.id);
+  current = new Date(current.getTime() + 1_000);
+  const followObservation = await observe(
+    retryTarget,
+    "subject_retry_follow",
+    "A job queued after the retried job still completes in the same pass.",
+  );
+  current = new Date(current.getTime() + 1_000);
+  const rejectedDrain = await drainHttp(retryTarget);
+  assert.deepEqual(rejectedDrain.body.data.errors, []);
+  const rejectedSecond = await jobFor(rejectObservation);
+  assert.equal(rejectedSecond.state, "failed");
+  assert.equal(rejectedSecond.error_class, "unsafe_output");
+  assert.match(rejectedSecond.output_hash ?? "", /^[a-f0-9]{64}$/u);
+  assert.notEqual(rejectedSecond.output_hash, rejectedFirst.output_hash);
+  assert.equal((await jobFor(followObservation)).state, "done");
+
+  // AC-RTY-004: only the retry reset may change a recorded output hash.
+  const setHash = (id: string, hash: string | null) => db.batch([{
+    sql: `UPDATE enrichment_jobs SET output_hash = ? WHERE id = ?`,
+    params: [hash, id],
+  }]);
+  await assert.rejects(() => setHash(completedRetry.id, "d".repeat(64)), /ENRICHMENT_OUTPUT_IMMUTABLE/u);
+  await assert.rejects(() => setHash(completedRetry.id, null), /ENRICHMENT_OUTPUT_IMMUTABLE/u);
+  await assert.rejects(() => setHash(rejectedSecond.id, "d".repeat(64)), /ENRICHMENT_OUTPUT_IMMUTABLE/u);
+  await assert.rejects(() => setHash(rejectedSecond.id, null), /ENRICHMENT_OUTPUT_IMMUTABLE/u);
+  await assert.rejects(
+    () => db.batch([{
+      sql: `UPDATE enrichment_jobs SET state = 'pending', output_hash = ? WHERE id = ?`,
+      params: ["d".repeat(64), rejectedSecond.id],
+    }]),
+    /ENRICHMENT_OUTPUT_IMMUTABLE/u,
+  );
+  await assert.rejects(
+    () => db.batch([{
+      sql: `UPDATE enrichment_jobs SET state = 'pending', attempts = 1, output_hash = NULL
+             WHERE id = ?`,
+      params: [rejectedSecond.id],
+    }]),
+    /ENRICHMENT_OUTPUT_IMMUTABLE/u,
+  );
+  const unchanged = await jobFor(rejectObservation);
+  assert.equal(unchanged.state, "failed");
+  assert.equal(unchanged.output_hash, rejectedSecond.output_hash);
 }

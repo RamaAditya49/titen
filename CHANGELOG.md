@@ -26,6 +26,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+schema 32
+
+### Fixed
+
+- A retried enrichment job can now record a new output. `titen jobs retry` clears the output hash of the job. Before this fix, the next run recorded a different hash and the database rejected it, so the job stayed leased and stopped the pass. Migration 32 replaces the trigger `enrichment_jobs_output_immutable`. The new trigger allows only the retry reset to `NULL`. Migration 32 also clears the output hash of each `pending` or `leased` job that an earlier retry left behind.
+
 ## [0.10.13] — 2026-11-11
 
 schema 31
