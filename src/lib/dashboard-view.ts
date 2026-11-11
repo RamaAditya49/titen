@@ -115,12 +115,17 @@ const schemas: Record<string, CollectionSchema> = {
   policies: {
     title: "Policies",
     identity: ["policy_id", "kind"],
-    columns: [field("Policy", ["policy_id", "id"], true), field("Kind", ["kind"]), field("Scope", ["scope_type"]), field("Scope ID", ["scope_id"], true), field("Enabled", ["enabled"]), field("Version", ["version"], true)],
+    columns: [
+      field("Policy", ["policy_id", "id"], true), field("Kind", ["kind"]), field("Claim kind", ["claim_kind"]),
+      field("Minimum trust", ["minimum_trust"]),
+      field("Independent approval", ["independent_approval"]),
+      field("Scope", ["scope_type"]), field("Scope ID", ["scope_id"], true), field("Enabled", ["enabled"]), field("Version", ["version"], true),
+    ],
   },
   approvals: {
     title: "Approval queue",
     identity: ["claim_id", "approval_id"],
-    columns: [field("Claim", ["claim_id", "approval_id"], true), field("Status", ["status"]), field("Version", ["version"], true), field("Submitted by", ["submitted_by"], true), date("Submitted", ["submitted_at"])],
+    columns: [field("Claim", ["claim_id", "approval_id"], true), field("Reason", ["submission_reason"]), field("Policy", ["policy_id"], true), field("Status", ["status"]), field("Version", ["version"], true), field("Submitted by", ["submitted_by"], true), date("Submitted", ["submitted_at"])],
   },
   releases: {
     title: "Release lifecycle",
@@ -312,6 +317,8 @@ export function renderCollection(target: HTMLElement, definition: CollectionDefi
 
   definition.rows.forEach((row, index) => {
     const tableRow = document.createElement("tr");
+    // A disabled record stays listed but reads as inactive; its Enabled cell still says "No".
+    if (row.enabled === false) tableRow.dataset.disabled = "";
     const label = recordLabel(row, schema, index);
     for (const column of schema.columns) {
       const value = firstValue(row, column.keys);

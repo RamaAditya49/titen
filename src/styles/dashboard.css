@@ -237,6 +237,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .operator-table tbody tr[aria-selected="true"] { box-shadow: inset 3px 0 var(--accent); }
 /* break-word keeps enum values (status, trust) whole; only opaque ids may break anywhere. */
 .operator-table td { color: var(--ink-soft); font-size: 11px; overflow-wrap: break-word; }
+.operator-table tbody tr[data-disabled] td:not(.collection-actions) { color: var(--muted); font-style: italic; }
 .operator-table .mono-value { color: var(--muted); font: 10px/1.45 "JetBrains Mono Variable", monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .collection-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; min-width: 150px; }
 /* WCAG 2.2 SC 2.5.8: row actions keep the text-link look with a 24px target. */
@@ -460,7 +461,7 @@ mark { padding: 0 2px; color: inherit; background: #edcba5; }
 .danger-content { margin: 0; padding: 10px 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; }
 .danger-content figcaption { margin-bottom: 6px; color: var(--muted); font: 9px "JetBrains Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
 .danger-content pre { max-height: 40vh; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 "JetBrains Mono Variable", monospace; }
-[data-collection="releases"] td[data-label="Content"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+[data-collection="releases"] td[data-label="Content"], [data-collection="approvals"] td[data-label="Reason"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .collection-note { color: var(--muted); font-size: 11px; }
 .danger-impact { color: var(--danger); font-weight: 600; }
 .danger-dialog textarea { min-height: 72px; padding: 8px 10px; background: var(--paper-strong); border: 1px solid var(--rule); border-radius: 2px; font: 12px/1.5 "Instrument Sans Variable", sans-serif; resize: vertical; }
