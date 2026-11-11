@@ -2954,8 +2954,8 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   assert.equal(failedFirst.state, "failed");
   assert.equal(failedFirst.error_class, "unsafe_output");
   assert.match(failedFirst.output_hash ?? "", /^[a-f0-9]{64}$/u);
-  const firstRetry = await retryJob(failedFirst.id);
-  assert.deepEqual(firstRetry.job_ids, [failedFirst.id]);
+  const retryQueued = await retryJob(failedFirst.id);
+  assert.deepEqual(retryQueued.job_ids, [failedFirst.id]);
   const requeued = await jobFor(validObservation);
   assert.equal(requeued.state, "pending");
   assert.equal(requeued.attempts, 0);
@@ -3021,7 +3021,7 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
     }]),
     /ENRICHMENT_OUTPUT_IMMUTABLE/u,
   );
-  const unchanged = await jobFor(rejectObservation);
-  assert.equal(unchanged.state, "failed");
-  assert.equal(unchanged.output_hash, rejectedSecond.output_hash);
+  const afterRejects = await jobFor(rejectObservation);
+  assert.equal(afterRejects.state, "failed");
+  assert.equal(afterRejects.output_hash, rejectedSecond.output_hash);
 }
