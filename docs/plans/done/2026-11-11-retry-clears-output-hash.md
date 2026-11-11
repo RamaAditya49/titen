@@ -1,14 +1,13 @@
 ---
 work_id: retry-clears-output-hash
-status: active
-stage: implement
-outcome: pending
-review_after: 2026-11-18
+status: done
+stage: done
+outcome: completed
 complexity: complex
 created: 2026-11-11
 updated: 2026-11-11
 owner: maintainers
-spec: docs/specs/active/2026-11-11-retry-clears-output-hash.md
+spec: docs/specs/done/2026-11-11-retry-clears-output-hash.md
 ---
 # Retry clears output hash plan
 
