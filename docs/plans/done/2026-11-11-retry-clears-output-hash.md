@@ -29,3 +29,12 @@ Goal: a retried enrichment job reaches a terminal state when the model returns a
 | AC-RTY-004 | bun-sqlite and cloudflare-d1 contract case `bun:sqlite replays bounded model enrichment` / `D1 replays bounded model enrichment` (assertEnrichmentContract in tests/contract/enrichment.ts): direct hash updates and a reset without the retry shape reject with `ENRICHMENT_OUTPUT_IMMUTABLE` |
 | AC-RTY-005 | `tests/integration/retry-output-hash-migration.test.ts` (Bun only): `migration 32 clears the output hash of pending and leased jobs` |
 | AC-RTY-006 | same `assertEnrichmentContract` runs in `tests/contract/bun-sqlite.test.ts` and `tests/contract/cloudflare-d1.test.ts` |
+
+## Verification
+
+Run on `rama-tuf` at commit `c737dd7`.
+
+- `pnpm typecheck`: no errors.
+- `pnpm test:api`: D1 harness 9 pass, Cloudflare D1 contract 156 pass, Bun contract and SDK 185 pass, 0 fail.
+- `pnpm test:integration`: 310 pass, 0 fail.
+- Without the change in `src/core/jobs.ts` and `src/core/migrations.ts`, the Bun contract case fails at the AC-RTY-001 assertion.
