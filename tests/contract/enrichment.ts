@@ -3142,6 +3142,6 @@ export async function assertEnrichmentContract(db: Db, runtime: string): Promise
   const acked = await ackEnrichmentJobs(db, "failed", current.toISOString(), readiness.orgId);
   assert.equal(acked.matched, 3, "AC-RDY-006: ack selects every failed class");
   assert.notEqual(await readyState(), "terminal_error", "an acknowledged provider failure does not mark readiness");
-  const purged = await purgeEnrichmentJobs(db, "failed", readiness.orgId);
-  assert.equal(purged.matched, 3, "AC-RDY-006: purge selects every failed class");
+  const purgedJobs = await purgeEnrichmentJobs(db, "failed", readiness.orgId);
+  assert.equal(purgedJobs.matched, 3, "AC-RDY-006: purge selects every failed class");
 }
