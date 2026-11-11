@@ -26,6 +26,12 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.13] — 2026-11-11
+
+schema 31
+
+This release closes 1 issue: the dashboard Approvals queue now shows what an approver decides. It adds no migration.
+
 ### Fixed
 
 - Dashboard Approvals now shows what an approver is deciding and why a decision is refused. Policies list their claim kind, minimum trust, and independent-approval setting, and disabled policies are de-emphasized. The approval queue shows each submission's reason and policy, and **Review evidence** opens the claim's Evidence trace in Atlas. The decision confirmation shows the submitter and submission reason. Under an independent-approval policy, the submitter no longer sees an **Approve** or **Reject** that the server always refuses; the row says another approver must decide. If the server does refuse a submitter's decision, the message names that rule instead of the generic "not authorized". The adapter maps that refusal to its own fixed wording. ([#407](https://github.com/RamaAditya49/titen/issues/407))
@@ -1733,7 +1739,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.12...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.13...HEAD
+[0.10.13]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.13
 [0.10.12]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.12
 [0.10.11]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.11
 [0.10.10]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.10
