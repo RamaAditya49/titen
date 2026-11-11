@@ -26,7 +26,11 @@ The **CLI command is `titen`** regardless; see [Package name](#package-name).
 
 ## [Unreleased]
 
+## [0.10.14] — 2026-11-11
+
 schema 32
+
+This release fixes `titen jobs retry`: a retried enrichment job can now finish. It adds migration 32.
 
 ### Fixed
 
@@ -1745,7 +1749,8 @@ disabled so the repository has no hosted automation cost; manual publication
 also keeps the npm token out of repository secrets. See
 [`docs/engineering/release.md`](./docs/engineering/release.md).
 
-[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.13...HEAD
+[Unreleased]: https://github.com/RamaAditya49/titen/compare/v0.10.14...HEAD
+[0.10.14]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.14
 [0.10.13]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.13
 [0.10.12]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.12
 [0.10.11]: https://github.com/RamaAditya49/titen/releases/tag/v0.10.11
